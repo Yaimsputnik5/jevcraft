@@ -1170,14 +1170,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // 1344): on top of one laid for a throw, the footing is a block wide and
     // nothing else is offered, and the drill of 2026-10-06 (04:16Z) held on
     // top of a 35-block pillar.
-    const ownPillar = bot._pillarUp && Math.floor(bot.entity.position.x) === bot._pillarUp.x && Math.floor(bot.entity.position.z) === bot._pillarUp.z;
+    // The bot's pillar is the column under its feet (onOwnPillar, note 1418),
+    // not the cell last recorded: a cell off it, 25588 (dragon-7, 2026-10-13
+    // 05:50Z) read no pillar of its own 35 up, dropped the record, and was
+    // left to the stall's moves and the dragon's blow.
+    const ownPillar = onOwnPillar();
     if (ownPillar && actions.dig) {
       const feet = bot.entity.position.floored();
       let depth = 0; while (depth < 64 && /^(cobblestone|cobbled_deepslate|netherrack|dirt|stone|blackstone|deepslate|andesite|diorite|granite|tuff)$/.test(bot.blockAt(feet.offset(0, -1 - depth, 0))?.name || '')) depth++;
       // The island's own end stone is no pillar of the bot's (note 1351): the
       // drill of 2026-10-06 (05:52Z on) was offered this on the ground 755
       // times, each changing nothing.
-      if (depth < 2) delete bot._pillarUp;
+      if (depth < 1) delete bot._pillarUp;
       if (depth >= 2) tree.pillar_down = {
         description: { action: `Dig down the bot's own pillar a block at a time from under the feet, ${depth} blocks to its foot: no fall on the way`, blocks: depth, health: bot.health, dragonHealth: beforeDragon },
         run: async () => {
