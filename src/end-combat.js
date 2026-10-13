@@ -1403,7 +1403,23 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const ownPillar = onOwnPillar();
     if (ownPillar && actions.dig) {
       const feet = bot.entity.position.floored();
-      let depth = 0; while (depth < 64 && /^(cobblestone|cobbled_deepslate|netherrack|dirt|stone|blackstone|deepslate|andesite|diorite|granite|tuff)$/.test(bot.blockAt(feet.offset(0, -1 - depth, 0))?.name || '')) depth++;
+      // The column's depth is its height over the island (note 1446): its
+      // blocks and the gaps between them (note 1434) down to the first block
+      // that is not the column's. End stone is the column's above the island
+      // (note 1438). Counted only through its own blocks, a column with a
+      // gap or laid in end stone was 'depth 1', no way down was offered, and
+      // 25588 (dragon-27, 2026-10-13 09:24Z), crystal 76 broken, stood 'only
+      // observe' on its column at 79 until the dragon knocked it off.
+      let depth = 0, gap = 0;
+      for (; depth < 64; depth++) {
+        const c = feet.offset(0, -1 - depth, 0), b = bot.blockAt(c), name = b?.name || '';
+        if (b?.boundingBox !== 'block') { if (++gap > 6) break; continue; }
+        gap = 0;
+        if (!SCAFFOLD_UNDER.test(name)) break;
+        if (name === 'end_stone' && c.y < 69 && [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(c.offset(dx, 0, dz))?.boundingBox === 'block').length >= 2) break;
+      }
+      depth -= gap;
+      if (!SCAFFOLD_UNDER.test(bot.blockAt(feet.offset(0, -1, 0))?.name || '')) depth = 0;
       // The island's own end stone is no pillar of the bot's (note 1351): the
       // drill of 2026-10-06 (05:52Z on) was offered this on the ground 755
       // times, each changing nothing.
