@@ -118,10 +118,15 @@ function safeEndPoint(bot, p, hazards = endHazards(bot)) {
 // has to cross to strike. The End kit carries a bucket for this. Poured
 // only on solid ground into the bot's own open cell; taken back once no
 // turned mob is near, so the bucket is there for the next one.
-async function pourAtFeet(bot, check) {
+async function pourAtFeet(bot, check, { urgent = false } = {}) {
   const bucket = bot.inventory.items().find(i => i.name === 'water_bucket');
-  // One bucket stays full for a knocked-back landing.
-  if (!bucket || countOf(bot, 'water_bucket') < 2) return null;
+  // One bucket stays full for a knocked-back landing, unless the enderman is
+  // at arm's length (note 1457): 25588 (dragon-37, 2026-10-13 11:23Z, full
+  // iron, a diamond sword, crystals 12 and 81 broken) had one bucket left
+  // and an enderman at 3 blocks, poured nothing, and was dead in three
+  // seconds, 15 to none, about 4 a blow through the iron. The water is
+  // taken back once the enderman is gone.
+  if (!bucket || (countOf(bot, 'water_bucket') < 2 && !urgent)) return null;
   const feet = bot.entity.position.floored(), below = feet.offset(0, -1, 0);
   if (bot.blockAt(below)?.boundingBox !== 'block' || bot.blockAt(feet)?.name !== 'air') return null;
   await bot.equip(bucket, 'hand'); check();
@@ -833,7 +838,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     }
     const turned = hostileEntities(bot, 12).find(e => live(bot, e) && e.name === 'enderman');
     if (turned && !state.water) {
-      const at = await pourAtFeet(bot, check);
+      const at = await pourAtFeet(bot, check, { urgent: turned.position.distanceTo(bot.entity.position) <= 4 });
       if (at) { state.water = { at: { ...at }, poured: Date.now() }; state.pours = (state.pours || 0) + 1; goal.step = { action: 'end_water', against: 'enderman', at: { ...at } }; save(); }
     }
     const attacker = hostileEntities(bot, 6).find(e => live(bot, e));
