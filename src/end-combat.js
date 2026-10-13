@@ -841,7 +841,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     };
     // The water poured for the last enderman comes back once none is near;
     // left behind, it is lost, and the bucket goes on empty.
-    if (state.water && !hostileEntities(bot, 16).some(e => live(bot, e))) {
+    // Taken back once no turned enderman is within eight (note 1468): the
+    // End keeps a hostile within sixteen at all hours, and 25588 (dragon-47,
+    // 2026-10-13 13:04Z, crystals 11 and 94 broken) fell 27 from a pillar's
+    // top with both buckets empty, the water of a pour and of a landing left
+    // where it lay.
+    if (state.water && !require('./end-pocket').angryEndermen(bot, 8, hostileEntities).some(e => live(bot, e))) {
       if (!await takeWaterBack(bot, check, state.water.at) && bot.entity.position.distanceTo(vector(state.water.at)) > 4) delete state.water;
       else if (countOf(bot, 'water_bucket')) delete state.water;
       save();
@@ -1156,7 +1161,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         let radius = 0; while (radius < 8 && bot.blockAt(new Vec3(c.x + radius + 1, c.y - 3, c.z))?.name === 'obsidian') radius++;
         const isCaged = caged(bot, target), under = radius <= 2 && !isCaged, feetY = under ? topY - 1 : topY;
         const out = Math.round(Math.hypot(c.x + .5 - here.x, c.z + .5 - here.z)), lift = feetY - Math.floor(here.y);
-        if (out > 64 || lift < 1 || lift > Math.min(carried, 64)) {
+        // Three over the lift (note 1468): the roofs on the way are of the same blocks, and 25588 (dragon-48, 2026-10-13 13:12Z) climbed 22 for a lift of 23 and stopped a block short with none left.
+        if (out > 64 || lift < 1 || lift + 3 > Math.min(carried, 67)) {
           if (!(state.punchSkipSaid > Date.now() - 20000)) { state.punchSkipSaid = Date.now(); console.log(`[end combat] no blow at crystal ${target.id}: ${out} off, lift ${lift}, ${carried} blocks carried, radius ${radius}`); }
           // Too few blocks for the climb, a pickaxe carried and the island's
           // stone underfoot (note 1435): the blocks are dug here, Jev's to
