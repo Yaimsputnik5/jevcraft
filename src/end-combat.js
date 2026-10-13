@@ -211,8 +211,16 @@ function arenaMovement(bot, center) {
   // danger radius from outside is not. Compare hazards with the live position:
   // a new cloud or knockback can put us closer than the original route start.
   // A stale distance would forbid even the first step back out of danger.
+  // Not the island's rim (note 1450): a cell of the island's own stone with
+  // the void beside it is no step of any walk; a span's cell (cobblestone,
+  // the bot's own) is. 25588 (dragon-30, 2026-10-13 09:53Z, full iron) took
+  // a walk to ground four blocks off along the eastern slope, the path went
+  // down the rim at (48, 34, -13) and over, and it fell out of the world;
+  // dragon-19 (07:56Z) went over the same rim at a run.
+  const { deepBeside } = require('./end-safety');
+  const rim = point => { const f = point.floored(); const under = bot.blockAt(f.offset(0, -1, 0)); return under?.name === 'end_stone' && deepBeside(bot, point); };
   const allowedPoint = point => {
-    return point.y >= start.y - 3 && point.distanceTo(start) <= 64 &&
+    return point.y >= start.y - 3 && point.distanceTo(start) <= 64 && !rim(point) &&
       (!center || Math.hypot(point.x - center.x, point.z - center.z) <= Math.max(96, Math.hypot(start.x - center.x, start.z - center.z))) &&
       (!previous.allowedPosition || previous.allowedPosition(point.floored())) &&
       endHazards(bot).every(({ entity, radius }) =>
@@ -295,7 +303,7 @@ async function arenaRoutes(bot, task, goal, policy, focus, { throwing = false } 
   const floorOpts = { matching: ['end_stone', 'obsidian', 'bedrock'].map(n => bot.registry.blocksByName[n].id),
     maxDistance: 64, count: 256, useExtraInfo: block => {
       const p = block.position.offset(.5, 1, .5);
-      return p.distanceTo(current) >= 5 && dryStanding(bot, p) && safeEndPoint(bot, p);
+      return p.distanceTo(current) >= 5 && dryStanding(bot, p) && safeEndPoint(bot, p) && !require('./end-safety').deepBeside(bot, p);
     } };
   const floors = bot.findBlocks(floorOpts);
   // Throwing, the ground near the crystal too (note 1344): the 256 floor
