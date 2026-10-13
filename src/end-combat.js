@@ -771,7 +771,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     let best = null;
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const x = column.x + dx, z = column.z + dz, g = ground(x, z); if (g === null || Math.abs(g + 1 - base.y) > 1) continue;
-      const cell = new Vec3(x, g + 1, z);
+      // Two out along the side where the ground is level there too (note 1517): the body steps off at a walk and lands one to three blocks out.
+      const g2 = ground(x + dx, z + dz);
+      const cell = g2 !== null && g2 === g && bot.blockAt(new Vec3(x + dx, g + 1, z + dz))?.name === 'air' ? new Vec3(x + dx, g + 1, z + dz) : new Vec3(x, g + 1, z);
       if (bot.blockAt(cell)?.name !== 'air') continue;
       if (voidEdge(bot, cell.offset(.5, 0, .5), 8) !== null) continue;
       let level = true, obsidian = 0;
@@ -819,8 +821,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // pillar's foot beside the way down; the drops away from a pillar landed
       // in water every time.
       let obsidian = 0; for (let k = 1; k <= 3; k++) for (let dy = -3; dy <= 2; dy++) if (bot.blockAt(f.offset(dx * k, dy, dz * k))?.name === 'obsidian') obsidian++;
-      // The pool's side first (note 1509): water lying within three of where the fall ends.
-      let pool = false; for (let ox = -3; ox <= 3 && !pool; ox++) for (let oz = -3; oz <= 3 && !pool; oz++) for (let dy = -1; dy <= 1 && !pool; dy++) if (bot.blockAt(f.offset(dx + ox, -fall - 1 + dy + 1, dz + oz))?.name === 'water') pool = true;
+      // The pool's own side (note 1517), the water still standing: a pool within three of either side's landing made both sides 'the pool's', the shorter fall was taken on the far side, and 25588 (dragon-81, 2026-10-13 20:39Z) landed four blocks east of its pool at (-14, 61, -44) from 27 up and died. The quarry's pits round a foot swallow a pool's spread, so the water must lie on the side stepped off.
+      const recorded = state.pool && Date.now() - state.pool.at < 15 * 60000 && bot.blockAt(new Vec3(state.pool.x, state.pool.y, state.pool.z))?.name === 'water' ? state.pool : null;
+      let pool = !!recorded && recorded.dx === dx && recorded.dz === dz && Math.abs(recorded.x - (u.x + dx)) <= 3 && Math.abs(recorded.z - (u.z + dz)) <= 3;
+      if (!pool) for (let k = 1; k <= 3 && !pool; k++) for (let dy = -1; dy <= 1 && !pool; dy++) if (bot.blockAt(f.offset(dx * k, -fall + dy, dz * k))?.name === 'water') pool = true;
       const score = fall + obsidian * 20 - (pool ? 100 : 0);
       if (!best || score < best.score) best = { dx, dz, fall, obsidian, pool, score, edge: f.offset(dx, 0, dz) };
     }
