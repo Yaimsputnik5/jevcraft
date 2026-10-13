@@ -644,7 +644,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       }
     }
     bot.setControlState?.('sneak', false);
-    if (!scaffold.test(bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || '')) delete bot._pillarUp;
+    // The record kept on the obsidian (note 1473): the way back to the column from the top can fail, and the record dropped there left 25588 (dragon-55, 2026-10-13 14:22Z, crystal 9 broken) 'only observe' on the top, 'column undefined'.
+    { const un = bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || ''; if (!scaffold.test(un) && !/^(obsidian|bedrock|iron_bars)$/.test(un)) delete bot._pillarUp; }
     console.log(`[end combat] down the column: ${n} dug, now at ${bot.entity.position.floored()}`);
     // The column's blocks lie at its foot: picked up for the next climb. The
     // drill of 2026-10-13 (04:26 to 04:56Z) built four columns and had 16 of
