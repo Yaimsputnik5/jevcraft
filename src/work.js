@@ -267,6 +267,15 @@ async function answerStall(bot, task, goal, save, stall, { client, survival, onS
   // unstuck moves offered here walked 25588 (dragon-6, 2026-10-13 05:41Z) off
   // its column by a bridge north, 22 up, into the dragon's breath and the
   // fall. The fight's own options (the climb on, the way down) answer it.
+  // And anywhere in the End while the dragon stands (note 1460): a detour
+  // is a walk with no eye on the breath. 25588 (dragon-40, 2026-10-13
+  // 11:51Z, full iron) was walked 'differently' through the cloud on the
+  // island's ground, 16 to 10.6 to 5 to none, with the fight's own escape a
+  // tick away. The fight's options and emergencies answer every stand there.
+  if (dimension(bot) === 'end' && goal?.step?.action !== 'end_bridge') {
+    if (!(goal.endStallSaid > now - 60000)) { goal.endStallSaid = now; console.log('[still] in the End: no detour, the fight\'s own options answer it'); }
+    stall.asked = true; return;
+  }
   if (dimension(bot) === 'end' && bot._pillarUp && bot._pillarUp.until > now) {
     const f = bot.entity.position.floored(), under = bot.blockAt(f.offset(0, -1, 0));
     if (under && /^(cobblestone|cobbled_deepslate|netherrack|dirt|stone|blackstone|deepslate|andesite|diorite|granite|tuff)$/.test(under.name) && Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) <= 2.5) {
