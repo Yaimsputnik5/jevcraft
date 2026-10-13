@@ -223,7 +223,14 @@ function arenaMovement(bot, center) {
   // down the rim at (48, 34, -13) and over, and it fell out of the world;
   // dragon-19 (07:56Z) went over the same rim at a run.
   const { deepBeside } = require('./end-safety');
-  const rim = point => { const f = point.floored(); const under = bot.blockAt(f.offset(0, -1, 0)); return under?.name === 'end_stone' && deepBeside(bot, point); };
+  // And three cells back from it (note 1467): the island's eastern
+  // underside slopes from 36 to 29 and over, every cell of it with a floor
+  // beside, and four trials went off it at (46 to 52, 27 to 32, -24 to -16):
+  // dragon-19, 30, 41 and 46 (2026-10-13), the last at full health on a walk
+  // to ground five blocks off. A cell with the void within three is no step
+  // of a walk; the bot's own cell is, to leave it.
+  const own = bot.entity.position.floored();
+  const rim = point => { const f = point.floored(); const under = bot.blockAt(f.offset(0, -1, 0)); return under?.name === 'end_stone' && (deepBeside(bot, point) || (!f.equals(own) && voidEdge(bot, point, 3) !== null)); };
   const allowedPoint = point => {
     return point.y >= start.y - 3 && point.distanceTo(start) <= 64 && !rim(point) &&
       (!center || Math.hypot(point.x - center.x, point.z - center.z) <= Math.max(96, Math.hypot(start.x - center.x, start.z - center.z))) &&
@@ -308,7 +315,7 @@ async function arenaRoutes(bot, task, goal, policy, focus, { throwing = false } 
   const floorOpts = { matching: ['end_stone', 'obsidian', 'bedrock'].map(n => bot.registry.blocksByName[n].id),
     maxDistance: 64, count: 256, useExtraInfo: block => {
       const p = block.position.offset(.5, 1, .5);
-      return p.distanceTo(current) >= 5 && dryStanding(bot, p) && safeEndPoint(bot, p) && !require('./end-safety').deepBeside(bot, p);
+      return p.distanceTo(current) >= 5 && dryStanding(bot, p) && safeEndPoint(bot, p) && !require('./end-safety').deepBeside(bot, p) && voidEdge(bot, p, 3) === null;
     } };
   const floors = bot.findBlocks(floorOpts);
   // Throwing, the ground near the crystal too (note 1344): the 256 floor
@@ -864,7 +871,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       if (at) { state.water = { at: { ...at }, poured: Date.now() }; state.pours = (state.pours || 0) + 1; goal.step = { action: 'end_water', against: 'enderman', at: { ...at } }; save(); }
     }
     // Within eight (note 1462): one at six struck the bot held 'unsafe' with none within six.
-    const attacker = hostileEntities(bot, 8).find(e => live(bot, e) && e.name !== 'ender_dragon' && (e.name !== 'enderman' || e.position.distanceTo(bot.entity.position) <= 8));
+    // Six again (note 1467): at eight the defence began and its loop, wanting six, ended at once, 21 passes a second (dragon-46).
+    const attacker = hostileEntities(bot, 6).find(e => live(bot, e) && e.name !== 'ender_dragon');
     if (attacker && sword && !(inWater() && attacker.name === 'enderman' && !canStrike(bot, attacker))) {
       goal.step = { action: 'end_defend', target: attacker.name, distance: Math.round(attacker.position.distanceTo(bot.entity.position) * 10) / 10 }; save();
       await defendHere(2000); return;
