@@ -85,7 +85,15 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
       // server refused is nothing to pick back up. Converted, no second click.
       const converted = countOf(bot, 'water_bucket') === before - 1 && countOf(bot, 'bucket') === emptyBefore + 1;
       const retry = used && !converted && Date.now() - used.at >= 40 && bot.blockAt(used.position)?.name !== 'water' && bot.entity.onGround === false;
-      if ((!used || retry) && bot.heldItem?.name === 'water_bucket' && bot.entity.velocity.y < 0) {
+      // Falling in earnest, half a block a tick or more (note 1513): a jump's
+      // way down peaks near 0.4, and the clutch, woken by the climb's jump
+      // (fallDanger takes a rise over 0.6 as a knock), clicked at the ground a
+      // block under the feet and poured the bucket out on the column's first
+      // block. 25588 (dragon-78, 2026-10-13 20:08Z): 'water clicked at
+      // (-9, 62, -37) from the body at (-9, 62, -37), falling -0.08 a tick';
+      // the buckets lost all day with no pour logged, and the 'water under the
+      // feet' that stopped climbs.
+      if ((!used || retry) && bot.heldItem?.name === 'water_bucket' && bot.entity.velocity.y <= -0.5) {
         const target = clutchTarget(bot, previous);
         if (target) {
           // Forced look updates the rotation carried in use_item immediately.
