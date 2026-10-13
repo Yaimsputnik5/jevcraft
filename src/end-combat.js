@@ -992,8 +992,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             const took = Math.max(0, Math.round((before - bot.health) * 10) / 10);
             (state.punches ||= []).push({ at: Date.now(), id: target.id, took, exploded: explosion, gone: !live(bot, target), under, shielded });
             console.log(`[end combat] crystal ${target.id} struck ${under ? 'from under the bedrock top' : 'from the top, crouched'}${shielded ? ', shield up' : ''}: ${explosion ? 'it blew' : 'no blast seen'}${live(bot, target) ? ', it stands' : ', it is gone'}; the blast took ${took}`);
-            if (explosion && !live(bot, target)) {
-              const evidence = { at: Date.now(), id: target.id, position: { ...target.position }, source: 'explosion_and_entity_removed', by: 'hand' };
+            // Gone after the blow is destroyed, the blast's packet seen or not
+            // (note 1429): 25588 (dragon-13, 2026-10-13 06:55Z) broke crystal 2,
+            // 'no blast seen, it is gone', and the fight kept it as standing.
+            if (!live(bot, target)) {
+              const evidence = { at: Date.now(), id: target.id, position: { ...target.position }, source: explosion ? 'explosion_and_entity_removed' : 'entity_removed_after_blow', by: 'hand' };
               state.destroyedCrystals.push(evidence); bot.emit('end_combat', { crystal: evidence }); progress = true;
               if (state.knownCrystals?.[crystalKey(target)]) Object.assign(state.knownCrystals[crystalKey(target)], { status: 'destroyed', confirmedAt: evidence.at });
             }
