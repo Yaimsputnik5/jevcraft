@@ -542,7 +542,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // crystal 12 broken) had its end-stone column at 69 read as the island
     // 'under 70', the record dropped, and stood 'only observe' eleven blocks
     // up. The column has ended when no open side drops three or more.
-    const columnEnded = () => { const f = bot.entity.position.floored(); const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block'); if (sides.length < 2) return true; const drop = ([dx, dz]) => { for (let dy = 1; dy <= 6; dy++) if (bot.blockAt(f.offset(dx, -dy, dz))?.boundingBox === 'block') return dy - 1; return 6; }; return Math.max(...sides.map(drop)) < 3; };
+    // By the drop alone (note 1474): the roof's post beside the column and the obsidian made two solid sides, and 25588 (dragon-55, 2026-10-13 14:28Z, crystals 9 and 67 broken) had its end-stone column at 69 read as ended, 'column undefined'.
+    const columnEnded = () => { const f = bot.entity.position.floored(); const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block'); const drop = ([dx, dz]) => { for (let dy = 1; dy <= 6; dy++) if (bot.blockAt(f.offset(dx, -dy, dz))?.boundingBox === 'block') return dy - 1; return 6; }; return Math.max(0, ...sides.map(drop)) < 3; };
     let n = 0;
     if (!await centreOnColumn()) console.log(`[end combat] not centred on the column before the dig: ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off`);
     console.log(`[end combat] down the column from ${bot.entity.position.floored()}, ${bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || 'nothing'} under the feet, column ${JSON.stringify(bot._pillarUp)}`);
@@ -1600,7 +1601,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         if (b?.boundingBox !== 'block') { if (++gap > 6) break; continue; }
         gap = 0;
         if (!SCAFFOLD_UNDER.test(name)) break;
-        if (name === 'end_stone' && c.y < 69 && [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(c.offset(dx, 0, dz))?.boundingBox === 'block').length >= 2) break;
+        if (name === 'end_stone' && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => { for (let dy = 0; dy <= 3; dy++) if (bot.blockAt(c.offset(dx, -dy, dz))?.boundingBox === 'block') return dy < 3; return false; })) break;
       }
       depth -= gap;
       if (!SCAFFOLD_UNDER.test(bot.blockAt(feet.offset(0, -1, 0))?.name || '')) depth = 0;
