@@ -172,3 +172,33 @@ test('the quarry digs no cell beside water nor within two of the pool poured for
   const cellsNearPool = (goal.endCombat.quarryCells || []).filter(c => Math.max(Math.abs(c.x - 3), Math.abs(c.z - 0)) <= 2);
   assert.equal(cellsNearPool.length, 0, JSON.stringify(goal.endCombat.quarryCells));
 });
+test('the pool is taken back into the bucket where the drop lands, before anything walks the body off (note 1535)', async () => {
+  const { bot, goal, task } = fixture();
+  const V = require('vec3').Vec3;
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'water_drop', at: Date.now() }, pool: { x: 1, y: 64, z: 0, dx: 1, dz: 0, at: Date.now() } };
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 20 }, { name: 'water_bucket', count: 1 }, { name: 'bucket', count: 1 }];
+  bot.entity.velocity = new V(0, -0.08, 0);
+  bot.entities[20].position = new V(80, 90, 80);
+  const cloud = { id: 40, name: 'area_effect_cloud', position: new V(0.5, 76, 0.5), isValid: true, metadata: {} };
+  cloud.metadata[registry.entitiesByName.area_effect_cloud.metadataKeys.indexOf('radius')] = 3;
+  bot.entities[40] = cloud;
+  bot.equip = async () => {};
+  bot.stopDigging = () => {};
+  bot.controlState = {};
+  const was = bot.blockAt;
+  bot.blockAt = p => { const f = p.floored(); if (f.x === 1 && f.y === 64 && f.z === 0) return { name: 'water', boundingBox: 'empty', position: f, getProperties: () => ({ level: 0 }) }; return was(p); };
+  bot.findBlocks = ({ matching }) => matching === registry.blocksByName.water.id && bot.entity.position.y < 70 ? [new V(1, 64, 0)] : [];
+  bot.setControlState = (k, v) => {
+    bot.controlState[k] = v;
+    if (k === 'forward' && v) setTimeout(() => { bot.entity.position = new V(1.5, 75.4, 0.5); bot.entity.onGround = false; bot.entity.velocity = new V(0.1, -0.5, 0); bot.emit('physicsTick');
+      setTimeout(() => { bot.entity.position = new V(1.5, 64, 0.5); bot.entity.onGround = true; bot.entity.velocity = new V(0, -0.08, 0); bot.emit('physicsTick'); }, 250); }, 60);
+  };
+  const water = require('../src/water'), orig = water.fillWaterBucket, filled = [];
+  water.fillWaterBucket = async (b, t, pos) => { filled.push(pos.clone()); };
+  try {
+    await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig: async () => {}, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'observe' } } }) });
+  } finally { water.fillWaterBucket = orig; }
+  assert.equal(Math.floor(bot.entity.position.y), 64);
+  assert.ok(filled.some(p => p.x === 1 && p.y === 64 && p.z === 0), `taken back: ${filled.map(String).join(' ') || 'nothing'}`);
+  assert.equal(goal.endCombat.pool, undefined, 'the pool record cleared');
+});

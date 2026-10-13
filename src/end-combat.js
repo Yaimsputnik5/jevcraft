@@ -882,6 +882,13 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     console.log(`[end combat] the water drop ended ${down ? 'down' : 'still up'} at ${bot.entity.position.floored()}, ${wet ? 'in the water' : 'dry'}, health ${health.toFixed(1)} to ${bot.health.toFixed(1)}`);
     if (down) delete bot._pillarUp;
     save();
+    // The pool taken back where the body lands (note 1535), before anything
+    // walks it off: the step's start took back only what stood within reach
+    // then, and 25588 (dragon-92, 2026-10-13 23:16Z, five crystals broken)
+    // landed its 26-block drop in the pool at (-15, 62, -36), was 42 blocks
+    // off at its next question ten seconds later, and poured its next pool
+    // with '0 full buckets left'.
+    if (down && countOf(bot, 'bucket') > 0 && !breathThreat(bot) && !dragonThreat(bot)) { try { await takeBackWaterNear(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
     return down;
   };
   // The way down the column as Jev chose it for this fight (column_descent): the drop where chosen and possible, the dig otherwise.
@@ -1067,6 +1074,19 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // breath with no key held, drifted 0.8 to 1.1 off the column's middle in
   // half a second with no blow recorded and fell 18 and 10 blocks, dragon-59
   // to its death. The climb's jumps (a move of their own) are left upright.
+  // Water standing within reach of the eye goes back into an empty bucket (notes 1495, 1535); the cell taken, or null.
+  const takeBackWaterNear = async () => {
+    if (countOf(bot, 'bucket') < 1) return null;
+    const { sourceWater, fillWaterBucket } = require('./water');
+    const eye = bot.entity.position.offset(0, 1.62, 0);
+    const near = bot.findBlocks({ matching: bot.registry.blocksByName.water.id, maxDistance: 5, count: 8, useExtraInfo: sourceWater })
+      .filter(p => eye.distanceTo(p.offset(.5, .5, .5)) <= 4.3).sort((p, q) => eye.distanceTo(p) - eye.distanceTo(q))[0];
+    if (!near) return null;
+    await fillWaterBucket(bot, task, near, { timeoutMs: 1500 });
+    console.log(`[end combat] water left at ${near} taken back into the bucket (${countOf(bot, 'water_bucket')} full carried)`);
+    if (state.pool && near.x === state.pool.x && near.z === state.pool.z) { delete state.pool; save(); }
+    return near;
+  };
   const crouchKeeper = setInterval(() => {
     try { if (!bot._controller && !bot._dropping && bot.entity?.onGround && (onOwnPillar() || onObsidianTop()) && !bot.controlState?.sneak) bot.setControlState?.('sneak', true); } catch (_) { /* nothing to hold */ }
   }, 50);
@@ -1080,16 +1100,14 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // poured, and died at 17:21Z, 'no water bucket carried', on its column.
     if (countOf(bot, 'bucket') > 0 && !breathThreat(bot) && !dragonThreat(bot)) {
       try {
-        const { sourceWater, fillWaterBucket } = require('./water');
+        const { fillWaterBucket } = require('./water');
         const eye = bot.entity.position.offset(0, 1.62, 0);
-        const near = bot.findBlocks({ matching: bot.registry.blocksByName.water.id, maxDistance: 5, count: 8, useExtraInfo: sourceWater })
-          .filter(p => eye.distanceTo(p.offset(.5, .5, .5)) <= 4.3).sort((p, q) => eye.distanceTo(p) - eye.distanceTo(q))[0];
-        if (near) { await fillWaterBucket(bot, task, near, { timeoutMs: 1500 }); console.log(`[end combat] water left at ${near} taken back into the bucket (${countOf(bot, 'water_bucket')} full carried)`); }
+        const near = await takeBackWaterNear();
         // The pool poured for a drop, walked back to within ten (note 1519):
         // left where it was poured it is a bucket gone, and 25588 (dragon-82,
         // 2026-10-13 20:49Z) poured its third pool with '0 full buckets left',
         // the second standing at (-28, 61, -25) where the climb was given up.
-        else if (state.pool && Date.now() - state.pool.at < 15 * 60000) {
+        if (!near && state.pool && Date.now() - state.pool.at < 15 * 60000) {
           const p = new Vec3(state.pool.x, state.pool.y, state.pool.z), d = bot.entity.position.distanceTo(p.offset(.5, 0, .5));
           if (bot.blockAt(p)?.name !== 'water') delete state.pool;
           else if (d <= 10 && !onOwnPillar()) {
