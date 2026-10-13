@@ -793,7 +793,14 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           // 25588 (dragon-56, 2026-10-13 14:39Z) stood in the cloud on the
           // island's rough eastern ground three seconds, 20 to none, with
           // 'No surveyed walking escape' each tick.
-          if (endEmergency(bot) === 'dragon_breath_cloud') {
+          // Only on thick ground well in from the rim (note 1477): six solid under
+          // the feet and no void within four. 25588 (dragon-58, 2026-10-13
+          // 14:54Z) dug two under its feet in a cloud on the eastern slope at
+          // (53, 43, -23), the island two blocks thick there, and fell through
+          // into the void.
+          const feet0 = bot.entity.position.floored();
+          const thick = [1, 2, 3, 4, 5, 6].every(dy => bot.blockAt(feet0.offset(0, -dy, 0))?.boundingBox === 'block');
+          if (endEmergency(bot) === 'dragon_breath_cloud' && thick && voidEdge(bot, bot.entity.position, 4) === null) {
             goal.step = { action: 'down_out_of_breath_on_ground', health: bot.health }; save();
             for (let n = 0; n < 2; n++) { const under = bot.entity.position.floored().offset(0, -1, 0); if (bot.blockAt(under)?.boundingBox !== 'block' || bot.blockAt(under.offset(0, -1, 0))?.boundingBox !== 'block') break; try { await actions.dig(bot, task, under, { dropInto: true, openPit: true, requireDrops: false }); } catch (e3) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(e3.name)) throw e3; break; } for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50); }
             return;
