@@ -429,7 +429,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     try {
       if (bot._fallRecovery || bot.entity?.onGround !== false || !fallDanger(bot) || !bot.inventory.items().some(i => i.name === 'water_bucket')) return;
       console.log(`[end combat] falling from ${bot.entity.position.floored()} at ${bot.health.toFixed(1)} health: the water bucket under the body`);
-      recoverFall(bot, task, goal, save, { refill: false }).then(r => console.log(`[end combat] the fall ended ${r ? 'in the water' : 'dry'} at ${bot.entity.position.floored()}, health ${bot.health.toFixed(1)}`), err => console.log(`[end combat] the water under the fall: ${String(err.message || err).slice(0, 120)}`));
+      // The bucket filled again from the pool at once (note 1485): left, the water runs down the island's slopes with the body in it. 25588 (dragon-65, 2026-10-13 16:19Z) landed in its water at (35, 58, -22) on the eastern slope, was carried five blocks east in three seconds, over the slope's edge, and from the shelf below over the rim into the void.
+      recoverFall(bot, task, goal, save, { refill: true }).then(r => console.log(`[end combat] the fall ended ${r ? 'in the water' : 'dry'} at ${bot.entity.position.floored()}, health ${bot.health.toFixed(1)}`), err => console.log(`[end combat] the water under the fall: ${String(err.message || err).slice(0, 120)}`));
     } catch (_) { /* nothing to catch */ }
   };
   bot.on('physicsTick', falling);
