@@ -829,7 +829,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   const waterDrop = async () => {
     const side = waterDropSide();
     const water = bot.inventory.items().find(i => i.name === 'water_bucket');
-    if (!side || !water) { console.log(`[end combat] no water drop from ${bot.entity.position.floored()}: ${!water ? 'no water bucket carried' : 'no side with ground under it'}`); return false; }
+    // Into the pool with no bucket in hand (note 1514): the pool at the foot is the landing, the bucket in the air only the second chance. 25588 (dragon-78, 2026-10-13 20:16Z) poured its last bucket into the pool at crystal 94's foot, struck the crystal, and was refused the drop at 85, 'no water bucket carried', the pool under it.
+    if (!side || (!water && !side.pool)) { console.log(`[end combat] no water drop from ${bot.entity.position.floored()}: ${!side ? 'no side with ground under it' : 'no water bucket carried and no pool under the way down'}`); return false; }
     const startY = bot.entity.position.y, health = bot.health;
     // Not a fall that kills if the water is late (note 1504): a fall takes its blocks less three, and the pour has missed one drop in six. 25588 (dragon-74, 2026-10-13 19:15Z, five crystals broken) stepped off crystal 87's column at 97, 40 blocks, and died on the ground at 58 with no water poured.
     if (side.fall - 3 >= health - 1) { const dig = side.fall - 3 - Math.floor(health - 1) + 1; console.log(`[end combat] no water drop from ${bot.entity.position.floored()}: a fall of ${side.fall} blocks takes about ${side.fall - 3} health and the body has ${health.toFixed(1)}; ${dig} dug first`); waterDrop.tooHighBy = dig; return false; }
@@ -838,7 +839,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // Onto the column's cell first, at a crouch, where the body stands beside it on the rim.
     if (!await centreOnColumn(0.3)) console.log(`[end combat] the water drop begins ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off the column's middle`);
     console.log(`[end combat] the water drop from ${bot.entity.position.floored()}, ${side.fall} blocks onto the island at (${side.edge.x}, ${side.edge.z})${side.pool ? ', into the pool' : ', no pool under it'}${side.obsidian ? `, ${side.obsidian} obsidian beside the way` : ''}, health ${health.toFixed(1)}`);
-    try { await bot.equip(water, 'hand'); } catch (_) { /* equipped in the fall */ }
+    if (water) { try { await bot.equip(water, 'hand'); } catch (_) { /* equipped in the fall */ } }
     // Upright for the step (note 1492): the crouch kept on the column (note
     // 1480) backs a crouched body off every edge, and the step off went 0.6
     // of a block and stopped at the edge, 'still up', four times in
