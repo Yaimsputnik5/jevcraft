@@ -55,7 +55,8 @@ test('fall cancellation and dimension changes release handlers and never claim a
   for (const cancel of [true, false]) {
     const { bot, task, goal } = fixture();
     const timer = setTimeout(() => { if (cancel) task.cancel(); else bot.game.dimension = 'overworld'; }, 10);
-    await assert.rejects(recoverFall(bot, task, goal, () => {}, { timeoutMs: 100 }), cancel ? { name: 'Cancelled' } : /dimension change/);
+    // A cancelled task no longer ends the clutch (note 1538): the body is still in the air; the recovery runs to its deadline.
+    await assert.rejects(recoverFall(bot, task, goal, () => {}, { timeoutMs: 100 }), cancel ? /fall-recovery deadline/ : /dimension change/);
     clearTimeout(timer); assert.equal(bot.listenerCount('physicsTick'), 0); assert.equal(goal.fallRecoveries, undefined);
   }
 });

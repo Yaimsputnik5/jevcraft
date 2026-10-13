@@ -58,8 +58,14 @@ async function recoverFall(bot, task, goal, save, options = {}) {
   bot._fallRecovery = recoverFallOnce(bot, task, goal, save, options).finally(() => { bot._fallRecovery = null; task.interruptCheck = previousInterrupt; });
   return bot._fallRecovery;
 }
+// Not stopped by the task's cancellation (note 1538): the body is in the air
+// whatever the task's fate, and the bucket is its only landing. 25588
+// (dragon-93, 2026-10-13 23:36Z) fell 21 off its column at 17.3 health with a
+// bucket in hand, 'the water under the fall: task cancelled: win', no click,
+// dead on the rim. Death and a change of dimension end it; nothing else.
 async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refill = true } = {}) {
-  task.check();
+  const alive = () => { if (bot.health <= 0 || bot.isAlive === false) throw new Error('Fall recovery interrupted by dimension change or death'); };
+  alive();
   if (!fallDanger(bot)) return false;
   const dimension = bot.game.dimension, initialHealth = bot.health;
   const water = bot.inventory.items().find(i => i.name === 'water_bucket');
@@ -67,7 +73,7 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
   // stopped the dragon fight mid-flight at twelve health, alive.
   if (!water) {
     const until = Date.now() + 5000;
-    while (bot.entity.onGround === false && Date.now() < until) { task.check(); if (bot.health <= 0 || bot.isAlive === false) break; await new Promise(r => setTimeout(r, 50)); }
+    while (bot.entity.onGround === false && Date.now() < until) { if (bot.health <= 0 || bot.isAlive === false) break; await new Promise(r => setTimeout(r, 50)); }
     return false;
   }
   if (String(dimension).includes('nether')) throw new Error('Water cannot protect a landing in the Nether');
@@ -76,9 +82,9 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
   const previousInterrupt = task.interruptCheck; task.interruptCheck = undefined;
   let previous = bot.entity.position.clone(), used, failure, wetSince = 0, dryLanding;
   const check = () => {
-    task.check();
     if (bot.game.dimension !== dimension || bot.health <= 0 || bot.isAlive === false) throw new Error('Fall recovery interrupted by dimension change or death');
   };
+  let ended = false;
   const tick = () => {
     try {
       check();
@@ -137,7 +143,7 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
             await fillWaterBucket(bot, task, used.position, { guard: check });
             evidence.bucketRecovered = true; save();
           }
-          return true;
+          ended = true; return true;
         }
       } else wetSince = 0;
       if (bot.entity.onGround && Math.abs(bot.entity.velocity.y) < .1 && dryStanding(bot, bot.entity.position)) {
@@ -158,13 +164,16 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
             await fillWaterBucket(bot, task, used.position, { guard: check });
             evidence.bucketRecovered = true; save();
           }
-          return false;
+          ended = true; return false;
         }
       } else dryLanding = undefined;
       await sleep(10);
     }
+    ended = true;
     throw new Error('No living landing in server-confirmed placed water within the fall-recovery deadline');
   } finally {
+    // Said when the clutch ends in the air (note 1538): the death's record otherwise keeps nothing of why no water was clicked.
+    if (!ended && !used) console.log(`[fall] the clutch ended in the air at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health, no water clicked: ${(bot._clutchWhy || []).slice(-6).join('; ') || 'no reason kept'}`);
     bot.removeListener('physicsTick', tick); bot.deactivateItem(); bot.clearControlStates(); task.interruptCheck = previousInterrupt;
   }
 }

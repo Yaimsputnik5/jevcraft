@@ -885,6 +885,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // 1480) backs a crouched body off every edge, and the step off went 0.6
     // of a block and stopped at the edge, 'still up', four times in
     // dragon-67 and dragon-68 (25588, 2026-10-13 16:45 to 17:05Z).
+    // The health read again at the step-off (note 1538): the drop was judged at
+    // 20.0 and taken at 17.3, the dragon's blow landing between, and 25588
+    // (dragon-93, 2026-10-13 23:36Z) fell 21 with no pool, 18 of fall damage
+    // against 17.3, dead on the rim.
+    if (side.fall - 3 >= bot.health - 1 && !side.pool && !inCloud) { const dig = side.fall - 3 - Math.floor(bot.health - 1) + 1; console.log(`[end combat] the water drop held at the step-off: the health is ${bot.health.toFixed(1)} now, a fall of ${side.fall} takes about ${side.fall - 3}, no pool under the way down; ${dig} dug first`); waterDrop.tooHighBy = dig; return false; }
     bot._dropping = true;
     try {
       bot.setControlState?.('sneak', false);
