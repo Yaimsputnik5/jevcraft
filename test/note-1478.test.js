@@ -202,3 +202,35 @@ test('the pool is taken back into the bucket where the drop lands, before anythi
   assert.ok(filled.some(p => p.x === 1 && p.y === 64 && p.z === 0), `taken back: ${filled.map(String).join(' ') || 'nothing'}`);
   assert.equal(goal.endCombat.pool, undefined, 'the pool record cleared');
 });
+
+test('a block standing one up in the pool\'s row is dug down before the pour (note 1536)', async () => {
+  const { bot, goal, task } = fixture();
+  const V = require('vec3').Vec3;
+  bot.entity.position = new V(18.5, 64, 0.5);
+  bot._pillarUp = null;
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'water_drop', at: Date.now() } };
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'end_stone', count: 40 }, { name: 'water_bucket', count: 1 }];
+  bot.entities[20].position = new V(60, 90, 60);
+  const removed = new Set(), water = new Set();
+  // The crystal's pillar at (20, 0), bedrock under the crystal; the ground at 63 everywhere, end stone a block up two cells out from the feet on every side.
+  bot.blockAt = p => {
+    const f = p.floored(), k = `${f.x},${f.y},${f.z}`;
+    if (water.has(k)) return { name: 'water', boundingBox: 'empty', position: f };
+    if (removed.has(k)) return { name: 'air', boundingBox: 'empty', position: f };
+    if (f.x === 20 && f.z === 0 && f.y === 84) return { name: 'bedrock', boundingBox: 'block', position: f };
+    if (f.x === 20 && f.z === 0 && f.y >= 64 && f.y <= 83) return { name: 'obsidian', boundingBox: 'block', position: f };
+    if (f.y === 64 && ((Math.abs(f.x - 18) === 2 && f.z === 0) || (Math.abs(f.z) === 2 && f.x === 18))) return { name: 'end_stone', boundingBox: 'block', position: f };
+    return { name: f.y < 64 ? 'end_stone' : 'air', boundingBox: f.y < 64 ? 'block' : 'empty', position: f };
+  };
+  let looked = null;
+  bot.lookAt = async p => { looked = p; };
+  bot.activateItem = () => { if (looked) water.add(`${Math.floor(looked.x)},${Math.ceil(looked.y)},${Math.floor(looked.z)}`); };
+  const dug = [];
+  const dig = async (b, t, p) => { dug.push(p.clone()); removed.add(`${p.x},${p.y},${p.z}`); };
+  const place = async () => { throw Object.assign(new Error('stop here'), { name: 'Cancelled' }); };
+  try {
+    await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig, place }, { systemOne: async ({ questions }) => ({ answers: { branch_0: { choice: JSON.stringify(questions).includes('pillar_punch_30') ? 'pillar_punch_30' : 'water_drop' } } }) });
+  } catch (err) { if (err.name !== 'Cancelled') throw err; }
+  assert.ok(dug.some(p => p.y === 64 && (Math.abs(p.x - 18) === 2 || Math.abs(p.z) === 2)), `the raised block dug: ${dug.map(String).join(' ') || 'nothing'}`);
+  assert.ok(goal.endCombat?.pool, 'the pool poured and recorded');
+});

@@ -783,17 +783,36 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // Out along the side by the fall's length (note 1530): the body steps off at a walk and keeps its way in the air, about a block out for every eight of fall, and 25588 (dragon-88, 2026-10-13 22:24Z, five crystals broken) fell 33 from (-29, 94, -25) and landed five blocks past its pool poured two out, dead. The furthest level cell out to that distance, one at the least.
       const want = Math.max(1, Math.min(5, Math.round(lift / 8)));
       let cell = new Vec3(x, g + 1, z);
-      for (let k = 1; k <= want; k++) { const gk = ground(x + dx * k, z + dz * k); if (gk === null || gk !== g || bot.blockAt(new Vec3(x + dx * k, g + 1, z + dz * k))?.name !== 'air') break; cell = new Vec3(x + dx * k, g + 1, z + dz * k); }
-      if (bot.blockAt(cell)?.name !== 'air') continue;
+      // A block standing one up in the row is dug down first (note 1536): the
+      // water does not pass it, and the body comes down beyond it. 25588
+      // (dragon-92, 2026-10-13 23:23Z, six crystals broken) had its pool at
+      // (-27, 61, -25), two out east of its column at (-29, -25), the row's
+      // third cell (-26, 61, -25) end stone a block up; the water ran round it,
+      // not over it, and the body fell 33 onto that one dry block, 20 to none.
+      const raised = [];
+      for (let k = 1; k <= want + 1; k++) {
+        const cx = x + dx * k, cz = z + dz * k, gk = ground(cx, cz);
+        if (gk === g + 1 && bot.blockAt(new Vec3(cx, gk, cz))?.name === 'end_stone' && actions.dig && raised.length < 3) { raised.push(new Vec3(cx, gk, cz)); if (k <= want) cell = new Vec3(cx, g + 1, cz); continue; }
+        if (gk === null || gk !== g || bot.blockAt(new Vec3(cx, g + 1, cz))?.name !== 'air') break;
+        if (k <= want) cell = new Vec3(cx, g + 1, cz);
+      }
+      if (bot.blockAt(cell)?.name !== 'air' && !raised.some(r => r.equals(cell))) continue;
       if (voidEdge(bot, cell.offset(.5, 0, .5), 8) !== null) continue;
       let level = true, obsidian = 0;
       for (let ox = -4; ox <= 4 && level; ox++) for (let oz = -4; oz <= 4 && level; oz++) { const gg = ground(x + ox, z + oz); if (gg === null || gg < g - 1) level = false; }
       if (!level) continue;
       for (let k = 1; k <= 3; k++) for (let dy = -1; dy <= 3; dy++) if (bot.blockAt(new Vec3(x + dx * k, g + dy, z + dz * k))?.name === 'obsidian') obsidian++;
-      const score = obsidian * 10 + bot.entity.position.distanceTo(cell.offset(.5, 0, .5));
-      if (!best || score < best.score) best = { cell, dx, dz, score, obsidian };
+      const score = obsidian * 10 + raised.length * 2 + bot.entity.position.distanceTo(cell.offset(.5, 0, .5));
+      if (!best || score < best.score) best = { cell, dx, dz, score, obsidian, raised };
     }
     if (!best) { console.log(`[end combat] no pool for the drop at the foot of (${column.x}, ${column.z}): no level cell beside the column's base clear of the void`); return null; }
+    for (const r of best.raised || []) {
+      try {
+        if (bot.entity.position.offset(0, 1.62, 0).distanceTo(r.offset(.5, .5, .5)) > 4.3) await actions.navigate(bot, task, new goals.GoalNear(r.x, r.y, r.z, 2), { timeoutMs: 6000, stallMs: 3000 });
+        await actions.dig(bot, task, r, { requireDrops: false });
+        console.log(`[end combat] the pool's row levelled: the block a step up at ${r} dug`);
+      } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the pool's row not levelled at ${r}: ${String(err.message || err).slice(0, 80)}`); }
+    }
     const eye = bot.entity.position.offset(0, 1.62, 0), target = best.cell.offset(.5, -.01, .5);
     if (eye.distanceTo(target) > 4.3) {
       try { await actions.navigate(bot, task, new goals.GoalNear(best.cell.x, best.cell.y, best.cell.z, 2), { timeoutMs: 8000, stallMs: 3000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
