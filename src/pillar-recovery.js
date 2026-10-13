@@ -195,18 +195,28 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     const start = feet.y;
     const below = bot.blockAt(feet.offset(0, -1, 0));
     if (!below || below.boundingBox !== 'block') break;
-    await move(bot, task, { label: 'pillar_up', keys: ['jump'], sneak: false, until: () => bot.entity.position.y >= start + 1.1, maxMs: 1200, tick: 20 });
-    // The server has the position a tick behind: placed the moment the feet
-    // cleared the cell here, it still saw the body in it and refused.
-    await new Promise(resolve => setTimeout(resolve, 60));
     // Placed with the look already down (set before the jump): placeBlock's
     // own smooth turn took ticks, the bot fell back into the cell before the
     // packet went, and the server refused every block of a pillar from two
     // hoglins in the arena.
     const place = bot._placeBlockWithOptions ? () => bot._placeBlockWithOptions(below, new Vec3(0, 1, 0), { swingArm: 'right', forceLook: true }) : () => bot.placeBlock(below, new Vec3(0, 1, 0));
-    try { await place(); placed++; bot._pillarUp = { x: feet.x, z: feet.z, until: Date.now() + 600000 }; }
-    catch (err) { task.check(); }
-    for (let i = 0; i < 20 && !bot.entity.onGround; i++) { task.check(); await new Promise(resolve => setTimeout(resolve, 25)); }
+    // A block the server refused is tried again, three jumps at most (note
+    // 1415): on the live servers, fourteen trials to a machine, the
+    // position runs further behind than the arena's, and a climb that gave up
+    // at the first refusal placed nothing three times running (25588,
+    // 2026-10-13 05:50Z, 'The pillar stopped 36 blocks short, 0 up').
+    for (let attempt = 0; attempt < 3 && bot.entity.position.floored().y <= start; attempt++) {
+      task.check();
+      await move(bot, task, { label: 'pillar_up', keys: ['jump'], sneak: false, until: () => bot.entity.position.y >= start + 1.1, maxMs: 1200, tick: 20 });
+      // The server has the position a tick behind: placed the moment the feet
+      // cleared the cell here, it still saw the body in it and refused.
+      await new Promise(resolve => setTimeout(resolve, 60 + attempt * 60));
+      try { await place(); placed++; bot._pillarUp = { x: feet.x, z: feet.z, until: Date.now() + 600000 }; }
+      catch (err) { task.check(); }
+      for (let i = 0; i < 20 && !bot.entity.onGround; i++) { task.check(); await new Promise(resolve => setTimeout(resolve, 25)); }
+      if (bot.entity.position.floored().y > start) break;
+      if (bot.blockAt(feet)?.boundingBox === 'block') break;
+    }
     if (bot.entity.position.floored().y <= start) break;
   }
   return placed;
