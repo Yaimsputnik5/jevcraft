@@ -1805,15 +1805,17 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // nine blocks higher, under the sky.
     {
       const feet = bot.entity.position.floored(), carried = blocksCarried(bot);
-      const top = (x, z) => { for (let y = feet.y + 12; y >= feet.y - 12; y--) if (bot.blockAt(new Vec3(x, y, z))?.boundingBox === 'block') return y + 1; return null; };
+      const top = (x, z) => { for (let y = feet.y + 18; y >= feet.y - 12; y--) if (bot.blockAt(new Vec3(x, y, z))?.boundingBox === 'block') return y + 1; return null; };
       if (feet.y <= 54 && carried >= 8 && !onOwnPillar() && !onObsidianTop() && !Object.keys(tree).some(k => k.startsWith('pillar_punch_'))) {
+        delete tree.dig_to_sky; // the shelf's overhang is not rock over the head to dig through (note 1512)
         let best = null;
         for (let dx = -24; dx <= 24; dx += 1) for (let dz = -24; dz <= 24; dz += 1) {
           const x = feet.x + dx, z = feet.z + dz; const d = Math.hypot(dx, dz); if (d > 24 || (best && d >= best.d)) continue;
           const here = top(x, z); if (here === null || Math.abs(here - feet.y) > 2) continue;
           for (const [ox, oz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
             const up = top(x + ox, z + oz); if (up === null) continue;
-            const rise = up - here; if (rise < 3 || rise > 9) continue;
+            // Faces up to sixteen (note 1512): east of the middle the shelf at 45 meets the top at 56, a face of eleven, and 25588 (dragon-78, 2026-10-13 20:06Z) at (35, 45, -22) had no climb offered and its walks to three pillars' feet fail.
+            const rise = up - here; if (rise < 3 || rise > 16) continue;
             if (Math.hypot(x + ox, z + oz) >= Math.hypot(x, z)) continue; // toward the island's middle
             if (bot.blockAt(new Vec3(x + ox, up, z + oz))?.boundingBox === 'block' || bot.blockAt(new Vec3(x + ox, up + 1, z + oz))?.boundingBox === 'block') continue;
             const base = new Vec3(x, here, z); const { deepBeside } = require('./end-safety');
