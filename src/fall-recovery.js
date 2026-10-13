@@ -34,7 +34,9 @@ function clutchTarget(bot, serverPosition) {
   const aim = new Vec3(feet.x, p.y - .001, feet.z), delta = aim.minus(eye);
   // Reach 5.2, not 4.5 (note 1499): the server allows a block's use a block past the hand's 4.5, and at a fall's speed of a block and a half a tick the half block is a tick, the one tick there is. 25588 (dragon-72, 2026-10-13 18:27Z, full iron) stepped off its column at 88 with the bucket in hand and died on the ground at 62 with no water poured, two drops of eight before it dry.
   // Within 4.0 of the cell, not 5.2 (note 1504): the server's body trails the client's by a tick in a fall, a block and a half higher, and measures the reach from there; clicks sent at 5.2 were a block out of its reach and refused, the water never placed, and the retry (note 1499) came six ticks later on the ground. 25588 (dragon-74, 2026-10-13 19:12Z) stepped off crystal 77's column, clicked, and landed dry at (-15, 61, 36), 20 to 5. Clicked every tick from 4.0 down, the first click lands within the server's reach and the second a tick later.
-  if (delta.norm() > 4.0) return why(`${delta.norm().toFixed(1)} to the cell, over 4.0`);
+  // 4.6 in a slow fall (note 1529): under a block a tick the server's body trails by less than a block, and a reach of 4.0 passed the last sample at 4.4 before the ground. 25588 (dragon-88, 2026-10-13 22:14Z) fell seven blocks at the western edge at 9.4 health, '5.5, 4.5, 4.4 to the cell, over 4.0', and landed on stone at 1.4.
+  const reach = bot.entity.velocity.y > -1.0 ? 4.6 : 4.0;
+  if (delta.norm() > reach) return why(`${delta.norm().toFixed(1)} to the cell, over ${reach}`);
   if (feet.y < p.y - .1) return why('the feet below the cell');
   const sight = bot.world.raycast(eye, delta.unit(), delta.norm() + .01);
   if (!sight?.position?.equals(hit.position)) return why(`the sight line ends at ${sight?.position || 'nothing'}, not the floor`);
