@@ -178,6 +178,7 @@ function climbStop(bot, feet, { canDig = diggableAbove } = {}) {
 async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = true, canDig = diggableAbove, blocks = SCAFFOLD } = {}) {
   const { move } = require('./motion');
   let placed = 0;
+  let rested = false;
   while (bot.entity.position.y < targetY - 0.5 && placed < maxBlocks) {
     // A climb away from the threat itself does not stop for it.
     task.check(); checkAir(bot); if (threats) checkThreats(bot);
@@ -199,7 +200,18 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     await bot.equip(block, 'hand');
     await bot.look(bot.entity.yaw, -Math.PI / 2, true);
     const start = feet.y;
-    const below = bot.blockAt(feet.offset(0, -1, 0));
+    let below = bot.blockAt(feet.offset(0, -1, 0));
+    // The body at the edge of the block it stands on, its middle over air
+    // (note 1456): onto the block it rests on first, as the span does
+    // (restingCell, note 533). 25588 (dragon-36, 2026-10-13 11:16Z, full
+    // iron, crystal 11 broken) stood on its column at (-13, -44) with its
+    // middle over (-12, -45), 'air under the feet' fifteen times, and the
+    // breath took it there.
+    if ((!below || below.boundingBox !== 'block') && !rested) {
+      const rest = require('./terrain').restingCell(bot);
+      if (rest && !rest.equals(feet)) { rested = true; await require('./bridging').creepTo(bot, task, rest, 1500); continue; }
+    }
+    rested = false;
     if (!below || below.boundingBox !== 'block') { if (!placed) console.log(`[pillar up] stopped before the first block: ${below ? below.name : 'nothing'} under the feet at ${feet}`); break; }
     // Placed with the look already down (set before the jump): placeBlock's
     // own smooth turn took ticks, the bot fell back into the cell before the

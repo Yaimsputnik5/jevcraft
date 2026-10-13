@@ -346,6 +346,20 @@ async function arenaRoutes(bot, task, goal, policy, focus, { throwing = false } 
 }
 
 async function fightEndStep(bot, task, goal, save, actions, client, { shot = shootBow } = {}) {
+  // No blow at what cannot be struck (note 1456): the server's answer to one
+  // is the door ('multiplayer.disconnect.invalid_entity_attacked'), and 25588
+  // was kicked twice today mid-fight (dragon-20 08:05Z, dragon-36 11:15Z),
+  // the second time at the foot of its column with crystal 11 just broken.
+  // Items, orbs, arrows, the breath and the fireball are never struck; a
+  // crystal only by the fight's own blow (bot._crystalBlow set round it).
+  if (!bot._attackGuard && typeof bot.attack === 'function') {
+    const raw = bot.attack.bind(bot); bot._attackGuard = true;
+    const NEVER = new Set(['item', 'experience_orb', 'arrow', 'spectral_arrow', 'trident', 'area_effect_cloud', 'dragon_fireball', 'fireball', 'small_fireball', 'shulker_bullet', 'end_crystal']);
+    bot.attack = (entity, ...rest) => {
+      if (!entity || (NEVER.has(entity.name) && !(entity.name === 'end_crystal' && bot._crystalBlow))) { console.log(`[end combat] no blow at ${entity?.name || 'nothing'} (id ${entity?.id}): it cannot be struck`); return; }
+      return raw(entity, ...rest);
+    };
+  }
   const check = () => {
     task.check(); checkAir(bot);
     if (dimension(bot) !== 'end' || bot.game.gameMode !== 'survival' || bot.health <= 0 || bot.isAlive === false) throw blocked('End combat requires a living Survival player in the End');
@@ -1259,7 +1273,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             bot._client.on('explosion', observe);
             try {
               for (let n = 0; n < 3 && !explosion && live(bot, target); n++) {
-                bot.attack(target);
+                bot._crystalBlow = true; try { bot.attack(target); } finally { bot._crystalBlow = false; }
                 for (let k = 0; k < 30 && !explosion && live(bot, target); k++) { check(); await sleep(50); }
               }
             } finally { bot._client.removeListener('explosion', observe); bot.setControlState?.('sneak', false); if (shielded) { try { bot.deactivateItem?.(); } catch (_) { /* lowered already */ } } }
