@@ -69,3 +69,14 @@ test('on its column the bot is kept crouched through the step, so no push takes 
   await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig, place: async () => {} }, { systemOne: async () => { await new Promise(r => setTimeout(r, 200)); return { answers: { branch_0: { choice: 'observe' } } }; } });
   assert.ok(set.some(([k, v]) => k === 'sneak' && v === true), JSON.stringify(set));
 });
+
+test('a column with obsidian on two sides and the roof post on a third is still the bot\'s own pillar (note 1482)', async () => {
+  const { bot, goal, task, dig } = fixture();
+  const solid = new Set(['1,75,0', '0,75,1', '-1,75,0', '-1,76,0', '-1,77,0', '-1,78,0']);
+  const was = bot.blockAt;
+  bot.blockAt = p => { const f = p.floored(); if (solid.has(`${f.x},${f.y},${f.z}`)) return { name: f.x === -1 ? 'end_stone' : 'obsidian', boundingBox: 'block', position: f }; return was(p); };
+  const steps = [];
+  const save = () => { if (goal.step) steps.push(goal.step.action); };
+  await fightEndStep(bot, task, goal, save, { navigate: async () => {}, dig, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'observe' } } }) });
+  assert.ok(steps.includes('hold_on_pillar'), steps.join(','));
+});

@@ -472,8 +472,14 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // 2026-10-13 11:30Z, full iron, crystal 11 broken) came down its column
     // to the foot at 60, was 'on its pillar' there, held for the fireball,
     // dug nothing in the cloud and died in it, 20 to none in three seconds.
+    // One open side at least, not two (note 1482): the roof's post beside the
+    // column (note 1454) and the obsidian make two or three solid sides at the
+    // top, and 25588 (dragon-62, 2026-10-13 15:54Z, full iron, crystals 16 and
+    // 83 broken) on its own column at (-10, 88, -38) was 'own pillar false',
+    // 'only observe', never crouched there, and was pushed off it at 81 in
+    // the breath, 19 blocks to its death.
     const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block');
-    if (sides.length < 2) return false;
+    if (sides.length < 1) return false;
     const drop = ([dx, dz]) => { for (let dy = 1; dy <= 6; dy++) if (bot.blockAt(f.offset(dx, -dy, dz))?.boundingBox === 'block') return dy - 1; return 6; };
     return Math.max(...sides.map(drop)) >= 3;
   };
