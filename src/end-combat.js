@@ -1093,7 +1093,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           const p = new Vec3(state.pool.x, state.pool.y, state.pool.z), d = bot.entity.position.distanceTo(p.offset(.5, 0, .5));
           if (bot.blockAt(p)?.name !== 'water') delete state.pool;
           else if (d <= 10 && !onOwnPillar()) {
-            try { await actions.navigate(bot, task, new goals.GoalNear(p.x, p.y, p.z, 2), { timeoutMs: 8000, stallMs: 3000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+            try { await actions.navigate(bot, task, new goals.GoalNear(p.x, p.y, p.z, 2), { timeoutMs: 8000, stallMs: 3000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the walk back to the pool at ${p} from ${bot.entity.position.floored()}: ${String(err.message || err).slice(0, 80)}`); }
             if (eye.distanceTo(p.offset(.5, .5, .5)) <= 4.3 || bot.entity.position.offset(0, 1.62, 0).distanceTo(p.offset(.5, .5, .5)) <= 4.3) { await fillWaterBucket(bot, task, p, { timeoutMs: 1500 }); console.log(`[end combat] the pool at ${p} taken back into the bucket (${countOf(bot, 'water_bucket')} full carried)`); delete state.pool; save(); }
           }
         }
@@ -1527,6 +1527,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // floor went down again. 25588 (dragon-74, 2026-10-13 19:09Z) stood
             // at (9, 55, 10), six under the island's top, 'only observe',
             // crystal 77's climb grown from 17 blocks to 24.
+            const byWater = p => [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0, -1, 0]].some(([ax, ay, az]) => /water/.test(bot.blockAt(p.offset(ax, ay, az))?.name || ''));
             let inPit = false;
             for (let dx = -4; dx <= 4 && !inPit; dx++) for (let dz = -4; dz <= 4 && !inPit; dz++) if ((dx || dz) && bot.blockAt(feet.offset(dx, 0, dz))?.boundingBox === 'block') inPit = true;
             if (skyOver(feet.offset(0, -1, 0))) for (let r = 2; r <= 4 && cells.length < want; r++) for (let dx = -r; dx <= r && cells.length < want; dx++) for (let dz = -r; dz <= r && cells.length < want; dz++) {
@@ -1534,9 +1535,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               for (const dy of inPit ? [1, 0] : [1, 0, -1]) {
                 const p = feet.offset(dx, dy, dz);
                 if (bot.blockAt(p)?.name !== 'end_stone' || bot.blockAt(p.offset(0, -1, 0))?.boundingBox !== 'block' || !skyOver(p) || deepBeside(bot, p.offset(.5, 1, .5))) continue;
+                // Not beside water, nor within two of the pool poured for a drop
+                // (note 1534): the water runs into the cell dug and the pool is
+                // not taken back. 25588 (dragon-92, 2026-10-13 23:14Z, four
+                // crystals broken) landed its 39-block drop in the pool at (11,
+                // 58, 34), quarried eleven cells round (10, 56, 35) beside it,
+                // never took the pool back, and poured its next with '0 full
+                // buckets left'.
+                if (byWater(p) || (state.pool && Math.max(Math.abs(p.x - state.pool.x), Math.abs(p.z - state.pool.z)) <= 2)) continue;
                 cells.push(p); break;
               }
             }
+            state.quarryLook = { crystal: target.id, cells: cells.length, want, inPit, sky: skyOver(feet.offset(0, -1, 0)), at: Date.now() }; state.quarryCells = cells.map(c => ({ x: c.x, y: c.y, z: c.z }));
             if (cells.length >= Math.min(want, 4)) tree[`quarry_blocks_${target.id}`] = {
               description: { action: `Dig ${cells.length} end stone from the island's ground within four blocks of where the bot stands, with the ${pickForBars.name.replace('_', ' ')}, for the climb beside crystal ${target.id}'s pillar: ${lift} blocks up to its stand, ${carried} carried. The floor cells dug have rock under them and no void beside; the dragon's passes and breath go on while it digs (about a second a block). The crystal is ${out} blocks off.`,
                 blocksWanted: lift, blocksCarried: carried, cellsToDig: cells.length, health: bot.health, dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null },
@@ -2103,7 +2113,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     chose = true;
     if (Object.keys(tree).length === 1 && tree.observe && !(state.onlyObserveSaid > Date.now() - 10000)) {
       state.onlyObserveSaid = Date.now();
-      console.log(`[end combat] only observe: standing on ${bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || 'nothing'} at ${bot.entity.position.floored()}, column ${JSON.stringify(bot._pillarUp)}, own pillar ${onOwnPillar()}, obsidian top ${onObsidianTop()}, safe ${safe}${safe ? '' : ` (${unsafeBecause(bot, bot.entity.position).slice(0, 3).join(', ')})`}, crystals ${crystals.length} (${crystals.slice(0, 3).map(c => `${c.id}@${Math.round(c.position.distanceTo(bot.entity.position))} bedrock:${bot.blockAt(c.position.floored().offset(0, -1, 0))?.name || 'unloaded'} caged:${caged(bot, c)}`).join('; ')}), ${blocksCarried(bot)} blocks; wet ${wet}, dragon phase ${dragon ? metadata(bot, dragon, 'phase') : 'none'} ${dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : '-'} off, head ${head ? `${Math.round(head.position.distanceTo(bot.entity.position))} off` : 'none'}, hostiles ${hostileEntities(bot, 64).map(e => `${e.name} ${Math.round(e.position.distanceTo(bot.entity.position))}`).join(', ') || 'none'}, routes ${JSON.stringify(state.routeLook || {})}, no shot: ${noShot}`);
+      console.log(`[end combat] only observe: standing on ${bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || 'nothing'} at ${bot.entity.position.floored()}, column ${JSON.stringify(bot._pillarUp)}, own pillar ${onOwnPillar()}, obsidian top ${onObsidianTop()}, safe ${safe}${safe ? '' : ` (${unsafeBecause(bot, bot.entity.position).slice(0, 3).join(', ')})`}, crystals ${crystals.length} (${crystals.slice(0, 3).map(c => `${c.id}@${Math.round(c.position.distanceTo(bot.entity.position))} bedrock:${bot.blockAt(c.position.floored().offset(0, -1, 0))?.name || 'unloaded'} caged:${caged(bot, c)}`).join('; ')}), ${blocksCarried(bot)} blocks; wet ${wet}, dragon phase ${dragon ? metadata(bot, dragon, 'phase') : 'none'} ${dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : '-'} off, head ${head ? `${Math.round(head.position.distanceTo(bot.entity.position))} off` : 'none'}, hostiles ${hostileEntities(bot, 64).map(e => `${e.name} ${Math.round(e.position.distanceTo(bot.entity.position))}`).join(', ') || 'none'}, routes ${JSON.stringify(state.routeLook || {})}, quarry ${state.quarryLook && Date.now() - state.quarryLook.at < 5000 ? JSON.stringify(state.quarryLook) : 'not looked'}, no shot: ${noShot}`);
     }
     goal.step = { action: 'end_combat', selected: decision.path, dragonHealth: beforeDragon, observedCrystals: crystals.length }; save();
     try { await decision.action.run(); }

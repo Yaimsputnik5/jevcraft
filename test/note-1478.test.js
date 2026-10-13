@@ -144,3 +144,31 @@ test('an end-stone column seven up from the island at 61 is still the bot\'s own
   await fightEndStep(bot, task, goal, save, { navigate: async () => {}, dig, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'observe' } } }) });
   assert.ok(steps.includes('hold_on_pillar'), steps.join(','));
 });
+
+test('the quarry digs no cell beside water nor within two of the pool poured for the drop (note 1534)', async () => {
+  const { bot, goal, task, dig } = fixture();
+  // On the island's flat ground at 64, 6 blocks carried, the crystal's pillar far off (lift 19); the pool poured at (3, 64, 0) east of the feet, its water flowed to (4, 64, 0).
+  bot.entity.position = new Vec3(0.5, 64, 0.5);
+  bot._pillarUp = null;
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'end_stone', count: 6 }, { name: 'water_bucket', count: 1 }, { name: 'bucket', count: 1 }];
+  bot.entities[20].position = new Vec3(60, 90, 60);
+  bot.blockAt = p => {
+    const f = p.floored();
+    if (f.x === 20 && f.z === 0 && f.y === 84) return { name: 'bedrock', boundingBox: 'block', position: f };
+    if (f.x === 20 && f.z === 0 && f.y >= 64 && f.y <= 83) return { name: 'obsidian', boundingBox: 'block', position: f };
+    if (f.y === 64 && f.z === 0 && (f.x === 3 || f.x === 4)) return { name: 'water', boundingBox: 'empty', position: f };
+    return { name: f.y < 64 ? 'end_stone' : 'air', boundingBox: f.y < 64 ? 'block' : 'empty', position: f };
+  };
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'water_drop', at: Date.now() }, pool: { x: 3, y: 64, z: 0, dx: 1, dz: 0, at: Date.now() } };
+  let seen = null;
+  const client = { systemOne: async ({ questions }) => { seen = JSON.stringify(questions); return { answers: { branch_0: { choice: 'observe' } } }; } };
+  await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig, place: async () => {} }, client);
+  const look = goal.endCombat.quarryLook;
+  assert.ok(look, 'the quarry was looked at');
+  // The ring two to four out round (0, 0) at the feet's level and a block down: the cells with x 1 to 5, z -2 to 2 are beside the water or within two of the pool and are left; the rest are dug.
+  assert.ok(look.cells >= 4, JSON.stringify(look));
+  assert.ok(seen && seen.includes('quarry_blocks_30'), 'the quarry offered');
+  // No cell within two of the pool: re-run the picker's rule on what the option would dig.
+  const cellsNearPool = (goal.endCombat.quarryCells || []).filter(c => Math.max(Math.abs(c.x - 3), Math.abs(c.z - 0)) <= 2);
+  assert.equal(cellsNearPool.length, 0, JSON.stringify(goal.endCombat.quarryCells));
+});
