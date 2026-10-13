@@ -455,6 +455,38 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       const underFoot = bot.entity.position.floored().offset(0, -1, 0);
       if (!scaffold.test(bot.blockAt(underFoot)?.name || '')) break;
       const yBefore = Math.floor(bot.entity.position.y);
+      // A gap under the block dug is filled first (note 1434): the climb
+      // beside a crystal's obsidian lays its blocks where the feet were, and
+      // where the body rested on the obsidian's rim the column has none.
+      // 25588 (dragon-18, 2026-10-13 07:40Z) stood at (31, 80, -23) on a
+      // cobblestone at 79 with air from 78 to 73, and the dig under its feet
+      // was refused ('No solid adjacent footing', the drop below unseen)
+      // eleven times while the breath took it from 20 to 8 and the fall the
+      // rest. The block goes in against the obsidian's side or the column's
+      // own; with none to lay, a drop of three or less is taken as it is.
+      const below2 = underFoot.offset(0, -1, 0);
+      if (bot.blockAt(below2)?.boundingBox !== 'block') {
+        const ref = [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0]].map(([dx, dy, dz]) => ({ b: bot.blockAt(below2.offset(dx, dy, dz)), face: new Vec3(-dx, -dy, -dz) })).find(r => r.b?.boundingBox === 'block');
+        const name = blocksCarriedName(bot), item = name && bot.inventory.items().find(i => i.name === name);
+        if (ref && item) {
+          try {
+            await bot.equip(item, 'hand'); check();
+            await bot.lookAt(ref.b.position.offset(.5 + ref.face.x * .5, .5 + ref.face.y * .5, .5 + ref.face.z * .5), true);
+            await bot.placeBlock(ref.b, ref.face);
+          } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+          await sleep(100);
+        }
+        if (bot.blockAt(below2)?.boundingBox !== 'block') {
+          let drop = 0; for (let dy = 1; dy <= 8 && bot.blockAt(underFoot.offset(0, -dy, 0))?.boundingBox !== 'block'; dy++) drop = dy;
+          console.log(`[end combat] a gap under the column's block at ${underFoot}: ${drop >= 8 ? 'eight or more' : drop} of air under it, no block laid in it (${ref ? '' : 'nothing solid beside it, '}${item ? '' : 'none of the kinds the climb lays carried'})`);
+          if (drop > 3) break;
+          // A short drop, as a player takes it: the block dug from where it is stood on.
+          try { await bot.dig(bot.blockAt(underFoot), true); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the way down the pillar stopped ${n} down: ${String(err.message || err).slice(0, 120)}`); break; }
+          for (let i = 0; i < 30 && Math.floor(bot.entity.position.y) >= yBefore; i++) { check(); await sleep(100); }
+          for (let i = 0; i < 40 && !bot.entity.onGround; i++) await sleep(50);
+          continue;
+        }
+      }
       try { await actions.dig(bot, task, underFoot, { dropInto: true, openPit: true, requireDrops: false }); }
       catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the way down the pillar stopped ${n} down: ${String(err.message || err).slice(0, 120)}`); break; }
       // The drop comes late (the server's block update, then the fall): up to
