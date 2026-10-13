@@ -807,12 +807,13 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // 16:38Z) at (-11, 79, 39) beside its column at (-10, 39): 'no side with
     // ground under it', and it dug instead.
     const f = new Vec3(u.x, Math.floor(bot.entity.position.y), u.z);
-    let best = null;
+    let best = null; const verdicts = [];
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      if (bot.blockAt(f.offset(dx, 0, dz))?.boundingBox === 'block' || bot.blockAt(f.offset(dx, 1, dz))?.boundingBox === 'block') continue;
+      const name = dx === 1 ? 'east' : dx === -1 ? 'west' : dz === 1 ? 'south' : 'north';
+      if (bot.blockAt(f.offset(dx, 0, dz))?.boundingBox === 'block' || bot.blockAt(f.offset(dx, 1, dz))?.boundingBox === 'block') { verdicts.push(`${name}: ${bot.blockAt(f.offset(dx, 0, dz))?.name}/${bot.blockAt(f.offset(dx, 1, dz))?.name} beside`); continue; }
       let fall = null;
       for (let dy = 1; dy <= 48; dy++) { const bl = bot.blockAt(f.offset(dx, -dy, dz)); if (bl?.boundingBox === 'block') { fall = dy - 1; break; } if (bl?.name === 'lava') break; }
-      if (fall === null || fall < 3) continue;
+      if (fall === null || fall < 3) { verdicts.push(`${name}: ${fall === null ? 'no floor within 48' : `a floor ${fall} down`}`); continue; }
       // Away from the obsidian (note 1501): the water goes where the server's
       // line of sight from the body reaches the floor, and a fall down the
       // pillar's side has the obsidian in that line. Both dry landings of
@@ -826,8 +827,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       let pool = !!recorded && recorded.dx === dx && recorded.dz === dz && Math.abs(recorded.x - (u.x + dx)) <= 3 && Math.abs(recorded.z - (u.z + dz)) <= 3;
       if (!pool) for (let k = 1; k <= 3 && !pool; k++) for (let dy = -1; dy <= 1 && !pool; dy++) if (bot.blockAt(f.offset(dx * k, -fall + dy, dz * k))?.name === 'water') pool = true;
       const score = fall + obsidian * 20 - (pool ? 100 : 0);
-      if (!best || score < best.score) best = { dx, dz, fall, obsidian, pool, score, edge: f.offset(dx, 0, dz) };
+      verdicts.push(`${name}: ${fall} down${pool ? ', the pool' : ''}${obsidian ? `, ${obsidian} obsidian` : ''}`);
+      if (!best || score < best.score) best = { dx, dz, fall, obsidian, pool, score, edge: f.offset(dx, 0, dz), name };
     }
+    // Said (note 1522): 25588 (dragon-83, 2026-10-13 21:17Z, six crystals broken) poured its pool south of the column at (-30, -22), dropped from 79 and landed three blocks east of it, dead, and no line said which side was stepped off or why.
+    console.log(`[end combat] the drop's sides from ${f}: ${verdicts.join('; ')}${best ? `; ${best.name} taken` : '; none'}${state.pool ? ` (the pool recorded at (${state.pool.x}, ${state.pool.y}, ${state.pool.z}), ${state.pool.dx === 1 ? 'east' : state.pool.dx === -1 ? 'west' : state.pool.dz === 1 ? 'south' : 'north'} of the column)` : ''}`);
     return best;
   };
   const waterDrop = async ({ inCloud = false } = {}) => {
