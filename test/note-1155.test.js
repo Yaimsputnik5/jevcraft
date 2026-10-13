@@ -59,7 +59,7 @@ test('the perched head out of reach: the run to the ground under it is offered, 
   assert.equal(said.under_head.headBlocksOff, 15);
   assert.equal(said.under_head.perchedSeconds, 0);
   assert.match(said.under_head.takeoff, /no water bucket is carried/);
-  assert.ok(!Object.keys(said).some(k => k.startsWith('move_')), 'no routes surveyed while the head is the way');
+  // The walks stay on offer while the dragon perches (note 1528): the run under the head is one way among them, not the only one.
   assert.deepEqual([went.x, went.y, went.z], [0, 64, 7]);
   assert.deepEqual(swings, [21, 21, 21], 'three swings at the head before it took off');
   assert.equal(goal.endCombat.headSwings, 3);
