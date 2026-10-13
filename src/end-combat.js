@@ -915,7 +915,13 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // again, three times at most, before it is given up.
             for (let tries = 0; tries < 3 && Math.floor(bot.entity.position.y) < feetY; tries++) {
               check();
-              await require('./pillar-recovery').pillarUp(bot, task, feetY, { dig: actions.dig, maxBlocks: Math.max(1, feetY - Math.floor(bot.entity.position.y)), threats: false });
+              // A caged crystal's bars reach out over the climb's cells at the top
+              // (note 1419): dug through where a pickaxe is carried. 25588
+              // (dragon-8, 2026-10-13 06:05Z) stopped 2 short, 'iron bars over
+              // the head, which the climb does not dig', three times.
+              const pr = require('./pillar-recovery');
+              const canDig = b => !!b && ((pr.DIGGABLE_ABOVE.test(b.name) && b.diggable) || (isCaged && !!pickForBars && b.name === 'iron_bars'));
+              await pr.pillarUp(bot, task, feetY, { dig: actions.dig, maxBlocks: Math.max(1, feetY - Math.floor(bot.entity.position.y)), threats: false, canDig });
             }
             if (Math.floor(bot.entity.position.y) < feetY) throw new Error(`The pillar stopped ${feetY - Math.floor(bot.entity.position.y)} blocks short, ${Math.floor(bot.entity.position.y) - from} up`);
             if (!live(bot, target)) throw new Error('The crystal was gone before the blow');
