@@ -145,7 +145,8 @@ async function descendPillar(bot, task, goal, save, expected, { combat = false }
 // next cell up; the pathfinder takes over from wherever it stops.
 // The hand-dug Nether blocks last (block-stock.js HAND_BLOCKS, note 692).
 const SCAFFOLD = ['netherrack', 'cobblestone', 'cobbled_deepslate', 'dirt', 'nether_bricks', 'blackstone', 'basalt', 'stone', 'andesite', 'diorite', 'granite', 'tuff', 'soul_soil', 'soul_sand', 'nether_wart_block', 'warped_wart_block', 'shroomlight'];
-const DIGGABLE_ABOVE = /^(netherrack|stone|deepslate|cobblestone|cobbled_deepslate|dirt|gravel|sand|soul_sand|soul_soil|basalt|blackstone|andesite|diorite|granite|tuff|nether_bricks|glowstone|magma_block|crimson_nylium|warped_nylium|nether_quartz_ore|nether_gold_ore|.*_leaves)$/;
+// The End island's end stone too (note 1420): a climb begun under its lip stopped 'end stone over the head' (25588, dragon-9, 2026-10-13 06:12Z).
+const DIGGABLE_ABOVE = /^(netherrack|stone|deepslate|cobblestone|cobbled_deepslate|dirt|gravel|sand|soul_sand|soul_soil|basalt|blackstone|andesite|diorite|granite|tuff|nether_bricks|glowstone|magma_block|crimson_nylium|warped_nylium|nether_quartz_ore|nether_gold_ore|.*_leaves|end_stone)$/;
 // `canDig` says which blocks overhead may be dug: a climb out of the mine
 // passes its own test, the one its column was looked over by.
 const diggableAbove = block => DIGGABLE_ABOVE.test(block.name) && block.diggable;
