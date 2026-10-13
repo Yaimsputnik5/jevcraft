@@ -255,6 +255,31 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600 } 
     }
     const dragon = breathThreat(bot) || dragonThreat(bot);
     if (!dragon) return false;
+    // In the breath, or with a fireball coming, straight out first at a run
+    // over any ground with a floor (straightAway), the surveys only where no
+    // straight run is to be had (note 1423): the cloud takes 6 a second, and
+    // the dodge's checked line failed on the island's rough low ground east
+    // while the surveys took their tenth of a second each. 25588 (dragon-10,
+    // 2026-10-13 06:17Z, full iron, two water buckets) went 20 to none in
+    // three seconds there, as dragon-6, -7 and -9 had before it.
+    if (['area_effect_cloud', 'dragon_fireball'].includes(dragon.name)) {
+      const start = bot.entity.position.clone(), toward = dragon.position.minus(start); toward.y = 0;
+      const bearing = Math.atan2(toward.z, toward.x);
+      const away = straightAway(bot, start, bearing, allowed || (() => true));
+      if (away) {
+        goal.step = { action: 'evade_breath_straight', hazard: dragon.name, from: { ...start }, toward: { x: away.x, y: away.y, z: away.z } }; save();
+        try {
+          await move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'evade_breath_straight', keys: ['forward', 'sprint', 'jump'], sneak: false,
+            why: 'straight out of the dragon\'s breath at a run', look: away.offset(0, 1.6, 0), maxMs: 2000, tick: 50,
+            until: () => bot.entity.position.distanceTo(start) >= RUN_BLOCKS - 1 || fallDanger(bot) || !breathThreat(bot) });
+        } catch (err) { check(); }
+        if (fallDanger(bot)) await recoverFall(bot, task, goal, save);
+        if (bot.entity.position.distanceTo(start) >= 2) {
+          const evidence = { at: Date.now(), from: { ...start }, to: { ...bot.entity.position }, hazard: { id: dragon.id, name: dragon.name }, straightRun: true };
+          goal.endCombat.lastEvasion = evidence; save(); bot.emit('end_combat', { evasion: evidence }); return true;
+        }
+      }
+    }
     const route = dodgeRoutes(bot, dragon, allowed)[0];
     if (!route) return await evadeOverTerrain(bot, task, goal, save, dragon, { allowed });
     const start = bot.entity.position.clone();

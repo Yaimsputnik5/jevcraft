@@ -63,3 +63,20 @@ test('in the breath on a one-wide bridge over the void, the escape walks along t
   assert.ok(Math.abs(walked.x - 91) > 3, `walked out of the cloud's radius of 3: ${walked.x}`);
   assert.equal(goal.step.action, 'evade_dragon_over_terrain');
 });
+
+test('in the breath on open ground the escape runs straight out first, no survey (note 1423)', async () => {
+  const { evadeDragon } = require('../src/end-safety');
+  const { bot } = platform(new Vec3(0.5, 64, 0.5));
+  bot.blockAt = p => ({ name: p.y < 64 ? 'end_stone' : 'air', boundingBox: p.y < 64 ? 'block' : 'empty' });
+  bot.entities = { 30: { id: 30, name: 'area_effect_cloud', position: new Vec3(0.5, 64, 0.5), metadata: {}, isValid: true } };
+  bot.look = async () => {}; bot.lookAt = async () => {}; bot.setControlState = () => {}; bot.clearControlStates = () => {};
+  const goal = { endCombat: {} }, steps = [];
+  let surveysBeforeRun = null;
+  const surveyed = [];
+  bot.pathfinder.getPathTo = (...a) => { surveyed.push(a); return { status: 'noPath', path: [] }; };
+  const save = () => { steps.push(goal.step?.action); if (goal.step?.action === 'evade_breath_straight' && surveysBeforeRun === null) surveysBeforeRun = surveyed.length; };
+  // The stub bot does not move, so the run gains nothing and the surveys follow it.
+  try { await evadeDragon(bot, new Task('dodge'), goal, save, { timeoutMs: 300 }); } catch (err) { assert.equal(err.name, 'NoEscape'); }
+  assert.equal(steps[0], 'evade_breath_straight', steps.join(','));
+  assert.equal(surveysBeforeRun, 0, 'no route survey before the straight run');
+});
