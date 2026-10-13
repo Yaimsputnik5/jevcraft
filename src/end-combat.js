@@ -1150,11 +1150,20 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             const { deepBeside } = require('./end-safety');
             const feet = here.floored();
             const cells = [];
-            for (let r = 1; r <= 4 && cells.length < want; r++) for (let dx = -r; dx <= r && cells.length < want; dx++) for (let dz = -r; dz <= r && cells.length < want; dz++) {
+            // Two cells out and never below the feet (note 1461): dug at the
+            // feet, each round left the bot a block lower in its own pit and
+            // the climb a block taller, and the stone rolled down the slope.
+            // 25588 (dragon-41, 2026-10-13 12:01Z, full iron) quarried at
+            // crystal 11's foot from lift 33 to lift 48 with 40 blocks carried,
+            // worked its way down the eastern slope to y 29 and went over the
+            // rim. The stone dug is level with the feet or a block up.
+            for (let r = 2; r <= 4 && cells.length < want; r++) for (let dx = -r; dx <= r && cells.length < want; dx++) for (let dz = -r; dz <= r && cells.length < want; dz++) {
               if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
-              const p = feet.offset(dx, -1, dz);
-              if (bot.blockAt(p)?.name !== 'end_stone' || bot.blockAt(p.offset(0, -1, 0))?.boundingBox !== 'block' || deepBeside(bot, p.offset(.5, 1, .5))) continue;
-              cells.push(p);
+              for (const dy of [0, -1]) {
+                const p = feet.offset(dx, dy, dz);
+                if (bot.blockAt(p)?.name !== 'end_stone' || bot.blockAt(p.offset(0, -1, 0))?.boundingBox !== 'block' || deepBeside(bot, p.offset(.5, 1, .5))) continue;
+                cells.push(p); break;
+              }
             }
             if (cells.length >= Math.min(want, 4)) tree[`quarry_blocks_${target.id}`] = {
               description: { action: `Dig ${cells.length} end stone from the island's ground within four blocks of where the bot stands, with the ${pickForBars.name.replace('_', ' ')}, for the climb beside crystal ${target.id}'s pillar: ${lift} blocks up to its stand, ${carried} carried. The floor cells dug have rock under them and no void beside; the dragon's passes and breath go on while it digs (about a second a block). The crystal is ${out} blocks off.`,
@@ -1172,7 +1181,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
                 // 25588 (dragon-30, 2026-10-13 09:52Z) quarried twice for nothing
                 // gained, 35 end stone lying eight to ten blocks off at (36 to 38,
                 // 42, -7 to -11), two blocks up the slope from where it stood.
-                try { await require('./drop-collection').collectNearbyDrops(bot, task, 'end_stone', { radius: 12, timeoutMs: 10000, waitForSpawnMs: 300, move: actions.navigate }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+                try { await require('./drop-collection').collectNearbyDrops(bot, task, 'end_stone', { radius: 8, timeoutMs: 8000, waitForSpawnMs: 300, move: actions.navigate }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
                 const after = blocksCarried(bot);
                 console.log(`[end combat] quarried ${after - before} end stone for the climb (${after} blocks carried, ${lift} wanted for crystal ${target.id})`);
                 if (after > before) progress = true;
