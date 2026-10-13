@@ -19,17 +19,24 @@ function fallDanger(bot) {
 // Use the previous transmitted position for server reach/aim, and the current
 // predicted landing column for the destination. No distant water placement,
 // client-only fluid or position edits are used.
+// Why no water went down is kept on the bot (note 1498), the last reasons
+// by tick, for the dry landing's log: 25588 (dragon-71, 2026-10-13 18:04Z)
+// stepped off its column with the bucket in hand, 22 blocks, and landed dry,
+// 20 to 3.9, with no word of what the clutch saw on the way down.
 function clutchTarget(bot, serverPosition) {
+  const why = reason => { (bot._clutchWhy ||= []).push(`${Math.floor(bot.entity.position.y)}:${reason}`); if (bot._clutchWhy.length > 12) bot._clutchWhy.shift(); return null; };
   const feet = bot.entity.position, eye = serverPosition.offset(0, 1.62, 0);
   const hit = bot.world.raycast(feet.offset(0, 1.62, 0), down, 5);
-  if (!hit?.position) return null;
+  if (!hit?.position) return why('nothing within five below');
   const support = bot.blockAt(hit.position), p = hit.position.offset(0, 1, 0);
-  if (support?.boundingBox !== 'block' || ['magma_block', 'cactus'].includes(support.name) ||
-    !['air', 'cave_air', 'void_air'].includes(bot.blockAt(p)?.name)) return null;
+  if (support?.boundingBox !== 'block' || ['magma_block', 'cactus'].includes(support.name)) return why(`${support?.name || 'nothing'} under`);
+  if (!['air', 'cave_air', 'void_air'].includes(bot.blockAt(p)?.name)) return why(`${bot.blockAt(p)?.name} where the water would go`);
   const aim = new Vec3(feet.x, p.y - .001, feet.z), delta = aim.minus(eye);
-  if (delta.norm() > 4.5 || feet.y < p.y - .1) return null;
+  if (delta.norm() > 4.5) return why(`${delta.norm().toFixed(1)} to the cell, over 4.5`);
+  if (feet.y < p.y - .1) return why('the feet below the cell');
   const sight = bot.world.raycast(eye, delta.unit(), delta.norm() + .01);
-  if (!sight?.position?.equals(hit.position)) return null;
+  if (!sight?.position?.equals(hit.position)) return why(`the sight line ends at ${sight?.position || 'nothing'}, not the floor`);
+  bot._clutchWhy = [];
   return { position: p, yaw: Math.atan2(-delta.x, -delta.z), pitch: Math.atan2(delta.y, Math.hypot(delta.x, delta.z)) };
 }
 
@@ -117,9 +124,10 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
           // observed source is still reachable instead of waiting for water
           // immersion that cannot occur while standing still on dry ground.
           const evidence = { at: Date.now(), landing: { ...bot.entity.position }, initialHealth, health: bot.health,
-            outcome: 'stable_dry_landing', waterProtectionConfirmed: false, attemptedWater: !!used,
+            outcome: 'stable_dry_landing', waterProtectionConfirmed: false, attemptedWater: !!used, noWaterBecause: used ? undefined : (bot._clutchWhy || []).slice(-6),
             source: used && { ...used.position }, waterConsumed: converted ? 1 : 0 };
           goal.lastFallLanding = evidence; save(); bot.emit('fall_recovery', evidence);
+          if (!used) console.log(`[fall] landed dry at ${bot.entity.position.floored()} with no water poured, ${initialHealth.toFixed(1)} to ${bot.health.toFixed(1)}: ${(bot._clutchWhy || []).slice(-6).join('; ') || 'the clutch was never asked (the bucket not in hand, or not falling)'}`);
           if (refill && converted && used) {
             await fillWaterBucket(bot, task, used.position, { guard: check });
             evidence.bucketRecovered = true; save();
