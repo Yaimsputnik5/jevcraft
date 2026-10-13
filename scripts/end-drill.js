@@ -18,7 +18,7 @@ const { Task, navigate, countOf } = require('../src/skills');
 const { prepareCombatGear } = require('../src/mob-hunt');
 const { fightEndStep } = require('../src/end-combat');
 const { watchGameProgress, gameStep, dimension } = require('../src/game-progress');
-const { waitFor, inventory, dig } = require('../src/work');
+const { waitFor, inventory, dig, place } = require('../src/work');
 const { arenaDir } = require('./lib/arena');
 
 const port = Number(process.env.MC_PORT || 25574);
@@ -70,7 +70,7 @@ bot.once('spawn', async () => {
     for (let step = 0; !goal.gameProgress?.milestones?.dragon_defeated && Date.now() - started < minutes * 60000; step++) {
       const passAt = Date.now();
       // A step's error is the live loop's next pass, not the drill's end.
-      try { await gameStep(bot, task, goal, save, { fight_dragon: (b, t, g, s) => fightEndStep(b, t, g, s, { navigate, dig }, client) }); }
+      try { await gameStep(bot, task, goal, save, { fight_dragon: (b, t, g, s) => fightEndStep(b, t, g, s, { navigate, dig, place }, client) }); }
       catch (err) { if (task.cancelled || deaths || err.name === 'Cancelled') throw err; log({ stepError: String(err.message || err).slice(0, 200) }); await sleep(500); }
       if (Date.now() - passAt < 200) await sleep(200);
       if (step % 60 === 0) {

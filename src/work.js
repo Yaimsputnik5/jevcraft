@@ -9095,7 +9095,7 @@ function gameHandlers(bot, decisionClient) {
         // Some of the frames, with the eyes carried, where Jev chose it (early-stronghold.js, note 1411).
         fill_end_portal_some: (bot, task, goal, save) => enterEnd(bot, task, goal, save, endPortalActions(), { fillOnly: true, partial: true }),
         enter_end: (bot, task, goal, save) => enterEnd(bot, task, goal, save, endPortalActions()),
-        fight_dragon: (bot, task, goal, save) => fightEndStep(bot, task, goal, save, { navigate, dig }, decisionClient),
+        fight_dragon: (bot, task, goal, save) => fightEndStep(bot, task, goal, save, { navigate, dig, place }, decisionClient),
         exit_end: (bot, task, goal, save) => exitEnd(bot, task, goal, save, { navigate }),
         prepare_combat: (bot, task, goal, save) => prepareCombatGear(bot, task, goal, save, { acquireStep }),
         barter: (bot, task, goal, save) => barterStep(bot, task, goal, save, { acquireStep, navigate }),

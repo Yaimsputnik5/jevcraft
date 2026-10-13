@@ -10,6 +10,14 @@ const { aimAtEntity, shootBow, throwAt, THROWN, THROWABLE } = require('./project
 // The dragon's head through the armour worn (Normal: 10 before armour), and
 // what the arena's drill of a bare kit came to under it (note 1343).
 // Iron bars about a crystal: one of the two caged pillars (note 1343).
+// What the blows at crystals took from the bot (note 1414): this fight's
+// own, then the arena's measure. -> string
+const PUNCH_RECORD = { under: 'the arena\'s drill of 2026-10-13 (05:08Z, full iron, shield raised) took 0.4', top: 'the arena\'s drills of 2026-10-13 (03:47 to 04:02Z, full iron, 20 health) took 14.5, 14.6 and 14.6 a crystal with no shield up, and 0 with the shield raised for the blow (04:12Z; the shield is raised where one is carried)' };
+function punchRecordSays(state, under = true) {
+  const own = (state?.punches || []).filter(p => p.exploded && p.under === under);
+  const mine = own.length ? `this fight's ${own.length} such blow${own.length === 1 ? '' : 's'} took ${own.map(p => p.took).join(', ')} health` : '';
+  return `The crystal bursts when struck, a blast of power six (a creeper's is three) centred on the top face of its bedrock: struck at its own height from beside it, standing, the arena's drill of 2026-10-06 (05:46Z, full iron) took 11.8; ${under ? 'from two blocks under the bedrock, beside the pillar' : 'crouched on the top two blocks from the bedrock'}, ${under ? PUNCH_RECORD.under : PUNCH_RECORD.top}${mine ? `; ${mine}` : ''}.`;
+}
 function caged(bot, crystal) {
   try { const c = crystal.position.floored(); for (let dx = -2; dx <= 2; dx++) for (let dy = -1; dy <= 3; dy++) for (let dz = -2; dz <= 2; dz++) if (bot.blockAt(c.offset(dx, dy, dz))?.name === 'iron_bars') return true; } catch (_) {}
   return false;
@@ -26,6 +34,7 @@ function breathSays(bot, dragon, to) {
     return d <= 8 ? { intoTheBreath: `ends ${Math.round(d)} blocks from the perched dragon while it breathes: its breath lies on the ground before its head, Instant Damage of 6 a time that armour does not lessen; the drill's bot in full iron at 20 health walked in there and died` } : {};
   } catch (_) { return {}; }
 }
+const blocksCarriedName = bot => { const SCAFF = ['cobblestone', 'end_stone', 'netherrack', 'dirt', 'stone', 'cobbled_deepslate', 'andesite', 'granite', 'diorite', 'oak_planks', 'spruce_planks', 'birch_planks']; return (bot.inventory?.items() || []).map(i => i.name).find(n => SCAFF.includes(n)) || null; };
 function blocksCarried(bot) {
   return bot.inventory.items().filter(i => /^(cobblestone|cobbled_deepslate|end_stone|netherrack|dirt|stone|blackstone|deepslate|andesite|diorite|granite|tuff|obsidian)$/.test(i.name)).reduce((n, i) => n + i.count, 0);
 }
@@ -366,11 +375,136 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     return sample.velocity;
   };
   bot.on('entityMoved', moved); if (dragon) moved(dragon);
+  // The bot's own pillar under it, air on three sides at least: no walk off it.
+  const onOwnPillar = () => {
+    const u = bot._pillarUp, p = bot.entity.position;
+    if (!u || Math.floor(p.x) !== u.x || Math.floor(p.z) !== u.z) return false;
+    const f = p.floored();
+    if (bot.blockAt(f.offset(0, -1, 0))?.boundingBox !== 'block') return false;
+    // Two of the four cells round the feet open at least (a pillar laid up
+    // against a round obsidian pillar's side has one or two of them solid).
+    return [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block').length >= 2;
+  };
+  // On an obsidian pillar's top (not the bot's own column): the top is a
+  // small flat place high over the island, with the bot's column at its edge.
+  const onObsidianTop = () => { const f = bot.entity.position.floored(); return bot.blockAt(f.offset(0, -1, 0))?.name === 'obsidian' && !!bot._pillarUp && Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) <= 12; };
+  // Back onto the bot's own column at a crouch: the pathfinder first, then a
+  // straight walk; said in the log either way.
+  const backToColumn = async () => {
+    const u = bot._pillarUp; if (!u) return false;
+    const col = new Vec3(u.x + .5, bot.entity.position.y, u.z + .5), toCol = () => Math.hypot(col.x - bot.entity.position.x, col.z - bot.entity.position.z);
+    if (toCol() < 0.2 && Math.floor(bot.entity.position.x) === u.x && Math.floor(bot.entity.position.z) === u.z) return true;
+    try { await actions.navigate(bot, task, new goals.GoalBlock(u.x, Math.floor(bot.entity.position.y), u.z), { timeoutMs: 10000, stallMs: 3000 }); }
+    catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+    // Centred on the column's cell (the dig is from under the feet): a stand
+    // at its edge, 0.45 off, had obsidian under the feet and dug nothing
+    // (the drill of 2026-10-13, 04:20Z).
+    if (toCol() >= 0.2) {
+      try {
+        if (typeof bot.lookAt === 'function') await bot.lookAt(col.offset(0, 1.6, 0), true);
+        await require('./motion').move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'back_to_column', keys: ['forward'], sneak: true,
+          why: 'back onto the bot\'s own pillar, the way down', look: col.offset(0, 1.6, 0), maxMs: 6000, tick: 50, until: () => toCol() < 0.2 });
+        // The column's top a block over the obsidian (the climb overshoots by
+        // one): stepped up to with a jump. The drill of 2026-10-13 (04:28Z)
+        // stopped 0.7 off, against its side.
+        if (toCol() >= 0.2) await require('./motion').move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'back_to_column_up', keys: ['forward', 'jump'], sneak: false,
+          why: 'up onto the column\'s top', look: col.offset(0, 1.6, 0), maxMs: 4000, tick: 50, until: () => toCol() < 0.2 });
+      } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+    }
+    const back = toCol() < 0.35 && Math.floor(bot.entity.position.x) === u.x && Math.floor(bot.entity.position.z) === u.z;
+    console.log(`[end combat] back to the column at (${u.x}, ${u.z}): ${back ? 'there' : `not reached, ${Math.round(toCol() * 10) / 10} off`}`);
+    return back;
+  };
+  // Down the bot's own column a block at a time from under the feet.
+  // Centred on the column's cell to a tenth of a block: the body is 0.6
+  // wide, and at 0.2 off toward the obsidian it still stands on its lip
+  // when the block under it is dug (the drills of 2026-10-13, 04:52 and
+  // 05:02Z, one dug and no drop). Short bursts of the forward key at a
+  // crouch, the look set to the column's middle each time.
+  const centreOnColumn = async () => {
+    const u = bot._pillarUp; if (!u) return false;
+    const col = () => new Vec3(u.x + .5, bot.entity.position.y, u.z + .5), off = () => Math.hypot(col().x - bot.entity.position.x, col().z - bot.entity.position.z);
+    for (let i = 0; i < 24 && off() > 0.1; i++) {
+      check();
+      if (typeof bot.lookAt === 'function') await bot.lookAt(col().offset(0, 1.6, 0), true);
+      bot.setControlState?.('sneak', true); bot.setControlState?.('forward', true);
+      await sleep(off() > 0.4 ? 120 : 60);
+      bot.setControlState?.('forward', false);
+      await sleep(80);
+    }
+    bot.setControlState?.('sneak', false);
+    return off() <= 0.15;
+  };
+  const digDownColumn = async ({ limit = 64 } = {}) => {
+    const scaffold = /^(cobblestone|cobbled_deepslate|netherrack|dirt|stone|blackstone|deepslate|andesite|diorite|granite|tuff)$/;
+    let n = 0;
+    if (!await centreOnColumn()) console.log(`[end combat] not centred on the column before the dig: ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off`);
+    console.log(`[end combat] down the column from ${bot.entity.position.floored()}, ${bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || 'nothing'} under the feet, column ${JSON.stringify(bot._pillarUp)}`);
+    for (; n < limit; n++) {
+      check();
+      const underFoot = bot.entity.position.floored().offset(0, -1, 0);
+      if (!scaffold.test(bot.blockAt(underFoot)?.name || '')) break;
+      const yBefore = Math.floor(bot.entity.position.y);
+      try { await actions.dig(bot, task, underFoot, { dropInto: true, openPit: true, requireDrops: false }); }
+      catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the way down the pillar stopped ${n} down: ${String(err.message || err).slice(0, 120)}`); break; }
+      // The drop comes late (the server's block update, then the fall): up to
+      // three seconds for it. The drill of 2026-10-13 (05:12Z) was called
+      // 'not dropped into' after one second and stood a block lower after.
+      for (let i = 0; i < 30 && Math.floor(bot.entity.position.y) >= yBefore; i++) { check(); await sleep(100); }
+      for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50);
+      // On the island already (the column's last block on the ground): done.
+      if (Math.floor(bot.entity.position.y) >= yBefore && bot.blockAt(underFoot.offset(0, -1, 0))?.boundingBox === 'block' && !scaffold.test(bot.blockAt(underFoot.offset(0, -1, 0))?.name || '')) { n++; break; }
+      if (Math.floor(bot.entity.position.y) >= yBefore) {
+        {
+          const q = bot.entity.position, f = q.floored();
+          const cells = [[0, -1, 0, 'under'], [1, -1, 0, 'E-1'], [-1, -1, 0, 'W-1'], [0, -1, 1, 'S-1'], [0, -1, -1, 'N-1'], [1, 0, 0, 'E'], [-1, 0, 0, 'W'], [0, 0, 1, 'S'], [0, 0, -1, 'N']].map(([dx, dy, dz, k]) => `${k}:${bot.blockAt(f.offset(dx, dy, dz))?.name || '?'}`).join(' ');
+          console.log(`[end combat] the way down the pillar stopped ${n} down: the dug cell was not dropped into; at (${q.x.toFixed(2)}, ${q.y.toFixed(2)}, ${q.z.toFixed(2)}) onGround ${bot.entity.onGround} velocity ${JSON.stringify(bot.entity.velocity)} ${cells}`); break;
+        }
+      }
+    }
+    if (!scaffold.test(bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || '')) delete bot._pillarUp;
+    console.log(`[end combat] down the column: ${n} dug, now at ${bot.entity.position.floored()}`);
+    // The column's blocks lie at its foot: picked up for the next climb. The
+    // drill of 2026-10-13 (04:26 to 04:56Z) built four columns and had 16 of
+    // its 128 blocks left, none picked up.
+    if (n >= 3) {
+      const material = blocksCarriedName(bot) || 'cobblestone';
+      try { await require('./drop-collection').collectNearbyDrops(bot, task, material, { radius: 6, timeoutMs: 5000, waitForSpawnMs: 500, move: actions.navigate }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+    }
+    return n;
+  };
   const respond = async () => {
     // Emergency handlers must not trip the guard that interrupted ordinary
     // planning. They still retain cancellation and the caller's guard.
     task.interruptCheck = oldInterrupt;
     if (fallDanger(bot)) await recoverFall(bot, task, goal, save);
+    // On its own pillar, nothing but air round the feet (note 1414): there
+    // is no walking escape from the dragon's pass, and looking for one threw
+    // 'No surveyed walking escape' twice a second for as long as the dragon
+    // circled near (the arena's drill of 2026-10-13, 03:28Z, thirteen up a
+    // pillar beside a crystal's). The pass is held through instead, crouched
+    // with the shield up, a second and a half; the step then goes on, to the
+    // climb or the way down.
+    else if (onOwnPillar() && endEmergency(bot) === 'dragon_breath_cloud') {
+      // The breath on the column: a shield does not stop it (Instant Damage,
+      // magic), and the drill of 2026-10-13 (05:35Z) died holding in it, 4 a
+      // time to none. The cloud lies on the top; three blocks down the column
+      // is under it.
+      goal.step = { action: 'down_out_of_breath', health: bot.health }; save();
+      await digDownColumn({ limit: 3 });
+    }
+    else if (onOwnPillar()) {
+      goal.step = { action: 'hold_on_pillar', hazard: endEmergency(bot), health: bot.health }; save();
+      const shield = bot.inventory.slots?.[45]?.name === 'shield' || bot.inventory.items().some(i => i.name === 'shield');
+      try {
+        if (shield && bot.inventory.slots?.[45]?.name !== 'shield') { const it = bot.inventory.items().find(i => i.name === 'shield'); if (it) await bot.equip(it, 'off-hand'); }
+        bot.setControlState?.('sneak', true);
+        if (shield) bot.activateItem?.(true);
+        const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
+        if (d && typeof bot.lookAt === 'function') await bot.lookAt(d.position, true);
+        for (let n = 0; n < 15; n++) { task.check(); await sleep(100); }
+      } finally { try { bot.deactivateItem?.(); } catch (_) { /* nothing held */ } bot.setControlState?.('sneak', false); }
+    }
     else {
       // Out of the dragon's way by ground no mob stands near, and where
       // there is none, by any ground (note 1174): an enderman's blow is
@@ -713,6 +847,131 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           await strikeWhilePerched(10000);
         } };
     }
+    // A crystal broken by hand (note 1414): up a pillar of the blocks carried
+    // beside the crystal's obsidian pillar, and the crystal struck from there
+    // with whatever is in hand; any blow breaks one. Its blast is centred on
+    // the top face of the bedrock it stands on, so every ray of the blast
+    // that goes downward enters the bedrock: a bot wholly under that face is
+    // out of the blast's line. Beside a thin pillar (radius two) the crystal
+    // is in reach from two blocks under the top, and the bot stands there;
+    // beside a thick one it is not, and the bot goes onto the top, two blocks
+    // from the bedrock, crouched, its body above the face in the blast's
+    // line (struck from beside it standing, the arena's drill of 2026-10-06
+    // took 11.8 in full iron). Measured in the arena: PUNCH_RECORD. With no
+    // bow, arrows or snowballs this is the one way to the crystals: 25595
+    // (2026-10-13 23:08 to 23:28Z), three arrows against eight crystals, was
+    // offered 462 moves and four shots in twenty minutes, answered 'none
+    // good' two times in three, and died with the dragon unhurt. A caged
+    // crystal is the pickaxe's (open_cage).
+    // From its own pillar too, where the ground's mobs below make the place
+    // 'unsafe' (the climb goes on, not down and up again), with no hazard on it.
+    const punchPlace = safe || (onOwnPillar() && endHazards(bot).every(({ entity, radius }) => hazardDistance(bot.entity.position, entity) > radius));
+    if (punchPlace && actions.dig && !Object.keys(tree).some(k => /^(throw_|pillar_throw_)/.test(k))) {
+      const here = bot.entity.position, carried = blocksCarried(bot);
+      // A caged crystal too, where a pickaxe is carried: its iron bars between
+      // the stand and the crystal are dug out on the top before the blow.
+      const pickForBars = bot.inventory.items().find(i => /_pickaxe$/.test(i.name) && !/wooden|golden/.test(i.name));
+      const byDistance = crystals.filter(c => (!caged(bot, c) || pickForBars) && bot.blockAt(c.position.floored().offset(0, -1, 0))?.name === 'bedrock')
+        .sort((a, b) => a.position.distanceTo(here) - b.position.distanceTo(here)).slice(0, 2);
+      for (const target of byDistance) {
+        const c = target.position.floored(), topY = c.y - 1;
+        // The pillar's radius, read along its side a few blocks under the top.
+        let radius = 0; while (radius < 8 && bot.blockAt(new Vec3(c.x + radius + 1, c.y - 3, c.z))?.name === 'obsidian') radius++;
+        const isCaged = caged(bot, target), under = radius <= 2 && !isCaged, feetY = under ? topY - 1 : topY;
+        const out = Math.round(Math.hypot(c.x + .5 - here.x, c.z + .5 - here.z)), lift = feetY - Math.floor(here.y);
+        if (out > 64 || lift < 1 || lift > Math.min(carried, 64)) { if (!(state.punchSkipSaid > Date.now() - 20000)) { state.punchSkipSaid = Date.now(); console.log(`[end combat] no blow at crystal ${target.id}: ${out} off, lift ${lift}, ${carried} blocks carried, radius ${radius}`); } continue; }
+        // Up its own pillar beside another crystal's, the way to this one's foot
+        // is down first (pillar_down): the arena's drill of 2026-10-13 (03:45Z)
+        // tried the walk from the top four times, 24 to 28 blocks off.
+        if ((onOwnPillar() || onObsidianTop() || here.y > 72) && out > radius + 2.2) continue;
+        tree[`pillar_punch_${target.id}`] = {
+          description: { action: under
+            ? `Walk to the foot of the healing crystal's obsidian pillar (radius ${radius}), pillar up ${lift} blocks beside it on the blocks carried to two under the bedrock the crystal stands on, and strike the crystal from there by hand: any blow breaks one, and the bedrock is between the bot and its blast`
+            : `Walk to the foot of the healing crystal's obsidian pillar (radius ${radius}, too thick to reach the crystal from its side), pillar up ${lift} blocks beside it on the blocks carried to its top, step onto the top two blocks from the crystal's bedrock, crouch, and strike the crystal by hand: any blow breaks one; crouched, the bot's body above the bedrock's top face is in the blast's line`,
+            position: { ...target.position }, blocksOff: out, blocks: lift, blocksCarried: carried, pillarRadius: radius, stance: under ? 'under the bedrock top, beside the pillar' : 'on the top, crouched',
+            dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null,
+            onTheColumn: `the climb and the way down are a minute or two each on a column one block wide, where the dragon's fireballs and breath find the bot and there is no step aside: in the arena's drills of 2026-10-13 (05:08 to 05:35Z) the bot broke six crystals so, and died twice on its column after a blow, once holding in the breath, once knocked off it at 9 health; the breath on the column is answered by digging down three`, ...(isCaged ? { caged: `iron bars round it, dug out between the stand and the crystal with the ${pickForBars.name.replaceAll('_', ' ')} first` } : {}), dragonPhase: metadata(bot, dragon, 'phase'), health: bot.health,
+            fallFromTheTop: `a knock off the top is a fall of ${lift} blocks, about ${Math.max(0, lift - 3)} damage before armour${countOf(bot, 'water_bucket') ? ', a water bucket carried for the landing' : ', no water bucket carried'}`,
+            crystalBlast: punchRecordSays(state, under) },
+          run: async () => {
+            const foot = new goals.GoalNear(c.x, Math.floor(here.y), c.z, radius + 1);
+            try { await actions.navigate(bot, task, foot, { timeoutMs: 40000, stallMs: 6000, sprint: true, stopWhen: () => hostileEntities(bot, 4).some(e => live(bot, e)) }); }
+            catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+            const p = bot.entity.position, flat = Math.hypot(c.x + .5 - p.x, c.z + .5 - p.z);
+            if (flat > radius + 2.2) throw new Error(`The pillar's foot was not reached: ${Math.round(flat)} blocks from its middle, its radius ${radius}`);
+            const from = Math.floor(p.y);
+            // A climb stops at one block the server refused (pillarUp); taken up
+            // again, three times at most, before it is given up.
+            for (let tries = 0; tries < 3 && Math.floor(bot.entity.position.y) < feetY; tries++) {
+              check();
+              await require('./pillar-recovery').pillarUp(bot, task, feetY, { dig: actions.dig, maxBlocks: Math.max(1, feetY - Math.floor(bot.entity.position.y)), threats: false });
+            }
+            if (Math.floor(bot.entity.position.y) < feetY) throw new Error(`The pillar stopped ${feetY - Math.floor(bot.entity.position.y)} blocks short, ${Math.floor(bot.entity.position.y) - from} up`);
+            if (!live(bot, target)) throw new Error('The crystal was gone before the blow');
+            let aim = target.position.offset(0, .4, 0);
+            if (!under) {
+              // Onto the top and to two blocks from the bedrock at a crouch (no walk
+              // off an edge): the pathfinder's goal on a pillar's top was not reached
+              // (the arena's drill of 2026-10-13, 03:40Z).
+              const q = bot.entity.position, dx = q.x - (c.x + .5), dz = q.z - (c.z + .5);
+              const dir = Math.abs(dx) >= Math.abs(dz) ? new Vec3(Math.sign(dx) || 1, 0, 0) : new Vec3(0, 0, Math.sign(dz) || 1);
+              const stand = c.offset(dir.x * 2, -1, dir.z * 2), centre = stand.offset(.5, 0, .5), flatTo = () => Math.hypot(centre.x - bot.entity.position.x, centre.z - bot.entity.position.z);
+              if (typeof bot.lookAt === 'function') await bot.lookAt(centre.offset(0, 1.6, 0), true);
+              await require('./motion').move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'pillar_top_stand', keys: ['forward'], sneak: true,
+                why: 'onto the pillar\'s top, to two blocks from the crystal\'s bedrock', look: centre.offset(0, 1.6, 0), maxMs: 8000, tick: 50, until: () => flatTo() < 0.35 || Math.floor(bot.entity.position.y) < topY - 1 });
+              if (flatTo() > 0.7 || Math.floor(bot.entity.position.y) < topY - 1) throw new Error(`The stand on the pillar's top was not reached: at ${bot.entity.position.floored()}, wanted ${stand}`);
+              // The cage's bars between the stand and the crystal, dug out (the cell
+              // next to the bedrock, from the top up three).
+              if (isCaged) {
+                const gap = c.offset(dir.x, -1, dir.z);
+                for (let dy = 0; dy <= 2; dy++) { const cell = gap.offset(0, dy, 0); check(); if (/iron_bars/.test(bot.blockAt(cell)?.name || '')) await actions.dig(bot, task, cell, { requireDrops: false }); }
+                if ([0, 1, 2].some(dy => /iron_bars/.test(bot.blockAt(gap.offset(0, dy, 0))?.name || ''))) throw new Error('The cage\'s bars between the stand and the crystal did not come out');
+              }
+              bot.setControlState?.('sneak', true);
+              aim = target.position.offset(0, 1.2, 0);
+            }
+            const before = bot.health;
+            const sword = bot.inventory.items().find(i => /_sword$|_axe$/.test(i.name));
+            if (sword) await bot.equip(sword, 'hand');
+            // The shield up for the blow where one is carried: a raised shield
+            // takes a blast from in front (a creeper's, TNT's), and the crystal's
+            // comes from where the bot looks.
+            let shielded = false;
+            const worn = bot.inventory.slots?.[45]?.name === 'shield', shield = worn ? bot.inventory.slots[45] : bot.inventory.items().find(i => i.name === 'shield');
+            if (shield) { try { if (!worn) await bot.equip(shield, 'off-hand'); bot.activateItem?.(true); shielded = true; await sleep(350); } catch (_) { shielded = false; } }
+            check();
+            if (typeof bot.lookAt === 'function') await bot.lookAt(aim, true);
+            let explosion = false;
+            const observe = packet => { if (vector(packet.center).distanceTo(target.position) < 3) explosion = true; };
+            bot._client.on('explosion', observe);
+            try {
+              for (let n = 0; n < 3 && !explosion && live(bot, target); n++) {
+                bot.attack(target);
+                for (let k = 0; k < 30 && !explosion && live(bot, target); k++) { check(); await sleep(50); }
+              }
+            } finally { bot._client.removeListener('explosion', observe); bot.setControlState?.('sneak', false); if (shielded) { try { bot.deactivateItem?.(); } catch (_) { /* lowered already */ } } }
+            await sleep(300);
+            const took = Math.max(0, Math.round((before - bot.health) * 10) / 10);
+            (state.punches ||= []).push({ at: Date.now(), id: target.id, took, exploded: explosion, gone: !live(bot, target), under, shielded });
+            console.log(`[end combat] crystal ${target.id} struck ${under ? 'from under the bedrock top' : 'from the top, crouched'}${shielded ? ', shield up' : ''}: ${explosion ? 'it blew' : 'no blast seen'}${live(bot, target) ? ', it stands' : ', it is gone'}; the blast took ${took}`);
+            if (explosion && !live(bot, target)) {
+              const evidence = { at: Date.now(), id: target.id, position: { ...target.position }, source: 'explosion_and_entity_removed', by: 'hand' };
+              state.destroyedCrystals.push(evidence); bot.emit('end_combat', { crystal: evidence }); progress = true;
+              if (state.knownCrystals?.[crystalKey(target)]) Object.assign(state.knownCrystals[crystalKey(target)], { status: 'destroyed', confirmedAt: evidence.at });
+            }
+            // Back onto the bot's own column at a crouch (the way down is dug from
+            // it, pillar_down): left on the obsidian top the bot had no way down
+            // and reached for the next crystal's foot from 28 blocks up (the
+            // arena's drill of 2026-10-13, 03:50Z).
+            if (!under && bot._pillarUp && !await backToColumn()) console.log('[end combat] left on the pillar\'s top after the blow: the way down is pillar_top_down');
+            // And straight down the column (as pillar_down digs): left on the top at
+            // 5.4 health, the drill of 2026-10-13 (04:02Z) took the dragon's breath
+            // twice there, 6 and 6, and went over the edge at 1.5.
+            if (bot._pillarUp && Math.floor(bot.entity.position.x) === bot._pillarUp.x && Math.floor(bot.entity.position.z) === bot._pillarUp.z) await digDownColumn();
+            save();
+          } };
+      }
+    }
     // A bed beside the perched head (bed-bomb.js): the heaviest blow, from a
     // trench that keeps the blast off the bot.
     const { bedPlans, bedBomb, bedsCarried } = require('./bed-bomb');
@@ -889,6 +1148,13 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // on in seconds. Down in the exit portal's basin with the dragon over it,
     // the fresh-End rehearsal (2026-09-24) called that Blocked a minute in,
     // five crystals down, which in the run would end the fight.
+    // Off an obsidian pillar's top, where a blow at its crystal left the bot
+    // (note 1414): back to the bot's own column and down it. The drill of
+    // 2026-10-13 (04:14Z) stood on the top after its blow, 36 up, offered
+    // only moves about the top.
+    if (onObsidianTop() && bot._pillarUp) tree.pillar_top_down = {
+      description: { action: `Walk back to the bot's own pillar at the top's edge, ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z))} blocks off, and dig down it a block at a time from under the feet to the island: no fall on the way`, health: bot.health, dragonHealth: beforeDragon },
+      run: async () => { if (!await backToColumn()) throw new Error('The bot\'s own column was not reached from the pillar\'s top'); await digDownColumn(); } };
     // Down its own pillar, a block at a time from under the feet (note
     // 1344): on top of one laid for a throw, the footing is a block wide and
     // nothing else is offered, and the drill of 2026-10-06 (04:16Z) held on
@@ -960,7 +1226,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     chose = true;
     if (Object.keys(tree).length === 1 && tree.observe && !(state.onlyObserveSaid > Date.now() - 10000)) {
       state.onlyObserveSaid = Date.now();
-      console.log(`[end combat] only observe: wet ${wet}, dragon phase ${dragon ? metadata(bot, dragon, 'phase') : 'none'} ${dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : '-'} off, head ${head ? `${Math.round(head.position.distanceTo(bot.entity.position))} off` : 'none'}, hostiles ${hostileEntities(bot, 64).map(e => `${e.name} ${Math.round(e.position.distanceTo(bot.entity.position))}`).join(', ') || 'none'}, routes ${JSON.stringify(state.routeLook || {})}, no shot: ${noShot}`);
+      console.log(`[end combat] only observe: standing on ${bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || 'nothing'} at ${bot.entity.position.floored()}, column ${JSON.stringify(bot._pillarUp)}, own pillar ${onOwnPillar()}, obsidian top ${onObsidianTop()}, safe ${safe}${safe ? '' : ` (${unsafeBecause(bot, bot.entity.position).slice(0, 3).join(', ')})`}, crystals ${crystals.length} (${crystals.slice(0, 3).map(c => `${c.id}@${Math.round(c.position.distanceTo(bot.entity.position))} bedrock:${bot.blockAt(c.position.floored().offset(0, -1, 0))?.name || 'unloaded'} caged:${caged(bot, c)}`).join('; ')}), ${blocksCarried(bot)} blocks; wet ${wet}, dragon phase ${dragon ? metadata(bot, dragon, 'phase') : 'none'} ${dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : '-'} off, head ${head ? `${Math.round(head.position.distanceTo(bot.entity.position))} off` : 'none'}, hostiles ${hostileEntities(bot, 64).map(e => `${e.name} ${Math.round(e.position.distanceTo(bot.entity.position))}`).join(', ') || 'none'}, routes ${JSON.stringify(state.routeLook || {})}, no shot: ${noShot}`);
     }
     goal.step = { action: 'end_combat', selected: decision.path, dragonHealth: beforeDragon, observedCrystals: crystals.length }; save();
     try { await decision.action.run(); }
@@ -995,4 +1261,4 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   }
 }
 
-module.exports = { dragonNearRoute, enclosed, dropOffs, leaveHighGround, voidEdge, endermenNearRoute, metadata, perched, perchedHead, repeatedCrystalMiss, observeArena, endHazards, safeEndPoint, arenaMovement, arenaRoutes, fightEndStep };
+module.exports = { PUNCH_RECORD, punchRecordSays, dragonNearRoute, enclosed, dropOffs, leaveHighGround, voidEdge, endermenNearRoute, metadata, perched, perchedHead, repeatedCrystalMiss, observeArena, endHazards, safeEndPoint, arenaMovement, arenaRoutes, fightEndStep };
