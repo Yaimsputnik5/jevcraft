@@ -51,7 +51,7 @@ const { decide } = require('./decisions');
 const { canStrike, defendNearby, raiseShield, lowerShield } = require('./combat');
 const { durable, carriedEquipment } = require('./mob-policy');
 const { fallDanger, recoverFall } = require('./fall-recovery');
-const { cloudRadius, hazardDistance, endEmergency, checkEndEmergency, evadeDragon } = require('./end-safety');
+const { cloudRadius, hazardDistance, endEmergency, checkEndEmergency, evadeDragon, dragonThreat } = require('./end-safety');
 const { endDecisionState } = require('./decisions/end-state');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const blocked = message => Object.assign(new Error(message), { name: 'Blocked' });
@@ -496,6 +496,14 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     console.log(`[end combat] down the column from ${bot.entity.position.floored()}, ${bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || 'nothing'} under the feet, column ${JSON.stringify(bot._pillarUp)}`);
     for (; n < limit; n++) {
       check();
+      // The dragon coming is held through before the block is dug (note
+      // 1448): with the breath on the column the emergency is the cloud's,
+      // the pass is never said, and a blow mid-dig throws the body off a
+      // column one wide. 25588 (dragon-29, 2026-10-13 09:44Z, two crystals
+      // broken in five minutes) was hit digging down out of the breath at 94,
+      // 15 to 10, and fell 33 to its death. The shield stops the blow and
+      // its knock; the dig goes on after.
+      if (passes < 20 && dragonThreat(bot)) { passes++; await holdOnColumn(); n--; continue; }
       const underFoot = bot.entity.position.floored().offset(0, -1, 0);
       if (!scaffold.test(bot.blockAt(underFoot)?.name || '')) break;
       const yBefore = Math.floor(bot.entity.position.y);
@@ -536,8 +544,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // (dragon-22, 2026-10-13 08:30Z), 'pillar down stopped 1 of 33 down:
       // dragon_charge_or_contact' at 3 health, was asked again at 8 and
       // climbed, and the breath at the top took the rest.
+      bot.setControlState?.('sneak', true);
       try { await actions.dig(bot, task, underFoot, { dropInto: true, openPit: true, requireDrops: false }); }
       catch (err) {
+        bot.setControlState?.('sneak', false);
         if (err.name === 'EndEmergency' && ['dragon_charge_or_contact'].includes(endEmergency(bot)) && passes < 20) { passes++; await holdOnColumn(); n--; continue; }
         // A dig something else stopped is dug again at once (note 1445): 25588
         // (dragon-26, 2026-10-13 09:17Z), in the breath on its column at 8
@@ -561,6 +571,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         }
       }
     }
+    bot.setControlState?.('sneak', false);
     if (!scaffold.test(bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || '')) delete bot._pillarUp;
     console.log(`[end combat] down the column: ${n} dug, now at ${bot.entity.position.floored()}`);
     // The column's blocks lie at its foot: picked up for the next climb. The
