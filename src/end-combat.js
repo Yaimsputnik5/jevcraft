@@ -937,7 +937,46 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         let radius = 0; while (radius < 8 && bot.blockAt(new Vec3(c.x + radius + 1, c.y - 3, c.z))?.name === 'obsidian') radius++;
         const isCaged = caged(bot, target), under = radius <= 2 && !isCaged, feetY = under ? topY - 1 : topY;
         const out = Math.round(Math.hypot(c.x + .5 - here.x, c.z + .5 - here.z)), lift = feetY - Math.floor(here.y);
-        if (out > 64 || lift < 1 || lift > Math.min(carried, 64)) { if (!(state.punchSkipSaid > Date.now() - 20000)) { state.punchSkipSaid = Date.now(); console.log(`[end combat] no blow at crystal ${target.id}: ${out} off, lift ${lift}, ${carried} blocks carried, radius ${radius}`); } continue; }
+        if (out > 64 || lift < 1 || lift > Math.min(carried, 64)) {
+          if (!(state.punchSkipSaid > Date.now() - 20000)) { state.punchSkipSaid = Date.now(); console.log(`[end combat] no blow at crystal ${target.id}: ${out} off, lift ${lift}, ${carried} blocks carried, radius ${radius}`); }
+          // Too few blocks for the climb, a pickaxe carried and the island's
+          // stone underfoot (note 1435): the blocks are dug here, Jev's to
+          // choose. 25588 (dragon-19, 2026-10-13 07:53Z, full iron, an iron
+          // pickaxe, 28 cobblestone) was offered a walk and a look at every
+          // tick, 'no blow at crystal 13: lift 33, 28 blocks carried', the
+          // island's end stone under its feet the whole while.
+          const floorHere = bot.blockAt(here.floored().offset(0, -1, 0))?.name;
+          if (out <= 64 && lift >= 1 && lift <= 64 && lift > carried && pickForBars && floorHere === 'end_stone' && !onOwnPillar() && !Object.keys(tree).some(k => k.startsWith('quarry_blocks_'))) {
+            const want = Math.min(24, lift + 4 - carried);
+            const { deepBeside } = require('./end-safety');
+            const feet = here.floored();
+            const cells = [];
+            for (let r = 1; r <= 4 && cells.length < want; r++) for (let dx = -r; dx <= r && cells.length < want; dx++) for (let dz = -r; dz <= r && cells.length < want; dz++) {
+              if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+              const p = feet.offset(dx, -1, dz);
+              if (bot.blockAt(p)?.name !== 'end_stone' || bot.blockAt(p.offset(0, -1, 0))?.boundingBox !== 'block' || deepBeside(bot, p.offset(.5, 1, .5))) continue;
+              cells.push(p);
+            }
+            if (cells.length >= Math.min(want, 4)) tree[`quarry_blocks_${target.id}`] = {
+              description: { action: `Dig ${cells.length} end stone from the island's ground within four blocks of where the bot stands, with the ${pickForBars.name.replace('_', ' ')}, for the climb beside crystal ${target.id}'s pillar: ${lift} blocks up to its stand, ${carried} carried. The floor cells dug have rock under them and no void beside; the dragon's passes and breath go on while it digs (about a second a block). The crystal is ${out} blocks off.`,
+                blocksWanted: lift, blocksCarried: carried, cellsToDig: cells.length, health: bot.health, dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null },
+              run: async () => {
+                const before = carried;
+                goal.step = { action: 'quarry_blocks', crystal: target.id, cells: cells.length }; save();
+                for (const p of cells) {
+                  check();
+                  if (bot.blockAt(p)?.name !== 'end_stone') continue;
+                  try { await actions.dig(bot, task, p, { requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] quarry stopped at ${p}: ${String(err.message || err).slice(0, 120)}`); break; }
+                }
+                try { await require('./drop-collection').collectNearbyDrops(bot, task, 'end_stone', { radius: 6, timeoutMs: 5000, waitForSpawnMs: 300, move: actions.navigate }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+                const after = blocksCarried(bot);
+                console.log(`[end combat] quarried ${after - before} end stone for the climb (${after} blocks carried, ${lift} wanted for crystal ${target.id})`);
+                if (after > before) progress = true;
+                save();
+              } };
+          }
+          continue;
+        }
         // Up its own pillar beside another crystal's, the way to this one's foot
         // is down first (pillar_down): the arena's drill of 2026-10-13 (03:45Z)
         // tried the walk from the top four times, 24 to 28 blocks off.
