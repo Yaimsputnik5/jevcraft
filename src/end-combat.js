@@ -826,7 +826,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // The pool's own side (note 1517), the water still standing: a pool within three of either side's landing made both sides 'the pool's', the shorter fall was taken on the far side, and 25588 (dragon-81, 2026-10-13 20:39Z) landed four blocks east of its pool at (-14, 61, -44) from 27 up and died. The quarry's pits round a foot swallow a pool's spread, so the water must lie on the side stepped off.
       const recorded = state.pool && Date.now() - state.pool.at < 15 * 60000 && bot.blockAt(new Vec3(state.pool.x, state.pool.y, state.pool.z))?.name === 'water' ? state.pool : null;
       let pool = !!recorded && recorded.dx === dx && recorded.dz === dz && Math.abs(recorded.x - (u.x + dx)) <= 5 && Math.abs(recorded.z - (u.z + dz)) <= 5;
-      if (!pool) for (let k = 1; k <= 3 && !pool; k++) for (let dy = -1; dy <= 1 && !pool; dy++) if (bot.blockAt(f.offset(dx * k, -fall + dy, dz * k))?.name === 'water') pool = true;
+      // With a pool recorded, its side alone is the pool's (note 1531): the pool's spread reaches the cells of the next side too, and 25588 (dragon-89, 2026-10-13 22:32Z, two crystals broken) had 'west: the pool; south: the pool' with the pool poured south, took west, the first of equals, and fell 26 onto stone, dead.
+      if (!pool && !recorded) for (let k = 1; k <= 3 && !pool; k++) for (let dy = -1; dy <= 1 && !pool; dy++) if (bot.blockAt(f.offset(dx * k, -fall + dy, dz * k))?.name === 'water') pool = true;
       const score = fall + obsidian * 20 - (pool ? 100 : 0);
       verdicts.push(`${name}: ${fall} down${pool ? ', the pool' : ''}${obsidian ? `, ${obsidian} obsidian` : ''}`);
       if (!best || score < best.score) best = { dx, dz, fall, obsidian, pool, score, edge: f.offset(dx, 0, dz), name };
