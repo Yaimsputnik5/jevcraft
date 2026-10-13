@@ -943,7 +943,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               if (typeof bot.lookAt === 'function') await bot.lookAt(centre.offset(0, 1.6, 0), true);
               await require('./motion').move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'pillar_top_stand', keys: ['forward'], sneak: true,
                 why: 'onto the pillar\'s top, to two blocks from the crystal\'s bedrock', look: centre.offset(0, 1.6, 0), maxMs: 8000, tick: 50, until: () => flatTo() < 0.35 || Math.floor(bot.entity.position.y) < topY - 1 });
-              if (flatTo() > 0.7 || Math.floor(bot.entity.position.y) < topY - 1) throw new Error(`The stand on the pillar's top was not reached: at ${bot.entity.position.floored()}, wanted ${stand}`);
+              // A cell short of the stand is still a stand, the crystal in reach
+              // (note 1425): 25588 (dragon-11, 2026-10-13 06:36Z) stopped one cell
+              // from it, three from the bedrock, and the blow was called off.
+              const toBedrock = Math.hypot(c.x + .5 - bot.entity.position.x, c.z + .5 - bot.entity.position.z);
+              if ((flatTo() > 0.7 && toBedrock > 3.4) || Math.floor(bot.entity.position.y) < topY - 1) throw new Error(`The stand on the pillar's top was not reached: at ${bot.entity.position.floored()}, wanted ${stand}, ${Math.round(toBedrock * 10) / 10} from the bedrock`);
               // The cage's bars between the stand and the crystal, dug out (the cell
               // next to the bedrock, from the top up three).
               if (isCaged) {
