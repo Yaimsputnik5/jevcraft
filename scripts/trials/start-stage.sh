@@ -30,7 +30,11 @@ SRC=$(basename "$BEST" | sed -E 's/^mid-//; s/-[0-9]{6}$//')
 K=$((BESTN + 1))
 # A name already used (a snapshot started by hand, a counter behind) is
 # passed over: midgame.js refuses a trial name that exists.
-while [ -e "$ROOT/artifacts/midgame-mid-$SRC-$STAGE-$K.log" ]; do K=$((K + 1)); done
+# The port's server folder too (note 1422): the log of a trial the janitor
+# cleared was gone while its world stood there, and two dragon saves of one
+# source world counted from one, 'dragon-1 already exists on 25588'.
+SERVER="$ROOT/.clean-run-$PORT"; [ "$PORT" = 25581 ] && SERVER="$ROOT/.clean-run"
+while [ -e "$ROOT/artifacts/midgame-mid-$SRC-$STAGE-$K.log" ] || [ -d "$SERVER/mid-$SRC-$STAGE-$K" ]; do K=$((K + 1)); done
 NAME="mid-$SRC-$STAGE-$K"
 echo "$K" > "$BEST/started"
 # The start is logged beside the saves (not in one) for the hourly rest the
