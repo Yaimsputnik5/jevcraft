@@ -1103,7 +1103,13 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             crystalBlast: punchRecordSays(state, under),
             thisFightOnColumns: state.columnDamage?.hits ? `on this fight's columns the bot has taken ${state.columnDamage.total} health in ${state.columnDamage.hits} blow${state.columnDamage.hits === 1 ? '' : 's'} (the largest ${state.columnDamage.max}); it has ${Math.round(bot.health * 10) / 10} now, and a blow on the column cannot be stepped from` : 'no blow has been taken on a column this fight yet' },
           run: async () => {
-            const foot = new goals.GoalNear(c.x, Math.floor(here.y), c.z, radius + 1);
+            // The foot at whatever height the island has there (note 1447): the
+            // island's ground runs from 36 to 60, and a goal at the bot's own
+            // height was a point in the air or in the rock by the far pillars.
+            // 25588 (dragon-28, 2026-10-13 09:35Z, crystal 10 broken, full
+            // health) was 'not reached: 44 blocks from its middle' after forty
+            // seconds and bounced between cells six blocks apart.
+            const foot = new goals.GoalNearXZ(c.x + .5, c.z + .5, radius + 1);
             try { await actions.navigate(bot, task, foot, { timeoutMs: 40000, stallMs: 6000, sprint: true, stopWhen: () => hostileEntities(bot, 4).some(e => live(bot, e)) }); }
             catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
             const p = bot.entity.position, flat = Math.hypot(c.x + .5 - p.x, c.z + .5 - p.z);
