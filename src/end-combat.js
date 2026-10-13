@@ -537,7 +537,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // ground (under 70, the cells about the feet solid) end stone is the
     // island, not the column.
     const scaffold = { test: name => SCAFFOLD_UNDER.test(name || '') && !(name === 'end_stone' && columnEnded()) };
-    const columnEnded = () => { const f = bot.entity.position.floored(); return f.y < 70 && [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox === 'block').length >= 2; };
+    // Ended where the ground is, not at a height (note 1471): the island's
+    // ground runs from 36 to 60, and 25588 (dragon-53, 2026-10-13 14:03Z,
+    // crystal 12 broken) had its end-stone column at 69 read as the island
+    // 'under 70', the record dropped, and stood 'only observe' eleven blocks
+    // up. The column has ended when no open side drops three or more.
+    const columnEnded = () => { const f = bot.entity.position.floored(); const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block'); if (sides.length < 2) return true; const drop = ([dx, dz]) => { for (let dy = 1; dy <= 6; dy++) if (bot.blockAt(f.offset(dx, -dy, dz))?.boundingBox === 'block') return dy - 1; return 6; }; return Math.max(...sides.map(drop)) < 3; };
     let n = 0;
     if (!await centreOnColumn()) console.log(`[end combat] not centred on the column before the dig: ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off`);
     console.log(`[end combat] down the column from ${bot.entity.position.floored()}, ${bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || 'nothing'} under the feet, column ${JSON.stringify(bot._pillarUp)}`);
