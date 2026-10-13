@@ -2041,7 +2041,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // from the top, had its record dropped on the obsidian at (-13, 79, 37),
       // 'column undefined', and stood 'only observe' with no way down.
       const underName = bot.blockAt(feet.offset(0, -1, 0))?.name || '';
-      if (depth < 1 && !/^(obsidian|bedrock|iron_bars)$/.test(underName)) delete bot._pillarUp;
+      // Dropped only on the island's own ground (note 1527): on air at the top's rim, the body's middle over the edge, the record is still the way back. 25588 (dragon-87, 2026-10-13 21:51Z, two crystals broken) stood 'on air' at (-17, 88, -37) after the blow, 'column undefined', 'only observe' nine times.
+      if (depth < 1 && underName === 'end_stone' && feet.y < 70) delete bot._pillarUp;
       if (depth >= 2) tree.pillar_down = {
         description: { action: `Dig down the bot's own pillar a block at a time from under the feet, ${depth} blocks to its foot: no fall on the way`, blocks: depth, health: bot.health, dragonHealth: beforeDragon },
         run: async () => {
