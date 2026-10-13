@@ -392,6 +392,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // them open, and the ground four or more blocks under is the bot's column.
   const readPillar = () => {
     const f = bot.entity.position.floored(), under = bot.blockAt(f.offset(0, -1, 0));
+    // High only (note 1441): the crystals' pillars top out at 76 to 103 and
+    // the entry platform and its spans lie at 49; 25588 (dragon-23,
+    // 2026-10-13 08:40Z) read its span's end at (90, 49, 7), the island's
+    // slope four under it, as its column, and the crystal's walk was skipped.
+    if (f.y < 66) return null;
     if (under?.boundingBox !== 'block' || !SCAFFOLD_UNDER.test(under.name) || under.name === 'end_stone' && f.y < 70) return null;
     const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]];
     if (sides.filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block').length < 2) return null;
@@ -564,9 +569,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       if (shield && bot.inventory.slots?.[45]?.name !== 'shield') { const it = bot.inventory.items().find(i => i.name === 'shield'); if (it) await bot.equip(it, 'off-hand'); }
       bot.setControlState?.('sneak', true);
       if (shield) bot.activateItem?.(true);
-      const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
-      if (d && typeof bot.lookAt === 'function') await bot.lookAt(d.position, true);
-      for (let n = 0; n < 15; n++) { task.check(); await sleep(100); }
+      // Faced the whole hold (note 1441): the shield stops only what comes
+      // from in front, and the dragon crosses the column in a second. 25588
+      // (dragon-23, 2026-10-13 08:41Z, leather) took 20 to 0.3 in one pass.
+      for (let n = 0; n < 15; n++) {
+        task.check();
+        const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
+        if (d && typeof bot.lookAt === 'function') { try { await bot.lookAt(d.position.offset(0, 2, 0), true); } catch (_) { /* looked already */ } }
+        await sleep(100);
+      }
     } finally { try { bot.deactivateItem?.(); } catch (_) { /* nothing held */ } bot.setControlState?.('sneak', false); }
   };
   const respond = async () => {
