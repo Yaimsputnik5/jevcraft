@@ -93,7 +93,12 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
       // (-9, 62, -37) from the body at (-9, 62, -37), falling -0.08 a tick';
       // the buckets lost all day with no pour logged, and the 'water under the
       // feet' that stopped climbs.
-      if ((!used || retry) && bot.heldItem?.name === 'water_bucket' && bot.entity.velocity.y <= -0.5) {
+      // And 0.85 a tick, not 0.5 (note 1518): a body at 0.85 has fallen five
+      // blocks and more, and a fall of five is two health at most, not worth
+      // the bucket that is then short at the column. 25588 (dragon-81,
+      // 2026-10-13 20:38Z) poured both buckets on falls of three into the
+      // quarry's pits and climbed with none.
+      if ((!used || retry) && bot.heldItem?.name === 'water_bucket' && bot.entity.velocity.y <= -0.85) {
         const target = clutchTarget(bot, previous);
         if (target) {
           // Forced look updates the rotation carried in use_item immediately.
