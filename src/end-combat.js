@@ -1423,8 +1423,13 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // health) was 'not reached: 44 blocks from its middle' after forty
             // seconds and bounced between cells six blocks apart.
             const foot = new goals.GoalNearXZ(c.x + .5, c.z + .5, radius + 1);
+            const walkFrom = bot.entity.position.floored(), walkAt = Date.now();
             try { await actions.navigate(bot, task, foot, { timeoutMs: 40000, stallMs: 6000, sprint: true, stopWhen: () => hostileEntities(bot, 4).some(e => live(bot, e)) }); }
-            catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+            catch (err) {
+              if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err;
+              // Said (note 1486): the walk to a foot failed from 18, 19 and 52 blocks (25588, dragon-61, 64 and 66, 2026-10-13) with no word of why.
+              console.log(`[end combat] the walk to crystal ${target.id}'s foot from ${walkFrom} ended after ${Math.round((Date.now() - walkAt) / 1000)} s at ${bot.entity.position.floored()}: ${String(err.message || err).slice(0, 160)}`);
+            }
             const p = bot.entity.position, flat = Math.hypot(c.x + .5 - p.x, c.z + .5 - p.z);
             if (flat > radius + 2.2) { (state.punchUnreached ||= {})[target.id] = Date.now(); save(); throw new Error(`The pillar's foot was not reached: ${Math.round(flat)} blocks from its middle, its radius ${radius}`); }
             const from = Math.floor(p.y);
