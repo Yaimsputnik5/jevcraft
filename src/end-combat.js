@@ -1560,7 +1560,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         const out = Math.round(Math.hypot(c.x + .5 - here.x, c.z + .5 - here.z)), lift = feetY - Math.floor(here.y);
         // Three over the lift (note 1468): the roofs on the way are of the same blocks, and 25588 (dragon-48, 2026-10-13 13:12Z) climbed 22 for a lift of 23 and stopped a block short with none left.
         // The three over the lift only before the climb (note 1470): on the column already, the climb finishes with what is carried. 25588 (dragon-52, 2026-10-13 13:53Z) at crystal 98's top, lift 28 and 30 blocks, was offered no blow, held 30 seconds 'unsafe: end_crystal 4<=12', and the breath took it 20 to none.
-        const margin = (onOwnPillar() || onObsidianTop()) ? 0 : 3;
+        // The roofs counted in (note 1541): one block every third block of the climb against the obsidian, and 25588 (dragon-95, 2026-10-13 23:53Z) began crystal 94's climb of 31 with 27 blocks and stood at 72 with 18 and 22 to go, no blow offered, and dug down.
+        const roofs = Math.ceil(Math.max(0, lift) / 3);
+        const margin = (onOwnPillar() || onObsidianTop()) ? 0 : 3 + roofs;
         // A lift of none is a stand reached (note 1472): 25588 (dragon-54, 2026-10-13 14:13Z) stood at crystal 66's stand, 'no blow at crystal 66: 3 off, lift 0', held 'unsafe' twenty seconds and died in the breath; dragon-52 the same at 98.
         if (out > 64 || lift < 0 || lift + margin > Math.min(carried, 64 + margin)) {
           if (!(state.punchSkipSaid > Date.now() - 20000)) { state.punchSkipSaid = Date.now(); console.log(`[end combat] no blow at crystal ${target.id}: ${out} off, lift ${lift}, ${carried} blocks carried, radius ${radius}`); }
@@ -1576,7 +1578,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // of the same blocks, and 25588 (dragon-43, 2026-10-13 12:23Z, three
             // crystals broken) climbed 38 for a lift of 37 and stopped a block
             // short with none left, 'no block of the kinds the climb lays carried'.
-            const want = Math.min(24, lift + 10 - carried);
+            const want = Math.min(24, lift + roofs + 7 - carried);
             const { deepBeside } = require('./end-safety');
             const feet = here.floored();
             const cells = [];
@@ -1684,7 +1686,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           description: { action: under
             ? `Walk to the foot of the healing crystal's obsidian pillar (radius ${radius}), pillar up ${lift} blocks beside it on the blocks carried to two under the bedrock the crystal stands on, and strike the crystal from there by hand: any blow breaks one, and the bedrock is between the bot and its blast`
             : `Walk to the foot of the healing crystal's obsidian pillar (radius ${radius}, too thick to reach the crystal from its side), pillar up ${lift} blocks beside it on the blocks carried to its top, step onto the top two blocks from the crystal's bedrock, crouch, and strike the crystal by hand: any blow breaks one; crouched, the bot's body above the bedrock's top face is in the blast's line`,
-            position: { ...target.position }, blocksOff: out, blocks: lift, blocksCarried: carried, pillarRadius: radius, stance: under ? 'under the bedrock top, beside the pillar' : 'on the top, crouched',
+            position: { ...target.position }, blocksOff: out, blocks: lift, blocksForTheClimb: lift + roofs, blocksCarried: carried, pillarRadius: radius, stance: under ? 'under the bedrock top, beside the pillar' : 'on the top, crouched',
             dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null,
             // Whether the drop's pool can be poured at this pillar's foot (note 1539): at the island's eastern rim (pillars 9, 11 and 20 of this world) no level cell beside the foot is clear of the void, the way down is the bucket in the air alone, and 25588 died on it three times on 2026-10-13 (dragon-84, 90, 93) and landed twice (dragon-92, 94).
             wayDown: poolAtTheFoot(c, radius, lift) ? 'a pool of water can be poured on level ground beside this pillar\'s foot before the climb, and the drop after the blow lands in it' : 'no pool can be poured at this pillar\'s foot: the void lies within eight blocks of every level cell beside it. The way down from here is the column dug down to a height the health can take and the bucket clicked under the body in the last blocks of the fall, a click the server refuses about one time in three; of the five such drops of 2026-10-13 at this rim, three ended in death (dragon-84, 90, 93) and two landed',
@@ -1714,6 +1716,21 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err;
               // Said (note 1486): the walk to a foot failed from 18, 19 and 52 blocks (25588, dragon-61, 64 and 66, 2026-10-13) with no word of why.
               console.log(`[end combat] the walk to crystal ${target.id}'s foot from ${walkFrom} ended after ${Math.round((Date.now() - walkAt) / 1000)} s at ${bot.entity.position.floored()}: ${String(err.message || err).slice(0, 160)}`);
+            }
+            // Up against the obsidian (note 1541): the column is raised where the
+            // body stands, and a body a cell or two short of the pillar's side
+            // raises a column whose top is a gap from the stand, and whose roofs
+            // want posts (four blocks each) for want of a block beside. 25588
+            // (dragon-95, 2026-10-13 23:51Z, crystal 12 broken) raised its column
+            // at (-9, -37) for crystal 91 at (-13, -40), 'the stand on the
+            // pillar's top was not reached: 4.4 from the bedrock' twice, and dug
+            // 24 down for nothing; its next climb spent 20 blocks on 9 of lift.
+            const obsidianBeside = () => { const f0 = bot.entity.position.floored(); return [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => [0, 1].some(dy => bot.blockAt(f0.offset(dx, dy, dz))?.name === 'obsidian')); };
+            if (!obsidianBeside() && Math.hypot(c.x + .5 - bot.entity.position.x, c.z + .5 - bot.entity.position.z) <= radius + 4) {
+              try {
+                await require('./motion').move(bot, task, { label: 'up_to_the_pillar', keys: ['forward'], sneak: false, why: 'the last step up against the pillar\'s obsidian, where the column goes up (note 1541)', look: new Vec3(c.x + .5, bot.entity.position.y + 1.2, c.z + .5), maxMs: 2500, tick: 25, until: () => obsidianBeside() });
+              } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+              console.log(`[end combat] the last step to crystal ${target.id}'s pillar: ${obsidianBeside() ? 'the obsidian beside the feet' : 'still off it'} at ${bot.entity.position.floored()}, ${Math.round(Math.hypot(c.x + .5 - bot.entity.position.x, c.z + .5 - bot.entity.position.z) * 10) / 10} from its middle`);
             }
             const p = bot.entity.position, flat = Math.hypot(c.x + .5 - p.x, c.z + .5 - p.z);
             if (flat > radius + 2.2) { (state.punchUnreached ||= {})[target.id] = Date.now(); save(); throw new Error(`The pillar's foot was not reached: ${Math.round(flat)} blocks from its middle, its radius ${radius}`); }

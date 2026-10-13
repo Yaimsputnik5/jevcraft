@@ -260,6 +260,8 @@ test('the climb\'s option says whether the drop\'s pool can be poured at the pil
     const client = { systemOne: async ({ questions }) => { said = questions.branch_0.criteria; return { answers: { branch_0: { choice: 'observe' } } }; } };
     await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig, place: async () => {} }, client);
     assert.ok(said?.pillar_punch_30, Object.keys(said || {}).join(','));
+    // The blocks the climb takes with its roofs, said (note 1541).
+    assert.equal(said.pillar_punch_30.blocksForTheClimb, said.pillar_punch_30.blocks + Math.ceil(said.pillar_punch_30.blocks / 3));
     if (rim) assert.match(said.pillar_punch_30.wayDown, /no pool can be poured at this pillar's foot/);
     else assert.match(said.pillar_punch_30.wayDown, /a pool of water can be poured on level ground/);
   }
