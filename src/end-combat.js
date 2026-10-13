@@ -1727,6 +1727,52 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // route "noPath" and "no clear arrow trajectory" to a dragon 19 to 37
     // blocks off with no mob near, 187 arrows carried (note 1136).
     const box = actions.dig && enclosed(bot);
+    // On the island's low eastern shelf with blocks carried (note 1506): the
+    // way up onto the top, a column laid against the cliff's face and a step
+    // off it onto the top. The shelf at 40 to 46 meets the top at 56 to 62 in
+    // faces of three to six, and the walks to the pillars' feet from it end
+    // 'no route' or 'timed out' (25588, dragon-67 to dragon-76, 2026-10-13,
+    // five to eight a run, two to four minutes each run down there). The
+    // cliff's base: the nearest cell within 24 whose ground is level with
+    // the feet and whose neighbour toward the island's middle is three to
+    // nine blocks higher, under the sky.
+    {
+      const feet = bot.entity.position.floored(), carried = blocksCarried(bot);
+      const top = (x, z) => { for (let y = feet.y + 12; y >= feet.y - 12; y--) if (bot.blockAt(new Vec3(x, y, z))?.boundingBox === 'block') return y + 1; return null; };
+      if (feet.y <= 54 && carried >= 8 && !onOwnPillar() && !onObsidianTop() && !Object.keys(tree).some(k => k.startsWith('pillar_punch_'))) {
+        let best = null;
+        for (let dx = -24; dx <= 24; dx += 1) for (let dz = -24; dz <= 24; dz += 1) {
+          const x = feet.x + dx, z = feet.z + dz; const d = Math.hypot(dx, dz); if (d > 24 || (best && d >= best.d)) continue;
+          const here = top(x, z); if (here === null || Math.abs(here - feet.y) > 2) continue;
+          for (const [ox, oz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+            const up = top(x + ox, z + oz); if (up === null) continue;
+            const rise = up - here; if (rise < 3 || rise > 9) continue;
+            if (Math.hypot(x + ox, z + oz) >= Math.hypot(x, z)) continue; // toward the island's middle
+            if (bot.blockAt(new Vec3(x + ox, up, z + oz))?.boundingBox === 'block' || bot.blockAt(new Vec3(x + ox, up + 1, z + oz))?.boundingBox === 'block') continue;
+            const base = new Vec3(x, here, z); const { deepBeside } = require('./end-safety');
+            if (deepBeside(bot, base.offset(.5, 0, .5)) || voidEdge(bot, base.offset(.5, 0, .5), 3) !== null) continue;
+            best = { d, base, rise, step: new Vec3(x + ox, up, z + oz) }; break;
+          }
+        }
+        if (best) tree.climb_to_the_top = { description: { action: `The bot stands on the island's low shelf at ${feet.y}, below its top: walk ${Math.round(best.d)} blocks to the cliff's base at (${best.base.x}, ${best.base.z}), lay a column of ${best.rise} blocks against its face from the ${carried} carried, and step off it onto the top at ${best.step.y}, where the pillars' feet are walked to. The walks to the pillars' feet from the shelf have ended 'no route' or 'timed out' this fight and others.`,
+            blocksCarried: carried, climb: best.rise, blocksToTheBase: Math.round(best.d), health: bot.health },
+          run: async () => {
+            goal.step = { action: 'climb_to_the_top', base: { ...best.base }, rise: best.rise }; save();
+            try { await actions.navigate(bot, task, new goals.GoalBlock(best.base.x, best.base.y, best.base.z), { timeoutMs: 30000, stallMs: 6000 }); }
+            catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+            const at = bot.entity.position.floored();
+            if (Math.abs(at.x - best.base.x) + Math.abs(at.z - best.base.z) > 1) throw new Error(`The cliff's base was not reached: at ${at}, ${Math.round(bot.entity.position.distanceTo(best.base.offset(.5, 0, .5)))} blocks off`);
+            const pr = require('./pillar-recovery');
+            await pr.pillarUp(bot, task, best.step.y, { dig: actions.dig, maxBlocks: best.rise + 2, threats: false });
+            if (Math.floor(bot.entity.position.y) < best.step.y) throw new Error(`The column against the cliff stopped ${best.step.y - Math.floor(bot.entity.position.y)} short`);
+            await require('./motion').move(bot, task, { label: 'onto_the_top', keys: ['forward'], sneak: true, look: best.step.offset(.5, 1.6, .5), maxMs: 2500, tick: 25,
+              until: () => Math.floor(bot.entity.position.x) === best.step.x && Math.floor(bot.entity.position.z) === best.step.z });
+            delete bot._pillarUp;
+            if (Math.floor(bot.entity.position.x) === best.step.x && Math.floor(bot.entity.position.z) === best.step.z) { progress = true; console.log(`[end combat] up onto the island's top at ${bot.entity.position.floored()}`); }
+            else throw new Error(`The step onto the top was not taken: at ${bot.entity.position.floored()}`);
+          } };
+      }
+    }
     // Under the island's rock with a pickaxe (note 1488): the way up to the sky,
     // the blocks over the head dug and the column laid under the feet
     // (pillarUp with end stone diggable). 25588 (dragon-66, 2026-10-13 16:30Z)
