@@ -1417,7 +1417,14 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // island's flat middle nothing rises beside the feet, and 25588
             // (dragon-68, 2026-10-13 17:20Z, three crystals broken, 10 blocks
             // carried, 26 wanted) stood 'only observe' with no quarry offered.
-            const inPit = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => bot.blockAt(feet.offset(dx, 0, dz))?.boundingBox === 'block');
+            // Any block at the feet's level within four, not only beside them
+            // (note 1503): the rounds dig a ring to four out, and standing in
+            // the middle of a pit seven wide nothing is beside the feet, so the
+            // floor went down again. 25588 (dragon-74, 2026-10-13 19:09Z) stood
+            // at (9, 55, 10), six under the island's top, 'only observe',
+            // crystal 77's climb grown from 17 blocks to 24.
+            let inPit = false;
+            for (let dx = -4; dx <= 4 && !inPit; dx++) for (let dz = -4; dz <= 4 && !inPit; dz++) if ((dx || dz) && bot.blockAt(feet.offset(dx, 0, dz))?.boundingBox === 'block') inPit = true;
             if (skyOver(feet.offset(0, -1, 0))) for (let r = 2; r <= 4 && cells.length < want; r++) for (let dx = -r; dx <= r && cells.length < want; dx++) for (let dz = -r; dz <= r && cells.length < want; dz++) {
               if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
               for (const dy of inPit ? [1, 0] : [1, 0, -1]) {
