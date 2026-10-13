@@ -897,6 +897,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         // is down first (pillar_down): the arena's drill of 2026-10-13 (03:45Z)
         // tried the walk from the top four times, 24 to 28 blocks off.
         if ((onOwnPillar() || onObsidianTop() || here.y > 72) && out > radius + 2.2) continue;
+        // A foot the walk did not reach rests two minutes (note 1424): from the
+        // entry platform, 25588 (dragon-11, 2026-10-13 06:33Z) was offered the
+        // crystal 63 blocks off across the void and chose it, the walk going
+        // nowhere, while the bridge to the island was the way.
+        if ((state.punchUnreached || {})[target.id] > Date.now() - 120000) continue;
         tree[`pillar_punch_${target.id}`] = {
           description: { action: under
             ? `Walk to the foot of the healing crystal's obsidian pillar (radius ${radius}), pillar up ${lift} blocks beside it on the blocks carried to two under the bedrock the crystal stands on, and strike the crystal from there by hand: any blow breaks one, and the bedrock is between the bot and its blast`
@@ -911,7 +916,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             try { await actions.navigate(bot, task, foot, { timeoutMs: 40000, stallMs: 6000, sprint: true, stopWhen: () => hostileEntities(bot, 4).some(e => live(bot, e)) }); }
             catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
             const p = bot.entity.position, flat = Math.hypot(c.x + .5 - p.x, c.z + .5 - p.z);
-            if (flat > radius + 2.2) throw new Error(`The pillar's foot was not reached: ${Math.round(flat)} blocks from its middle, its radius ${radius}`);
+            if (flat > radius + 2.2) { (state.punchUnreached ||= {})[target.id] = Date.now(); save(); throw new Error(`The pillar's foot was not reached: ${Math.round(flat)} blocks from its middle, its radius ${radius}`); }
             const from = Math.floor(p.y);
             // A climb stops at one block the server refused (pillarUp); taken up
             // again, three times at most, before it is given up.
