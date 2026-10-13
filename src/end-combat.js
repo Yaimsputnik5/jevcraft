@@ -486,8 +486,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const u = bot._pillarUp; if (!u) return false;
     const col = new Vec3(u.x + .5, bot.entity.position.y, u.z + .5), toCol = () => Math.hypot(col.x - bot.entity.position.x, col.z - bot.entity.position.z);
     if (toCol() < 0.2 && Math.floor(bot.entity.position.x) === u.x && Math.floor(bot.entity.position.z) === u.z) return true;
-    try { await actions.navigate(bot, task, new goals.GoalBlock(u.x, Math.floor(bot.entity.position.y), u.z), { timeoutMs: 10000, stallMs: 3000 }); }
-    catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+    // No pathfinder walk on an obsidian top (note 1476): crouched steps only,
+    // which cannot leave an edge. 25588 (dragon-57, 2026-10-13 14:45Z, full
+    // iron, crystal 94 broken on the tallest top at 103) was walked past its
+    // column and off the far edge by the walk back, 42 blocks to its death.
+    const underName = bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || '';
+    if (!/^(obsidian|bedrock|iron_bars)$/.test(underName)) {
+      try { await actions.navigate(bot, task, new goals.GoalBlock(u.x, Math.floor(bot.entity.position.y), u.z), { timeoutMs: 10000, stallMs: 3000 }); }
+      catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+    }
     // Centred on the column's cell (the dig is from under the feet): a stand
     // at its edge, 0.45 off, had obsidian under the feet and dug nothing
     // (the drill of 2026-10-13, 04:20Z).
