@@ -1386,9 +1386,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // 'not reached' from 52 and 35 blocks, the pathfinder digging nothing.
             // Under the sky: no block within twelve over the cell, so no tunnel.
             const skyOver = p => { for (let dy = 1; dy <= 12; dy++) if (bot.blockAt(p.offset(0, dy, 0))?.boundingBox === 'block') return false; return true; };
+            // The floor a block down as well, but only from level ground (note
+            // 1494): standing in a pit (a block beside the feet at their level)
+            // the walls are dug, never the floor, so no pit goes two deep. On the
+            // island's flat middle nothing rises beside the feet, and 25588
+            // (dragon-68, 2026-10-13 17:20Z, three crystals broken, 10 blocks
+            // carried, 26 wanted) stood 'only observe' with no quarry offered.
+            const inPit = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => bot.blockAt(feet.offset(dx, 0, dz))?.boundingBox === 'block');
             if (skyOver(feet.offset(0, -1, 0))) for (let r = 2; r <= 4 && cells.length < want; r++) for (let dx = -r; dx <= r && cells.length < want; dx++) for (let dz = -r; dz <= r && cells.length < want; dz++) {
               if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
-              for (const dy of [1, 0]) {
+              for (const dy of inPit ? [1, 0] : [1, 0, -1]) {
                 const p = feet.offset(dx, dy, dz);
                 if (bot.blockAt(p)?.name !== 'end_stone' || bot.blockAt(p.offset(0, -1, 0))?.boundingBox !== 'block' || !skyOver(p) || deepBeside(bot, p.offset(.5, 1, .5))) continue;
                 cells.push(p); break;
