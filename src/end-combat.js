@@ -609,9 +609,34 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   const roofOverhead = async () => {
     const f = bot.entity.position.floored(), cell = f.offset(0, 2, 0);
     if (bot.blockAt(cell)?.boundingBox === 'block') return true;
-    const ref = [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0]].map(([dx, dy, dz]) => ({ b: bot.blockAt(cell.offset(dx, dy, dz)), face: new Vec3(-dx, -dy, -dz) })).find(r => r.b?.boundingBox === 'block');
+    let ref = [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0]].map(([dx, dy, dz]) => ({ b: bot.blockAt(cell.offset(dx, dy, dz)), face: new Vec3(-dx, -dy, -dz) })).find(r => r.b?.boundingBox === 'block');
     const name = blocksCarriedName(bot), item = name && bot.inventory.items().find(i => i.name === name);
-    if (!ref || !item) return false;
+    if (!item) return false;
+    // Nothing beside the cell over the head (the column at a corner of the
+    // obsidian, or alone): a post is laid up the column's own side (note
+    // 1454), from the block under the feet to the cell beside the roof's,
+    // four blocks, and the roof against it. Half the roofs asked for today
+    // were 'not laid' for want of a block beside: 25588 (dragon-34,
+    // 2026-10-13 10:53Z, full iron, three crystals in five minutes) took 14
+    // of the breath on its climb to crystal 109 and died on the way down.
+    if (!ref) {
+      const under = bot.blockAt(f.offset(0, -1, 0));
+      if (under?.boundingBox !== 'block') return false;
+      const side = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dz]) => [-1, 0, 1, 2].every(dy => bot.blockAt(f.offset(dx, dy, dz))?.boundingBox !== 'block'));
+      if (!side) return false;
+      try {
+        await bot.equip(item, 'hand'); check();
+        // The first against the under block's side, the rest each on the one below.
+        await bot.lookAt(under.position.offset(.5 + side[0] * .5, .5, .5 + side[1] * .5), true); await bot.placeBlock(under, new Vec3(side[0], 0, side[1])); await sleep(60);
+        for (let dy = 0; dy <= 2; dy++) {
+          const below = bot.blockAt(f.offset(side[0], dy - 1, side[1])); if (below?.boundingBox !== 'block') break;
+          check(); await bot.lookAt(below.position.offset(.5, 1, .5), true); await bot.placeBlock(below, new Vec3(0, 1, 0)); await sleep(60);
+        }
+      } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+      const post = bot.blockAt(cell.offset(side[0], 0, side[1]));
+      if (post?.boundingBox !== 'block') { console.log(`[end combat] no post for a roof over the head at ${cell}: ${post?.name || 'nothing'} where its top should be`); return false; }
+      ref = { b: post, face: new Vec3(-side[0], 0, -side[1]) };
+    }
     try {
       await bot.equip(item, 'hand'); check();
       await bot.lookAt(ref.b.position.offset(.5 + ref.face.x * .5, .5 + ref.face.y * .5, .5 + ref.face.z * .5), true);
