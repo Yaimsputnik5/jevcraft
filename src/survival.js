@@ -2860,7 +2860,13 @@ class Survival {
         // seconds, 14.3 health to none, stopped nothing.
         const atArm = !!byMob && !!source?.position && source.position.distanceTo(bot.entity.position) <= 3;
         const answering = (held && held.choice !== 'keep_working' && !require('./vitals').inFire(bot)) || (!!require('./vitals').wayOutRunning(bot, now) && !atArm);
-        if (bot._hurtTimes.filter(t => now - t < 4000).length >= (byMob ? 1 : 2) && !answering && !(bot._threatResponseAt > now - 3000) && !(bot._threatAbortAt > now - 5000) && (bot.health ?? 0) > 0) {
+        // Not in the End (note 1431): the fight there owns every tick and
+        // answers the hurt itself, and this stop cut its answers short: 25588
+        // (dragon-15, 2026-10-13 07:13Z), in the dragon's breath on its column,
+        // was digging down out of it when the stop aborted the dig at 14
+        // health ('Digging aborted'), and it fell to its death at 8.
+        const inEnd = /end$/.test(String(bot.game?.dimension || ''));
+        if (!inEnd && bot._hurtTimes.filter(t => now - t < 4000).length >= (byMob ? 1 : 2) && !answering && !(bot._threatResponseAt > now - 3000) && !(bot._threatAbortAt > now - 5000) && (bot.health ?? 0) > 0) {
           bot._threatAbortAt = now; bot._threatAbort = true;
           const was = require('./turn').stopForTurn(bot);
           console.log(`[hurt] hit with no survival response (health ${Math.round(bot.health)}): the step is stopped for the survival layer ${JSON.stringify({
