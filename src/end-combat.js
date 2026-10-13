@@ -492,11 +492,13 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // pillar beside a crystal's). The pass is held through instead, crouched
     // with the shield up, a second and a half; the step then goes on, to the
     // climb or the way down.
-    else if (onOwnPillar() && endEmergency(bot) === 'dragon_breath_cloud') {
-      // The breath on the column: a shield does not stop it (Instant Damage,
-      // magic), and the drill of 2026-10-13 (05:35Z) died holding in it, 4 a
-      // time to none. The cloud lies on the top; three blocks down the column
-      // is under it.
+    else if (onOwnPillar() && ['dragon_breath_cloud', 'incoming_dragon_fireball'].includes(endEmergency(bot))) {
+      // The breath on the column, or a fireball coming (its cloud lands where
+      // the bot stands): a shield does not stop it (Instant Damage, magic),
+      // the drill of 2026-10-13 (05:35Z) died holding in it, 4 a time to none,
+      // and 25588 (dragon-9, 06:05Z) held with the shield up for a fireball,
+      // 20 to 8 in six seconds, and died of the next at 06:06Z. The cloud lies
+      // on the top; three blocks down the column is under it.
       goal.step = { action: 'down_out_of_breath', health: bot.health }; save();
       await digDownColumn({ limit: 3 });
     }
@@ -901,7 +903,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             : `Walk to the foot of the healing crystal's obsidian pillar (radius ${radius}, too thick to reach the crystal from its side), pillar up ${lift} blocks beside it on the blocks carried to its top, step onto the top two blocks from the crystal's bedrock, crouch, and strike the crystal by hand: any blow breaks one; crouched, the bot's body above the bedrock's top face is in the blast's line`,
             position: { ...target.position }, blocksOff: out, blocks: lift, blocksCarried: carried, pillarRadius: radius, stance: under ? 'under the bedrock top, beside the pillar' : 'on the top, crouched',
             dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null,
-            onTheColumn: `the climb and the way down are a minute or two each on a column one block wide, where the dragon's fireballs and breath find the bot and there is no step aside: in the arena's drills of 2026-10-13 (05:08 to 05:35Z) the bot broke six crystals so, and died twice on its column after a blow, once holding in the breath, once knocked off it at 9 health; the breath on the column is answered by digging down three`, ...(isCaged ? { caged: `iron bars round it, dug out between the stand and the crystal with the ${pickForBars.name.replaceAll('_', ' ')} first` } : {}), dragonPhase: metadata(bot, dragon, 'phase'), health: bot.health,
+            onTheColumn: `the climb and the way down are a minute or two each on a column one block wide, where the dragon's fireballs and breath find the bot and there is no step aside: a fireball's cloud on the column took 6 a second from 25588 (2026-10-13 06:05Z, 20 to 8 in six seconds, and 10 to none a minute later on its next climb); in the arena's drills (05:08 to 05:35Z) the bot broke six crystals so and died twice on its column after a blow; the breath or a fireball on the column is answered by digging down three`, ...(isCaged ? { caged: `iron bars round it, dug out between the stand and the crystal with the ${pickForBars.name.replaceAll('_', ' ')} first` } : {}), dragonPhase: metadata(bot, dragon, 'phase'), health: bot.health,
             fallFromTheTop: `a knock off the top is a fall of ${lift} blocks, about ${Math.max(0, lift - 3)} damage before armour${countOf(bot, 'water_bucket') ? ', a water bucket carried for the landing' : ', no water bucket carried'}`,
             crystalBlast: punchRecordSays(state, under) },
           run: async () => {
