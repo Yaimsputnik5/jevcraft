@@ -362,6 +362,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const NEVER = new Set(['item', 'experience_orb', 'arrow', 'spectral_arrow', 'trident', 'area_effect_cloud', 'dragon_fireball', 'fireball', 'small_fireball', 'shulker_bullet', 'end_crystal']);
     bot.attack = (entity, ...rest) => {
       if (!entity || (NEVER.has(entity.name) && !(entity.name === 'end_crystal' && bot._crystalBlow))) { console.log(`[end combat] no blow at ${entity?.name || 'nothing'} (id ${entity?.id}): it cannot be struck`); return; }
+      // Every blow named (note 1463): the server's door ('invalid_entity_attacked') was shown 25588 five times today with no blow the guard refused, the last two on the way down a column (dragon-43, 12:2xZ).
+      console.log(`[end combat] blow at ${entity.name} (id ${entity.id}, ${Math.round(entity.position?.distanceTo?.(bot.entity.position) * 10) / 10} off)`);
       return raw(entity, ...rest);
     };
   }
@@ -1306,9 +1308,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             const observe = packet => { if (vector(packet.center).distanceTo(target.position) < 3) explosion = true; };
             bot._client.on('explosion', observe);
             try {
-              for (let n = 0; n < 3 && !explosion && live(bot, target); n++) {
+              // One blow (note 1463): a second at a crystal the server has removed is a blow at nothing it knows.
+              for (let n = 0; n < 1 && !explosion && live(bot, target); n++) {
                 bot._crystalBlow = true; try { bot.attack(target); } finally { bot._crystalBlow = false; }
-                for (let k = 0; k < 30 && !explosion && live(bot, target); k++) { check(); await sleep(50); }
+                for (let k = 0; k < 40 && !explosion && live(bot, target); k++) { check(); await sleep(50); }
               }
             } finally { bot._client.removeListener('explosion', observe); bot.setControlState?.('sneak', false); if (shielded) { try { bot.deactivateItem?.(); } catch (_) { /* lowered already */ } } }
             await sleep(300);
