@@ -36,9 +36,15 @@ function clutchTarget(bot, serverPosition) {
 // One recovery at a time (note 1483): a second caller in the same fall gets
 // the first's promise, not a second bucket click, which would take the water
 // back up with the empty bucket.
+// The caller's interrupt check is set aside for the whole recovery, from its
+// first check (note 1484): the fall is the End fight's own emergency, and
+// recoverFall called from the fight's tick watcher (note 1483) was thrown out
+// by it at once, 'the water under the fall: dangerous_fall' (25588, dragon-65,
+// 2026-10-13 16:21Z, from (40, 56, -23) at 15 health).
 async function recoverFall(bot, task, goal, save, options = {}) {
   if (bot._fallRecovery) return bot._fallRecovery;
-  bot._fallRecovery = recoverFallOnce(bot, task, goal, save, options).finally(() => { bot._fallRecovery = null; });
+  const previousInterrupt = task.interruptCheck; task.interruptCheck = undefined;
+  bot._fallRecovery = recoverFallOnce(bot, task, goal, save, options).finally(() => { bot._fallRecovery = null; task.interruptCheck = previousInterrupt; });
   return bot._fallRecovery;
 }
 async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refill = true } = {}) {

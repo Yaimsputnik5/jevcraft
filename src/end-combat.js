@@ -560,6 +560,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   };
   const digDownColumn = async ({ limit = 64 } = {}) => {
     let passes = 0, aborts = 0;
+    const digFromY = Math.floor(bot.entity.position.y), digFromHealth = bot.health;
     // The column's blocks: what the climb lays, end stone among them (note
     // 1438): 25588 (dragon-21, 2026-10-13 08:17Z), its cobblestone gone and
     // its column laid in end stone, had the way down dig nothing at (-31, 85,
@@ -592,7 +593,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // a second, and 25588 (dragon-33, 2026-10-13 10:41Z, full iron, three
       // crystals broken) held crouched in it for the dragon's pass, 17 to 11
       // to 5 to none. In the cloud the dig is the way; the pass is taken.
-      if (passes < 20 && dragonThreat(bot) && !breathThreat(bot)) { passes++; await holdOnColumn(); n--; continue; }
+      if (passes < 20 && dragonThreat(bot) && !breathThreat(bot)) { passes++; const held = await holdOnColumn(); if (held === 'cloud' && state.descent?.pick === 'water_drop' && await waterDrop()) return; n--; continue; }
       // The column's own cell, and the body centred on it again each block
       // (note 1452): a body a cell off the column after a drop or a knock
       // read air under its middle, and 25588 (dragon-33, 2026-10-13 10:31Z)
@@ -687,6 +688,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // The record kept on the obsidian (note 1473): the way back to the column from the top can fail, and the record dropped there left 25588 (dragon-55, 2026-10-13 14:22Z, crystal 9 broken) 'only observe' on the top, 'column undefined'.
     { const un = bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || ''; if (!scaffold.test(un) && !/^(obsidian|bedrock|iron_bars)$/.test(un)) delete bot._pillarUp; }
     console.log(`[end combat] down the column: ${n} dug, now at ${bot.entity.position.floored()}`);
+    // The descent's record for the way-down question (note 1484).
+    { const from = digFromY, to = Math.floor(bot.entity.position.y); (state.descents ||= []).push({ at: Date.now(), kind: 'dig', from, to, dug: n, down: from - to >= Math.min(limit, 3), fell: from - to > n + 2, lost: Math.round((digFromHealth - bot.health) * 10) / 10 }); state.descents = state.descents.slice(-20); }
     // The column's blocks lie at its foot: picked up for the next climb. The
     // drill of 2026-10-13 (04:26 to 04:56Z) built four columns and had 16 of
     // its 128 blocks left, none picked up.
@@ -739,6 +742,73 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     console.log(`[end combat] a roof against the fireball over the head at ${cell}: ${roofed ? 'laid' : 'not laid'}`);
     return roofed;
   };
+  // The way down the column by the water bucket (note 1484): off the column's
+  // edge onto the island by its foot, the water under the body in the last
+  // blocks of the fall (fall-recovery.js), the bucket filled again from the
+  // pool. The dig down is a block a second and a half, 15 to 20 of them,
+  // and every blow of the breath on a column one wide knocks the body 0.4
+  // away from the dragon and lifts it: 25588 fell off its column in the
+  // breath five times on 2026-10-13 (dragon-59, 61, 62, 63, 64), three to
+  // its death, two blows enough each time. The side stepped off: the one
+  // with ground soonest under it and nothing solid beside the feet.
+  const waterDropSide = () => {
+    const u = bot._pillarUp; if (!u) return null;
+    const f = bot.entity.position.floored();
+    let best = null;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (bot.blockAt(f.offset(dx, 0, dz))?.boundingBox === 'block' || bot.blockAt(f.offset(dx, 1, dz))?.boundingBox === 'block') continue;
+      let fall = null;
+      for (let dy = 1; dy <= 48; dy++) { const bl = bot.blockAt(f.offset(dx, -dy, dz)); if (bl?.boundingBox === 'block') { fall = dy - 1; break; } if (bl?.name === 'lava') break; }
+      if (fall === null || fall < 3) continue;
+      if (!best || fall < best.fall) best = { dx, dz, fall, edge: f.offset(dx, 0, dz) };
+    }
+    return best;
+  };
+  const waterDrop = async () => {
+    const side = waterDropSide();
+    const water = bot.inventory.items().find(i => i.name === 'water_bucket');
+    if (!side || !water) { console.log(`[end combat] no water drop from ${bot.entity.position.floored()}: ${!water ? 'no water bucket carried' : 'no side with ground under it'}`); return false; }
+    const startY = bot.entity.position.y, health = bot.health;
+    goal.step = { action: 'water_drop', from: { ...bot.entity.position }, fall: side.fall, health }; save();
+    console.log(`[end combat] the water drop from ${bot.entity.position.floored()}, ${side.fall} blocks onto the island at (${side.edge.x}, ${side.edge.z}), health ${health.toFixed(1)}`);
+    try { await bot.equip(water, 'hand'); } catch (_) { /* equipped in the fall */ }
+    try {
+      await require('./motion').move(bot, task, { label: 'water_drop', keys: ['forward'], sneak: false, why: 'off the column onto the island by its foot, the water bucket in hand for the landing (note 1484)',
+        look: side.edge.offset(0.5, 1.0, 0.5), maxMs: 2000, tick: 25, until: () => !bot.entity.onGround && bot.entity.position.y < startY - 0.5 });
+    } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    let wet = false;
+    try { wet = await recoverFall(bot, task, goal, save, { refill: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the water drop's landing: ${String(err.message || err).slice(0, 120)}`); }
+    for (let i = 0; i < 60 && !bot.entity.onGround; i++) await sleep(50);
+    const down = bot.entity.position.y <= startY - 3;
+    (state.descents ||= []).push({ at: Date.now(), kind: 'drop', from: startY, to: bot.entity.position.y, wet, lost: Math.round((health - bot.health) * 10) / 10, down });
+    console.log(`[end combat] the water drop ended ${down ? 'down' : 'still up'} at ${bot.entity.position.floored()}, ${wet ? 'in the water' : 'dry'}, health ${health.toFixed(1)} to ${bot.health.toFixed(1)}`);
+    if (down) delete bot._pillarUp;
+    save();
+    return down;
+  };
+  // The way down the column as Jev chose it for this fight (column_descent): the drop where chosen and possible, the dig otherwise.
+  const wayDown = async (opts) => {
+    if (state.descent?.pick === 'water_drop' && Date.now() - state.descent.at < 30 * 60000 && onOwnPillar() && await waterDrop()) return;
+    await digDownColumn(opts);
+  };
+  // Jev's choice of the way down, once a fight (note 1484): asked at the
+  // foot before the climb, where there is time for it; held half an hour.
+  const descentChoice = async (lift) => {
+    if (!client || (state.descent && Date.now() - state.descent.at < 30 * 60000)) return;
+    const water = countOf(bot, 'water_bucket');
+    const dug = (state.descents || []).filter(d => d.kind === 'dig'), dropped = (state.descents || []).filter(d => d.kind === 'drop');
+    const record = (list, what) => list.length ? ` This fight's ${list.length} ${what}${list.length === 1 ? '' : 's'}: ${list.filter(d => d.down).length} down, ${list.filter(d => d.fell).length} fell, ${Math.round(list.reduce((n, d) => n + (d.lost || 0), 0) * 10) / 10} health lost in all.` : '';
+    const tree = {
+      dig_down: { description: `Come down the column after each crystal by digging the block under the feet, one at a time, about a second and a half a block, ${lift} blocks here, crouched with the shield up through the dragon's passes. The breath's cloud lands on the column where the body stands, 6 health a second whatever is worn, and every blow of it knocks the body 0.4 away from the dragon and lifts it: on a column one wide two blows put the body off it. On 2026-10-13 25588 fell off its column in the breath five times this way (dragon-59, 61, 62, 63, 64), 10 to 19 blocks, three times to its death; the dig itself brought 14 blocks down safely in most descents.${record(dug, 'dig')}` },
+      water_drop: { description: `Come down the column after each crystal by stepping off its edge onto the island by its foot, ${lift} blocks down, the water bucket in hand: the water is poured under the body in the last four blocks of the fall and the body lands in it unhurt, the bucket filled again from the pool. ${water} water bucket${water === 1 ? '' : 's'} carried. A second and a half in the air instead of twenty seconds on the column. Where the water is not poured in time (the pour has worked on the island's edges before; it has not been tried from a column in a live fight) the fall of ${lift} blocks takes about ${Math.max(0, lift - 3)} health. The column's blocks are left standing; the next climb's blocks are dug from the island (quarry_blocks). Chosen, it is also the way out of the breath's cloud at the feet on the column: off at once, not three blocks dug in it.${record(dropped, 'drop')}` },
+    };
+    try {
+      const decision = await decide('column_descent', { client, bot, task, goal, save, tree, interrupt: check, state: { lift, waterBuckets: water, health: bot.health, descents: (state.descents || []).slice(-6) } });
+      if (decision.stale) return;
+      state.descent = { pick: decision.path.at(-1), at: Date.now() }; save();
+      console.log(`[end combat] the way down this fight: ${state.descent.pick}`);
+    } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the way down was not chosen: ${String(err.message || err).slice(0, 100)}`); }
+  };
   // The pass held through on the column, crouched with the shield up, a
   // second and a half (note 1414).
   const holdOnColumn = async () => {
@@ -780,7 +850,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (await holdOnColumn() !== 'cloud') return;
     console.log(`[end combat] the breath at the feet during the hold at ${bot.entity.position.floored()}, health ${bot.health.toFixed(1)}: down the column`);
     goal.step = { action: 'down_out_of_breath', health: bot.health }; save();
-    await digDownColumn({ limit: 3 });
+    await wayDown({ limit: 3 });
   };
   const respond = async () => {
     // Emergency handlers must not trip the guard that interrupted ordinary
@@ -813,17 +883,17 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         await holdOrDown();
       } else {
         goal.step = { action: 'down_out_of_breath', health: bot.health }; save();
-        await digDownColumn({ limit: 3 });
+        await wayDown({ limit: 3 });
       }
     }
     // On the obsidian top (no walk off it either): the breath or a fireball
     // sends the bot back to its column and three down; a pass is held through.
     else if (onObsidianTop() && ['dragon_breath_cloud', 'incoming_dragon_fireball'].includes(endEmergency(bot))) {
       goal.step = { action: 'off_the_top_out_of_breath', health: bot.health }; save();
-      if (await backToColumn()) await digDownColumn({ limit: 3 });
+      if (await backToColumn()) await wayDown({ limit: 3 });
     }
     else if (onOwnPillar()) await holdOrDown();
-    else if (onObsidianTop()) { if (await holdOnColumn() === 'cloud' && await backToColumn()) await digDownColumn({ limit: 3 }); }
+    else if (onObsidianTop()) { if (await holdOnColumn() === 'cloud' && await backToColumn()) await wayDown({ limit: 3 }); }
     else {
       // Out of the dragon's way by ground no mob stands near, and where
       // there is none, by any ground (note 1174): an enderman's blow is
@@ -1357,6 +1427,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             const p = bot.entity.position, flat = Math.hypot(c.x + .5 - p.x, c.z + .5 - p.z);
             if (flat > radius + 2.2) { (state.punchUnreached ||= {})[target.id] = Date.now(); save(); throw new Error(`The pillar's foot was not reached: ${Math.round(flat)} blocks from its middle, its radius ${radius}`); }
             const from = Math.floor(p.y);
+            await descentChoice(feetY - from);
             // A climb stops at one block the server refused (pillarUp); taken up
             // again, three times at most, before it is given up.
             for (let tries = 0; tries < 3 && Math.floor(bot.entity.position.y) < feetY; tries++) {
@@ -1472,7 +1543,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // (dragon-39, 2026-10-13 11:41Z, full iron, crystal 9 broken) came
             // down three at a time, 79, 75, 72, a question between each, and died
             // on the column at 72 with 7 blocks left.
-            if (!live(bot, target) && onOwnPillar()) { goal.step = { action: 'down_after_the_blow', crystal: target.id, health: bot.health }; save(); await digDownColumn({ limit: 64 }); }
+            if (!live(bot, target) && onOwnPillar()) { goal.step = { action: 'down_after_the_blow', crystal: target.id, health: bot.health }; save(); await wayDown({ limit: 64 }); }
             // And straight down the column (as pillar_down digs): left on the top at
             // 5.4 health, the drill of 2026-10-13 (04:02Z) took the dragon's breath
             // twice there, 6 and 6, and went over the edge at 1.5.

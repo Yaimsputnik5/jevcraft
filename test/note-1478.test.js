@@ -99,3 +99,32 @@ test('a fall off the column mid-step is caught in the air: the water bucket goes
   assert.ok(steps.includes('protect_fall_with_water'), steps.join(','));
   assert.ok(equipped.includes('water_bucket'), equipped.join(','));
 });
+
+test('the way down chosen as the water drop: off the column\'s edge with the bucket, nothing dug (note 1484)', async () => {
+  const { bot, goal, task } = fixture();
+  const V = require('vec3').Vec3;
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'water_drop', at: Date.now() } };
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 20 }, { name: 'water_bucket', count: 2 }];
+  bot.entity.velocity = new V(0, -0.08, 0);
+  bot.entities[20].position = new V(80, 90, 80);
+  const cloud = { id: 40, name: 'area_effect_cloud', position: new V(0.5, 76, 0.5), isValid: true, metadata: {} };
+  cloud.metadata[registry.entitiesByName.area_effect_cloud.metadataKeys.indexOf('radius')] = 3;
+  bot.entities[40] = cloud;
+  const equipped = [], dug = [];
+  bot.equip = async item => { equipped.push(item.name); };
+  bot.stopDigging = () => {};
+  bot.controlState = {};
+  bot.setControlState = (k, v) => {
+    bot.controlState[k] = v;
+    if (k === 'forward' && v) setTimeout(() => { bot.entity.position = new V(1.5, 75.4, 0.5); bot.entity.onGround = false; bot.entity.velocity = new V(0.1, -0.5, 0); bot.emit('physicsTick');
+      setTimeout(() => { bot.entity.position = new V(1.5, 64, 0.5); bot.entity.onGround = true; bot.entity.velocity = new V(0, -0.08, 0); bot.emit('physicsTick'); }, 250); }, 60);
+  };
+  const steps = [];
+  const save = () => { if (goal.step) steps.push(goal.step.action); };
+  await fightEndStep(bot, task, goal, save, { navigate: async () => {}, dig: async (b, t, p) => { dug.push(p); }, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'observe' } } }) });
+  assert.ok(steps.includes('water_drop'), steps.join(','));
+  assert.ok(equipped.includes('water_bucket'), equipped.join(','));
+  assert.equal(dug.length, 0, dug.map(String).join(' '));
+  assert.equal(Math.floor(bot.entity.position.y), 64);
+  assert.equal(goal.endCombat.descents?.[0]?.kind, 'drop');
+});

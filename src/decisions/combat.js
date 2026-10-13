@@ -118,4 +118,17 @@ define({
   ungated: 'Jev\'s pick is taken at any confidence and asked again each step; Jev not reachable, the bot holds and it is asked again (jev-down.js)',
 });
 
+// The way down the bot's own column after each crystal (src/end-combat.js descentChoice, note 1484).
+define({
+  id: 'column_descent', area: 'endgame', parent: 'dragon_fight', kind: 'end', primitive: 'choice', stakes: 'medium', tree: true,
+  question: 'After each crystal is struck from the column, how does the bot come down: digging the column under its feet a block at a time, or stepping off its edge with the water bucket for the landing?',
+  trigger: 'At the foot of a crystal\'s pillar before the climb (pillar_punch), once a fight; asked again after half an hour.',
+  source: 'src/end-combat.js (fightEndStep: descentChoice, wayDown, waterDrop, digDownColumn)',
+  options: [
+    { key: 'dig_down', label: 'dig the column down from under the feet, a block at a time', when: 'always here; said with the breath\'s knock on a column one wide and the record of the falls', level: 'root' },
+    { key: 'water_drop', label: 'step off the column\'s edge, the water bucket poured under the body before it lands', when: 'always here; said with the buckets carried, the fall, and what the fall costs when the pour is late', level: 'root' },
+  ],
+  instructions: { task: 'The bot is about to climb a column beside a crystal\'s pillar in the End. Choose how it comes down after the blow, for this fight.', guidance: 'Each option says what it costs and its record: the time on the column and the breath\'s knock, or the fall and the bucket.' },
+});
+
 module.exports = {};
