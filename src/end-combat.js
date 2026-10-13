@@ -520,10 +520,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // when the block under it is dug (the drills of 2026-10-13, 04:52 and
   // 05:02Z, one dug and no drop). Short bursts of the forward key at a
   // crouch, the look set to the column's middle each time.
-  const centreOnColumn = async () => {
+  const centreOnColumn = async (tolerance = 0.1) => {
     const u = bot._pillarUp; if (!u) return false;
     const col = () => new Vec3(u.x + .5, bot.entity.position.y, u.z + .5), off = () => Math.hypot(col().x - bot.entity.position.x, col().z - bot.entity.position.z);
-    for (let i = 0; i < 24 && off() > 0.1; i++) {
+    for (let i = 0; i < 24 && off() > tolerance; i++) {
       check();
       if (typeof bot.lookAt === 'function') await bot.lookAt(col().offset(0, 1.6, 0), true);
       bot.setControlState?.('sneak', true); bot.setControlState?.('forward', true);
@@ -552,7 +552,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // By the drop alone (note 1474): the roof's post beside the column and the obsidian made two solid sides, and 25588 (dragon-55, 2026-10-13 14:28Z, crystals 9 and 67 broken) had its end-stone column at 69 read as ended, 'column undefined'.
     const columnEnded = () => { const f = bot.entity.position.floored(); const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block'); const drop = ([dx, dz]) => { for (let dy = 1; dy <= 6; dy++) if (bot.blockAt(f.offset(dx, -dy, dz))?.boundingBox === 'block') return dy - 1; return 6; }; return Math.max(0, ...sides.map(drop)) < 3; };
     let n = 0;
-    if (!await centreOnColumn()) console.log(`[end combat] not centred on the column before the dig: ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off`);
+    // In the cloud, a body within 0.45 of the middle stands wholly on the block and is dug down at once (note 1481).
+    if (!await centreOnColumn(breathThreat(bot)?.name === 'area_effect_cloud' ? 0.45 : 0.1)) console.log(`[end combat] not centred on the column before the dig: ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off`);
     console.log(`[end combat] down the column from ${bot.entity.position.floored()}, ${bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || 'nothing'} under the feet, column ${JSON.stringify(bot._pillarUp)}`);
     for (; n < limit; n++) {
       check();
@@ -585,7 +586,14 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // full iron, crystal 12 broken) had its roof at 76 and the cloud at its
       // feet at 74, 20 to 14 to 9.7 to 4.7, and was knocked off digging.
       // Every third block (note 1459): the roofs and their posts took 26 blocks of 33 on one climb and descent (dragon-39).
-      if (n % 3 === 0) { const fh = bot.entity.position.floored(); if (![2, 3, 4].some(dy => bot.blockAt(fh.offset(0, dy, 0))?.boundingBox === 'block')) { try { await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } } }
+      // Not with the breath at the feet (note 1481): the cloud is 6 a second,
+      // and the body is out of it two blocks down; the second block has to be
+      // dug inside two seconds, and a roof laid first costs the second.
+      // 25588 (dragon-61, 2026-10-13 15:40Z, four crystals broken) took the
+      // cloud on crystal 91's column top at 85, began the way down at once,
+      // and was a block down two seconds later, 20 to 14 to 8 to 2 to none.
+      const inCloud = breathThreat(bot)?.name === 'area_effect_cloud';
+      if (n % 3 === 0 && !inCloud) { const fh = bot.entity.position.floored(); if (![2, 3, 4].some(dy => bot.blockAt(fh.offset(0, dy, 0))?.boundingBox === 'block')) { try { await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } } }
       const yBefore = Math.floor(bot.entity.position.y);
       // A gap under the block dug is filled first (note 1434): the climb
       // beside a crystal's obsidian lays its blocks where the feet were, and
