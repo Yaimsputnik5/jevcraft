@@ -538,6 +538,8 @@ function tick(bot, survival, now = Date.now()) {
   hold.free = afloat ? moving : !!wayOut || moving || walkingStance || (!cover && guard.every(g => g.closing));
   if (hold.free) { hold.why = guard[0]?.why || hold.why; if (require('./combat').raiseShield(bot)) hold.raised = true; return; }
   const { set, look } = bot._shotRaw;
+  // Named for the move's log (note 1497): the raw set here goes round motion.js's watch.
+  if (bot._controller && !bot._controller.failed) bot._controller.letGoBy = `the shot hold (${hold.why || 'cover'}; moving ${moving}, way out ${!!wayOut}, walking stance ${walkingStance}, guard ${guard.map(g => g.name || g.kind || '?').join('/') || 'none'})`;
   for (const k of MOVE_KEYS) set(k, afloat && k === 'jump');
   if (require('./terrain').onSpan?.(bot)) set('sneak', true);
   if (cover && !guard.length) return walkCover(bot, cover);

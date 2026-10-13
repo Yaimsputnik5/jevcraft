@@ -324,8 +324,14 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600 } 
     // it died in it. Run once, then stand where the run ended.
     if (dragon?.name === 'dragon_fireball') {
       const last = goal.endCombat?.lastEvasion;
-      if (last?.straightRun && last.hazard?.name === 'dragon_fireball' && Date.now() - last.at < 2500) {
-        goal.step = { action: 'stand_after_fireball_run', since: last.at }; save();
+      // Only after a run that went somewhere (note 1497): four blocks or more
+      // from where it began, out of the cloud's reach. 25588 (dragon-70,
+      // 2026-10-13 18:00Z, eight crystals broken, 4.9 health, no food left)
+      // ran 1.8 blocks from a fireball, stood where the run ended, and the
+      // ball's cloud took it there.
+      const ran = last?.from && last?.to ? Math.hypot(last.to.x - last.from.x, last.to.z - last.from.z) : 0;
+      if (last?.straightRun && last.hazard?.name === 'dragon_fireball' && Date.now() - last.at < 2500 && ran >= 4) {
+        goal.step = { action: 'stand_after_fireball_run', since: last.at, ran: Math.round(ran * 10) / 10 }; save();
         await sleep(200); return true;
       }
     }
