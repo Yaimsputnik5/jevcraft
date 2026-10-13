@@ -526,6 +526,13 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       if (onCell && (f0.x !== u.x || f0.z !== u.z)) { await centreOnColumn(); }
       const underFoot = onCell ? new Vec3(u.x, Math.floor(bot.entity.position.y) - 1, u.z) : bot.entity.position.floored().offset(0, -1, 0);
       if (!scaffold.test(bot.blockAt(underFoot)?.name || '')) break;
+      // A roof kept over the head on the way down (note 1455), laid again
+      // when the one above is three or more over: the breath that kills on
+      // the column comes with no fireball seen in flight, and the way down is
+      // where the body stands longest. 25588 (dragon-35, 2026-10-13 10:59Z,
+      // full iron, crystal 12 broken) had its roof at 76 and the cloud at its
+      // feet at 74, 20 to 14 to 9.7 to 4.7, and was knocked off digging.
+      if (n % 2 === 0) { const fh = bot.entity.position.floored(); if (![2, 3].some(dy => bot.blockAt(fh.offset(0, dy, 0))?.boundingBox === 'block')) { try { await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } } }
       const yBefore = Math.floor(bot.entity.position.y);
       // A gap under the block dug is filled first (note 1434): the climb
       // beside a crystal's obsidian lays its blocks where the feet were, and
