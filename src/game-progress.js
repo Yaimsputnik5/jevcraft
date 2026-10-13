@@ -362,6 +362,10 @@ function ladderRung(bot, goal, waiting, { allOptional = false } = {}) {
   // An optional rung (note 776) is the ladder's only when Jev chose it, or
   // for optionalRungs' listing of them all.
   const ready = rung => rung && !waiting.has(rung.phase) && (allOptional || !skipsOptional(goal, rung.phase)) ? rung : null;
+  // The bed before the kit where Jev chose it at win_strategy (bed-first.js,
+  // note 1413): the ladder's next rung for the hour, ahead of the tools and
+  // the armour, until one is carried.
+  { const bf = require('./bed-first'); if (bf.bedFirstHolds(bot, goal) && !isSetAside(goal, 'bed_search', 'wool') && ready({ phase: 'bed' })) return bedRung(bot, goal); }
   // Equipped gear lives outside inventory.items(): armour in slots 5 to 8,
   // the shield in the off-hand at 45. A shield on the arm is not a missing shield.
   const equipped = [5, 6, 7, 8, 45].map(slot => bot.inventory.slots?.[slot]).filter(Boolean);

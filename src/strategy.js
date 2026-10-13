@@ -513,6 +513,15 @@ function strategyOptions(bot, goal, stage, sides = {}, planFor = null) {
       options[key] = { ...o, optIn: true };
     }
   }
+  // A bed beside whatever the ladder's next is, with no bed carried (bed-first.js, note 1413).
+  // (With the base's bed claimed, carry_bed below is that offer.)
+  if (!bedCarried(bot) && !goal.survival?.home?.bed?.claimedAt && !Object.keys(options).some(k => /bed/.test(k)) && !isSetAside(goal, 'bed_search', 'wool') && stage.phase !== 'bed') {
+    try {
+      const bf = require('./bed-first'), gp = require('./game-progress');
+      const o = rungOption(gp.bedRung(bot, goal), false, bot, goal, planFor);
+      options.rung_bed = { ...o, description: `${o.description} ${bf.bedFirstSays(bot, goal)} Chosen, the bed is the ladder's next step for an hour, before the tools and the armour, until one is carried.`, bedFirst: true };
+    } catch (_) { /* offered next time */ }
+  }
   const fit = (bot.health ?? 20) >= 14 && (bot.food ?? 20) >= 12 && !immediateThreat(bot);
   // Whether a trip fits in the daylight left is Jev's to weigh, not a rule
   // that hides it (the user, 2026-09-26: "drop the daylight rule, let Jev
@@ -820,6 +829,7 @@ async function strategyStep(bot, task, goal, save, stage, { client, decide, side
     // An optional rung chosen goes on the ladder (note 776) before the hold
     // reads the rungs open, so its own opening is not a new rung.
     if (options[choice]?.optIn && rungPhase) require('./game-progress').optIn(goal, rungPhase);
+    if (options[choice]?.bedFirst) { goal.bedFirst = { at: now() }; bot.chat?.('A bed first: the nights are what kill.'); }
     if (last?.rungPhase && last.open && rungPhase !== last.rungPhase) console.log(`[strategy] reversal: ${choice} (${rungPhase ? label(rungPhase) : 'no rung'}) chosen over ${label(last.choice)}, with ${label(last.rungPhase)} still open and nothing decided about it since it was chosen ${agoWords(now() - last.at)} ago`);
     goal.strategy = { choice, rungPhase, ladderNext: stage.phase, keys, at: now(), source: decision.standIn ? 'stand-in' : 'jev',
       ...(rungPhase || TO_THE_NETHER.test(choice) ? { openPhases: openRungs(bot, goal, now()).map(r => r.phase) } : {}),
