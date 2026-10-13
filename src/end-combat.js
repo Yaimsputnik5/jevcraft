@@ -1836,7 +1836,14 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // The island's own end stone is no pillar of the bot's (note 1351): the
       // drill of 2026-10-06 (05:52Z on) was offered this on the ground 755
       // times, each changing nothing.
-      if (depth < 1) delete bot._pillarUp;
+      // Not on the pillar's top (note 1493): standing on the obsidian, the
+      // bedrock or the cage's bars after the blow, the column is beside the
+      // body, not under it, and the record is the way back to it. 25588
+      // (dragon-68, 2026-10-13 17:08Z, crystals 12 and 90 broken) struck 90
+      // from the top, had its record dropped on the obsidian at (-13, 79, 37),
+      // 'column undefined', and stood 'only observe' with no way down.
+      const underName = bot.blockAt(feet.offset(0, -1, 0))?.name || '';
+      if (depth < 1 && !/^(obsidian|bedrock|iron_bars)$/.test(underName)) delete bot._pillarUp;
       if (depth >= 2) tree.pillar_down = {
         description: { action: `Dig down the bot's own pillar a block at a time from under the feet, ${depth} blocks to its foot: no fall on the way`, blocks: depth, health: bot.health, dragonHealth: beforeDragon },
         run: async () => {
