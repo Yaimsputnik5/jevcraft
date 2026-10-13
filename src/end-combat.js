@@ -359,9 +359,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // crystal only by the fight's own blow (bot._crystalBlow set round it).
   if (!bot._attackGuard && typeof bot.attack === 'function') {
     const raw = bot.attack.bind(bot); bot._attackGuard = true;
-    const NEVER = new Set(['item', 'experience_orb', 'arrow', 'spectral_arrow', 'trident', 'area_effect_cloud', 'dragon_fireball', 'fireball', 'small_fireball', 'shulker_bullet', 'end_crystal']);
+    // Nor the bot itself (note 1466): the blow named by note 1463 was 'blow at player (id 50, 0 off)', the bot's own body, and the door followed at once (dragon-44, 2026-10-13 12:37Z).
+    const NEVER = new Set(['item', 'experience_orb', 'arrow', 'spectral_arrow', 'trident', 'area_effect_cloud', 'dragon_fireball', 'fireball', 'small_fireball', 'shulker_bullet', 'end_crystal', 'player']);
     bot.attack = (entity, ...rest) => {
-      if (!entity || (NEVER.has(entity.name) && !(entity.name === 'end_crystal' && bot._crystalBlow))) { console.log(`[end combat] no blow at ${entity?.name || 'nothing'} (id ${entity?.id}): it cannot be struck`); return; }
+      if (!entity || entity === bot.entity || entity.id === bot.entity?.id || (NEVER.has(entity.name) && !(entity.name === 'end_crystal' && bot._crystalBlow))) { console.log(`[end combat] no blow at ${entity?.name || 'nothing'} (id ${entity?.id}): it cannot be struck`); return; }
       // Every blow named (note 1463): the server's door ('invalid_entity_attacked') was shown 25588 five times today with no blow the guard refused, the last two on the way down a column (dragon-43, 12:2xZ).
       console.log(`[end combat] blow at ${entity.name} (id ${entity.id}, ${Math.round(entity.position?.distanceTo?.(bot.entity.position) * 10) / 10} off)`);
       return raw(entity, ...rest);
