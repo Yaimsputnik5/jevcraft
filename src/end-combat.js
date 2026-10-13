@@ -512,7 +512,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // 15 to 10, and fell 33 to its death. The shield stops the blow and
       // its knock; the dig goes on after.
       if (passes < 20 && dragonThreat(bot)) { passes++; await holdOnColumn(); n--; continue; }
-      const underFoot = bot.entity.position.floored().offset(0, -1, 0);
+      // The column's own cell, and the body centred on it again each block
+      // (note 1452): a body a cell off the column after a drop or a knock
+      // read air under its middle, and 25588 (dragon-33, 2026-10-13 10:31Z)
+      // had its way down stop '1 dug' at (-10, 81, -37) beside its column at
+      // (-10, -38).
+      const u = bot._pillarUp, p0 = bot.entity.position, f0 = p0.floored();
+      const onCell = u && Math.hypot(u.x + .5 - p0.x, u.z + .5 - p0.z) <= 0.95 && bot.blockAt(new Vec3(u.x, f0.y - 1, u.z))?.boundingBox === 'block';
+      if (onCell && (f0.x !== u.x || f0.z !== u.z)) { await centreOnColumn(); }
+      const underFoot = onCell ? new Vec3(u.x, Math.floor(bot.entity.position.y) - 1, u.z) : bot.entity.position.floored().offset(0, -1, 0);
       if (!scaffold.test(bot.blockAt(underFoot)?.name || '')) break;
       const yBefore = Math.floor(bot.entity.position.y);
       // A gap under the block dug is filled first (note 1434): the climb
