@@ -560,6 +560,24 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     }
     return n;
   };
+  // A block over the head on the column, against a solid beside the cell
+  // over it (the crystal's obsidian) or, failing that, nothing: true when
+  // the cell over the head is solid after.
+  const roofOverhead = async () => {
+    const f = bot.entity.position.floored(), cell = f.offset(0, 2, 0);
+    if (bot.blockAt(cell)?.boundingBox === 'block') return true;
+    const ref = [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0]].map(([dx, dy, dz]) => ({ b: bot.blockAt(cell.offset(dx, dy, dz)), face: new Vec3(-dx, -dy, -dz) })).find(r => r.b?.boundingBox === 'block');
+    const name = blocksCarriedName(bot), item = name && bot.inventory.items().find(i => i.name === name);
+    if (!ref || !item) return false;
+    try {
+      await bot.equip(item, 'hand'); check();
+      await bot.lookAt(ref.b.position.offset(.5 + ref.face.x * .5, .5 + ref.face.y * .5, .5 + ref.face.z * .5), true);
+      await bot.placeBlock(ref.b, ref.face);
+    } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    const roofed = bot.blockAt(cell)?.boundingBox === 'block';
+    console.log(`[end combat] a roof against the fireball over the head at ${cell}: ${roofed ? 'laid' : 'not laid'}`);
+    return roofed;
+  };
   // The pass held through on the column, crouched with the shield up, a
   // second and a half (note 1414).
   const holdOnColumn = async () => {
@@ -599,8 +617,20 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // and 25588 (dragon-9, 06:05Z) held with the shield up for a fireball,
       // 20 to 8 in six seconds, and died of the next at 06:06Z. The cloud lies
       // on the top; three blocks down the column is under it.
-      goal.step = { action: 'down_out_of_breath', health: bot.health }; save();
-      await digDownColumn({ limit: 3 });
+      // A fireball coming: a roof over the head first (note 1442), laid
+      // against the obsidian beside the column; the ball bursts on the roof
+      // and its cloud lies on top of that, three blocks over the feet, where
+      // the body is not. Of the 84 blows the dragon landed on 25588 today
+      // (dragon-6 to dragon-23, 2026-10-13), 70 were its breath, 6 a second
+      // whatever is worn; the dig down out of it was three blocks and some
+      // three seconds, 18 health. With no roof to lay, the dig as before.
+      if (endEmergency(bot) === 'incoming_dragon_fireball' && await roofOverhead()) {
+        goal.step = { action: 'roof_against_fireball', health: bot.health }; save();
+        await holdOnColumn();
+      } else {
+        goal.step = { action: 'down_out_of_breath', health: bot.health }; save();
+        await digDownColumn({ limit: 3 });
+      }
     }
     // On the obsidian top (no walk off it either): the breath or a fireball
     // sends the bot back to its column and three down; a pass is held through.
