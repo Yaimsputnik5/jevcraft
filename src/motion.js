@@ -212,6 +212,14 @@ async function move(bot, task, { label, keys = ['forward'], sneak = true, why, l
   // first tick, and a loop of those never lets the connection's keepalive
   // through (the arena server timed the bot out mid-drill).
   await new Promise(resolve => setImmediate(resolve));
+  // The controller is the bot's before the look (note 1523): the shot hold's
+  // lock lets a held-key move's looks and keys through only while a move is
+  // under way, and the look came first, so with a fireball in flight the look
+  // was swallowed and the body walked off along whatever it faced, the
+  // dragon's way. 25588 (dragon-83, 2026-10-13 21:17Z, six crystals broken)
+  // chose the south side of its column for the drop, where its pool lay, and
+  // stepped off east, 17 blocks onto stone at 14 health, dead.
+  bot._controller = { name: label, keys: [...keys], sneak, why, since: Date.now(), starting: true };
   if (look) await bot.lookAt(look, true);
   // The heading the move was aimed at, held for its whole length: mid-72-e
   // held forward to climb south out of a pool and was found facing north,
@@ -222,7 +230,8 @@ async function move(bot, task, { label, keys = ['forward'], sneak = true, why, l
   const touched = [...new Set([...keys, ...(sneak ? ['sneak'] : [])])];
   const held = key => !!(bot.getControlState ? bot.getControlState(key) : bot.controlState?.[key]);
   const previous = Object.fromEntries(touched.map(key => [key, held(key)]));
-  const controller = { name: label, keys: [...keys], sneak, why, since: Date.now() };
+  const controller = bot._controller && bot._controller.starting ? bot._controller : { name: label, keys: [...keys], sneak, why, since: Date.now() };
+  delete controller.starting;
   bot._controller = controller;
   const escaping = !!bodyBurning(bot);
   // A run out of fire walks the route its own search chose with the flames
