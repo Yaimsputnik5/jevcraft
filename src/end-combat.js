@@ -394,7 +394,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const f = bot.entity.position.floored(), under = bot.blockAt(f.offset(0, -1, 0));
     if (under?.boundingBox !== 'block' || !SCAFFOLD_UNDER.test(under.name) || under.name === 'end_stone' && f.y < 70) return null;
     const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    if (sides.filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block').length < 3) return null;
+    if (sides.filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block').length < 2) return null;
     const drop = ([dx, dz]) => { for (let dy = 1; dy <= 6; dy++) if (bot.blockAt(f.offset(dx, -dy, dz))?.boundingBox === 'block') return dy - 1; return 6; };
     if (Math.max(...sides.map(drop)) < 4) return null;
     return { x: f.x, z: f.z, until: Date.now() + 600000, read: true };
@@ -463,7 +463,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     return off() <= 0.15;
   };
   const digDownColumn = async ({ limit = 64 } = {}) => {
-    const scaffold = /^(cobblestone|cobbled_deepslate|netherrack|dirt|stone|blackstone|deepslate|andesite|diorite|granite|tuff)$/;
+    // The column's blocks: what the climb lays, end stone among them (note
+    // 1438): 25588 (dragon-21, 2026-10-13 08:17Z), its cobblestone gone and
+    // its column laid in end stone, had the way down dig nothing at (-31, 85,
+    // 26), 'end_stone under the feet', the record dropped, and stood 'only
+    // observe' through 58 failed escapes, 20 to 11. On the island's own
+    // ground (under 70, the cells about the feet solid) end stone is the
+    // island, not the column.
+    const scaffold = { test: name => SCAFFOLD_UNDER.test(name || '') && !(name === 'end_stone' && columnEnded()) };
+    const columnEnded = () => { const f = bot.entity.position.floored(); return f.y < 70 && [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox === 'block').length >= 2; };
     let n = 0;
     if (!await centreOnColumn()) console.log(`[end combat] not centred on the column before the dig: ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off`);
     console.log(`[end combat] down the column from ${bot.entity.position.floored()}, ${bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || 'nothing'} under the feet, column ${JSON.stringify(bot._pillarUp)}`);
@@ -1317,7 +1325,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           for (let n = 0; n < depth; n++) {
             check();
             const under = bot.entity.position.floored().offset(0, -1, 0);
-            if (!/^(cobblestone|cobbled_deepslate|netherrack|dirt|stone|blackstone|deepslate|andesite|diorite|granite|tuff)$/.test(bot.blockAt(under)?.name || '')) break;
+            if (!SCAFFOLD_UNDER.test(bot.blockAt(under)?.name || '') || (bot.blockAt(under)?.name === 'end_stone' && under.y < 69 && [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(under.offset(dx, 0, dz))?.boundingBox === 'block').length >= 2)) break;
             // Dropped into, as the pillar's own column is (note 1382): dug
             // as a block in the way, the step aside found no footing on a
             // pillar one wide and threw "No solid adjacent footing", and the
