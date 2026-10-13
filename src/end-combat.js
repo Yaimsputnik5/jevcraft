@@ -725,13 +725,30 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // Faced the whole hold (note 1441): the shield stops only what comes
       // from in front, and the dragon crosses the column in a second. 25588
       // (dragon-23, 2026-10-13 08:41Z, leather) took 20 to 0.3 in one pass.
+      // Let go the moment the breath is at the feet (note 1478): the roof is one
+      // block over the head, and a ball from a dragon flying low passes under
+      // its edge and bursts on the body, its cloud on the top. 25588
+      // (dragon-60, 2026-10-13 15:14Z, full iron) roofed its column at 65,
+      // held crouched at 63 through two such holds, the cloud at its feet
+      // the whole time, and took 20 to 14.6 to 9.6 to 3.9 to none in three
+      // seconds, the dig down never begun. The hold tells its caller 'cloud'.
+      const was = bot.health;
       for (let n = 0; n < 15; n++) {
         task.check();
+        if (breathThreat(bot)?.name === 'area_effect_cloud' || bot.health < was - 0.5) return 'cloud';
         const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
         if (d && typeof bot.lookAt === 'function') { try { await bot.lookAt(d.position.offset(0, 2, 0), true); } catch (_) { /* looked already */ } }
         await sleep(100);
       }
+      return 'held';
     } finally { try { bot.deactivateItem?.(); } catch (_) { /* nothing held */ } bot.setControlState?.('sneak', false); }
+  };
+  // A hold ended by the breath at the feet: three down the column, out of it.
+  const holdOrDown = async () => {
+    if (await holdOnColumn() !== 'cloud') return;
+    console.log(`[end combat] the breath at the feet during the hold at ${bot.entity.position.floored()}, health ${bot.health.toFixed(1)}: down the column`);
+    goal.step = { action: 'down_out_of_breath', health: bot.health }; save();
+    await digDownColumn({ limit: 3 });
   };
   const respond = async () => {
     // Emergency handlers must not trip the guard that interrupted ordinary
@@ -761,7 +778,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // three seconds, 18 health. With no roof to lay, the dig as before.
       if (endEmergency(bot) === 'incoming_dragon_fireball' && await roofOverhead()) {
         goal.step = { action: 'roof_against_fireball', health: bot.health }; save();
-        await holdOnColumn();
+        await holdOrDown();
       } else {
         goal.step = { action: 'down_out_of_breath', health: bot.health }; save();
         await digDownColumn({ limit: 3 });
@@ -773,7 +790,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       goal.step = { action: 'off_the_top_out_of_breath', health: bot.health }; save();
       if (await backToColumn()) await digDownColumn({ limit: 3 });
     }
-    else if (onOwnPillar() || onObsidianTop()) await holdOnColumn();
+    else if (onOwnPillar()) await holdOrDown();
+    else if (onObsidianTop()) { if (await holdOnColumn() === 'cloud' && await backToColumn()) await digDownColumn({ limit: 3 }); }
     else {
       // Out of the dragon's way by ground no mob stands near, and where
       // there is none, by any ground (note 1174): an enderman's blow is
