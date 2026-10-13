@@ -480,7 +480,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const onColumnCell = Math.hypot(u.x + .5 - p.x, u.z + .5 - p.z) <= 0.95 && bot.blockAt(new Vec3(u.x, f.y - 1, u.z))?.boundingBox === 'block';
     if (onColumnCell) f.x = u.x, f.z = u.z;
     const under = bot.blockAt(f.offset(0, -1, 0));
-    if (under?.boundingBox !== 'block' || !SCAFFOLD_UNDER.test(under.name) || under.name === 'end_stone' && f.y < 70) return false;
+    // End stone under the feet below 70 is the island's, not a column's, only
+    // off the column's own cell (note 1533): the climb's column is laid of
+    // quarried end stone from the island's ground at 61, and 25588 (dragon-91,
+    // 2026-10-13 22:54Z, four crystals broken) seven blocks up it at (-30,
+    // 68, -23) was 'not on a pillar', looked for a walking escape from the
+    // dragon's pass three times ('No surveyed walking escape'), took the
+    // fireball's cloud there with no roof and no hold, and was knocked off.
+    // On the recorded cell the drop beside the feet (below) tells the
+    // column from the island's ground.
+    if (under?.boundingBox !== 'block' || !SCAFFOLD_UNDER.test(under.name) || under.name === 'end_stone' && f.y < 70 && !onColumnCell) return false;
     if (Math.hypot(u.x + .5 - p.x, u.z + .5 - p.z) > 2.5) return false;
     if (u.x !== f.x || u.z !== f.z) bot._pillarUp = { ...u, x: f.x, z: f.z };
     // Two of the four cells round the feet open at least (a pillar laid up

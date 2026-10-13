@@ -128,3 +128,19 @@ test('the way down chosen as the water drop: off the column\'s edge with the buc
   assert.equal(Math.floor(bot.entity.position.y), 64);
   assert.equal(goal.endCombat.descents?.[0]?.kind, 'drop');
 });
+
+test('an end-stone column seven up from the island at 61 is still the bot\'s own pillar on its cell (note 1533)', async () => {
+  const { bot, goal, task, dig } = fixture();
+  // The island's ground at 61, the column of quarried end stone from 61 to 67, feet at 68.
+  bot.blockAt = p => {
+    const f = p.floored();
+    if (f.x === 0 && f.z === 0 && f.y >= 61 && f.y < 68) return { name: 'end_stone', boundingBox: 'block', position: f };
+    if (f.x === 20 && f.z === 0 && f.y >= 61 && f.y <= 83) return { name: 'obsidian', boundingBox: 'block', position: f };
+    return { name: f.y < 61 ? 'end_stone' : 'air', boundingBox: f.y < 61 ? 'block' : 'empty', position: f };
+  };
+  bot.entity.position = new Vec3(0.5, 68, 0.5);
+  const steps = [];
+  const save = () => { if (goal.step) steps.push(goal.step.action); };
+  await fightEndStep(bot, task, goal, save, { navigate: async () => {}, dig, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'observe' } } }) });
+  assert.ok(steps.includes('hold_on_pillar'), steps.join(','));
+});
