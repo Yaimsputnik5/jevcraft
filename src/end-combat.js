@@ -415,6 +415,24 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     return sample.velocity;
   };
   bot.on('entityMoved', moved); if (dragon) moved(dragon);
+  // A fall off the column caught in the air, every tick of the step (note
+  // 1483): the dragon's wing pushes the body off its column with no blow
+  // (note 1480), the push lifts it, so a crouch holds nothing, and the fall
+  // from a column is 15 to 20 blocks onto the island. The dig under way
+  // notices nothing until it ends. With a water bucket carried the water goes
+  // under the body before it lands (fall-recovery.js), as it does on the
+  // island's edges. 25588 (dragon-59, 15:06Z), (dragon-61, 15:37Z, to 1
+  // health), (dragon-62, 15:54Z) and (dragon-63, 16:04Z), all of 2026-10-13,
+  // full iron, two water buckets carried, fell 10 to 19 blocks off their
+  // columns, dragon-59, 62 and 63 to their deaths, no water poured.
+  const falling = () => {
+    try {
+      if (bot._fallRecovery || bot.entity?.onGround !== false || !fallDanger(bot) || !bot.inventory.items().some(i => i.name === 'water_bucket')) return;
+      console.log(`[end combat] falling from ${bot.entity.position.floored()} at ${bot.health.toFixed(1)} health: the water bucket under the body`);
+      recoverFall(bot, task, goal, save, { refill: false }).then(r => console.log(`[end combat] the fall ended ${r ? 'in the water' : 'dry'} at ${bot.entity.position.floored()}, health ${bot.health.toFixed(1)}`), err => console.log(`[end combat] the water under the fall: ${String(err.message || err).slice(0, 120)}`));
+    } catch (_) { /* nothing to catch */ }
+  };
+  bot.on('physicsTick', falling);
   // The bot's own pillar under it, air on three sides at least: no walk off it.
   // By the block under the feet, not the column's recorded cell (note 1416):
   // the jumps of the climb drift, and 25588 (05:41Z) stood a cell off the
@@ -647,7 +665,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         // (dragon-26, 2026-10-13 09:17Z), in the breath on its column at 8
         // health, had its way down end 'Digging aborted' one block down, and
         // the next two ticks of the breath took the rest.
-        if (/Digging aborted/.test(String(err.message || '')) && aborts < 3) { aborts++; console.log(`[end combat] the dig under the feet was stopped by something else (pathing ${bot.pathfinder?.isMoving?.() ?? '?'}, goal ${bot.pathfinder?.goal ? 'set' : 'none'}, digging ${bot.targetDigBlock?.name || 'nothing'}): dug again`); n--; continue; }
+        if (/Digging aborted/.test(String(err.message || '')) && aborts < 3 && bot.entity.onGround !== false) { aborts++; console.log(`[end combat] the dig under the feet was stopped by something else (pathing ${bot.pathfinder?.isMoving?.() ?? '?'}, goal ${bot.pathfinder?.goal ? 'set' : 'none'}, digging ${bot.targetDigBlock?.name || 'nothing'}): dug again`); n--; continue; }
         if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the way down the pillar stopped ${n} down: ${String(err.message || err).slice(0, 120)}`); break;
       }
       // The drop comes late (the server's block update, then the fall): up to
@@ -1765,7 +1783,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     state.noProgress = progress ? 0 : (state.noProgress || 0) + (chose ? 1 : 0);
     state.lastActionAt = started; save();
     clearInterval(crouchKeeper);
-    bot.removeListener('entityMoved', moved); task.interruptCheck = oldInterrupt;
+    bot.removeListener('entityMoved', moved); bot.removeListener('physicsTick', falling); task.interruptCheck = oldInterrupt;
     bot.pathfinder.setGoal(null); bot.clearControlStates(); policy.restore();
   }
 }

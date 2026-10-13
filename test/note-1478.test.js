@@ -80,3 +80,22 @@ test('a column with obsidian on two sides and the roof post on a third is still 
   await fightEndStep(bot, task, goal, save, { navigate: async () => {}, dig, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'observe' } } }) });
   assert.ok(steps.includes('hold_on_pillar'), steps.join(','));
 });
+
+test('a fall off the column mid-step is caught in the air: the water bucket goes to the hand at once (note 1483)', async () => {
+  const { bot, goal, task, dig } = fixture();
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 20 }, { name: 'water_bucket', count: 2 }];
+  bot.entity.velocity = new (require('vec3').Vec3)(0, -0.08, 0);
+  const equipped = [];
+  bot.equip = async item => { equipped.push(item.name); };
+  bot.stopDigging = () => {};
+  const steps = [];
+  const save = () => { if (goal.step) steps.push(goal.step.action); };
+  // Pushed off the column 300 ms into the hold: in the air, falling, nothing within four blocks under.
+  setTimeout(() => { bot.entity.position = new (require('vec3').Vec3)(2.5, 72, 0.5); bot.entity.onGround = false; bot.entity.velocity = new (require('vec3').Vec3)(0.1, -0.6, 0); bot.emit('physicsTick'); }, 300);
+  // Landed on the island 300 ms later.
+  setTimeout(() => { bot.entity.position = new (require('vec3').Vec3)(2.5, 64, 0.5); bot.entity.onGround = true; bot.entity.velocity = new (require('vec3').Vec3)(0, -0.08, 0); }, 600);
+  await fightEndStep(bot, task, goal, save, { navigate: async () => {}, dig, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'observe' } } }) });
+  await new Promise(r => setTimeout(r, 600));
+  assert.ok(steps.includes('protect_fall_with_water'), steps.join(','));
+  assert.ok(equipped.includes('water_bucket'), equipped.join(','));
+});

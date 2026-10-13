@@ -33,7 +33,15 @@ function clutchTarget(bot, serverPosition) {
   return { position: p, yaw: Math.atan2(-delta.x, -delta.z), pitch: Math.atan2(delta.y, Math.hypot(delta.x, delta.z)) };
 }
 
-async function recoverFall(bot, task, goal, save, { timeoutMs = 12000, refill = true } = {}) {
+// One recovery at a time (note 1483): a second caller in the same fall gets
+// the first's promise, not a second bucket click, which would take the water
+// back up with the empty bucket.
+async function recoverFall(bot, task, goal, save, options = {}) {
+  if (bot._fallRecovery) return bot._fallRecovery;
+  bot._fallRecovery = recoverFallOnce(bot, task, goal, save, options).finally(() => { bot._fallRecovery = null; });
+  return bot._fallRecovery;
+}
+async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refill = true } = {}) {
   task.check();
   if (!fallDanger(bot)) return false;
   const dimension = bot.game.dimension, initialHealth = bot.health;
