@@ -778,7 +778,21 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       try { await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) && safeFromHostiles(bot, p, endMobs(bot)) }); }
       catch (err) {
         if (err.name !== 'NoEscape') throw err;
-        await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) });
+        try { await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) }); }
+        catch (err2) {
+          if (err2.name !== 'NoEscape' || !actions.dig) throw err2;
+          // No walk out of the cloud on the ground (note 1475): two blocks dug
+          // under the feet put the body under it, as the column's way does.
+          // 25588 (dragon-56, 2026-10-13 14:39Z) stood in the cloud on the
+          // island's rough eastern ground three seconds, 20 to none, with
+          // 'No surveyed walking escape' each tick.
+          if (endEmergency(bot) === 'dragon_breath_cloud') {
+            goal.step = { action: 'down_out_of_breath_on_ground', health: bot.health }; save();
+            for (let n = 0; n < 2; n++) { const under = bot.entity.position.floored().offset(0, -1, 0); if (bot.blockAt(under)?.boundingBox !== 'block' || bot.blockAt(under.offset(0, -1, 0))?.boundingBox !== 'block') break; try { await actions.dig(bot, task, under, { dropInto: true, openPit: true, requireDrops: false }); } catch (e3) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(e3.name)) throw e3; break; } for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50); }
+            return;
+          }
+          throw err2;
+        }
       }
     }
   };

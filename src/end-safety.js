@@ -316,6 +316,19 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600 } 
       await sleep(10);
     }
     const dragon = breathThreat(bot) || dragonThreat(bot);
+    // One run a fireball (note 1475): the ball is aimed at where the bot
+    // stood when it was thrown, and a run begun again each tick from the
+    // ball's moving position went back and forth over the same two cells.
+    // 25588 (dragon-56, 2026-10-13 14:39Z, full iron) ran three times in a
+    // second and a half, 41.8 to 43.3 to 41.4, the cloud landed on it and
+    // it died in it. Run once, then stand where the run ended.
+    if (dragon?.name === 'dragon_fireball') {
+      const last = goal.endCombat?.lastEvasion;
+      if (last?.straightRun && last.hazard?.name === 'dragon_fireball' && Date.now() - last.at < 2500) {
+        goal.step = { action: 'stand_after_fireball_run', since: last.at }; save();
+        await sleep(200); return true;
+      }
+    }
     if (!dragon) return false;
     // In the breath, or with a fireball coming, straight out first at a run
     // over any ground with a floor (straightAway), the surveys only where no
