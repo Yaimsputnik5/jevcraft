@@ -181,7 +181,11 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     task.check(); checkAir(bot); if (threats) checkThreats(bot);
     const feet = bot.entity.position.floored();
     const head = feet.offset(0, 2, 0), above = bot.blockAt(head);
-    if (climbStop(bot, feet, { canDig })) break;
+    // Why a climb stops, said once when it placed nothing (note 1417): 25588
+    // (dragon-7, 2026-10-13 05:55Z) was 'stopped 35 blocks short, 0 up' with
+    // 80 cobblestone carried and no word of why.
+    const why = climbStop(bot, feet, { canDig });
+    if (why) { if (!placed) console.log(`[pillar up] stopped before the first block: ${why}`); break; }
     if (!dryPassable(above)) {
       await dig(bot, task, head, { requireDrops: false });
       continue;
@@ -189,12 +193,12 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     // In the order the kinds are listed, not the pack's: rock before wood
     // before the gravel that falls.
     const block = blocks.map(n => bot.inventory.items().find(i => i.name === n)).find(Boolean);
-    if (!block) break;
+    if (!block) { if (!placed) console.log('[pillar up] stopped before the first block: no block of the kinds the climb lays carried'); break; }
     await bot.equip(block, 'hand');
     await bot.look(bot.entity.yaw, -Math.PI / 2, true);
     const start = feet.y;
     const below = bot.blockAt(feet.offset(0, -1, 0));
-    if (!below || below.boundingBox !== 'block') break;
+    if (!below || below.boundingBox !== 'block') { if (!placed) console.log(`[pillar up] stopped before the first block: ${below ? below.name : 'nothing'} under the feet at ${feet}`); break; }
     // Placed with the look already down (set before the jump): placeBlock's
     // own smooth turn took ticks, the bot fell back into the cell before the
     // packet went, and the server refused every block of a pillar from two
@@ -217,7 +221,7 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
       if (bot.entity.position.floored().y > start) break;
       if (bot.blockAt(feet)?.boundingBox === 'block') break;
     }
-    if (bot.entity.position.floored().y <= start) break;
+    if (bot.entity.position.floored().y <= start) { if (!placed) console.log(`[pillar up] stopped before the first block: the block was not placed in three jumps from ${feet} (on ground ${bot.entity.onGround}, ${block.name} in hand)`); break; }
   }
   return placed;
 }
