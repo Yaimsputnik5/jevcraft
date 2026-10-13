@@ -754,7 +754,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // with ground soonest under it and nothing solid beside the feet.
   const waterDropSide = () => {
     const u = bot._pillarUp; if (!u) return null;
-    const f = bot.entity.position.floored();
+    // From the column's own cell (note 1489): after the blow the body stands
+    // on the obsidian's rim beside its column, and from that cell the only
+    // open side is the column's top, no fall. 25588 (dragon-66, 2026-10-13
+    // 16:38Z) at (-11, 79, 39) beside its column at (-10, 39): 'no side with
+    // ground under it', and it dug instead.
+    const f = new Vec3(u.x, Math.floor(bot.entity.position.y), u.z);
     let best = null;
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       if (bot.blockAt(f.offset(dx, 0, dz))?.boundingBox === 'block' || bot.blockAt(f.offset(dx, 1, dz))?.boundingBox === 'block') continue;
@@ -771,6 +776,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (!side || !water) { console.log(`[end combat] no water drop from ${bot.entity.position.floored()}: ${!water ? 'no water bucket carried' : 'no side with ground under it'}`); return false; }
     const startY = bot.entity.position.y, health = bot.health;
     goal.step = { action: 'water_drop', from: { ...bot.entity.position }, fall: side.fall, health }; save();
+    // Onto the column's cell first, at a crouch, where the body stands beside it on the rim.
+    if (!await centreOnColumn(0.3)) console.log(`[end combat] the water drop begins ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off the column's middle`);
     console.log(`[end combat] the water drop from ${bot.entity.position.floored()}, ${side.fall} blocks onto the island at (${side.edge.x}, ${side.edge.z}), health ${health.toFixed(1)}`);
     try { await bot.equip(water, 'hand'); } catch (_) { /* equipped in the fall */ }
     try {
