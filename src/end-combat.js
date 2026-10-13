@@ -561,7 +561,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // where the body stands longest. 25588 (dragon-35, 2026-10-13 10:59Z,
       // full iron, crystal 12 broken) had its roof at 76 and the cloud at its
       // feet at 74, 20 to 14 to 9.7 to 4.7, and was knocked off digging.
-      if (n % 2 === 0) { const fh = bot.entity.position.floored(); if (![2, 3].some(dy => bot.blockAt(fh.offset(0, dy, 0))?.boundingBox === 'block')) { try { await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } } }
+      // Every third block (note 1459): the roofs and their posts took 26 blocks of 33 on one climb and descent (dragon-39).
+      if (n % 3 === 0) { const fh = bot.entity.position.floored(); if (![2, 3, 4].some(dy => bot.blockAt(fh.offset(0, dy, 0))?.boundingBox === 'block')) { try { await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } } }
       const yBefore = Math.floor(bot.entity.position.y);
       // A gap under the block dug is filled first (note 1434): the climb
       // beside a crystal's obsidian lays its blocks where the feet were, and
@@ -1315,7 +1316,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // for the next question, the breath found it there, 20 to 3.9 on
             // the way down, and it fell. The crystal is gone; nothing is up
             // here.
-            if (!live(bot, target) && onOwnPillar()) { goal.step = { action: 'down_after_the_blow', crystal: target.id, health: bot.health }; save(); await digDownColumn({ limit: 3 }); }
+            // All the way down (note 1459): the crystal is gone, and every stand
+            // for a question on the column is a pass or a breath taken. 25588
+            // (dragon-39, 2026-10-13 11:41Z, full iron, crystal 9 broken) came
+            // down three at a time, 79, 75, 72, a question between each, and died
+            // on the column at 72 with 7 blocks left.
+            if (!live(bot, target) && onOwnPillar()) { goal.step = { action: 'down_after_the_blow', crystal: target.id, health: bot.health }; save(); await digDownColumn({ limit: 64 }); }
             // And straight down the column (as pillar_down digs): left on the top at
             // 5.4 health, the drill of 2026-10-13 (04:02Z) took the dragon's breath
             // twice there, 6 and 6, and went over the edge at 1.5.
