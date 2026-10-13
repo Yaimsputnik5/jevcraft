@@ -502,7 +502,13 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       goal.step = { action: 'down_out_of_breath', health: bot.health }; save();
       await digDownColumn({ limit: 3 });
     }
-    else if (onOwnPillar()) {
+    // On the obsidian top (no walk off it either): the breath or a fireball
+    // sends the bot back to its column and three down; a pass is held through.
+    else if (onObsidianTop() && ['dragon_breath_cloud', 'incoming_dragon_fireball'].includes(endEmergency(bot))) {
+      goal.step = { action: 'off_the_top_out_of_breath', health: bot.health }; save();
+      if (await backToColumn()) await digDownColumn({ limit: 3 });
+    }
+    else if (onOwnPillar() || onObsidianTop()) {
       goal.step = { action: 'hold_on_pillar', hazard: endEmergency(bot), health: bot.health }; save();
       const shield = bot.inventory.slots?.[45]?.name === 'shield' || bot.inventory.items().some(i => i.name === 'shield');
       try {
@@ -878,7 +884,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // to the climb to strike it (note 1416): 25588 (dragon-6, 2026-10-13
     // 05:40Z), 22 up its column beside the crystal, was held 'unsafe: end
     // crystal 10<=12' at every tick, offered nothing, and died of the fall.
-    const punchPlace = safe || (onOwnPillar() && endHazards(bot).filter(({ entity }) => entity.name !== 'end_crystal').every(({ entity, radius }) => hazardDistance(bot.entity.position, entity) > radius));
+    // And from the obsidian top itself, where the blow is struck (note 1426):
+    // 25588 (dragon-11, 2026-10-13 06:27Z), a cell short of its stand on the
+    // top, was offered nothing there ('unsafe: end crystal 4<=12'), took the
+    // dragon's wing twice and fell.
+    const punchPlace = safe || ((onOwnPillar() || onObsidianTop()) && endHazards(bot).filter(({ entity }) => entity.name !== 'end_crystal').every(({ entity, radius }) => hazardDistance(bot.entity.position, entity) > radius));
     if (punchPlace && actions.dig && !Object.keys(tree).some(k => /^(throw_|pillar_throw_)/.test(k))) {
       const here = bot.entity.position, carried = blocksCarried(bot);
       // A caged crystal too, where a pickaxe is carried: its iron bars between
