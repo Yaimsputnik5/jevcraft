@@ -51,7 +51,7 @@ const { decide } = require('./decisions');
 const { canStrike, defendNearby, raiseShield, lowerShield } = require('./combat');
 const { durable, carriedEquipment } = require('./mob-policy');
 const { fallDanger, recoverFall } = require('./fall-recovery');
-const { cloudRadius, hazardDistance, endEmergency, checkEndEmergency, evadeDragon, dragonThreat } = require('./end-safety');
+const { cloudRadius, hazardDistance, endEmergency, checkEndEmergency, evadeDragon, dragonThreat, breathThreat } = require('./end-safety');
 const { endDecisionState } = require('./decisions/end-state');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const blocked = message => Object.assign(new Error(message), { name: 'Blocked' });
@@ -511,7 +511,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // broken in five minutes) was hit digging down out of the breath at 94,
       // 15 to 10, and fell 33 to its death. The shield stops the blow and
       // its knock; the dig goes on after.
-      if (passes < 20 && dragonThreat(bot)) { passes++; await holdOnColumn(); n--; continue; }
+      // Not with the breath on the body (note 1453): a hold in the cloud is 6
+      // a second, and 25588 (dragon-33, 2026-10-13 10:41Z, full iron, three
+      // crystals broken) held crouched in it for the dragon's pass, 17 to 11
+      // to 5 to none. In the cloud the dig is the way; the pass is taken.
+      if (passes < 20 && dragonThreat(bot) && !breathThreat(bot)) { passes++; await holdOnColumn(); n--; continue; }
       // The column's own cell, and the body centred on it again each block
       // (note 1452): a body a cell off the column after a drop or a knock
       // read air under its middle, and 25588 (dragon-33, 2026-10-13 10:31Z)
