@@ -1654,6 +1654,29 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // route "noPath" and "no clear arrow trajectory" to a dragon 19 to 37
     // blocks off with no mob near, 187 arrows carried (note 1136).
     const box = actions.dig && enclosed(bot);
+    // Under the island's rock with a pickaxe (note 1488): the way up to the sky,
+    // the blocks over the head dug and the column laid under the feet
+    // (pillarUp with end stone diggable). 25588 (dragon-66, 2026-10-13 16:30Z)
+    // quarried itself into tunnels four to fourteen blocks under the island's
+    // top, and from there every pillar's foot was 'not reached'; the fight's
+    // options had no way out.
+    {
+      const feet = bot.entity.position.floored();
+      let rock = 0; for (let dy = 1; dy <= 30; dy++) if (bot.blockAt(feet.offset(0, dy, 0))?.boundingBox === 'block') rock = dy;
+      const pick = bot.inventory.items().find(i => /_pickaxe$/.test(i.name));
+      if (rock >= 2 && pick && actions.dig && blocksCarried(bot) >= 1) {
+        const skyY = feet.y + rock + 1;
+        tree.dig_to_sky = { description: { action: `The bot stands under the island's rock, ${rock} blocks of it over its head to the open sky at ${skyY}: dig up to the sky, the blocks over the head dug with the ${pick.name.replace('_', ' ')} and the column laid under the feet from the ${blocksCarried(bot)} blocks carried. No pillar's foot is walked to from down here.`,
+          rockOverhead: rock, blocksCarried: blocksCarried(bot), health: bot.health },
+          run: async () => {
+            const pr = require('./pillar-recovery');
+            goal.step = { action: 'dig_to_sky', from: { ...bot.entity.position }, to: skyY }; save();
+            await pr.pillarUp(bot, task, skyY, { dig: actions.dig, maxBlocks: rock + 2, threats: false, canDig: b => !!b && b.diggable && b.name !== 'bedrock' && b.name !== 'obsidian' });
+            if (Math.floor(bot.entity.position.y) >= skyY - 1) { progress = true; delete bot._pillarUp; }
+            else throw new Error(`The way up stopped ${skyY - Math.floor(bot.entity.position.y)} short of the sky`);
+          } };
+      }
+    }
     if (box && !tree.shoot_dragon && !Object.keys(tree).some(k => /^(crystal_|move_|strike_head|bed_bomb)/.test(k))) {
       const toward = (focus === fountain ? dragon : focus)?.position || focus || (state.arenaCenter && vector(state.arenaCenter)) || bot.entity.position.offset(1, 0, 0);
       const feet = bot.entity.position.floored(), dx = toward.x - (feet.x + .5), dz = toward.z - (feet.z + .5);
