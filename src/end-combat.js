@@ -1308,6 +1308,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             if (shield) { try { if (!worn) await bot.equip(shield, 'off-hand'); bot.activateItem?.(true); shielded = true; await sleep(350); } catch (_) { shielded = false; } }
             check();
             if (typeof bot.lookAt === 'function') await bot.lookAt(aim, true);
+            // The facing given a moment to land (note 1465): the shield stops a
+            // blast from in front, and four blows today took 15.4 'no blast
+            // seen', the unshielded figure, all at the pillar at (-10, -37)
+            // (dragon-32, 37, 43, 44), the turn to the crystal and the blow in
+            // the same tick.
+            await sleep(250); check();
             let explosion = false;
             const observe = packet => { if (vector(packet.center).distanceTo(target.position) < 3) explosion = true; };
             bot._client.on('explosion', observe);
