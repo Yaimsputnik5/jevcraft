@@ -415,6 +415,13 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const u = bot._pillarUp, p = bot.entity.position;
     if (!u || u.until < Date.now()) return false;
     const f = p.floored();
+    // The block stood on, not the cell the middle of the body is over (note
+    // 1444): a body 0.6 wide at the column's edge stands on the column with
+    // its middle over air. 25588 (dragon-25, 2026-10-13 09:04Z) at (30.8,
+    // 77, -26.5) on its column at (31, -27) was 'not on a pillar', a stall
+    // detour walked it off, and it fell 17 at 3.9 health.
+    const onColumnCell = Math.hypot(u.x + .5 - p.x, u.z + .5 - p.z) <= 0.95 && bot.blockAt(new Vec3(u.x, f.y - 1, u.z))?.boundingBox === 'block';
+    if (onColumnCell) f.x = u.x, f.z = u.z;
     const under = bot.blockAt(f.offset(0, -1, 0));
     if (under?.boundingBox !== 'block' || !SCAFFOLD_UNDER.test(under.name) || under.name === 'end_stone' && f.y < 70) return false;
     if (Math.hypot(u.x + .5 - p.x, u.z + .5 - p.z) > 2.5) return false;
@@ -1168,6 +1175,13 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // and reached for the next crystal's foot from 28 blocks up (the
             // arena's drill of 2026-10-13, 03:50Z).
             if (!under && bot._pillarUp && !await backToColumn()) console.log('[end combat] left on the pillar\'s top after the blow: the way down is pillar_top_down');
+            // And three down the column at once (note 1444): the blow brings
+            // the dragon, and the top is where its breath lands. 25588
+            // (dragon-25, 2026-10-13 09:04Z) stood on the top after the blow
+            // for the next question, the breath found it there, 20 to 3.9 on
+            // the way down, and it fell. The crystal is gone; nothing is up
+            // here.
+            if (!live(bot, target) && onOwnPillar()) { goal.step = { action: 'down_after_the_blow', crystal: target.id, health: bot.health }; save(); await digDownColumn({ limit: 3 }); }
             // And straight down the column (as pillar_down digs): left on the top at
             // 5.4 health, the drill of 2026-10-13 (04:02Z) took the dragon's breath
             // twice there, 6 and 6, and went over the edge at 1.5.
