@@ -93,6 +93,9 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
           // could pick the just-placed water back up with the now-empty bucket.
           bot.look(target.yaw, target.pitch, true).catch(err => { failure = err; });
           bot.activateItem(); used = { at: Date.now(), position: target.position, serverPosition: previous.clone(), clicks: (used?.clicks || 0) + 1 };
+          // Said as it happens (note 1508), for a fall that ends in a death: 25588 (dragon-76, 2026-10-13 19:36Z) was knocked off an obsidian top at 88 by the breath, clicked, used a bucket, and died on the ground at 62 three blocks east of where it clicked, with no word of where the water went.
+          console.log(`[fall] water clicked (${used.clicks}) at ${target.position} from the body at ${bot.entity.position.floored()} (server about ${previous.floored()}), falling ${bot.entity.velocity.y.toFixed(2)} a tick, health ${bot.health.toFixed(1)}`);
+          goal.step = { ...(goal.step || {}), waterClicked: { at: { x: target.position.x, y: target.position.y, z: target.position.z }, body: { ...bot.entity.position }, clicks: used.clicks } }; save();
         }
       }
     } catch (err) { failure = err; }
