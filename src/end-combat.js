@@ -1257,10 +1257,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               run: async () => {
                 const before = blocksCarried(bot);
                 goal.step = { action: 'quarry_blocks', crystal: target.id, cells: cells.length }; save();
+                let dug = 0, skipped = 0;
                 for (const p of cells) {
                   check();
-                  if (bot.blockAt(p)?.name !== 'end_stone') continue;
-                  try { await actions.dig(bot, task, p, { requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] quarry stopped at ${p}: ${String(err.message || err).slice(0, 120)}`); break; }
+                  if (bot.blockAt(p)?.name !== 'end_stone') { skipped++; continue; }
+                  try { await actions.dig(bot, task, p, { requireDrops: false }); dug++; } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] quarry stopped at ${p}: ${String(err.message || err).slice(0, 120)}`); break; }
                 }
                 // The stone picked up from where it lies, twelve blocks about and
                 // ten seconds (note 1449): dug on the island's slopes it rolls, and
@@ -1269,7 +1270,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
                 // 42, -7 to -11), two blocks up the slope from where it stood.
                 try { await require('./drop-collection').collectNearbyDrops(bot, task, 'end_stone', { radius: 8, timeoutMs: 8000, waitForSpawnMs: 300, move: actions.navigate }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
                 const after = blocksCarried(bot);
-                console.log(`[end combat] quarried ${after - before} end stone for the climb (${after} blocks carried, ${lift} wanted for crystal ${target.id})`);
+                // What the quarry came to, said (note 1479): 25588 (dragon-61, 2026-10-13 15:27Z) 'quarried 0' on the eastern slope at (70, 45, -12) with no word of the cells dug or where the stone lay.
+                const lying = Object.values(bot.entities).filter(e => e.name === 'item' && e.isValid !== false && e.position && e.position.distanceTo(bot.entity.position) <= 16).map(e => `${e.position.floored()} ${Math.round(e.position.distanceTo(bot.entity.position))} off`);
+                console.log(`[end combat] quarried ${after - before} end stone for the climb (${after} blocks carried, ${lift} wanted for crystal ${target.id}; ${dug} of ${cells.length} cells dug, ${skipped} no longer end stone; items lying within 16: ${lying.length ? lying.slice(0, 6).join(', ') : 'none'})`);
                 if (after > before) progress = true;
                 save();
               } };
