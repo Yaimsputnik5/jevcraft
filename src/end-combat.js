@@ -753,6 +753,50 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // breath five times on 2026-10-13 (dragon-59, 61, 62, 63, 64), three to
   // its death, two blows enough each time. The side stepped off: the one
   // with ground soonest under it and nothing solid beside the feet.
+  // The pool poured at the column's foot before the climb (note 1509), where
+  // the drop lands: the pour in the air is a tick's work at a block and a
+  // half a tick, and a tick late it is nothing. 25588 (dragon-77, 2026-10-13
+  // 19:41Z) landed 'in the water' at 2 health, the water a tick behind the
+  // body; dragon-71, 73, 74, 75 and 76 landed dry or died, one drop in four.
+  // A source on level ground spreads seven blocks round, and any water under
+  // the feet, flowing or still, ends the fall. Poured on a cell beside the
+  // column's base away from the obsidian, with the ground about it level
+  // (nothing two lower within four) and no void within eight; taken back
+  // after the landing (note 1495). The side it lies on is the drop's.
+  const poolForTheDrop = async (column) => {
+    const water = bot.inventory.items().find(i => i.name === 'water_bucket');
+    if (!water) return null;
+    const base = new Vec3(column.x, Math.floor(bot.entity.position.y), column.z);
+    const ground = (x, z) => { for (let y = base.y + 1; y >= base.y - 3; y--) if (bot.blockAt(new Vec3(x, y, z))?.boundingBox === 'block') return y; return null; };
+    let best = null;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const x = column.x + dx, z = column.z + dz, g = ground(x, z); if (g === null || Math.abs(g + 1 - base.y) > 1) continue;
+      const cell = new Vec3(x, g + 1, z);
+      if (bot.blockAt(cell)?.name !== 'air') continue;
+      if (voidEdge(bot, cell.offset(.5, 0, .5), 8) !== null) continue;
+      let level = true, obsidian = 0;
+      for (let ox = -4; ox <= 4 && level; ox++) for (let oz = -4; oz <= 4 && level; oz++) { const gg = ground(x + ox, z + oz); if (gg === null || gg < g - 1) level = false; }
+      if (!level) continue;
+      for (let k = 1; k <= 3; k++) for (let dy = -1; dy <= 3; dy++) if (bot.blockAt(new Vec3(x + dx * k, g + dy, z + dz * k))?.name === 'obsidian') obsidian++;
+      const score = obsidian * 10 + bot.entity.position.distanceTo(cell.offset(.5, 0, .5));
+      if (!best || score < best.score) best = { cell, dx, dz, score, obsidian };
+    }
+    if (!best) { console.log(`[end combat] no pool for the drop at the foot of (${column.x}, ${column.z}): no level cell beside the column's base clear of the void`); return null; }
+    const eye = bot.entity.position.offset(0, 1.62, 0), target = best.cell.offset(.5, -.01, .5);
+    if (eye.distanceTo(target) > 4.3) {
+      try { await actions.navigate(bot, task, new goals.GoalNear(best.cell.x, best.cell.y, best.cell.z, 2), { timeoutMs: 8000, stallMs: 3000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+    }
+    try {
+      await bot.equip(water, 'hand'); check();
+      await bot.lookAt(target, true);
+      bot.activateItem();
+      for (let n = 0; n < 20; n++) { check(); if (bot.blockAt(best.cell)?.name === 'water') break; await sleep(50); }
+    } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+    const poured = bot.blockAt(best.cell)?.name === 'water';
+    console.log(`[end combat] the pool for the drop ${poured ? 'poured' : 'not poured'} at ${best.cell} beside the column at (${column.x}, ${column.z})${best.obsidian ? `, ${best.obsidian} obsidian that way` : ''}; ${countOf(bot, 'water_bucket')} full bucket${countOf(bot, 'water_bucket') === 1 ? '' : 's'} left`);
+    if (poured) { state.pool = { x: best.cell.x, y: best.cell.y, z: best.cell.z, dx: best.dx, dz: best.dz, at: Date.now() }; save(); return state.pool; }
+    return null;
+  };
   const waterDropSide = () => {
     const u = bot._pillarUp; if (!u) return null;
     // From the column's own cell (note 1489): after the blow the body stands
@@ -775,8 +819,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // pillar's foot beside the way down; the drops away from a pillar landed
       // in water every time.
       let obsidian = 0; for (let k = 1; k <= 3; k++) for (let dy = -3; dy <= 2; dy++) if (bot.blockAt(f.offset(dx * k, dy, dz * k))?.name === 'obsidian') obsidian++;
-      const score = fall + obsidian * 20;
-      if (!best || score < best.score) best = { dx, dz, fall, obsidian, score, edge: f.offset(dx, 0, dz) };
+      // The pool's side first (note 1509): water lying within three of where the fall ends.
+      let pool = false; for (let ox = -3; ox <= 3 && !pool; ox++) for (let oz = -3; oz <= 3 && !pool; oz++) for (let dy = -1; dy <= 1 && !pool; dy++) if (bot.blockAt(f.offset(dx + ox, -fall - 1 + dy + 1, dz + oz))?.name === 'water') pool = true;
+      const score = fall + obsidian * 20 - (pool ? 100 : 0);
+      if (!best || score < best.score) best = { dx, dz, fall, obsidian, pool, score, edge: f.offset(dx, 0, dz) };
     }
     return best;
   };
@@ -791,7 +837,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     goal.step = { action: 'water_drop', from: { ...bot.entity.position }, fall: side.fall, health }; save();
     // Onto the column's cell first, at a crouch, where the body stands beside it on the rim.
     if (!await centreOnColumn(0.3)) console.log(`[end combat] the water drop begins ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off the column's middle`);
-    console.log(`[end combat] the water drop from ${bot.entity.position.floored()}, ${side.fall} blocks onto the island at (${side.edge.x}, ${side.edge.z})${side.obsidian ? `, ${side.obsidian} obsidian beside the way` : ''}, health ${health.toFixed(1)}`);
+    console.log(`[end combat] the water drop from ${bot.entity.position.floored()}, ${side.fall} blocks onto the island at (${side.edge.x}, ${side.edge.z})${side.pool ? ', into the pool' : ', no pool under it'}${side.obsidian ? `, ${side.obsidian} obsidian beside the way` : ''}, health ${health.toFixed(1)}`);
     try { await bot.equip(water, 'hand'); } catch (_) { /* equipped in the fall */ }
     // Upright for the step (note 1492): the crouch kept on the column (note
     // 1480) backs a crouched body off every edge, and the step off went 0.6
@@ -840,7 +886,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const record = (list, what) => list.length ? ` This fight's ${list.length} ${what}${list.length === 1 ? '' : 's'}: ${list.filter(d => d.down).length} down, ${list.filter(d => d.fell).length} fell, ${Math.round(list.reduce((n, d) => n + (d.lost || 0), 0) * 10) / 10} health lost in all.` : '';
     const tree = {
       dig_down: { description: `Come down the column after each crystal by digging the block under the feet, one at a time, about a second and a half a block, ${lift} blocks here, crouched with the shield up through the dragon's passes. The breath's cloud lands on the column where the body stands, 6 health a second whatever is worn, and every blow of it knocks the body 0.4 away from the dragon and lifts it: on a column one wide two blows put the body off it. On 2026-10-13 25588 fell off its column in the breath five times this way (dragon-59, 61, 62, 63, 64), 10 to 19 blocks, three times to its death; the dig itself brought 14 blocks down safely in most descents.${record(dug, 'dig')}` },
-      water_drop: { description: `Come down the column after each crystal by stepping off its edge onto the island by its foot, ${lift} blocks down, the water bucket in hand: the water is poured under the body in the last four blocks of the fall and the body lands in it unhurt, the bucket filled again from the pool. ${water} water bucket${water === 1 ? '' : 's'} carried. A second and a half in the air instead of twenty seconds on the column. Where the water is not poured in time (one drop in six so far has landed dry) the fall of ${lift} blocks takes about ${Math.max(0, lift - 3)} health; a drop whose dry fall would kill is not taken, and the column is dug down instead. The column's blocks are left standing; the next climb's blocks are dug from the island (quarry_blocks). Chosen, it is also the way out of the breath's cloud at the feet on the column: off at once, not three blocks dug in it.${record(dropped, 'drop')}` },
+      water_drop: { description: `Come down the column after each crystal by stepping off its edge onto the island by its foot, ${lift} blocks down: a bucket of water is poured at the column's foot before the climb and the body lands in that pool unhurt, the second bucket poured under the body in the last blocks of the fall if the pool is missed; the buckets are filled again from the water after. ${water} water bucket${water === 1 ? '' : 's'} carried. A second and a half in the air instead of twenty seconds on the column. Where the water is not poured in time (one drop in six so far has landed dry) the fall of ${lift} blocks takes about ${Math.max(0, lift - 3)} health; a drop whose dry fall would kill is not taken, and the column is dug down instead. The column's blocks are left standing; the next climb's blocks are dug from the island (quarry_blocks). Chosen, it is also the way out of the breath's cloud at the feet on the column: off at once, not three blocks dug in it.${record(dropped, 'drop')}` },
     };
     try {
       const decision = await decide('column_descent', { client, bot, task, goal, save, tree, interrupt: check, state: { lift, waterBuckets: water, health: bot.health, descents: (state.descents || []).slice(-6) } });
@@ -1530,6 +1576,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             if (flat > radius + 2.2) { (state.punchUnreached ||= {})[target.id] = Date.now(); save(); throw new Error(`The pillar's foot was not reached: ${Math.round(flat)} blocks from its middle, its radius ${radius}`); }
             const from = Math.floor(p.y);
             await descentChoice(feetY - from);
+            if (state.descent?.pick === 'water_drop') { try { await poolForTheDrop(bot.entity.position.floored()); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; } }
             // A climb stops at one block the server refused (pillarUp); taken up
             // again, three times at most, before it is given up.
             for (let tries = 0; tries < 3 && Math.floor(bot.entity.position.y) < feetY; tries++) {
