@@ -265,6 +265,9 @@ function dropOffs(bot, center = null) {
   }
   return out.sort((a, b) => a.toCenter - b.toCenter || a.fall - b.fall);
 }
+// The steps a span to `to` takes: a cell a step along one axis at a time (bridging.js stepToward), and the stretch laid beyond what stands.
+const spanSteps = (here, to, stretch) => stretch + Math.ceil(Math.abs(to.x - here.x) + Math.abs(to.z - here.z));
+
 async function leaveHighGround(bot, task, goal, save, state) {
   const { fallDanger, recoverFall } = require('./fall-recovery');
   const way = dropOffs(bot, state?.arenaCenter || { x: 0, z: 0 })[0];
@@ -1132,7 +1135,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           run: async () => {
             const from = here.clone();
             goal.step = { action: 'end_bridge', toward: { x: to.x, y: Math.floor(here.y), z: to.z }, blocks }; save();
-            const placed = await bridging.bridgeTo(bot, task, new Vec3(to.x, Math.floor(here.y), to.z), { maxBlocks: STRETCH, maxSteps: STRETCH });
+            // The steps cover the cells already laid and the stretch (note
+            // 1433): the span walks what stands before it lays, and with
+            // twelve steps for twelve blocks a span twelve long is walked to
+            // its end and nothing laid. 25588 (dragon-6 to dragon-17,
+            // 2026-10-13) stood on the entry platform of mid-243-ma-end-3 with
+            // its span of twelve to (91, 48, 5), the island's stone two blocks
+            // on at (89, 48, 8), and walked the span out and back every ten
+            // seconds, "changed nothing", until the dragon knocked it off.
+            const placed = await bridging.bridgeTo(bot, task, new Vec3(to.x, Math.floor(here.y), to.z), { maxBlocks: STRETCH, maxSteps: spanSteps(here, to, STRETCH) });
             state.bridged = (state.bridged || 0) + placed; if (placed > 0 || bot.entity.position.distanceTo(from) >= 2) progress = true; save();
           } };
       }
@@ -1306,4 +1317,4 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   }
 }
 
-module.exports = { PUNCH_RECORD, punchRecordSays, dragonNearRoute, enclosed, dropOffs, leaveHighGround, voidEdge, endermenNearRoute, metadata, perched, perchedHead, repeatedCrystalMiss, observeArena, endHazards, safeEndPoint, arenaMovement, arenaRoutes, fightEndStep };
+module.exports = { spanSteps, PUNCH_RECORD, punchRecordSays, dragonNearRoute, enclosed, dropOffs, leaveHighGround, voidEdge, endermenNearRoute, metadata, perched, perchedHead, repeatedCrystalMiss, observeArena, endHazards, safeEndPoint, arenaMovement, arenaRoutes, fightEndStep };
