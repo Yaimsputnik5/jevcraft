@@ -1156,8 +1156,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           // tick, 'no blow at crystal 13: lift 33, 28 blocks carried', the
           // island's end stone under its feet the whole while.
           const floorHere = bot.blockAt(here.floored().offset(0, -1, 0))?.name;
-          if (out <= 64 && lift >= 1 && lift <= 64 && lift > carried && pickForBars && floorHere === 'end_stone' && !onOwnPillar() && !Object.keys(tree).some(k => k.startsWith('quarry_blocks_'))) {
-            const want = Math.min(24, lift + 4 - carried);
+          if (out <= 64 && lift >= 1 && lift <= 64 && lift + 6 > carried && pickForBars && floorHere === 'end_stone' && !onOwnPillar() && !Object.keys(tree).some(k => k.startsWith('quarry_blocks_'))) {
+            // Ten over the lift (note 1464): the roofs on the way up and down are
+            // of the same blocks, and 25588 (dragon-43, 2026-10-13 12:23Z, three
+            // crystals broken) climbed 38 for a lift of 37 and stopped a block
+            // short with none left, 'no block of the kinds the climb lays carried'.
+            const want = Math.min(24, lift + 10 - carried);
             const { deepBeside } = require('./end-safety');
             const feet = here.floored();
             const cells = [];
