@@ -1443,7 +1443,17 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
                 // 25588 (dragon-30, 2026-10-13 09:52Z) quarried twice for nothing
                 // gained, 35 end stone lying eight to ten blocks off at (36 to 38,
                 // 42, -7 to -11), two blocks up the slope from where it stood.
-                try { await require('./drop-collection').collectNearbyDrops(bot, task, 'end_stone', { radius: 8, timeoutMs: 8000, waitForSpawnMs: 300, move: actions.navigate }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+                // Every stone, not the first (note 1502): collectNearbyDrops returns at
+                // the first item gained, and 25588 (dragon-74, 2026-10-13 18:57Z) dug 18
+                // cells and 'quarried 1', six stones lying two and three blocks off,
+                // then dug 24 more for 2. Picked up until none is gained or twenty seconds.
+                { const t0 = Date.now(); let rounds = 0;
+                  while (Date.now() - t0 < 20000 && rounds < 30) {
+                    check(); rounds++;
+                    let got = false;
+                    try { got = await require('./drop-collection').collectNearbyDrops(bot, task, 'end_stone', { radius: 8, timeoutMs: 5000, waitForSpawnMs: rounds === 1 ? 300 : 0, move: actions.navigate }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; break; }
+                    if (!got) break;
+                  } }
                 const after = blocksCarried(bot);
                 // What the quarry came to, said (note 1479): 25588 (dragon-61, 2026-10-13 15:27Z) 'quarried 0' on the eastern slope at (70, 45, -12) with no word of the cells dug or where the stone lay.
                 const lying = Object.values(bot.entities).filter(e => e.name === 'item' && e.isValid !== false && e.position && e.position.distanceTo(bot.entity.position) <= 16).map(e => `${e.position.floored()} ${Math.round(e.position.distanceTo(bot.entity.position))} off`);
