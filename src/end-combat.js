@@ -786,7 +786,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (!side || !water) { console.log(`[end combat] no water drop from ${bot.entity.position.floored()}: ${!water ? 'no water bucket carried' : 'no side with ground under it'}`); return false; }
     const startY = bot.entity.position.y, health = bot.health;
     // Not a fall that kills if the water is late (note 1504): a fall takes its blocks less three, and the pour has missed one drop in six. 25588 (dragon-74, 2026-10-13 19:15Z, five crystals broken) stepped off crystal 87's column at 97, 40 blocks, and died on the ground at 58 with no water poured.
-    if (side.fall - 3 >= health - 1) { console.log(`[end combat] no water drop from ${bot.entity.position.floored()}: a fall of ${side.fall} blocks takes about ${side.fall - 3} health and the body has ${health.toFixed(1)}; the dig instead`); return false; }
+    if (side.fall - 3 >= health - 1) { const dig = side.fall - 3 - Math.floor(health - 1) + 1; console.log(`[end combat] no water drop from ${bot.entity.position.floored()}: a fall of ${side.fall} blocks takes about ${side.fall - 3} health and the body has ${health.toFixed(1)}; ${dig} dug first`); waterDrop.tooHighBy = dig; return false; }
+    waterDrop.tooHighBy = 0;
     goal.step = { action: 'water_drop', from: { ...bot.entity.position }, fall: side.fall, health }; save();
     // Onto the column's cell first, at a crouch, where the body stands beside it on the rim.
     if (!await centreOnColumn(0.3)) console.log(`[end combat] the water drop begins ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off the column's middle`);
@@ -816,7 +817,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   };
   // The way down the column as Jev chose it for this fight (column_descent): the drop where chosen and possible, the dig otherwise.
   const wayDown = async (opts) => {
-    if (state.descent?.pick === 'water_drop' && Date.now() - state.descent.at < 30 * 60000 && onOwnPillar() && await waterDrop()) return;
+    const dropChosen = state.descent?.pick === 'water_drop' && Date.now() - state.descent.at < 30 * 60000;
+    if (dropChosen && onOwnPillar()) {
+      if (await waterDrop()) return;
+      // Too high for the drop: dug down to where a dry fall is borne, then the
+      // drop (note 1507). 25588 (dragon-76, 2026-10-13 19:33Z) at 82 was
+      // refused the drop of 23 and dug the whole column, the drop coming only
+      // when the breath found it at 73.
+      if (waterDrop.tooHighBy > 0) {
+        await digDownColumn({ limit: Math.min(waterDrop.tooHighBy, opts?.limit ?? 64) });
+        if (onOwnPillar() && await waterDrop()) return;
+      }
+    }
     await digDownColumn(opts);
   };
   // Jev's choice of the way down, once a fight (note 1484): asked at the
