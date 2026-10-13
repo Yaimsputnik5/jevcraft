@@ -32,7 +32,8 @@ function clutchTarget(bot, serverPosition) {
   if (support?.boundingBox !== 'block' || ['magma_block', 'cactus'].includes(support.name)) return why(`${support?.name || 'nothing'} under`);
   if (!['air', 'cave_air', 'void_air'].includes(bot.blockAt(p)?.name)) return why(`${bot.blockAt(p)?.name} where the water would go`);
   const aim = new Vec3(feet.x, p.y - .001, feet.z), delta = aim.minus(eye);
-  if (delta.norm() > 4.5) return why(`${delta.norm().toFixed(1)} to the cell, over 4.5`);
+  // Reach 5.2, not 4.5 (note 1499): the server allows a block's use a block past the hand's 4.5, and at a fall's speed of a block and a half a tick the half block is a tick, the one tick there is. 25588 (dragon-72, 2026-10-13 18:27Z, full iron) stepped off its column at 88 with the bucket in hand and died on the ground at 62 with no water poured, two drops of eight before it dry.
+  if (delta.norm() > 5.2) return why(`${delta.norm().toFixed(1)} to the cell, over 5.2`);
   if (feet.y < p.y - .1) return why('the feet below the cell');
   const sight = bot.world.raycast(eye, delta.unit(), delta.norm() + .01);
   if (!sight?.position?.equals(hit.position)) return why(`the sight line ends at ${sight?.position || 'nothing'}, not the floor`);
@@ -78,14 +79,19 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
   const tick = () => {
     try {
       check();
-      if (!used && bot.heldItem?.name === 'water_bucket' && bot.entity.velocity.y < 0) {
+      // Clicked again (note 1499) when a click has brought no water and no
+      // empty bucket in 120 ms and the body is still falling: a click the
+      // server refused is nothing to pick back up. Converted, no second click.
+      const converted = countOf(bot, 'water_bucket') === before - 1 && countOf(bot, 'bucket') === emptyBefore + 1;
+      const retry = used && !converted && Date.now() - used.at >= 120 && bot.blockAt(used.position)?.name !== 'water' && bot.entity.onGround === false;
+      if ((!used || retry) && bot.heldItem?.name === 'water_bucket' && bot.entity.velocity.y < 0) {
         const target = clutchTarget(bot, previous);
         if (target) {
           // Forced look updates the rotation carried in use_item immediately.
           // Send once, before this tick's movement packet; a repeated click
           // could pick the just-placed water back up with the now-empty bucket.
           bot.look(target.yaw, target.pitch, true).catch(err => { failure = err; });
-          bot.activateItem(); used = { at: Date.now(), position: target.position, serverPosition: previous.clone() };
+          bot.activateItem(); used = { at: Date.now(), position: target.position, serverPosition: previous.clone(), clicks: (used?.clicks || 0) + 1 };
         }
       }
     } catch (err) { failure = err; }
