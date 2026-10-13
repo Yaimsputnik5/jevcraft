@@ -1778,7 +1778,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // expose escape positions when healing or avoiding a breath cloud.
     // By the fountain already, the wait is there: no walk to another cell of its ring.
     const waitingThere = focus === fountain && fountain && Math.abs(byFountain - PERCH_RANGE) <= 3 && safe;
-    if ((!Object.keys(tree).some(key => key.startsWith('crystal_') || key.startsWith('throw_')) || bot.health < 16) && !waitingThere && !(tree.under_head || tree.strike_head)) for (const route of await arenaRoutes(bot, task, goal, policy, focus, { throwing })) {
+    // No walk from the bot's own column or an obsidian top (note 1520): the ways off are the column, the drop and pillar_top_down, and a walk there is a fall. 25588 (dragon-82, 2026-10-13 20:55Z, four crystals broken) on crystal 96's top at 85 with no bucket and no pool chose move_-5,3 and move_-4,3 three times running and died 23 blocks below.
+    if (!onOwnPillar() && !onObsidianTop() && (!Object.keys(tree).some(key => key.startsWith('crystal_') || key.startsWith('throw_')) || bot.health < 16) && !waitingThere && !(tree.under_head || tree.strike_head)) for (const route of await arenaRoutes(bot, task, goal, policy, focus, { throwing })) {
       tree[`move_${route.key}`] = { description: { action: focus?.name === 'unresolved_crystal_location'
         ? 'Approach a previously observed crystal location to check whether the crystal remains. Loss of entity tracking did not establish destruction.'
         : !safe ? 'Escape the unsafe current position along this surveyed route'
