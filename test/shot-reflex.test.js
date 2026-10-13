@@ -296,3 +296,19 @@ test('what each shot on a line came to is tallied and said to Jev', () => {
   assert.deepEqual(said.map(d => [d.shield, d.landed]), [['up', false], ['down', true]]);
   assert.match(reflex.blockedSays(bot), /This run, of the shots on a line to the bot: with the shield up 0 landed and 1 did not; with it down 1 landed/);
 });
+
+test('the body lock lets a running move look its way while the hold is on (note 1532)', async () => {
+  const { lockBody } = require('../src/shot-reflex');
+  const looks = [];
+  const bot = { setControlState() {}, look: async (...a) => { looks.push(['look', ...a]); }, lookAt: async (...a) => { looks.push(['lookAt', ...a]); }, _shotHold: { since: 1, free: false } };
+  lockBody(bot);
+  await bot.lookAt('away');
+  assert.equal(looks.length, 0, 'no move: the hold keeps the look');
+  bot._controller = { name: 'evade_breath_straight', keys: ['forward', 'sprint'] };
+  await bot.lookAt('away');
+  await bot.look(1, 0, true);
+  assert.deepEqual(looks.map(l => l[0]), ['lookAt', 'look'], 'a move under way looks where it runs');
+  bot._controller.failed = true;
+  await bot.lookAt('away');
+  assert.equal(looks.length, 2, 'a failed move has no look');
+});

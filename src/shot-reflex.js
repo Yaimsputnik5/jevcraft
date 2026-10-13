@@ -406,8 +406,16 @@ function lockBody(bot) {
   const held = () => bot._shotHold && !bot._shotHold.free;
   // A held-key move's own press goes through (note 1500): the hold frees itself for a move on its next tick, but between the move's first press and that tick the lock swallowed the press, and every run out of the breath began 'let go mid-move; pressed again' (25588, dragon-69 to dragon-73, 2026-10-13).
   bot.setControlState = (key, on) => { if (held() && on && MOVE_KEYS.includes(key) && !(bot._controller && !bot._controller.failed)) return; return set(key, on); };
-  bot.look = (...a) => held() ? Promise.resolve() : look(...a);
-  bot.lookAt = (...a) => held() ? Promise.resolve() : lookAt(...a);
+  // So too its look (note 1532): the move sets its controller and then looks
+  // its way (note 1523), but with a hold already on when it began, the look
+  // was swallowed here and the keys ran the body where the hold had turned
+  // it, at the shooter. 25588 (dragon-91, 2026-10-13 22:54Z, four crystals
+  // broken) ran 'straight out of the dragon's breath' from its pool at
+  // (-30, 62, -21) toward (-34, 62, -16) and went the other way, to (-27, 61,
+  // -24), under the fireball it ran from, 10.7 to 4.7 to none.
+  const moving = () => bot._controller && !bot._controller.failed;
+  bot.look = (...a) => held() && !moving() ? Promise.resolve() : look(...a);
+  bot.lookAt = (...a) => held() && !moving() ? Promise.resolve() : lookAt(...a);
 }
 
 // One look, every tick: the warnings, the question about them, the shots
