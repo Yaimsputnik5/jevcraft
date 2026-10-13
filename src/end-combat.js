@@ -1360,11 +1360,22 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // crystal 11's foot from lift 33 to lift 48 with 40 blocks carried,
             // worked its way down the eastern slope to y 29 and went over the
             // rim. The stone dug is level with the feet or a block up.
-            for (let r = 2; r <= 4 && cells.length < want; r++) for (let dx = -r; dx <= r && cells.length < want; dx++) for (let dz = -r; dz <= r && cells.length < want; dz++) {
+            // Level with the feet or a block up, as the note above says, and
+            // under the open sky (note 1487): the code dug the floor round the
+            // feet (a block down) and the walls beside them, and each round left
+            // the bot a block lower in a pit of its own, the next round digging
+            // from the pit's floor. 25588 (dragon-66, 2026-10-13 16:30Z) quarried
+            // 65 cells in three rounds at (41 to 51, 42 to 46, 3 to 6), dug
+            // itself four blocks under the island's top and a tunnel west along
+            // z 6 at 42 under solid rock, and could walk to no pillar's foot:
+            // 'not reached' from 52 and 35 blocks, the pathfinder digging nothing.
+            // Under the sky: no block within twelve over the cell, so no tunnel.
+            const skyOver = p => { for (let dy = 1; dy <= 12; dy++) if (bot.blockAt(p.offset(0, dy, 0))?.boundingBox === 'block') return false; return true; };
+            if (skyOver(feet.offset(0, -1, 0))) for (let r = 2; r <= 4 && cells.length < want; r++) for (let dx = -r; dx <= r && cells.length < want; dx++) for (let dz = -r; dz <= r && cells.length < want; dz++) {
               if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
-              for (const dy of [0, -1]) {
+              for (const dy of [1, 0]) {
                 const p = feet.offset(dx, dy, dz);
-                if (bot.blockAt(p)?.name !== 'end_stone' || bot.blockAt(p.offset(0, -1, 0))?.boundingBox !== 'block' || deepBeside(bot, p.offset(.5, 1, .5))) continue;
+                if (bot.blockAt(p)?.name !== 'end_stone' || bot.blockAt(p.offset(0, -1, 0))?.boundingBox !== 'block' || !skyOver(p) || deepBeside(bot, p.offset(.5, 1, .5))) continue;
                 cells.push(p); break;
               }
             }
