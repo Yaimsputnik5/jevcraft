@@ -1078,14 +1078,19 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               description: { action: `Dig ${cells.length} end stone from the island's ground within four blocks of where the bot stands, with the ${pickForBars.name.replace('_', ' ')}, for the climb beside crystal ${target.id}'s pillar: ${lift} blocks up to its stand, ${carried} carried. The floor cells dug have rock under them and no void beside; the dragon's passes and breath go on while it digs (about a second a block). The crystal is ${out} blocks off.`,
                 blocksWanted: lift, blocksCarried: carried, cellsToDig: cells.length, health: bot.health, dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null },
               run: async () => {
-                const before = carried;
+                const before = blocksCarried(bot);
                 goal.step = { action: 'quarry_blocks', crystal: target.id, cells: cells.length }; save();
                 for (const p of cells) {
                   check();
                   if (bot.blockAt(p)?.name !== 'end_stone') continue;
                   try { await actions.dig(bot, task, p, { requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] quarry stopped at ${p}: ${String(err.message || err).slice(0, 120)}`); break; }
                 }
-                try { await require('./drop-collection').collectNearbyDrops(bot, task, 'end_stone', { radius: 6, timeoutMs: 5000, waitForSpawnMs: 300, move: actions.navigate }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+                // The stone picked up from where it lies, twelve blocks about and
+                // ten seconds (note 1449): dug on the island's slopes it rolls, and
+                // 25588 (dragon-30, 2026-10-13 09:52Z) quarried twice for nothing
+                // gained, 35 end stone lying eight to ten blocks off at (36 to 38,
+                // 42, -7 to -11), two blocks up the slope from where it stood.
+                try { await require('./drop-collection').collectNearbyDrops(bot, task, 'end_stone', { radius: 12, timeoutMs: 10000, waitForSpawnMs: 300, move: actions.navigate }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
                 const after = blocksCarried(bot);
                 console.log(`[end combat] quarried ${after - before} end stone for the climb (${after} blocks carried, ${lift} wanted for crystal ${target.id})`);
                 if (after > before) progress = true;
