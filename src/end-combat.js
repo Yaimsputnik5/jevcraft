@@ -1177,6 +1177,26 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
                 if ([0, 1, 2].some(dy => /iron_bars/.test(bot.blockAt(gap.offset(0, dy, 0))?.name || ''))) throw new Error('The cage\'s bars between the stand and the crystal did not come out');
               }
               bot.setControlState?.('sneak', true);
+              // A roof over the stand on the top (note 1451), on a post of three
+              // laid on the side away from the crystal: the blow brings the
+              // dragon, its fireball bursts on the roof and the cloud lies three
+              // over the feet. 25588 (dragon-32, 2026-10-13 10:25Z, full iron,
+              // crystals 109 and 110 broken) was in the breath on the top the
+              // moment of the blow, 20 to 4.6, and the way back to its column
+              // found no route; the next tick took the rest.
+              try {
+                const f0 = bot.entity.position.floored(), post = f0.offset(dir.x, 0, dir.z);
+                const name = blocksCarriedName(bot), item = name && bot.inventory.items().find(i => i.name === name);
+                if (item && bot.blockAt(post.offset(0, -1, 0))?.boundingBox === 'block') {
+                  for (let dy = 0; dy <= 2; dy++) {
+                    const cell = post.offset(0, dy, 0); if (bot.blockAt(cell)?.boundingBox === 'block') continue;
+                    const ref = bot.blockAt(cell.offset(0, -1, 0)); if (ref?.boundingBox !== 'block') break;
+                    check(); await bot.equip(item, 'hand'); await bot.lookAt(ref.position.offset(.5, 1, .5), true); await bot.placeBlock(ref, new Vec3(0, 1, 0)); await sleep(60);
+                  }
+                  const roofed = await roofOverhead();
+                  console.log(`[end combat] a roof over the stand on the top at ${f0.offset(0, 2, 0)}: ${roofed ? 'laid' : 'not laid'}`);
+                }
+              } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
               aim = target.position.offset(0, 1.2, 0);
             }
             const before = bot.health;
