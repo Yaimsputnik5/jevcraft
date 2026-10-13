@@ -454,8 +454,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (Math.hypot(u.x + .5 - p.x, u.z + .5 - p.z) > 2.5) return false;
     if (u.x !== f.x || u.z !== f.z) bot._pillarUp = { ...u, x: f.x, z: f.z };
     // Two of the four cells round the feet open at least (a pillar laid up
-    // against a round obsidian pillar's side has one or two of them solid).
-    return [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block').length >= 2;
+    // against a round obsidian pillar's side has one or two of them solid),
+    // and a drop of three or more off one of them (note 1458): at the
+    // column's foot, in the pit the quarry left round it, the sides are
+    // open and the ground a block down, and the bot is on the island, where
+    // the breath is run from, not held in or dug under. 25588 (dragon-38,
+    // 2026-10-13 11:30Z, full iron, crystal 11 broken) came down its column
+    // to the foot at 60, was 'on its pillar' there, held for the fireball,
+    // dug nothing in the cloud and died in it, 20 to none in three seconds.
+    const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block');
+    if (sides.length < 2) return false;
+    const drop = ([dx, dz]) => { for (let dy = 1; dy <= 6; dy++) if (bot.blockAt(f.offset(dx, -dy, dz))?.boundingBox === 'block') return dy - 1; return 6; };
+    return Math.max(...sides.map(drop)) >= 3;
   };
   // On an obsidian pillar's top (not the bot's own column): the top is a
   // small flat place high over the island, with the bot's column at its edge.
