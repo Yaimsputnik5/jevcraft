@@ -826,15 +826,17 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     }
     return best;
   };
-  const waterDrop = async () => {
+  const waterDrop = async ({ inCloud = false } = {}) => {
     const side = waterDropSide();
     const water = bot.inventory.items().find(i => i.name === 'water_bucket');
     // Into the pool with no bucket in hand (note 1514): the pool at the foot is the landing, the bucket in the air only the second chance. 25588 (dragon-78, 2026-10-13 20:16Z) poured its last bucket into the pool at crystal 94's foot, struck the crystal, and was refused the drop at 85, 'no water bucket carried', the pool under it.
     if (!side || (!water && !side.pool)) { console.log(`[end combat] no water drop from ${bot.entity.position.floored()}: ${!side ? 'no side with ground under it' : 'no water bucket carried and no pool under the way down'}`); return false; }
     const startY = bot.entity.position.y, health = bot.health;
     // Not a fall that kills if the water is late (note 1504): a fall takes its blocks less three, and the pour has missed one drop in six. 25588 (dragon-74, 2026-10-13 19:15Z, five crystals broken) stepped off crystal 87's column at 97, 40 blocks, and died on the ground at 58 with no water poured.
-    if (side.fall - 3 >= health - 1) { const dig = side.fall - 3 - Math.floor(health - 1) + 1; console.log(`[end combat] no water drop from ${bot.entity.position.floored()}: a fall of ${side.fall} blocks takes about ${side.fall - 3} health and the body has ${health.toFixed(1)}; ${dig} dug first`); waterDrop.tooHighBy = dig; return false; }
-    waterDrop.tooHighBy = 0;
+    // Not in the breath's cloud, and not into the pool (note 1516): in the cloud the dig first is 6 a second for a second and more a block, more than a block of fall is worth, and 25588 (dragon-79, 2026-10-13 20:23Z, full iron) at 82 in the cloud was refused the drop of 25, dug, and died digging; the pool at the foot takes any fall.
+    if (side.fall - 3 >= health - 1 && (inCloud || side.pool)) console.log(`[end combat] the water drop of ${side.fall} blocks at ${health.toFixed(1)} health, ${inCloud ? 'the breath at the feet: the fall over the cloud' : 'into the pool at the foot'}`);
+    else if (side.fall - 3 >= health - 1) { const dig = side.fall - 3 - Math.floor(health - 1) + 1; console.log(`[end combat] no water drop from ${bot.entity.position.floored()}: a fall of ${side.fall} blocks takes about ${side.fall - 3} health and the body has ${health.toFixed(1)}; ${dig} dug first`); waterDrop.tooHighBy = dig; return false; }
+    if (!(side.fall - 3 >= health - 1)) waterDrop.tooHighBy = 0;
     goal.step = { action: 'water_drop', from: { ...bot.entity.position }, fall: side.fall, health }; save();
     // Onto the column's cell first, at a crouch, where the body stands beside it on the rim.
     if (!await centreOnColumn(0.3)) console.log(`[end combat] the water drop begins ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off the column's middle`);
@@ -866,7 +868,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   const wayDown = async (opts) => {
     const dropChosen = state.descent?.pick === 'water_drop' && Date.now() - state.descent.at < 30 * 60000;
     if (dropChosen && onOwnPillar()) {
-      if (await waterDrop()) return;
+      if (await waterDrop({ inCloud: breathThreat(bot)?.name === 'area_effect_cloud' })) return;
       // Too high for the drop: dug down to where a dry fall is borne, then the
       // drop (note 1507). 25588 (dragon-76, 2026-10-13 19:33Z) at 82 was
       // refused the drop of 23 and dug the whole column, the drop coming only
