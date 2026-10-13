@@ -33,7 +33,8 @@ function clutchTarget(bot, serverPosition) {
   if (!['air', 'cave_air', 'void_air'].includes(bot.blockAt(p)?.name)) return why(`${bot.blockAt(p)?.name} where the water would go`);
   const aim = new Vec3(feet.x, p.y - .001, feet.z), delta = aim.minus(eye);
   // Reach 5.2, not 4.5 (note 1499): the server allows a block's use a block past the hand's 4.5, and at a fall's speed of a block and a half a tick the half block is a tick, the one tick there is. 25588 (dragon-72, 2026-10-13 18:27Z, full iron) stepped off its column at 88 with the bucket in hand and died on the ground at 62 with no water poured, two drops of eight before it dry.
-  if (delta.norm() > 5.2) return why(`${delta.norm().toFixed(1)} to the cell, over 5.2`);
+  // Within 4.0 of the cell, not 5.2 (note 1504): the server's body trails the client's by a tick in a fall, a block and a half higher, and measures the reach from there; clicks sent at 5.2 were a block out of its reach and refused, the water never placed, and the retry (note 1499) came six ticks later on the ground. 25588 (dragon-74, 2026-10-13 19:12Z) stepped off crystal 77's column, clicked, and landed dry at (-15, 61, 36), 20 to 5. Clicked every tick from 4.0 down, the first click lands within the server's reach and the second a tick later.
+  if (delta.norm() > 4.0) return why(`${delta.norm().toFixed(1)} to the cell, over 4.0`);
   if (feet.y < p.y - .1) return why('the feet below the cell');
   const sight = bot.world.raycast(eye, delta.unit(), delta.norm() + .01);
   if (!sight?.position?.equals(hit.position)) return why(`the sight line ends at ${sight?.position || 'nothing'}, not the floor`);
@@ -83,7 +84,7 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
       // empty bucket in 120 ms and the body is still falling: a click the
       // server refused is nothing to pick back up. Converted, no second click.
       const converted = countOf(bot, 'water_bucket') === before - 1 && countOf(bot, 'bucket') === emptyBefore + 1;
-      const retry = used && !converted && Date.now() - used.at >= 120 && bot.blockAt(used.position)?.name !== 'water' && bot.entity.onGround === false;
+      const retry = used && !converted && Date.now() - used.at >= 40 && bot.blockAt(used.position)?.name !== 'water' && bot.entity.onGround === false;
       if ((!used || retry) && bot.heldItem?.name === 'water_bucket' && bot.entity.velocity.y < 0) {
         const target = clutchTarget(bot, previous);
         if (target) {
@@ -134,6 +135,7 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
             source: used && { ...used.position }, waterConsumed: converted ? 1 : 0 };
           goal.lastFallLanding = evidence; save(); bot.emit('fall_recovery', evidence);
           if (!used) console.log(`[fall] landed dry at ${bot.entity.position.floored()} with no water poured, ${initialHealth.toFixed(1)} to ${bot.health.toFixed(1)}: ${(bot._clutchWhy || []).slice(-6).join('; ') || 'the clutch was never asked (the bucket not in hand, or not falling)'}`);
+          else if (!converted) console.log(`[fall] landed dry at ${bot.entity.position.floored()}, ${initialHealth.toFixed(1)} to ${bot.health.toFixed(1)}: clicked ${used.clicks || 1} time${(used.clicks || 1) === 1 ? '' : 's'} at ${used.position} from ${used.serverPosition.floored()}, no water came of it (the server refused the placing)`);
           if (refill && converted && used) {
             await fillWaterBucket(bot, task, used.position, { guard: check });
             evidence.bucketRecovered = true; save();

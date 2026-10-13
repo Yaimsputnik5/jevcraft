@@ -89,7 +89,8 @@ test('landing on dry ground after a water attempt ends the emergency without cla
 
 test('brief ground contact followed by another fall cannot complete the landing guard', async () => {
   const { bot, task, goal } = fixture();
-  bot.activateItem = () => { bot.entity.position.y = 1; bot.entity.onGround = true; bot.entity.velocity.y = -.0784; };
+  // The first click lands the body; a later click (the clutch clicks again each tick while it falls, note 1504) places nothing.
+  let clicks = 0; bot.activateItem = () => { if (clicks++) return; bot.entity.position.y = 1; bot.entity.onGround = true; bot.entity.velocity.y = -.0784; };
   const timer = setInterval(() => bot.emit('physicsTick'), 5);
   const airborne = setTimeout(() => { bot.entity.onGround = false; bot.entity.position.y = 3; bot.entity.velocity.y = -.4; }, 65);
   try {
