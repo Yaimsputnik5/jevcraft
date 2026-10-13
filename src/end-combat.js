@@ -845,6 +845,20 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const others = endMobs(bot).filter(e => e.name !== 'enderman');
     return safeFromHostiles(bot, p, others) && others.every(e => p.distanceTo(e.position) >= 20) && endHazards(bot).every(({ entity, radius }) => hazardDistance(p, entity) > radius);
   };
+  // Crouched whenever the bot stands on its column or an obsidian top and no
+  // move of its own is under way (note 1480): a crouched body on the ground is
+  // not moved off its block's edge by anything, its own keys or a push (the
+  // physics backs the whole of the step off the edge), and the dragon's wing
+  // passing through the column pushes without a blow: the dragon shoves
+  // whatever its parts touch, and strikes only a body not hurt by a mob
+  // within two ticks, which the breath at the feet is. 25588 (dragon-59,
+  // 2026-10-13 15:06Z) and (dragon-61, 15:37Z), both digging down out of the
+  // breath with no key held, drifted 0.8 to 1.1 off the column's middle in
+  // half a second with no blow recorded and fell 18 and 10 blocks, dragon-59
+  // to its death. The climb's jumps (a move of their own) are left upright.
+  const crouchKeeper = setInterval(() => {
+    try { if (!bot._controller && bot.entity?.onGround && (onOwnPillar() || onObsidianTop()) && !bot.controlState?.sneak) bot.setControlState?.('sneak', true); } catch (_) { /* nothing to hold */ }
+  }, 50);
   try {
     // What the columns have cost this fight (note 1440): every blow taken on
     // the bot's own column or an obsidian top, told on the climb's option.
@@ -1736,6 +1750,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // down and 187 arrows carried (note 1136).
     state.noProgress = progress ? 0 : (state.noProgress || 0) + (chose ? 1 : 0);
     state.lastActionAt = started; save();
+    clearInterval(crouchKeeper);
     bot.removeListener('entityMoved', moved); task.interruptCheck = oldInterrupt;
     bot.pathfinder.setGoal(null); bot.clearControlStates(); policy.restore();
   }

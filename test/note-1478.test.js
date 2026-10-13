@@ -59,3 +59,13 @@ test('the hold with no breath is held to its end, nothing dug (note 1478)', asyn
   assert.ok(steps.includes('hold_on_pillar'), steps.join(','));
   assert.equal(dug.length, 0, dug.map(String).join(' '));
 });
+
+test('on its column the bot is kept crouched through the step, so no push takes it off the edge (note 1478, 1480)', async () => {
+  const { bot, goal, task, dig } = fixture();
+  bot.entities[20].position = new (require('vec3').Vec3)(80, 90, 80); // the dragon far: no hold, the question asked
+  const set = [];
+  bot.controlState = {};
+  bot.setControlState = (k, v) => { set.push([k, v]); bot.controlState[k] = v; };
+  await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig, place: async () => {} }, { systemOne: async () => { await new Promise(r => setTimeout(r, 200)); return { answers: { branch_0: { choice: 'observe' } } }; } });
+  assert.ok(set.some(([k, v]) => k === 'sneak' && v === true), JSON.stringify(set));
+});
