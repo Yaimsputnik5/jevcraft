@@ -383,7 +383,24 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // the jumps of the climb drift, and 25588 (05:41Z) stood a cell off the
   // cell last recorded, 22 up, and was not on its pillar by the record.
   const SCAFFOLD_UNDER = /^(cobblestone|cobbled_deepslate|netherrack|dirt|stone|blackstone|deepslate|andesite|diorite|granite|tuff|end_stone)$/;
+  // The record read from the ground where it is lost (note 1437): a
+  // reconnect empties it, and 25588 (dragon-20, 2026-10-13 08:05Z), kicked
+  // by the server and back on its own column at (-31, 92, -28) three
+  // crystals in, was 'own pillar false, column undefined', held standing
+  // through the dragon's pass, was knocked off and died of the fall. A
+  // scaffold block under the feet, three or more of the four cells about
+  // them open, and the ground four or more blocks under is the bot's column.
+  const readPillar = () => {
+    const f = bot.entity.position.floored(), under = bot.blockAt(f.offset(0, -1, 0));
+    if (under?.boundingBox !== 'block' || !SCAFFOLD_UNDER.test(under.name) || under.name === 'end_stone' && f.y < 70) return null;
+    const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    if (sides.filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block').length < 3) return null;
+    const drop = ([dx, dz]) => { for (let dy = 1; dy <= 6; dy++) if (bot.blockAt(f.offset(dx, -dy, dz))?.boundingBox === 'block') return dy - 1; return 6; };
+    if (Math.max(...sides.map(drop)) < 4) return null;
+    return { x: f.x, z: f.z, until: Date.now() + 600000, read: true };
+  };
   const onOwnPillar = () => {
+    if (!bot._pillarUp || bot._pillarUp.until < Date.now()) { const r = readPillar(); if (r) { bot._pillarUp = r; console.log(`[end combat] the bot's own column read from the ground under it at (${r.x}, ${r.z}), no record of it kept`); } }
     const u = bot._pillarUp, p = bot.entity.position;
     if (!u || u.until < Date.now()) return false;
     const f = p.floored();

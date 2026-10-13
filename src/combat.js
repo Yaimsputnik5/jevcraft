@@ -237,7 +237,14 @@ async function strike(bot, task, target) {
 // one and two on the other, and killed neither in five seconds (note 535).
 // Not past a creeper come nearest, which the dance answers.
 function strikeTarget(bot) {
-  const list = threats(bot, 5).filter(({ entity, visible, distance }) => (visible || distance <= 2) && canStrike(bot, entity));
+  // Not the dragon, a crystal or the breath (note 1437): a reflex blow at
+  // the dragon from a column is a point of damage for a knock off it, a
+  // crystal struck blows up in the face, and the server's answer to a blow
+  // at what cannot be struck is the door ('invalid_entity_attacked': 25588,
+  // dragon-20, 2026-10-13 08:05Z, holding on its column through a pass).
+  // The fight's own blows (end-combat.js) are not this reflex's.
+  const NOT_STRUCK = new Set(['ender_dragon', 'end_crystal', 'area_effect_cloud', 'dragon_fireball']);
+  const list = threats(bot, 5).filter(({ entity, visible, distance }) => !NOT_STRUCK.has(entity.name) && (visible || distance <= 2) && canStrike(bot, entity));
   const last = bot._struck && Date.now() - bot._struck.at < 3000 && list[0]?.entity.name !== 'creeper' ? list.find(t => t.entity.id === bot._struck.id) : null;
   return last || list[0];
 }
