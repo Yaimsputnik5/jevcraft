@@ -1169,7 +1169,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         // Three over the lift (note 1468): the roofs on the way are of the same blocks, and 25588 (dragon-48, 2026-10-13 13:12Z) climbed 22 for a lift of 23 and stopped a block short with none left.
         // The three over the lift only before the climb (note 1470): on the column already, the climb finishes with what is carried. 25588 (dragon-52, 2026-10-13 13:53Z) at crystal 98's top, lift 28 and 30 blocks, was offered no blow, held 30 seconds 'unsafe: end_crystal 4<=12', and the breath took it 20 to none.
         const margin = (onOwnPillar() || onObsidianTop()) ? 0 : 3;
-        if (out > 64 || lift < 1 || lift + margin > Math.min(carried, 64 + margin)) {
+        // A lift of none is a stand reached (note 1472): 25588 (dragon-54, 2026-10-13 14:13Z) stood at crystal 66's stand, 'no blow at crystal 66: 3 off, lift 0', held 'unsafe' twenty seconds and died in the breath; dragon-52 the same at 98.
+        if (out > 64 || lift < 0 || lift + margin > Math.min(carried, 64 + margin)) {
           if (!(state.punchSkipSaid > Date.now() - 20000)) { state.punchSkipSaid = Date.now(); console.log(`[end combat] no blow at crystal ${target.id}: ${out} off, lift ${lift}, ${carried} blocks carried, radius ${radius}`); }
           // Too few blocks for the climb, a pickaxe carried and the island's
           // stone underfoot (note 1435): the blocks are dug here, Jev's to
