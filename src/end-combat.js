@@ -1530,9 +1530,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               run: async () => {
                 const before = blocksCarried(bot);
                 goal.step = { action: 'quarry_blocks', crystal: target.id, cells: cells.length }; save();
-                let dug = 0, skipped = 0;
+                let dug = 0, skipped = 0, hostile = null;
+                // The quarry stops for a hostile within five (note 1525): the step's emergencies are the dragon's and the breath's, not an enderman's, and 25588 (dragon-85, 2026-10-13 21:34Z, three crystals broken, a diamond sword and a shield carried) went on digging through five blows of an enderman in four seconds, 20 to none.
+                const hostileNear = () => (hostile = hostileEntities(bot, 5).find(e => live(bot, e) && e.name !== 'ender_dragon') || null);
                 for (const p of cells) {
                   check();
+                  if (hostileNear()) { console.log(`[end combat] the quarry stopped for a ${hostile.name} ${Math.round(hostile.position.distanceTo(bot.entity.position))} blocks off`); break; }
                   if (bot.blockAt(p)?.name !== 'end_stone') { skipped++; continue; }
                   try { await actions.dig(bot, task, p, { requireDrops: false }); dug++; } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] quarry stopped at ${p}: ${String(err.message || err).slice(0, 120)}`); break; }
                 }
@@ -1546,7 +1549,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
                 // cells and 'quarried 1', six stones lying two and three blocks off,
                 // then dug 24 more for 2. Picked up until none is gained or twenty seconds.
                 { const t0 = Date.now(); let rounds = 0;
-                  while (Date.now() - t0 < 20000 && rounds < 30) {
+                  while (Date.now() - t0 < 20000 && rounds < 30 && !hostileNear()) {
                     check(); rounds++;
                     let got = false;
                     try { got = await require('./drop-collection').collectNearbyDrops(bot, task, 'end_stone', { radius: 8, timeoutMs: 5000, waitForSpawnMs: rounds === 1 ? 300 : 0, move: actions.navigate }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; break; }
