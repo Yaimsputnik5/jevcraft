@@ -94,3 +94,12 @@ test('the straight run out of the breath takes no slope steeper than a block a c
   const gentle = straightAway(bot, bot.entity.position, Math.PI, () => true, 6);
   assert.ok(gentle && gentle.x > 5, `down a gentle slope: ${gentle}`);
 });
+
+test('the straight run takes no cell a block up: with no jump the step stops it (note 1443)', () => {
+  const { bot } = platform(new Vec3(0.5, 64, 0.5));
+  // Level ground at y 63 west of x 0; from x 1 east the ground is a block higher, a step up.
+  bot.blockAt = p => { const f = p.floored(); const top = f.x <= 0 ? 63 : 64; return { name: f.y <= top ? 'end_stone' : 'air', boundingBox: f.y <= top ? 'block' : 'empty' }; };
+  const away = straightAway(bot, bot.entity.position, Math.PI, () => true, 6);
+  assert.ok(away, 'a run is found');
+  assert.ok(away.x - 0.5 < 1, `not up the step: ${away}`);
+});

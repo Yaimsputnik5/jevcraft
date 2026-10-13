@@ -151,7 +151,12 @@ function straightAway(bot, start, bearing, allowed = () => true, blocks = RUN_BL
       // 07:56Z, full iron) ran six cells from a fireball down the island's
       // eastern slope, 39 to 37, and went two cells past them over the rim,
       // the water bucket's save with nothing under it to land on.
-      const floor = [y, y - 1, y - 2].find(fy => solid(x, fy, z) && !solid(x, fy + 1, z) && !solid(x, fy + 2, z));
+      // Level or one down only (note 1443): the run holds forward with no
+      // jump (note 1428), and a cell a block up stops it at the step. 25588
+      // (dragon-24, 2026-10-13 08:58Z), down its column to the island's
+      // ground in a hollow, ran one block into the hollow's side from a
+      // fireball and stood in the cloud, 12 to none.
+      const floor = [y - 1, y - 2].find(fy => solid(x, fy, z) && !solid(x, fy + 1, z) && !solid(x, fy + 2, z));
       if (floor === undefined || !allowed(new Vec3(x + .5, floor + 1, z + .5)) || deepBeside(bot, new Vec3(x + .5, floor + 1, z + .5))) ok = false; else y = floor + 1;
     }
     if (ok) return new Vec3(start.x + dx * blocks, y, start.z + dz * blocks);
