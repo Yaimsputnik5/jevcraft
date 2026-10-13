@@ -397,6 +397,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (sides.filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block').length < 2) return null;
     const drop = ([dx, dz]) => { for (let dy = 1; dy <= 6; dy++) if (bot.blockAt(f.offset(dx, -dy, dz))?.boundingBox === 'block') return dy - 1; return 6; };
     if (Math.max(...sides.map(drop)) < 4) return null;
+    // Not a span over the void (note 1439): a column stands on something
+    // within eight blocks under its block, a bridge's cell has nothing.
+    // 25588 (dragon-22, 2026-10-13 08:21Z) read its own column at (94, 3),
+    // the entry platform's bridge, one block over the void.
+    let footing = false; for (let dy = 2; dy <= 9 && !footing; dy++) footing = bot.blockAt(f.offset(0, -dy, 0))?.boundingBox === 'block';
+    if (!footing) return null;
     return { x: f.x, z: f.z, until: Date.now() + 600000, read: true };
   };
   const onOwnPillar = () => {
