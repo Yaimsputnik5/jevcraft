@@ -122,19 +122,19 @@ function dodgeRoutes(bot, dragon, allowed = () => true) {
 // with a solid block at most two under the feet's level or one over it (a
 // step down or up, never the void) and not walled two high. -> Vec3 or null
 const RUN_BLOCKS = 6;
-function straightAway(bot, start, bearing, allowed = () => true) {
+function straightAway(bot, start, bearing, allowed = () => true, blocks = RUN_BLOCKS) {
   const solid = (x, y, z) => bot.blockAt(new Vec3(x, y, z))?.boundingBox === 'block';
   const feet = Math.floor(start.y);
   for (const angle of [Math.PI, Math.PI * .75, -Math.PI * .75, Math.PI / 2, -Math.PI / 2]) {
     const dx = Math.cos(bearing + angle), dz = Math.sin(bearing + angle);
     let ok = true, y = feet;
-    for (let d = 1; d <= RUN_BLOCKS && ok; d++) {
+    for (let d = 1; d <= blocks && ok; d++) {
       const x = Math.floor(start.x + dx * d), z = Math.floor(start.z + dz * d);
       // The floor under this cell: one up, level, or down to two.
       const floor = [y, y - 1, y - 2, y - 3].find(fy => solid(x, fy, z) && !solid(x, fy + 1, z) && !solid(x, fy + 2, z));
       if (floor === undefined || !allowed(new Vec3(x + .5, floor + 1, z + .5)) || deepBeside(bot, new Vec3(x + .5, floor + 1, z + .5))) ok = false; else y = floor + 1;
     }
-    if (ok) return new Vec3(start.x + dx * RUN_BLOCKS, y, start.z + dz * RUN_BLOCKS);
+    if (ok) return new Vec3(start.x + dx * blocks, y, start.z + dz * blocks);
   }
   return null;
 }
@@ -265,7 +265,15 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600 } 
     if (['area_effect_cloud', 'dragon_fireball'].includes(dragon.name)) {
       const start = bot.entity.position.clone(), toward = dragon.position.minus(start); toward.y = 0;
       const bearing = Math.atan2(toward.z, toward.x);
-      const away = straightAway(bot, start, bearing, allowed || (() => true));
+      // Six cells, else three, else two (note 1430): on the island's rough
+      // eastern ground, the void near, no six-cell run was to be had, and
+      // 25588 (dragon-14, 2026-10-13 07:06Z, full iron) stood in the cloud
+      // 'no surveyed walking escape' three seconds, 20 to 2. A short step out
+      // and the next tick's step again beat standing.
+      let runBlocks = RUN_BLOCKS;
+      let away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks);
+      if (!away) { runBlocks = 3; away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks); }
+      if (!away) { runBlocks = 2; away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks); }
       if (away) {
         goal.step = { action: 'evade_breath_straight', hazard: dragon.name, from: { ...start }, toward: { x: away.x, y: away.y, z: away.z } }; save();
         // No jump, and the floor a step ahead read each tick (note 1428): at a
@@ -277,11 +285,11 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600 } 
         try {
           await move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'evade_breath_straight', keys: ['forward', 'sprint'], sneak: false,
             why: 'straight out of the dragon\'s breath at a run', look: away.offset(0, 1.6, 0), maxMs: 1800, tick: 25,
-            until: () => bot.entity.position.distanceTo(start) >= RUN_BLOCKS - 2 || fallDanger(bot) || !breathThreat(bot) || !floorAhead() });
+            until: () => bot.entity.position.distanceTo(start) >= Math.max(1.5, runBlocks - 1) || fallDanger(bot) || !breathThreat(bot) || !floorAhead() });
         } catch (err) { check(); }
         if (fallDanger(bot)) await recoverFall(bot, task, goal, save);
-        if (bot.entity.position.distanceTo(start) >= 2) {
-          const evidence = { at: Date.now(), from: { ...start }, to: { ...bot.entity.position }, hazard: { id: dragon.id, name: dragon.name }, straightRun: true };
+        if (bot.entity.position.distanceTo(start) >= 1.2) {
+          const evidence = { at: Date.now(), from: { ...start }, to: { ...bot.entity.position }, hazard: { id: dragon.id, name: dragon.name }, straightRun: true, blocks: runBlocks };
           goal.endCombat.lastEvasion = evidence; save(); bot.emit('end_combat', { evasion: evidence }); return true;
         }
       }
