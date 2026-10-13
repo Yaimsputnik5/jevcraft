@@ -848,11 +848,20 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       } catch (err) { if (['Cancelled', 'NeedsAir'].includes(err.name)) throw err; state.pocketFailedAt = Date.now(); save(); }
     }
     const turned = hostileEntities(bot, 12).find(e => live(bot, e) && e.name === 'enderman');
-    if (turned && !state.water) {
+    // Poured again where the last water is gone or far (note 1462): the
+    // End's endermen keep a hostile within sixteen blocks at all hours, the
+    // water was never taken back, and one pour a fight was all there was.
+    // 25588 (dragon-42, 2026-10-13 12:11Z, full iron, two buckets carried)
+    // stood 'end_hold' among three endermen at 6, 10 and 12 blocks, poured
+    // nothing, and took 4 a second to none.
+    const lastWater = state.water && vector(state.water.at);
+    const waterStands = lastWater && bot.blockAt(lastWater)?.name === 'water' && lastWater.distanceTo(bot.entity.position) <= 6;
+    if (turned && !waterStands) {
       const at = await pourAtFeet(bot, check, { urgent: turned.position.distanceTo(bot.entity.position) <= 4 });
       if (at) { state.water = { at: { ...at }, poured: Date.now() }; state.pours = (state.pours || 0) + 1; goal.step = { action: 'end_water', against: 'enderman', at: { ...at } }; save(); }
     }
-    const attacker = hostileEntities(bot, 6).find(e => live(bot, e));
+    // Within eight (note 1462): one at six struck the bot held 'unsafe' with none within six.
+    const attacker = hostileEntities(bot, 8).find(e => live(bot, e) && e.name !== 'ender_dragon' && (e.name !== 'enderman' || e.position.distanceTo(bot.entity.position) <= 8));
     if (attacker && sword && !(inWater() && attacker.name === 'enderman' && !canStrike(bot, attacker))) {
       goal.step = { action: 'end_defend', target: attacker.name, distance: Math.round(attacker.position.distanceTo(bot.entity.position) * 10) / 10 }; save();
       await defendHere(2000); return;
