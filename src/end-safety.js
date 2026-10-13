@@ -19,7 +19,7 @@ function hazardDistance(point, entity) {
 function breathThreat(bot) {
   const entities = Object.values(bot.entities).filter(e => e.isValid !== false);
   return entities.find(e => e.name === 'area_effect_cloud' && hazardDistance(bot.entity.position, e) <= cloudRadius(bot, e)) ||
-    entities.find(e => e.name === 'dragon_fireball' && e.position.distanceTo(bot.entity.position) < 18);
+    entities.find(e => e.name === 'dragon_fireball' && e.position.distanceTo(bot.entity.position) < 48); // 48, not 18 (note 1469): the roof wants the ball seen while it is still far; at 18 it was a second off, and 25588 (dragon-51, 2026-10-13 13:44Z) took the cloud at its feet on the climb, 20 to 2 in two seconds.
 }
 
 function dragonThreat(bot) {
