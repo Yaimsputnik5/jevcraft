@@ -782,7 +782,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     try { await bot.equip(water, 'hand'); } catch (_) { /* equipped in the fall */ }
     try {
       await require('./motion').move(bot, task, { label: 'water_drop', keys: ['forward'], sneak: false, why: 'off the column onto the island by its foot, the water bucket in hand for the landing (note 1484)',
-        look: side.edge.offset(0.5, 1.0, 0.5), maxMs: 2000, tick: 25, until: () => !bot.entity.onGround && bot.entity.position.y < startY - 0.5 });
+        // The fall is the move's purpose (note 1490): refused as a 'deadly fall ahead', 25588 (dragon-67, 2026-10-13 16:45Z) stood on its column top at 103 'still up' twice and dug instead.
+        look: side.edge.offset(0.5, 1.0, 0.5), maxMs: 2000, tick: 25, intoFall: true, until: () => !bot.entity.onGround && bot.entity.position.y < startY - 0.5 });
     } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     let wet = false;
     try { wet = await recoverFall(bot, task, goal, save, { refill: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the water drop's landing: ${String(err.message || err).slice(0, 120)}`); }
@@ -1669,9 +1670,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // options had no way out.
     {
       const feet = bot.entity.position.floored();
-      let rock = 0; for (let dy = 1; dy <= 30; dy++) if (bot.blockAt(feet.offset(0, dy, 0))?.boundingBox === 'block') rock = dy;
+      // Rock, not the roof the column lays over the head (note 1490): three solid blocks or more in the thirty above, and not on the bot's own column or an obsidian top. 25588 (dragon-67, 2026-10-13 16:45Z) was offered the dig to the sky on its column under its own roof, and the least bad took it four times.
+      let rock = 0, solidAbove = 0; for (let dy = 1; dy <= 30; dy++) if (bot.blockAt(feet.offset(0, dy, 0))?.boundingBox === 'block') { rock = dy; solidAbove++; }
       const pick = bot.inventory.items().find(i => /_pickaxe$/.test(i.name));
-      if (rock >= 2 && pick && actions.dig && blocksCarried(bot) >= 1) {
+      if (rock >= 2 && solidAbove >= 3 && !onOwnPillar() && !onObsidianTop() && pick && actions.dig && blocksCarried(bot) >= 1) {
         const skyY = feet.y + rock + 1;
         tree.dig_to_sky = { description: { action: `The bot stands under the island's rock, ${rock} blocks of it over its head to the open sky at ${skyY}: dig up to the sky, the blocks over the head dug with the ${pick.name.replace('_', ' ')} and the column laid under the feet from the ${blocksCarried(bot)} blocks carried. No pillar's foot is walked to from down here.`,
           rockOverhead: rock, blocksCarried: blocksCarried(bot), health: bot.health },

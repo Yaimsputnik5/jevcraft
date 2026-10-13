@@ -188,7 +188,8 @@ function burningAhead(bot, keys, { deep = false, flames = true } = {}) {
   return null;
 }
 
-async function move(bot, task, { label, keys = ['forward'], sneak = true, why, look, until = () => false, guard = () => {}, maxMs = 1500, tick = 25, throughFlames = false } = {}) {
+// `intoFall`: a deadly fall ahead is the move's own purpose (the water drop off a column, end-combat.js note 1490), with the water bucket for the landing; lava ahead is still refused.
+async function move(bot, task, { label, keys = ['forward'], sneak = true, why, look, until = () => false, guard = () => {}, maxMs = 1500, tick = 25, throughFlames = false, intoFall = false } = {}) {
   if (!label) throw new Error('A held-key move needs a name');
   for (const key of keys) if (!MOVEMENT.has(key)) throw new Error(`Not a movement key: ${key}`);
   if (!sneak && keys.some(key => HORIZONTAL.has(key)) && !why) throw new Error(`${label}: walking upright needs a reason`);
@@ -221,7 +222,7 @@ async function move(bot, task, { label, keys = ['forward'], sneak = true, why, l
   const flames = !throughFlames;
   const refused = () => {
     const hit = !escaping && burningAhead(bot, keys, { deep: !sneak, flames });
-    if (!hit) return false;
+    if (!hit || (intoFall && hit.name === 'deadly_fall')) return false;
     // Said on the bot, for the caller to go another way and say why.
     bot._moveRefused = controller.refused = { label, ...hit, at: Date.now() };
     console.log(`[motion] ${label}: ${hit.name.replace('_', ' ')} at (${hit.x}, ${hit.y}, ${hit.z}) ahead; not walked into`);
