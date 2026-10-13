@@ -81,6 +81,21 @@ function deepBeside(bot, p) {
   }
   return false;
 }
+// How many of the eight cells about this one have no floor within DEEP blocks.
+function voidSides(bot, p) {
+  const fx = Math.floor(p.x), fy = Math.floor(p.y), fz = Math.floor(p.z);
+  let sides = 0;
+  for (const [dx, dz] of ROUND) {
+    let floor = false, loaded = true;
+    for (let y = fy; y >= fy - DEEP; y--) {
+      const b = bot.blockAt(new Vec3(fx + dx, y, fz + dz));
+      if (!b) { loaded = false; break; }
+      if (b.boundingBox === 'block') { floor = true; break; }
+    }
+    if (loaded && !floor) sides++;
+  }
+  return sides;
+}
 
 // A short level corridor is checked across the player's footprint. Running
 // sideways can evade a charge; jumping blindly near an island edge cannot.
@@ -139,6 +154,52 @@ function straightAway(bot, start, bearing, allowed = () => true, blocks = RUN_BL
   return null;
 }
 
+// Whether a knock from the dragon's way would carry the body off this cell
+// into the void: the one and two cells on from it, away from the dragon,
+// with no floor within DEEP blocks.
+function knockedIntoVoid(bot, p, dragon) {
+  const away = p.minus(dragon.position); away.y = 0;
+  if (away.norm() < .01) return false;
+  const u = away.unit(), fy = Math.floor(p.y);
+  for (const n of [1, 2]) {
+    const c = p.plus(u.scaled(n)).floored();
+    let floor = false, loaded = true;
+    for (let y = fy; y >= fy - DEEP; y--) {
+      const b = bot.blockAt(new Vec3(c.x, y, c.z));
+      if (!b) { loaded = false; break; }
+      if (b.boundingBox === 'block') { floor = true; break; }
+    }
+    if (loaded && !floor) return true;
+  }
+  return false;
+}
+
+// The cells out of the breath where every cell has the void beside it (note
+// 1404): out of the cloud first (its own radius, without the margin), then
+// those a knock would not carry off into the void, then the fewest sides
+// open to it, then the nearest. The dragon's blow and its breath's touch
+// shove the body away from the dragon (note 1432): 25588 (dragon-16,
+// 2026-10-13 07:18Z), out of the breath at the entry platform's corner
+// (102.5, 49, 2.5), the void on five of its eight sides and on the far side
+// from the dragon, was knocked off it by the next blow and fell out of the
+// world. On a bridge the knock runs along it; at a corner, over the side.
+function cloudEdgeCells(bot, start, dragon, allowed = () => true) {
+  const here = hazardDistance(start, dragon), out = cloudRadius(bot, dragon) - 2, feet = start.floored(), edge = [];
+  const shover = Object.values(bot.entities || {}).find(e => e.name === 'ender_dragon' && e.isValid !== false) || dragon;
+  // Two blocks farther from the cloud, or, where no cell is, one: on the
+  // entry platform, five blocks square, the two-block gain left only the
+  // corner.
+  for (const gain of [2, 1]) {
+    for (let dx = -10; dx <= 10; dx++) for (let dz = -10; dz <= 10; dz++) for (const dy of [0, -1, 1]) {
+      const p = feet.offset(dx, dy, dz).offset(.5, 0, .5), d = Math.hypot(dx, dz), h = hazardDistance(p, dragon);
+      if (d < 2 || d > 10 || h < here + gain || !allowed(p) || !dryStanding(bot, p)) continue;
+      edge.push({ p, d, inside: h <= out, knocked: knockedIntoVoid(bot, p, shover), sides: voidSides(bot, p) }); break;
+    }
+    if (edge.length) break;
+  }
+  return edge.sort((a, b) => a.inside - b.inside || a.knocked - b.knocked || a.sides - b.sides || a.d - b.d).slice(0, 4).map(e => e.p);
+}
+
 async function evadeOverTerrain(bot, task, goal, save, dragon, { allowed = () => true, walk = navigate } = {}) {
   const start = bot.entity.position.clone(), dimension = bot.game.dimension, toward = dragon.position.minus(start); toward.y = 0;
   const check = () => {
@@ -162,16 +223,7 @@ async function evadeOverTerrain(bot, task, goal, save, dragon, { allowed = () =>
   // one-wide bridge from the entry platform in the dragon's breath, "No
   // surveyed walking escape" each step, and each touch of the breath
   // knocked it half a block on, 20 to 8 and over the side into the void.
-  if (!candidates.length && dragon.name === 'area_effect_cloud') {
-    // Out of the cloud first (its own radius, without the margin), nearest first.
-    const here = hazardDistance(start, dragon), out = cloudRadius(bot, dragon) - 2, feet = start.floored(), edge = [];
-    for (let dx = -10; dx <= 10; dx++) for (let dz = -10; dz <= 10; dz++) for (const dy of [0, -1, 1]) {
-      const p = feet.offset(dx, dy, dz).offset(.5, 0, .5), d = Math.hypot(dx, dz), h = hazardDistance(p, dragon);
-      if (d < 2 || d > 10 || h < here + 2 || !allowed(p) || !dryStanding(bot, p)) continue;
-      edge.push({ p, d, inside: h <= out }); break;
-    }
-    candidates.push(...edge.sort((a, b) => a.inside - b.inside || a.d - b.d).slice(0, 4).map(e => e.p));
-  }
+  if (!candidates.length && dragon.name === 'area_effect_cloud') candidates.push(...cloudEdgeCells(bot, start, dragon, allowed));
   const movement = bot.pathfinder.movements;
   const previous = { canDig: movement.canDig, allowSprinting: movement.allowSprinting, maxDropDown: movement.maxDropDown,
     allow1by1towers: movement.allow1by1towers, scafoldingBlocks: movement.scafoldingBlocks };
@@ -317,4 +369,4 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600 } 
     return true;
   } finally { bot.clearControlStates(); }
 }
-module.exports = { deepBeside, straightAway, cloudRadius, hazardDistance, breathThreat, dragonThreat, endEmergency, checkEndEmergency, dodgeRoutes, evadeOverTerrain, evadeDragon };
+module.exports = { deepBeside, voidSides, knockedIntoVoid, cloudEdgeCells, straightAway, cloudRadius, hazardDistance, breathThreat, dragonThreat, endEmergency, checkEndEmergency, dodgeRoutes, evadeOverTerrain, evadeDragon };
