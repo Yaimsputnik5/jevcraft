@@ -28,7 +28,7 @@ test('with every crystal down and few arrows, the move offered is to the fountai
   await fightEndStep(bot, task, goal, () => {}, { navigate: async (b, t, dest) => { went = dest; bot.entity.position = new Vec3(dest.x + .5, dest.y, dest.z + .5); } }, client);
   const moves = Object.entries(said).filter(([k]) => k.startsWith('move_'));
   assert.ok(moves.length >= 1, Object.keys(said).join(','));
-  assert.match(moves[0][1].action, /Go to stand about 16 blocks from the fountain the dragon perches on, and wait there for the sword at its head when it lands: 20 arrows are left, the sword reaches the dragon only at its perch, and at its perch arrows do nothing to it/);
+  assert.match(moves[0][1].action, /Go to stand about 16 blocks from the fountain the dragon perches on, and wait there for the sword at its head when it lands \(it stays perched only while a player is within 20 blocks of it.*: 20 arrows are left, the sword reaches the dragon only at its perch, and at its perch arrows do nothing to it/);
   assert.equal(moves[0][1].target, 'fountain');
   assert.equal(Math.abs(went.x), 8, 'the cell nearest twelve from the fountain is the first offered');
 });
@@ -59,6 +59,9 @@ test('the perched head out of reach: the run to the ground under it is offered, 
   assert.equal(said.under_head.headBlocksOff, 15);
   assert.equal(said.under_head.perchedSeconds, 0);
   assert.match(said.under_head.takeoff, /no water bucket is carried/);
+  // The perch's rule told (note 1537): it stays only with a player within twenty blocks.
+  assert.match(said.under_head.perchRule, /stays at its perch only while a player stands within 20 blocks/);
+  assert.match(said.under_head.perchRule, /the bot is \d+ blocks from it/);
   // The walks stay on offer while the dragon perches (note 1528): the run under the head is one way among them, not the only one.
   assert.deepEqual([went.x, went.y, went.z], [0, 64, 7]);
   assert.deepEqual(swings, [21, 21, 21], 'three swings at the head before it took off');
