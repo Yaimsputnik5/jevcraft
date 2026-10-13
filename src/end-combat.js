@@ -239,7 +239,8 @@ function arenaMovement(bot, center) {
         hazardDistance(point, entity) >= Math.min(radius, hazardDistance(bot.entity.position, entity) - .1));
   };
   const allowed = p => allowedPoint(vector(p).offset(.5, 0, .5));
-  Object.assign(movement, { canDig: true, blocksCantBreak: cantBreak, allow1by1towers: false, allowSprinting: false,
+  // Towers of one allowed with ten blocks or more carried (note 1505): the island's eastern shelf at 41 to 46 meets the top at 56 to 62 in faces of three to six blocks, and every walk from the entry platform to a pillar's foot across them ended 'navigation timed out without reaching new ground' (25588, dragon-67 to dragon-75, 2026-10-13, five to eight failed foot walks a run, two to four minutes each run on the shelf). The rim's cells are still no step of any walk.
+  Object.assign(movement, { canDig: true, blocksCantBreak: cantBreak, allow1by1towers: blocksCarried(bot) >= 10, allowSprinting: false,
     scafoldingBlocks: ['cobblestone', 'end_stone'].map(n => bot.registry.itemsByName[n].id), allowedPosition: allowed });
   return { allowed, allowedPoint, restore: () => Object.assign(movement, previous) };
 }
