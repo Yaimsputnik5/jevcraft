@@ -780,11 +780,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (!await centreOnColumn(0.3)) console.log(`[end combat] the water drop begins ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off the column's middle`);
     console.log(`[end combat] the water drop from ${bot.entity.position.floored()}, ${side.fall} blocks onto the island at (${side.edge.x}, ${side.edge.z}), health ${health.toFixed(1)}`);
     try { await bot.equip(water, 'hand'); } catch (_) { /* equipped in the fall */ }
+    // Upright for the step (note 1492): the crouch kept on the column (note
+    // 1480) backs a crouched body off every edge, and the step off went 0.6
+    // of a block and stopped at the edge, 'still up', four times in
+    // dragon-67 and dragon-68 (25588, 2026-10-13 16:45 to 17:05Z).
+    bot._dropping = true;
     try {
+      bot.setControlState?.('sneak', false);
       await require('./motion').move(bot, task, { label: 'water_drop', keys: ['forward'], sneak: false, why: 'off the column onto the island by its foot, the water bucket in hand for the landing (note 1484)',
         // The fall is the move's purpose (note 1490): refused as a 'deadly fall ahead', 25588 (dragon-67, 2026-10-13 16:45Z) stood on its column top at 103 'still up' twice and dug instead.
         look: side.edge.offset(0.5, 1.0, 0.5), maxMs: 2000, tick: 25, intoFall: true, until: () => !bot.entity.onGround && bot.entity.position.y < startY - 0.5 });
     } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    finally { bot._dropping = false; }
     let wet = false;
     try { wet = await recoverFall(bot, task, goal, save, { refill: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the water drop's landing: ${String(err.message || err).slice(0, 120)}`); }
     for (let i = 0; i < 60 && !bot.entity.onGround; i++) await sleep(50);
@@ -968,7 +975,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // half a second with no blow recorded and fell 18 and 10 blocks, dragon-59
   // to its death. The climb's jumps (a move of their own) are left upright.
   const crouchKeeper = setInterval(() => {
-    try { if (!bot._controller && bot.entity?.onGround && (onOwnPillar() || onObsidianTop()) && !bot.controlState?.sneak) bot.setControlState?.('sneak', true); } catch (_) { /* nothing to hold */ }
+    try { if (!bot._controller && !bot._dropping && bot.entity?.onGround && (onOwnPillar() || onObsidianTop()) && !bot.controlState?.sneak) bot.setControlState?.('sneak', true); } catch (_) { /* nothing to hold */ }
   }, 50);
   try {
     // What the columns have cost this fight (note 1440): every blow taken on
