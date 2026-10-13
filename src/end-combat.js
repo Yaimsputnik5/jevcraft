@@ -376,11 +376,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   };
   bot.on('entityMoved', moved); if (dragon) moved(dragon);
   // The bot's own pillar under it, air on three sides at least: no walk off it.
+  // By the block under the feet, not the column's recorded cell (note 1416):
+  // the jumps of the climb drift, and 25588 (05:41Z) stood a cell off the
+  // cell last recorded, 22 up, and was not on its pillar by the record.
+  const SCAFFOLD_UNDER = /^(cobblestone|cobbled_deepslate|netherrack|dirt|stone|blackstone|deepslate|andesite|diorite|granite|tuff|end_stone)$/;
   const onOwnPillar = () => {
     const u = bot._pillarUp, p = bot.entity.position;
-    if (!u || Math.floor(p.x) !== u.x || Math.floor(p.z) !== u.z) return false;
+    if (!u || u.until < Date.now()) return false;
     const f = p.floored();
-    if (bot.blockAt(f.offset(0, -1, 0))?.boundingBox !== 'block') return false;
+    const under = bot.blockAt(f.offset(0, -1, 0));
+    if (under?.boundingBox !== 'block' || !SCAFFOLD_UNDER.test(under.name) || under.name === 'end_stone' && f.y < 70) return false;
+    if (Math.hypot(u.x + .5 - p.x, u.z + .5 - p.z) > 2.5) return false;
+    if (u.x !== f.x || u.z !== f.z) bot._pillarUp = { ...u, x: f.x, z: f.z };
     // Two of the four cells round the feet open at least (a pillar laid up
     // against a round obsidian pillar's side has one or two of them solid).
     return [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block').length >= 2;
@@ -865,7 +872,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // crystal is the pickaxe's (open_cage).
     // From its own pillar too, where the ground's mobs below make the place
     // 'unsafe' (the climb goes on, not down and up again), with no hazard on it.
-    const punchPlace = safe || (onOwnPillar() && endHazards(bot).every(({ entity, radius }) => hazardDistance(bot.entity.position, entity) > radius));
+    // The crystal's own twelve blocks (a hazard to a shot at it) are no bar
+    // to the climb to strike it (note 1416): 25588 (dragon-6, 2026-10-13
+    // 05:40Z), 22 up its column beside the crystal, was held 'unsafe: end
+    // crystal 10<=12' at every tick, offered nothing, and died of the fall.
+    const punchPlace = safe || (onOwnPillar() && endHazards(bot).filter(({ entity }) => entity.name !== 'end_crystal').every(({ entity, radius }) => hazardDistance(bot.entity.position, entity) > radius));
     if (punchPlace && actions.dig && !Object.keys(tree).some(k => /^(throw_|pillar_throw_)/.test(k))) {
       const here = bot.entity.position, carried = blocksCarried(bot);
       // A caged crystal too, where a pickaxe is carried: its iron bars between

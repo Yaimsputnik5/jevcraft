@@ -262,6 +262,18 @@ function straightToward(bot, task, goal, save, walk, now = Date.now()) {
   } catch (_) { return null; }
 }
 async function answerStall(bot, task, goal, save, stall, { client, survival, onStep = () => {}, idle = false, now = Date.now(), failed = null, chose = {}, recoveryAdviser = null } = {}) {
+  // In the End on a pillar of the bot's own (end-combat.js pillar_punch), a
+  // stand is the fight's, not a stall (note 1416): the detours and the
+  // unstuck moves offered here walked 25588 (dragon-6, 2026-10-13 05:41Z) off
+  // its column by a bridge north, 22 up, into the dragon's breath and the
+  // fall. The fight's own options (the climb on, the way down) answer it.
+  if (dimension(bot) === 'end' && bot._pillarUp && bot._pillarUp.until > now) {
+    const f = bot.entity.position.floored(), under = bot.blockAt(f.offset(0, -1, 0));
+    if (under && /^(cobblestone|cobbled_deepslate|netherrack|dirt|stone|blackstone|deepslate|andesite|diorite|granite|tuff)$/.test(under.name) && Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) <= 2.5) {
+      if (!(goal.pillarStallSaid > now - 60000)) { goal.pillarStallSaid = now; console.log('[still] on the bot\'s own pillar in the End: no detour, the fight\'s own options answer it'); }
+      stall.asked = true; return;
+    }
+  }
   const stats = survival?.state || goal.survival || goal;
   // A stall of the stall's own answer (a detour, persist, work free) is the
   // stall of the work it answered, named as that (note 763b): 25595
