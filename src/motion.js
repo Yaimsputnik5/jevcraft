@@ -189,8 +189,22 @@ function burningAhead(bot, keys, { deep = false, flames = true } = {}) {
 }
 
 // `intoFall`: a deadly fall ahead is the move's own purpose (the water drop off a column, end-combat.js note 1490), with the water bucket for the landing; lava ahead is still refused.
+// Who let a move's key go (note 1496): the release is caught at the bot's
+// own setControlState and clearControlStates and named in the move's log,
+// by the three frames above the call. 25588 (dragon-69, 2026-10-13 17:29Z)
+// had its run out of the breath's cloud 'let go mid-move by something else'
+// five times in four seconds, never moved, and died in it, 20 to none.
+function watchReleases(bot) {
+  if (bot._releaseWatch || typeof bot.setControlState !== 'function') return;
+  bot._releaseWatch = true;
+  const frames = () => new Error().stack.split('\n').slice(3, 6).map(l => l.trim().replace(/^at /, '').replace(/\(.*\/src\//, '(src/')).join(' < ');
+  const raw = bot.setControlState.bind(bot);
+  bot.setControlState = (key, on) => { if (!on && bot._controller && !bot._controller.failed && bot._controller.keys?.includes(key) && bot.controlState?.[key]) bot._controller.letGoBy = `set(${key}, false) at ${frames()}`; return raw(key, on); };
+  if (typeof bot.clearControlStates === 'function') { const rawClear = bot.clearControlStates.bind(bot); bot.clearControlStates = () => { if (bot._controller && !bot._controller.failed) bot._controller.letGoBy = `clearControlStates at ${frames()}`; return rawClear(); }; }
+}
 async function move(bot, task, { label, keys = ['forward'], sneak = true, why, look, until = () => false, guard = () => {}, maxMs = 1500, tick = 25, throughFlames = false, intoFall = false } = {}) {
   if (!label) throw new Error('A held-key move needs a name');
+  watchReleases(bot);
   for (const key of keys) if (!MOVEMENT.has(key)) throw new Error(`Not a movement key: ${key}`);
   if (!sneak && keys.some(key => HORIZONTAL.has(key)) && !why) throw new Error(`${label}: walking upright needs a reason`);
   const limit = Math.min(maxMs, MAX_MS);
@@ -256,7 +270,7 @@ async function move(bot, task, { label, keys = ['forward'], sneak = true, why, l
       const dropped = touched.filter(key => !held(key));
       if (dropped.length) {
         controller.repressed = (controller.repressed || 0) + 1;
-        if (controller.repressed === 1) console.log(`[motion] ${label}: ${dropped.join(', ')} let go mid-move by something else; pressed again`);
+        if (controller.repressed === 1) console.log(`[motion] ${label}: ${dropped.join(', ')} let go mid-move by ${controller.letGoBy || 'something else'}; pressed again`);
         for (const key of dropped) bot.setControlState(key, true);
       }
       await sleep(tick);

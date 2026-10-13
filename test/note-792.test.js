@@ -131,7 +131,7 @@ test('the held-key move: a key let go by something else is pressed again; flames
   try {
     await motion.move(bot, new Task('t'), { label: 'probe', keys: ['jump'], sneak: false, why: 'test', maxMs: 300, tick: 25 });
   } finally { clearInterval(let_go); console.log = log; }
-  assert.ok(seen.some(m => /probe: jump let go mid-move by something else; pressed again/.test(m)), seen.join('\n'));
+  assert.ok(seen.some(m => /probe: jump let go mid-move by .*clearControlStates.*; pressed again/.test(m)), seen.join('\n'));
   // Facing the flame over the pocket, the body alight beside it: another
   // move is refused it; one marked as a run out of fire is not.
   bot.entity.yaw = Math.atan2(-(-100.5 - TUNNEL_AT.x), -(152.5 - TUNNEL_AT.z));
