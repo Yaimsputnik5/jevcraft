@@ -233,6 +233,10 @@ test('a block standing one up in the pool\'s row is dug down before the pour (no
   } catch (err) { if (err.name !== 'Cancelled') throw err; }
   assert.ok(dug.some(p => p.y === 64 && (Math.abs(p.x - 18) === 2 || Math.abs(p.z) === 2)), `the raised block dug: ${dug.map(String).join(' ') || 'nothing'}`);
   assert.ok(goal.endCombat?.pool, 'the pool poured and recorded');
+  // The row dug one deep into a trench, the water in it (note 1540).
+  const trench = dug.filter(p => p.y === 63);
+  assert.ok(trench.length >= 2, `the trench dug: ${dug.map(String).join(' ')}`);
+  assert.equal(goal.endCombat.pool.y, 63, JSON.stringify(goal.endCombat.pool));
 });
 
 test('the climb\'s option says whether the drop\'s pool can be poured at the pillar\'s foot (note 1539)', async () => {

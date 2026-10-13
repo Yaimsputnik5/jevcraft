@@ -818,6 +818,30 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         console.log(`[end combat] the pool's row levelled: the block a step up at ${r} dug`);
       } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the pool's row not levelled at ${r}: ${String(err.message || err).slice(0, 80)}`); }
     }
+    // The row dug one deep into a trench before the pour, the water poured in
+    // its middle (note 1540): on open ground the water runs only toward the
+    // nearest drop within four blocks, and 25588 (dragon-94, 2026-10-13
+    // 23:44Z, two crystals broken) had its pool at (-6, 61, -42), four out
+    // east of its column at (-10, -42), flow east alone; the two cells between
+    // the column and the pour stayed dry and the body fell 27 onto (-8, 61,
+    // -42), 20 to none. In a trench the water is the lowest thing about and
+    // fills it end to end.
+    if (actions.dig) {
+      const g = best.cell.y - 1, len = Math.min(5, Math.max(2, Math.round(lift / 8) + 1)), trench = [];
+      for (let k = 1; k <= len; k++) {
+        const floor = new Vec3(column.x + best.dx * k, g, column.z + best.dz * k);
+        if (bot.blockAt(floor)?.name !== 'end_stone' || bot.blockAt(floor.offset(0, -1, 0))?.boundingBox !== 'block' || bot.blockAt(floor.offset(0, 1, 0))?.boundingBox === 'block') break;
+        trench.push(floor);
+      }
+      let dug = 0;
+      for (const t of trench) {
+        try {
+          if (bot.entity.position.offset(0, 1.62, 0).distanceTo(t.offset(.5, .5, .5)) > 4.3) await actions.navigate(bot, task, new goals.GoalNear(t.x, t.y + 1, t.z, 2), { timeoutMs: 6000, stallMs: 3000 });
+          await actions.dig(bot, task, t, { requireDrops: false }); dug++;
+        } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the pool's trench stopped at ${t}: ${String(err.message || err).slice(0, 80)}`); break; }
+      }
+      if (dug >= 2) { best.cell = trench[Math.floor((dug - 1) / 2)].clone(); console.log(`[end combat] the pool's trench dug: ${dug} cells from ${trench[0]} out from the column at (${column.x}, ${column.z}); the water goes in at ${best.cell}`); }
+    }
     const eye = bot.entity.position.offset(0, 1.62, 0), target = best.cell.offset(.5, -.01, .5);
     if (eye.distanceTo(target) > 4.3) {
       try { await actions.navigate(bot, task, new goals.GoalNear(best.cell.x, best.cell.y, best.cell.z, 2), { timeoutMs: 8000, stallMs: 3000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
