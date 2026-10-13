@@ -978,6 +978,22 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     try { if (!bot._controller && !bot._dropping && bot.entity?.onGround && (onOwnPillar() || onObsidianTop()) && !bot.controlState?.sneak) bot.setControlState?.('sneak', true); } catch (_) { /* nothing to hold */ }
   }, 50);
   try {
+    // Water left standing within reach goes back into an empty bucket at the
+    // step's start, with no dragon or breath upon the bot (note 1495): the
+    // buckets go down for landings, for endermen and for the breath, and
+    // what any of them leaves is the next landing's bucket. 25588 (dragon-68,
+    // 2026-10-13, four crystals broken) lost one bucket at 17:01Z in an
+    // evasion and the other at 17:13Z, each the water left where it was
+    // poured, and died at 17:21Z, 'no water bucket carried', on its column.
+    if (countOf(bot, 'bucket') > 0 && !breathThreat(bot) && !dragonThreat(bot)) {
+      try {
+        const { sourceWater, fillWaterBucket } = require('./water');
+        const eye = bot.entity.position.offset(0, 1.62, 0);
+        const near = bot.findBlocks({ matching: bot.registry.blocksByName.water.id, maxDistance: 5, count: 8, useExtraInfo: sourceWater })
+          .filter(p => eye.distanceTo(p.offset(.5, .5, .5)) <= 4.3).sort((p, q) => eye.distanceTo(p) - eye.distanceTo(q))[0];
+        if (near) { await fillWaterBucket(bot, task, near, { timeoutMs: 1500 }); console.log(`[end combat] water left at ${near} taken back into the bucket (${countOf(bot, 'water_bucket')} full carried)`); }
+      } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    }
     // What the columns have cost this fight (note 1440): every blow taken on
     // the bot's own column or an obsidian top, told on the climb's option.
     { const h = bot.health, was = state.lastHealthSeen; state.lastHealthSeen = h;
