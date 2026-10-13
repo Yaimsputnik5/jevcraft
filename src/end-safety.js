@@ -145,8 +145,13 @@ function straightAway(bot, start, bearing, allowed = () => true, blocks = RUN_BL
     let ok = true, y = feet;
     for (let d = 1; d <= blocks && ok; d++) {
       const x = Math.floor(start.x + dx * d), z = Math.floor(start.z + dz * d);
-      // The floor under this cell: one up, level, or down to two.
-      const floor = [y, y - 1, y - 2, y - 3].find(fy => solid(x, fy, z) && !solid(x, fy + 1, z) && !solid(x, fy + 2, z));
+      // The floor under this cell: one up, level, or one down (note 1436).
+      // Down two or three a cell the run is a fall down a slope, the body in
+      // the air past where it meant to stop: 25588 (dragon-19, 2026-10-13
+      // 07:56Z, full iron) ran six cells from a fireball down the island's
+      // eastern slope, 39 to 37, and went two cells past them over the rim,
+      // the water bucket's save with nothing under it to land on.
+      const floor = [y, y - 1, y - 2].find(fy => solid(x, fy, z) && !solid(x, fy + 1, z) && !solid(x, fy + 2, z));
       if (floor === undefined || !allowed(new Vec3(x + .5, floor + 1, z + .5)) || deepBeside(bot, new Vec3(x + .5, floor + 1, z + .5))) ok = false; else y = floor + 1;
     }
     if (ok) return new Vec3(start.x + dx * blocks, y, start.z + dz * blocks);
@@ -333,7 +338,7 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600 } 
         // over the island's eastern edge, and 25588 (dragon-12, 2026-10-13
         // 06:37Z) fell out of the world at full health.
         const dir = away.minus(start); dir.y = 0; const unit = dir.scaled(1 / (dir.norm() || 1));
-        const floorAhead = () => { const n = bot.entity.position.plus(unit.scaled(0.9)); const f = n.floored(); return [0, -1, -2, -3].some(dy => bot.blockAt(f.offset(0, dy - 1, 0))?.boundingBox === 'block') && !deepBeside(bot, n); };
+        const floorAhead = () => { const n = bot.entity.position.plus(unit.scaled(0.9)); const f = n.floored(); return [0, -1, -2].some(dy => bot.blockAt(f.offset(0, dy - 1, 0))?.boundingBox === 'block') && !deepBeside(bot, n); };
         try {
           await move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'evade_breath_straight', keys: ['forward', 'sprint'], sneak: false,
             why: 'straight out of the dragon\'s breath at a run', look: away.offset(0, 1.6, 0), maxMs: 1800, tick: 25,

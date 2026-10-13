@@ -80,3 +80,17 @@ test('in the breath on open ground the escape runs straight out first, no survey
   assert.equal(steps[0], 'evade_breath_straight', steps.join(','));
   assert.equal(surveysBeforeRun, 0, 'no route survey before the straight run');
 });
+
+test('the straight run out of the breath takes no slope steeper than a block a cell: down a slope the body is in the air past its stop (note 1436)', () => {
+  const { bot } = platform(new Vec3(0.5, 64, 0.5));
+  // Level ground west of x 0 at y 64; east of it the ground steps down two a cell, to the rim at x 6.
+  bot.blockAt = p => { const f = p.floored(); const top = f.x < 0 ? 63 : f.x <= 5 ? 63 - 2 * f.x : -100; return { name: f.y <= top ? 'end_stone' : 'air', boundingBox: f.y <= top ? 'block' : 'empty' }; };
+  // The cloud to the west: straight out is east, down the slope.
+  const away = straightAway(bot, bot.entity.position, Math.PI, () => true, 6);
+  assert.ok(away, 'a run is found');
+  assert.ok(away.x - 0.5 < 1, `not down the slope: ${away}`);
+  // One down a cell is walked.
+  bot.blockAt = p => { const f = p.floored(); const top = f.x < 0 ? 63 : 63 - f.x; return { name: f.y <= top ? 'end_stone' : 'air', boundingBox: f.y <= top ? 'block' : 'empty' }; };
+  const gentle = straightAway(bot, bot.entity.position, Math.PI, () => true, 6);
+  assert.ok(gentle && gentle.x > 5, `down a gentle slope: ${gentle}`);
+});
