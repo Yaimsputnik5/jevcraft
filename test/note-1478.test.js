@@ -234,3 +234,29 @@ test('a block standing one up in the pool\'s row is dug down before the pour (no
   assert.ok(dug.some(p => p.y === 64 && (Math.abs(p.x - 18) === 2 || Math.abs(p.z) === 2)), `the raised block dug: ${dug.map(String).join(' ') || 'nothing'}`);
   assert.ok(goal.endCombat?.pool, 'the pool poured and recorded');
 });
+
+test('the climb\'s option says whether the drop\'s pool can be poured at the pillar\'s foot (note 1539)', async () => {
+  const { bot, goal, task, dig } = fixture();
+  const V = require('vec3').Vec3;
+  bot.entity.position = new V(0.5, 64, 0.5);
+  bot._pillarUp = null;
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'water_drop', at: Date.now() } };
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'end_stone', count: 40 }, { name: 'water_bucket', count: 1 }];
+  bot.entities[20].position = new V(60, 90, 60);
+  for (const rim of [false, true]) {
+    // Flat island to the pillar at (20, 0); at the rim, nothing but the void east of x 16.
+    bot.blockAt = p => {
+      const f = p.floored();
+      if (f.x === 20 && f.z === 0 && f.y === 84) return { name: 'bedrock', boundingBox: 'block', position: f };
+      if (f.x === 20 && f.z === 0 && f.y >= 40 && f.y <= 83) return { name: 'obsidian', boundingBox: 'block', position: f };
+      if (rim && f.x > 16) return { name: 'air', boundingBox: 'empty', position: f };
+      return { name: f.y < 64 ? 'end_stone' : 'air', boundingBox: f.y < 64 ? 'block' : 'empty', position: f };
+    };
+    let said = null;
+    const client = { systemOne: async ({ questions }) => { said = questions.branch_0.criteria; return { answers: { branch_0: { choice: 'observe' } } }; } };
+    await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig, place: async () => {} }, client);
+    assert.ok(said?.pillar_punch_30, Object.keys(said || {}).join(','));
+    if (rim) assert.match(said.pillar_punch_30.wayDown, /no pool can be poured at this pillar's foot/);
+    else assert.match(said.pillar_punch_30.wayDown, /a pool of water can be poured on level ground/);
+  }
+});

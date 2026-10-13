@@ -772,10 +772,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // column's base away from the obsidian, with the ground about it level
   // (nothing two lower within four) and no void within eight; taken back
   // after the landing (note 1495). The side it lies on is the drop's.
-  const poolForTheDrop = async (column, lift = 20) => {
-    const water = bot.inventory.items().find(i => i.name === 'water_bucket');
-    if (!water) return null;
-    const base = new Vec3(column.x, Math.floor(bot.entity.position.y), column.z);
+  // The cell the drop's pool would be poured on beside a column base, or null (note 1539: read for the climb's option as well as the pour).
+  const poolCellFor = (base, lift = 20) => {
+    const column = base;
     const ground = (x, z) => { for (let y = base.y + 1; y >= base.y - 3; y--) if (bot.blockAt(new Vec3(x, y, z))?.boundingBox === 'block') return y; return null; };
     let best = null;
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -805,6 +804,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       const score = obsidian * 10 + raised.length * 2 + bot.entity.position.distanceTo(cell.offset(.5, 0, .5));
       if (!best || score < best.score) best = { cell, dx, dz, score, obsidian, raised };
     }
+    return best;
+  };
+  const poolForTheDrop = async (column, lift = 20) => {
+    const water = bot.inventory.items().find(i => i.name === 'water_bucket');
+    if (!water) return null;
+    const best = poolCellFor(new Vec3(column.x, Math.floor(bot.entity.position.y), column.z), lift);
     if (!best) { console.log(`[end combat] no pool for the drop at the foot of (${column.x}, ${column.z}): no level cell beside the column's base clear of the void`); return null; }
     for (const r of best.raised || []) {
       try {
@@ -827,6 +832,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     console.log(`[end combat] the pool for the drop ${poured ? 'poured' : 'not poured'} at ${best.cell} beside the column at (${column.x}, ${column.z})${best.obsidian ? `, ${best.obsidian} obsidian that way` : ''}; ${countOf(bot, 'water_bucket')} full bucket${countOf(bot, 'water_bucket') === 1 ? '' : 's'} left`);
     if (poured) { state.pool = { x: best.cell.x, y: best.cell.y, z: best.cell.z, dx: best.dx, dz: best.dz, at: Date.now() }; save(); return state.pool; }
     return null;
+  };
+  // Whether a pool can be poured at a pillar's foot, read from the foot cell on the bot's side of it (note 1539).
+  const poolAtTheFoot = (c, radius, lift) => {
+    try {
+      const here = bot.entity.position, dx = here.x - (c.x + .5), dz = here.z - (c.z + .5), n = Math.hypot(dx, dz) || 1;
+      const fx = Math.floor(c.x + .5 + dx / n * (radius + 1.5)), fz = Math.floor(c.z + .5 + dz / n * (radius + 1.5));
+      let gy = null; for (let y = 72; y >= 36 && gy === null; y--) if (bot.blockAt(new Vec3(fx, y, fz))?.boundingBox === 'block') gy = y;
+      if (gy === null) return false;
+      return !!poolCellFor(new Vec3(fx, gy + 1, fz), lift);
+    } catch (_) { return false; }
   };
   const waterDropSide = () => {
     const u = bot._pillarUp; if (!u) return null;
@@ -1647,6 +1662,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             : `Walk to the foot of the healing crystal's obsidian pillar (radius ${radius}, too thick to reach the crystal from its side), pillar up ${lift} blocks beside it on the blocks carried to its top, step onto the top two blocks from the crystal's bedrock, crouch, and strike the crystal by hand: any blow breaks one; crouched, the bot's body above the bedrock's top face is in the blast's line`,
             position: { ...target.position }, blocksOff: out, blocks: lift, blocksCarried: carried, pillarRadius: radius, stance: under ? 'under the bedrock top, beside the pillar' : 'on the top, crouched',
             dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null,
+            // Whether the drop's pool can be poured at this pillar's foot (note 1539): at the island's eastern rim (pillars 9, 11 and 20 of this world) no level cell beside the foot is clear of the void, the way down is the bucket in the air alone, and 25588 died on it three times on 2026-10-13 (dragon-84, 90, 93) and landed twice (dragon-92, 94).
+            wayDown: poolAtTheFoot(c, radius, lift) ? 'a pool of water can be poured on level ground beside this pillar\'s foot before the climb, and the drop after the blow lands in it' : 'no pool can be poured at this pillar\'s foot: the void lies within eight blocks of every level cell beside it. The way down from here is the column dug down to a height the health can take and the bucket clicked under the body in the last blocks of the fall, a click the server refuses about one time in three; of the five such drops of 2026-10-13 at this rim, three ended in death (dragon-84, 90, 93) and two landed',
             onTheColumn: `the climb and the way down are a minute or two each on a column one block wide, where the dragon's fireballs and breath find the bot and there is no step aside: a fireball's cloud on the column took 6 a second from 25588 (2026-10-13 06:05Z, 20 to 8 in six seconds, and 10 to none a minute later on its next climb); in the arena's drills (05:08 to 05:35Z) the bot broke six crystals so and died twice on its column after a blow; the breath or a fireball on the column is answered by digging down three`, ...(isCaged ? { caged: `iron bars round it, dug out between the stand and the crystal with the ${pickForBars.name.replaceAll('_', ' ')} first` } : {}), dragonPhase: metadata(bot, dragon, 'phase'), health: bot.health,
             fallFromTheTop: `a knock off the top is a fall of ${lift} blocks, about ${Math.max(0, lift - 3)} damage before armour${countOf(bot, 'water_bucket') ? ', a water bucket carried for the landing' : ', no water bucket carried'}`,
             crystalBlast: punchRecordSays(state, under),
