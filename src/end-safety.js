@@ -268,10 +268,16 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600 } 
       const away = straightAway(bot, start, bearing, allowed || (() => true));
       if (away) {
         goal.step = { action: 'evade_breath_straight', hazard: dragon.name, from: { ...start }, toward: { x: away.x, y: away.y, z: away.z } }; save();
+        // No jump, and the floor a step ahead read each tick (note 1428): at a
+        // sprint and a jump the run went two cells past the six it had checked,
+        // over the island's eastern edge, and 25588 (dragon-12, 2026-10-13
+        // 06:37Z) fell out of the world at full health.
+        const dir = away.minus(start); dir.y = 0; const unit = dir.scaled(1 / (dir.norm() || 1));
+        const floorAhead = () => { const n = bot.entity.position.plus(unit.scaled(0.9)); const f = n.floored(); return [0, -1, -2, -3].some(dy => bot.blockAt(f.offset(0, dy - 1, 0))?.boundingBox === 'block') && !deepBeside(bot, n); };
         try {
-          await move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'evade_breath_straight', keys: ['forward', 'sprint', 'jump'], sneak: false,
-            why: 'straight out of the dragon\'s breath at a run', look: away.offset(0, 1.6, 0), maxMs: 2000, tick: 50,
-            until: () => bot.entity.position.distanceTo(start) >= RUN_BLOCKS - 1 || fallDanger(bot) || !breathThreat(bot) });
+          await move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'evade_breath_straight', keys: ['forward', 'sprint'], sneak: false,
+            why: 'straight out of the dragon\'s breath at a run', look: away.offset(0, 1.6, 0), maxMs: 1800, tick: 25,
+            until: () => bot.entity.position.distanceTo(start) >= RUN_BLOCKS - 2 || fallDanger(bot) || !breathThreat(bot) || !floorAhead() });
         } catch (err) { check(); }
         if (fallDanger(bot)) await recoverFall(bot, task, goal, save);
         if (bot.entity.position.distanceTo(start) >= 2) {
