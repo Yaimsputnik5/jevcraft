@@ -404,7 +404,8 @@ function lockBody(bot) {
   bot._shotRaw = { set, look, lookAt };
   // A hold carried while the stance closes (note 709) leaves the walk its keys and looks.
   const held = () => bot._shotHold && !bot._shotHold.free;
-  bot.setControlState = (key, on) => { if (held() && on && MOVE_KEYS.includes(key)) return; return set(key, on); };
+  // A held-key move's own press goes through (note 1500): the hold frees itself for a move on its next tick, but between the move's first press and that tick the lock swallowed the press, and every run out of the breath began 'let go mid-move; pressed again' (25588, dragon-69 to dragon-73, 2026-10-13).
+  bot.setControlState = (key, on) => { if (held() && on && MOVE_KEYS.includes(key) && !(bot._controller && !bot._controller.failed)) return; return set(key, on); };
   bot.look = (...a) => held() ? Promise.resolve() : look(...a);
   bot.lookAt = (...a) => held() ? Promise.resolve() : lookAt(...a);
 }
