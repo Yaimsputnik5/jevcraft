@@ -1367,13 +1367,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           voidEdgeBlocks: voidEdge(bot, ground), endermenNearRoute: endermenNearRoute(bot, bot.entity.position, ground), headHitThroughArmourWorn: headHit(bot),
           perchedSeconds: Math.round((Date.now() - state.perchedSince) / 1000), runSeconds: Math.round(ground.distanceTo(bot.entity.position) / 5.6 * 10) / 10,
           takeoff: `it sits from about five seconds to most of a minute; as it takes off its body knocks what stands beside it high into the air, and ${countOf(bot, 'water_bucket') ? 'a water bucket is carried to land in' : 'no water bucket is carried to land in'}: the dragon stage of 2026-10-07 (25588) ran under it 18 seconds into a perch with none, arrived as it took off, was hit for 10 and thrown 56 blocks up, and died of the fall`,
+          // This fight's record of the run (note 1510): 25588 (dragon-77, 2026-10-13 19:44 to 19:51Z) ran four times from 20 to 40 blocks, reached the head none, 'the dragon took off before the bot was under its head', and lost 6 to 7 health to a run twice.
+          thisFight: state.underHead?.tries ? `this fight's ${state.underHead.tries} run${state.underHead.tries === 1 ? '' : 's'} under the head: ${state.underHead.reached} reached it before it took off, ${state.underHead.struck} struck it, ${Math.round(state.underHead.lost * 10) / 10} health lost on the runs` : 'not run this fight yet',
           ...(drillSays(bot) ? { drill: drillSays(bot) } : {}) },
         run: async () => {
+          const tally = state.underHead ||= { tries: 0, reached: 0, struck: 0, lost: 0 }; tally.tries++; const healthAtStart = bot.health;
           const reached = () => { const h = live(bot, dragon) && perchedHead(bot, dragon); return !h || canStrike(bot, h); };
           try { await actions.navigate(bot, task, new goals.GoalNear(Math.floor(ground.x), ground.y, Math.floor(ground.z), 1), { timeoutMs: 9000, stallMs: 2500, sprint: true, stopWhen: () => reached() || hostileEntities(bot, 4).some(e => live(bot, e)) }); }
           catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency'].includes(err.name)) throw err; }
           let h = live(bot, dragon) && perchedHead(bot, dragon);
+          tally.lost += Math.max(0, healthAtStart - bot.health); save();
           if (!h) throw new Error('The dragon took off before the bot was under its head');
+          tally.reached++; save();
           // Under it and a block or two short of it: up on blocks laid under
           // the feet (note 1176). The head sits three to four blocks over
           // the ground by the fountain, and the sword reaches three from the
@@ -1390,6 +1395,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           }
           if (!canStrike(bot, h)) throw new Error('Under the perched head, and it is out of the sword\'s reach');
           await strikeWhilePerched(10000);
+          { const after = metadata(bot, dragon, 'health'); if (Number.isFinite(after) && after < beforeDragon) tally.struck++; save(); }
         } };
     }
     // A crystal broken by hand (note 1414): up a pillar of the blocks carried
