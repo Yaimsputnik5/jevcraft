@@ -766,7 +766,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       let fall = null;
       for (let dy = 1; dy <= 48; dy++) { const bl = bot.blockAt(f.offset(dx, -dy, dz)); if (bl?.boundingBox === 'block') { fall = dy - 1; break; } if (bl?.name === 'lava') break; }
       if (fall === null || fall < 3) continue;
-      if (!best || fall < best.fall) best = { dx, dz, fall, edge: f.offset(dx, 0, dz) };
+      // Away from the obsidian (note 1501): the water goes where the server's
+      // line of sight from the body reaches the floor, and a fall down the
+      // pillar's side has the obsidian in that line. Both dry landings of
+      // dragon-71 and the fatal one of dragon-73 (25588, 2026-10-13 18:05Z and
+      // 18:51Z) were off the column at (33, -22) toward (30, 60, -22), the
+      // pillar's foot beside the way down; the drops away from a pillar landed
+      // in water every time.
+      let obsidian = 0; for (let k = 1; k <= 3; k++) for (let dy = -3; dy <= 2; dy++) if (bot.blockAt(f.offset(dx * k, dy, dz * k))?.name === 'obsidian') obsidian++;
+      const score = fall + obsidian * 20;
+      if (!best || score < best.score) best = { dx, dz, fall, obsidian, score, edge: f.offset(dx, 0, dz) };
     }
     return best;
   };
@@ -778,7 +787,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     goal.step = { action: 'water_drop', from: { ...bot.entity.position }, fall: side.fall, health }; save();
     // Onto the column's cell first, at a crouch, where the body stands beside it on the rim.
     if (!await centreOnColumn(0.3)) console.log(`[end combat] the water drop begins ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off the column's middle`);
-    console.log(`[end combat] the water drop from ${bot.entity.position.floored()}, ${side.fall} blocks onto the island at (${side.edge.x}, ${side.edge.z}), health ${health.toFixed(1)}`);
+    console.log(`[end combat] the water drop from ${bot.entity.position.floored()}, ${side.fall} blocks onto the island at (${side.edge.x}, ${side.edge.z})${side.obsidian ? `, ${side.obsidian} obsidian beside the way` : ''}, health ${health.toFixed(1)}`);
     try { await bot.equip(water, 'hand'); } catch (_) { /* equipped in the fall */ }
     // Upright for the step (note 1492): the crouch kept on the column (note
     // 1480) backs a crouched body off every edge, and the step off went 0.6
