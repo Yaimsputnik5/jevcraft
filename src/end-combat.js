@@ -1069,6 +1069,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         const near = bot.findBlocks({ matching: bot.registry.blocksByName.water.id, maxDistance: 5, count: 8, useExtraInfo: sourceWater })
           .filter(p => eye.distanceTo(p.offset(.5, .5, .5)) <= 4.3).sort((p, q) => eye.distanceTo(p) - eye.distanceTo(q))[0];
         if (near) { await fillWaterBucket(bot, task, near, { timeoutMs: 1500 }); console.log(`[end combat] water left at ${near} taken back into the bucket (${countOf(bot, 'water_bucket')} full carried)`); }
+        // The pool poured for a drop, walked back to within ten (note 1519):
+        // left where it was poured it is a bucket gone, and 25588 (dragon-82,
+        // 2026-10-13 20:49Z) poured its third pool with '0 full buckets left',
+        // the second standing at (-28, 61, -25) where the climb was given up.
+        else if (state.pool && Date.now() - state.pool.at < 15 * 60000) {
+          const p = new Vec3(state.pool.x, state.pool.y, state.pool.z), d = bot.entity.position.distanceTo(p.offset(.5, 0, .5));
+          if (bot.blockAt(p)?.name !== 'water') delete state.pool;
+          else if (d <= 10 && !onOwnPillar()) {
+            try { await actions.navigate(bot, task, new goals.GoalNear(p.x, p.y, p.z, 2), { timeoutMs: 8000, stallMs: 3000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+            if (eye.distanceTo(p.offset(.5, .5, .5)) <= 4.3 || bot.entity.position.offset(0, 1.62, 0).distanceTo(p.offset(.5, .5, .5)) <= 4.3) { await fillWaterBucket(bot, task, p, { timeoutMs: 1500 }); console.log(`[end combat] the pool at ${p} taken back into the bucket (${countOf(bot, 'water_bucket')} full carried)`); delete state.pool; save(); }
+          }
+        }
       } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     }
     // What the columns have cost this fight (note 1440): every blow taken on
