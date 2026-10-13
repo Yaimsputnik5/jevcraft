@@ -481,7 +481,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     return off() <= 0.15;
   };
   const digDownColumn = async ({ limit = 64 } = {}) => {
-    let passes = 0;
+    let passes = 0, aborts = 0;
     // The column's blocks: what the climb lays, end stone among them (note
     // 1438): 25588 (dragon-21, 2026-10-13 08:17Z), its cobblestone gone and
     // its column laid in end stone, had the way down dig nothing at (-31, 85,
@@ -539,6 +539,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       try { await actions.dig(bot, task, underFoot, { dropInto: true, openPit: true, requireDrops: false }); }
       catch (err) {
         if (err.name === 'EndEmergency' && ['dragon_charge_or_contact'].includes(endEmergency(bot)) && passes < 20) { passes++; await holdOnColumn(); n--; continue; }
+        // A dig something else stopped is dug again at once (note 1445): 25588
+        // (dragon-26, 2026-10-13 09:17Z), in the breath on its column at 8
+        // health, had its way down end 'Digging aborted' one block down, and
+        // the next two ticks of the breath took the rest.
+        if (/Digging aborted/.test(String(err.message || '')) && aborts < 3) { aborts++; console.log(`[end combat] the dig under the feet was stopped by something else (pathing ${bot.pathfinder?.isMoving?.() ?? '?'}, goal ${bot.pathfinder?.goal ? 'set' : 'none'}, digging ${bot.targetDigBlock?.name || 'nothing'}): dug again`); n--; continue; }
         if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the way down the pillar stopped ${n} down: ${String(err.message || err).slice(0, 120)}`); break;
       }
       // The drop comes late (the server's block update, then the fall): up to
@@ -588,6 +593,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // The pass held through on the column, crouched with the shield up, a
   // second and a half (note 1414).
   const holdOnColumn = async () => {
+    // The roof first, on the bot's own column (note 1445): the dragon that
+    // comes at the column breathes at it, and the fireball not seen in
+    // flight bursts at the feet. 25588 (dragon-26, 2026-10-13 09:16Z) took
+    // the first cloud at its feet, 20 to 14, before any fireball was seen,
+    // and the roof laid against the second came too late.
+    if (onOwnPillar() && !onObsidianTop()) { try { await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
     goal.step = { action: 'hold_on_pillar', hazard: endEmergency(bot), health: bot.health }; save();
     const shield = bot.inventory.slots?.[45]?.name === 'shield' || bot.inventory.items().some(i => i.name === 'shield');
     try {
