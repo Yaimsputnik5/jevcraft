@@ -895,9 +895,19 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       let pool = !!recorded && recorded.dx === dx && recorded.dz === dz && Math.abs(recorded.x - (u.x + dx)) <= 5 && Math.abs(recorded.z - (u.z + dz)) <= 5;
       // With a pool recorded, its side alone is the pool's (note 1531): the pool's spread reaches the cells of the next side too, and 25588 (dragon-89, 2026-10-13 22:32Z, two crystals broken) had 'west: the pool; south: the pool' with the pool poured south, took west, the first of equals, and fell 26 onto stone, dead.
       if (!pool && !recorded) for (let k = 1; k <= 3 && !pool; k++) for (let dy = -1; dy <= 1 && !pool; dy++) if (bot.blockAt(f.offset(dx * k, -fall + dy, dz * k))?.name === 'water') pool = true;
-      const score = fall + obsidian * 20 - (pool ? 100 : 0);
-      verdicts.push(`${name}: ${fall} down${pool ? ', the pool' : ''}${obsidian ? `, ${obsidian} obsidian` : ''}`);
-      if (!best || score < best.score) best = { dx, dz, fall, obsidian, pool, score, edge: f.offset(dx, 0, dz), name };
+      // The cells along the body's way out (note 1543), a block out for every
+      // eight of fall: a block standing in them higher than the floor beside
+      // the column is the landing, not the pool. 25588 (dragon-95, 2026-10-14
+      // 00:05Z, three crystals broken) stepped off crystal 96's column at
+      // (-32, 85, 21) east toward its pool and came down on the stump of its
+      // own earlier column at (-30, 69, 21), two cells out, 20 to 7.
+      let inTheWay = null;
+      for (let k = 2; k <= Math.max(2, Math.round(fall / 8) + 1) && !inTheWay; k++) {
+        for (let dy = 0; dy < fall - 1; dy++) { const bl = bot.blockAt(f.offset(dx * k, -dy, dz * k)); if (bl?.boundingBox === 'block') { inTheWay = { cell: f.offset(dx * k, -dy, dz * k), over: fall - 1 - dy }; break; } }
+      }
+      const score = fall + obsidian * 20 - (pool ? 100 : 0) + (inTheWay ? 200 : 0);
+      verdicts.push(`${name}: ${fall} down${pool ? ', the pool' : ''}${obsidian ? `, ${obsidian} obsidian` : ''}${inTheWay ? `, ${bot.blockAt(inTheWay.cell)?.name} in the fall's way at ${inTheWay.cell}, ${inTheWay.over} over the floor` : ''}`);
+      if (!best || score < best.score) best = { dx, dz, fall, obsidian, pool: pool && !inTheWay, inTheWay, score, edge: f.offset(dx, 0, dz), name };
     }
     // Said (note 1522): 25588 (dragon-83, 2026-10-13 21:17Z, six crystals broken) poured its pool south of the column at (-30, -22), dropped from 79 and landed three blocks east of it, dead, and no line said which side was stepped off or why.
     console.log(`[end combat] the drop's sides from ${f}: ${verdicts.join('; ')}${best ? `; ${best.name} taken` : '; none'}${state.pool ? ` (the pool recorded at (${state.pool.x}, ${state.pool.y}, ${state.pool.z}), ${state.pool.dx === 1 ? 'east' : state.pool.dx === -1 ? 'west' : state.pool.dz === 1 ? 'south' : 'north'} of the column)` : ''}`);

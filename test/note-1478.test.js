@@ -266,3 +266,29 @@ test('the climb\'s option says whether the drop\'s pool can be poured at the pil
     else assert.match(said.pillar_punch_30.wayDown, /a pool of water can be poured on level ground/);
   }
 });
+
+
+test('a block standing in the fall\'s way two cells out is said, and that side loses the pool (note 1543)', async () => {
+  const { bot, goal, task } = fixture();
+  const V = require('vec3').Vec3;
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'water_drop', at: Date.now() }, pool: { x: 2, y: 64, z: 0, dx: 1, dz: 0, at: Date.now() } };
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 20 }, { name: 'water_bucket', count: 2 }];
+  bot.entity.velocity = new V(0, -0.08, 0);
+  bot.entities[20].position = new V(80, 90, 80);
+  const cloud = { id: 40, name: 'area_effect_cloud', position: new V(0.5, 76, 0.5), isValid: true, metadata: {} };
+  cloud.metadata[registry.entitiesByName.area_effect_cloud.metadataKeys.indexOf('radius')] = 3;
+  bot.entities[40] = cloud;
+  // The pool east at (2, 64, 0), and the stump of an old column at (2, 64..70, 0) standing in the way east; west is clear.
+  const was = bot.blockAt;
+  bot.blockAt = p => { const f = p.floored(); if (f.x === 2 && f.z === 0 && f.y >= 64 && f.y <= 70) return { name: 'end_stone', boundingBox: 'block', position: f }; if (f.x === 2 && f.z === 0 && f.y === 71) return { name: 'water', boundingBox: 'empty', position: f }; return was(p); };
+  goal.endCombat.pool = { x: 2, y: 71, z: 0, dx: 1, dz: 0, at: Date.now() };
+  bot.equip = async () => {}; bot.stopDigging = () => {}; bot.controlState = {};
+  bot.setControlState = (k, v) => { bot.controlState[k] = v; if (k === 'forward' && v) setTimeout(() => { bot.entity.position = new V(-1.5, 75.4, 0.5); bot.entity.onGround = false; bot.entity.velocity = new V(-0.1, -0.5, 0); bot.emit('physicsTick'); setTimeout(() => { bot.entity.position = new V(-1.5, 64, 0.5); bot.entity.onGround = true; bot.entity.velocity = new V(0, -0.08, 0); bot.emit('physicsTick'); }, 250); }, 60); };
+  const lines = [], log = console.log; console.log = (...a) => { lines.push(a.join(' ')); log(...a); };
+  try { await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig: async () => {}, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'observe' } } }) }); }
+  finally { console.log = log; }
+  const sides = lines.find(l => l.includes("the drop's sides from"));
+  assert.ok(sides, lines.filter(l => l.includes('drop')).join('\n'));
+  assert.match(sides, /east: .*end_stone in the fall's way at \(2, 70, 0\)/);
+  assert.match(sides, /west taken/);
+});
