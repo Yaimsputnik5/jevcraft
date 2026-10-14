@@ -3065,7 +3065,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       await Promise.race([running, cut]);
     }
     catch (err) {
-      if (err.name === 'EndEmergency') { bot.pathfinder.setGoal(null); bot.clearControlStates(); const c = cutCloud; console.log(`[end combat] ${[].concat(decision.path).join('/')} cut by the breath's cloud at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health${c ? ` (the cloud at ${c.position.floored()}, ${Math.round(cloudRadius(bot, c) * 10) / 10} wide, ${Math.round(hazardDistance(bot.entity.position, c) * 10) / 10} off)` : ''}`); }
+      if (err.name === 'EndEmergency') { bot.pathfinder.setGoal(null); bot.clearControlStates(); const c = cutCloud; console.log(`[end combat] ${[].concat(decision.path).join('/')} cut by ${c ? 'the breath\'s cloud at the feet' : `the emergency '${String(err.message).slice(0, 40)}'`} at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health${c ? ` (the cloud at ${c.position.floored()}, ${Math.round(cloudRadius(bot, c) * 10) / 10} wide, ${Math.round(hazardDistance(bot.entity.position, c) * 10) / 10} off)` : ''}`); }
       if (['Cancelled', 'Blocked', 'EndEmergency'].includes(err.name)) throw err;
       // Moving targets, a newly visible cloud or an obstructed route require
       // a fresh bounded choice. They do not invalidate the retained goal.
