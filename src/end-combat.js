@@ -1515,12 +1515,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           // 90's foot with 17 blocks carried, no run found, 13 to 7.5 to 1.7
           // to none in two seconds, nothing pressed; dragon-124 and 110 the
           // same on the island's ground.
-          if (inBreath() && blocksCarried(bot) >= 2) {
+          // Not under a roof, not on a pillar's top, and not twice (note 1608): with a block two over the head the jump is stopped and the two blocks never go down, and 25588 (dragon-148, 2026-10-14 08:57Z) stood on crystal 9's top under its stand's roof, 'up out of the breath on thin ground: 0 blocks up' seven times in the cloud, 20 to 17, and the dragon's body carried it 42 blocks off, dead. A climb that gains nothing falls through to the dig and the other ways.
+          const roofed = [2, 3].some(dy => bot.blockAt(bot.entity.position.floored().offset(0, dy, 0))?.boundingBox === 'block');
+          if (inBreath() && blocksCarried(bot) >= 2 && !roofed && !onObsidianTop()) {
             goal.step = { action: 'up_out_of_breath_on_ground', health: bot.health }; save();
             const from = Math.floor(bot.entity.position.y);
             try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
-            console.log(`[end combat] up out of the breath on ${thick ? 'the ground' : 'thin ground'}: ${Math.floor(bot.entity.position.y) - from} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
-            return;
+            const rose = Math.floor(bot.entity.position.y) - from;
+            console.log(`[end combat] up out of the breath on ${thick ? 'the ground' : 'thin ground'}: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
+            if (rose >= 1) return;
           }
           if (inBreath() && thick && voidEdge(bot, bot.entity.position, 4) === null) {
             goal.step = { action: 'down_out_of_breath_on_ground', health: bot.health }; save();
