@@ -596,7 +596,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   const healingSays = n => n > 0 ? `${n} crystal${n === 1 ? '' : 's'} stand${n === 1 ? 's' : ''}: the nearest heals the dragon two a second (a point every ten ticks), so what the sword takes at the head is back in seconds; a diamond sword's blow at the head is about 7, healed in under four seconds. The crystals first is the fight a player plays` : 'no crystal stands: what the sword takes at the head stays off';
   // The hole answers the dragon's body (note 1628): two deep, the body is below the wings and the throw (the arena's drills of 2026-10-14), so the dragon within eighteen is no emergency there. 25588 (dragon-161, 2026-10-14 11:45Z) struck the perched head from its hole at (5, 60, -6), the take-off read 'dragon_charge_or_contact', the stand was cut and the next step climbed out into the open at the take-off.
   // And the fireball coming (note 1637): the hole's answer to it is the roof, and the stand cut for it left the hole open; 25588 (dragon-166, 2026-10-14 13:39Z, eight crystals broken, 41 minutes) had stay_in_hole cut by 'incoming_dragon_fireball' at 12.3 health, the ball burst in the open hole, and the cloud took it 12.3 to 0.3 to none, the three blocks up laid none.
-  const holeAnswers = () => (holeHere() || inRecordedHole()) && ['dragon_charge_or_contact', 'incoming_dragon_fireball'].includes(endEmergency(bot));
+  // And while the hole is being dug (note 1647): the dig is a second, it is the answer to the dragon's coming, and the charge read at eighteen cut it; 25588 (dragon-181, 2026-10-14 16:20Z) had wait_in_hole cut so twice in a minute with the body on the rim and the hole half dug.
+  const holeAnswers = () => ((holeHere() || inRecordedHole()) && ['dragon_charge_or_contact', 'incoming_dragon_fireball'].includes(endEmergency(bot))) || (state.diggingHole > Date.now() - 4000 && endEmergency(bot) === 'dragon_charge_or_contact');
   // The roof over the hole's mouth (note 1623): a fireball comes to the body and its cloud fills the hole it bursts in; 25588 (dragon-159, 2026-10-14 11:07Z) lost 16 in a hole 40 blocks from the fountain with the dragon flying, and had its stand in the hole by the fountain cut by a cloud at the feet (11:09Z, 13.6 to 11.6). With a block two over the feet the ball bursts on it and the cloud lies above; the sword wants it off, so it is laid while the dragon flies and taken off when it sits.
   const roofCell = () => bot.entity.position.floored().offset(0, 2, 0);
   const roofed = () => bot.blockAt(roofCell())?.boundingBox === 'block';
@@ -2743,7 +2744,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           const centre = feet.offset(.5, 0, .5), off = () => Math.hypot(centre.x - bot.entity.position.x, centre.z - bot.entity.position.z);
           await centreOn(feet.x, feet.z, 0.12);
           // Dug from on the block, dropping into the cell (note 1616): the dig helper steps the body off any block under its own feet unless told to drop in, and the hole's first block was dug from the cell beside it, the body left on the rim 0.8 off the middle every time (25588, dragon-139, 141, 144, 153 and 154, 2026-10-14; the arena's centring test of 09:38Z brought the body to 0.1 in 0.6 s, so the nudge was never the fault).
-          for (const dy of [1, 2]) { check(); await actions.dig(bot, task, feet.offset(0, -dy, 0), { requireDrops: false, dropInto: true }); }
+          for (const dy of [1, 2]) { check(); state.diggingHole = Date.now(); await actions.dig(bot, task, feet.offset(0, -dy, 0), { requireDrops: false, dropInto: true }); }
           for (let i = 0; i < 30 && Math.floor(bot.entity.position.y) > feet.y - 2; i++) await sleep(50);
           const inIt = Math.floor(bot.entity.position.y) <= feet.y - 2;
           if (inIt) { state.hole = { x: feet.x, y: feet.y - 2, z: feet.z, at: Date.now() }; save(); if (!(dragon && perched(bot, dragon))) await roofHole(true); }
@@ -2856,7 +2857,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               if (Math.abs(feet.x - feetAt.x) > 1 || Math.abs(feet.z - feetAt.z) > 1) throw new Error(`The hole's cell at (${feetAt.x}, ${feetAt.z}) was not reached: the body at ${feet}`);
               if (!thickAt(feet)) throw new Error(`The ground at ${feet} is not the hole's: thin, open beside, or the void within four`);
               await centreOn(feet.x, feet.z, 0.12);
-              for (const dy of [1, 2]) { check(); await actions.dig(bot, task, feet.offset(0, -dy, 0), { requireDrops: false, dropInto: true }); }
+              for (const dy of [1, 2]) { check(); state.diggingHole = Date.now(); await actions.dig(bot, task, feet.offset(0, -dy, 0), { requireDrops: false, dropInto: true }); }
               for (let i = 0; i < 30 && Math.floor(bot.entity.position.y) > feet.y - 2; i++) await sleep(50);
               const fNow = bot.entity.position.floored();
               const inIt = Math.floor(bot.entity.position.y) <= feet.y - 2 && fNow.x === feet.x && fNow.z === feet.z;
