@@ -85,16 +85,31 @@ function observeArena(bot, state, now = Date.now()) {
   const dragon = Object.values(bot.entities).find(e => live(bot, e) && e.name === 'ender_dragon');
   if (dragon) {
     state.lastDragon = { position: { ...dragon.position }, phase: metadata(bot, dragon, 'phase'), at: now };
-    if (perched(bot, dragon)) state.arenaCenter = { ...dragon.position };
+    if (perched(bot, dragon)) { state.arenaCenter = { ...dragon.position }; bot._arenaCenter = { ...dragon.position }; }
   }
   return crystals;
 }
 
 function endHazards(bot) {
-  return Object.values(bot.entities).filter(e => live(bot, e) && (['end_crystal', 'area_effect_cloud', 'dragon_fireball'].includes(e.name) ||
+  const hazards = Object.values(bot.entities).filter(e => live(bot, e) && (['end_crystal', 'area_effect_cloud', 'dragon_fireball'].includes(e.name) ||
     e.name === 'ender_dragon' && !perched(bot, e) && metadata(bot, e, 'phase') !== 9))
     .map(e => ({ entity: e, radius: e.name === 'end_crystal' ? 12 : e.name === 'area_effect_cloud' ?
       cloudRadius(bot, e) : e.name === 'ender_dragon' ? ([2, 3].includes(metadata(bot, e, 'phase')) ? 10 : 16) : 6 }));
+  // The dragon's body at its perch (note 1544): sitting on the fountain, or
+  // coming down to it, its body and wings strike what stands within about
+  // eight of the fountain's middle, 4.9 a blow. A walk ends no nearer than
+  // that, unless it is the run under the head. 25588 (dragon-95, 2026-10-14
+  // 00:12Z, four crystals broken, 14.3 health) walked toward the fountain in
+  // four moves as the dragon came down, ended 7.6 from its middle, and took
+  // three blows in 1.3 seconds, 14.3 to 7.9 to 1.5 to none.
+  if (!bot._underHeadRun) for (const e of Object.values(bot.entities)) {
+    if (e.name !== 'ender_dragon' || !live(bot, e)) continue;
+    const phase = metadata(bot, e, 'phase');
+    const spot = perched(bot, e) ? e.position : [2, 3].includes(phase) && bot._arenaCenter ? vector(bot._arenaCenter) : null;
+    // Only from outside: the body already within the eight (under the head for the sword, note 1156) is not 'unsafe' for it; no walk goes in.
+    if (spot && Math.hypot(spot.x - bot.entity.position.x, spot.z - bot.entity.position.z) > 8) hazards.push({ entity: { name: 'ender_dragon_body', position: spot, isValid: true }, radius: 8 });
+  }
+  return hazards;
 }
 // The mobs a place in the End is judged by: the dragon is not one of them
 // (note 1156). Its flight, its charge and its breath are the hazards'
@@ -892,7 +907,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       let obsidian = 0; for (let k = 1; k <= 3; k++) for (let dy = -3; dy <= 2; dy++) if (bot.blockAt(f.offset(dx * k, dy, dz * k))?.name === 'obsidian') obsidian++;
       // The pool's own side (note 1517), the water still standing: a pool within three of either side's landing made both sides 'the pool's', the shorter fall was taken on the far side, and 25588 (dragon-81, 2026-10-13 20:39Z) landed four blocks east of its pool at (-14, 61, -44) from 27 up and died. The quarry's pits round a foot swallow a pool's spread, so the water must lie on the side stepped off.
       const recorded = state.pool && Date.now() - state.pool.at < 15 * 60000 && bot.blockAt(new Vec3(state.pool.x, state.pool.y, state.pool.z))?.name === 'water' ? state.pool : null;
-      let pool = !!recorded && recorded.dx === dx && recorded.dz === dz && Math.abs(recorded.x - (u.x + dx)) <= 5 && Math.abs(recorded.z - (u.z + dz)) <= 5;
+      // The pool's row is the body's row (note 1545): along the side one to six out, and a cell at most to either hand. The trench is one wide, and 25588 (dragon-96, 2026-10-14 00:20Z, two crystals broken) dropped east from its column at (-9, -40) 'into the pool' recorded at (-8, 60, -42), the trench of an earlier column two cells south, fell 26 onto dry stone at (-6, 61, -40), 20 to none.
+      const along = recorded ? (recorded.x - u.x) * dx + (recorded.z - u.z) * dz : 0, aside = recorded ? Math.abs((recorded.x - u.x) * dz) + Math.abs((recorded.z - u.z) * dx) : 0;
+      let pool = !!recorded && recorded.dx === dx && recorded.dz === dz && along >= 1 && along <= 6 && aside <= 1;
       // With a pool recorded, its side alone is the pool's (note 1531): the pool's spread reaches the cells of the next side too, and 25588 (dragon-89, 2026-10-13 22:32Z, two crystals broken) had 'west: the pool; south: the pool' with the pool poured south, took west, the first of equals, and fell 26 onto stone, dead.
       if (!pool && !recorded) for (let k = 1; k <= 3 && !pool; k++) for (let dy = -1; dy <= 1 && !pool; dy++) if (bot.blockAt(f.offset(dx * k, -fall + dy, dz * k))?.name === 'water') pool = true;
       // The cells along the body's way out (note 1543), a block out for every
@@ -1513,6 +1530,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           ...(drillSays(bot) ? { drill: drillSays(bot) } : {}) },
         run: async () => {
           const tally = state.underHead ||= { tries: 0, reached: 0, struck: 0, lost: 0 }; tally.tries++; const healthAtStart = bot.health;
+          bot._underHeadRun = true; setTimeout(() => { bot._underHeadRun = false; }, 60000);
           const reached = () => { const h = live(bot, dragon) && perchedHead(bot, dragon); return !h || canStrike(bot, h); };
           try { await actions.navigate(bot, task, new goals.GoalNear(Math.floor(ground.x), ground.y, Math.floor(ground.z), 1), { timeoutMs: 9000, stallMs: 2500, sprint: true, stopWhen: () => reached() || hostileEntities(bot, 4).some(e => live(bot, e)) }); }
           catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency'].includes(err.name)) throw err; }
@@ -1535,7 +1553,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             }
           }
           if (!canStrike(bot, h)) throw new Error('Under the perched head, and it is out of the sword\'s reach');
-          await strikeWhilePerched(10000);
+          try { await strikeWhilePerched(10000); } finally { bot._underHeadRun = false; }
           { const after = metadata(bot, dragon, 'health'); if (Number.isFinite(after) && after < beforeDragon) tally.struck++; save(); }
         } };
     }
@@ -1947,7 +1965,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         targetDistance: route.targetDistance, currentTargetDistance: focus?.position?.distanceTo(bot.entity.position),
         desiredHorizontalRange: route.desiredHorizontalRange,
         voidEdgeBlocks: voidEdge(bot, vector(route.p)), endermenNearRoute: endermenNearRoute(bot, bot.entity.position, vector(route.p)),
-        ...(dragon ? { dragonBlocksFromRoute: dragonNearRoute(dragon, bot.entity.position, vector(route.p)), dragonPerched: perched(bot, dragon) } : {}), ...breathSays(bot, dragon, vector(route.p)) }, run: async () => {
+        ...(dragon ? { dragonBlocksFromRoute: dragonNearRoute(dragon, bot.entity.position, vector(route.p)), dragonPerched: perched(bot, dragon) } : {}),
+        // Said (note 1544) when the walk ends by the fountain while the dragon sits there or comes down to it.
+        ...(dragon && (perched(bot, dragon) || [2, 3].includes(metadata(bot, dragon, 'phase'))) ? { perchBody: `ends ${Math.round(Math.hypot(route.p.x + .5 - centre.x, route.p.z + .5 - centre.z))} blocks from the fountain's middle, where the dragon ${perched(bot, dragon) ? 'sits' : 'is coming down to sit'}: its body and wings strike what stands within about 8 of it, 4.9 a blow; 25588 (dragon-95, 2026-10-14 00:12Z) walked to 7.6 from it at 14.3 health and took three blows in 1.3 seconds, dead` } : {}),
+        ...breathSays(bot, dragon, vector(route.p)) }, run: async () => {
         state.visits[route.key] = (state.visits[route.key] || 0) + 1; save();
         const initiallySafe = safeEndPoint(bot, bot.entity.position);
         // A walk stops for a mob at arm's length: the recorded rehearsal

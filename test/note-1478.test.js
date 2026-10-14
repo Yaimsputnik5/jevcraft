@@ -292,3 +292,51 @@ test('a block standing in the fall\'s way two cells out is said, and that side l
   assert.match(sides, /east: .*end_stone in the fall's way at \(2, 70, 0\)/);
   assert.match(sides, /west taken/);
 });
+
+test('the dragon\'s body at its perch, or where it comes down to sit, is a walk hazard of eight blocks, except for the run under its head (note 1544)', () => {
+  const { endHazards } = require('../src/end-combat');
+  const { bot } = fixture();
+  const V = require('vec3').Vec3, dragon = bot.entities[20], phase = registry.entitiesByName.ender_dragon.metadataKeys.indexOf('phase');
+  dragon.position = new V(12.5, 66, 0.5); dragon.metadata[phase] = 6;
+  let body = endHazards(bot).find(h => h.entity.name === 'ender_dragon_body');
+  assert.ok(body, 'the perched body is a hazard'); assert.equal(body.radius, 8); assert.equal(body.entity.position.x, 12.5);
+  // Already within the eight (under the head for the sword): the place is not unsafe for it.
+  bot.entity.position = new V(8.5, 64, 0.5);
+  assert.ok(!endHazards(bot).some(h => h.entity.name === 'ender_dragon_body'), 'no hazard from inside');
+  bot.entity.position = new V(0.5, 76, 0.5);
+  assert.ok(!endHazards(bot).some(h => h.entity.name === 'ender_dragon'), 'the perched dragon itself is not run from');
+  bot._underHeadRun = true;
+  assert.ok(!endHazards(bot).some(h => h.entity.name === 'ender_dragon_body'), 'the run under the head goes to it');
+  bot._underHeadRun = false;
+  // Coming down to sit (phase 3), still 20 blocks off in the air: the hazard is the fountain, where it lands.
+  dragon.position = new V(20, 80, 0); dragon.metadata[phase] = 3; bot._arenaCenter = { x: 12.5, y: 66, z: 0.5 };
+  body = endHazards(bot).find(h => h.entity.name === 'ender_dragon_body');
+  assert.ok(body && body.entity.position.x === 12.5, JSON.stringify(endHazards(bot).map(h => h.entity.name)));
+  // Circling: no body hazard.
+  dragon.metadata[phase] = 0;
+  assert.ok(!endHazards(bot).some(h => h.entity.name === 'ender_dragon_body'));
+});
+
+
+test('a pool recorded two cells to one side of the drop\'s row is not the drop\'s pool (note 1545)', async () => {
+  const { bot, goal, task } = fixture();
+  const V = require('vec3').Vec3;
+  // The pool east of the column but two cells south of its row: water at (2, 64, 2), recorded as east.
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'water_drop', at: Date.now() }, pool: { x: 2, y: 64, z: 2, dx: 1, dz: 0, at: Date.now() } };
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 20 }, { name: 'water_bucket', count: 2 }];
+  bot.entity.velocity = new V(0, -0.08, 0);
+  bot.entities[20].position = new V(80, 90, 80);
+  const cloud = { id: 40, name: 'area_effect_cloud', position: new V(0.5, 76, 0.5), isValid: true, metadata: {} };
+  cloud.metadata[registry.entitiesByName.area_effect_cloud.metadataKeys.indexOf('radius')] = 3;
+  bot.entities[40] = cloud;
+  const was = bot.blockAt;
+  bot.blockAt = p => { const f = p.floored(); if (f.x === 2 && f.y === 64 && f.z === 2) return { name: 'water', boundingBox: 'empty', position: f }; return was(p); };
+  bot.equip = async () => {}; bot.stopDigging = () => {}; bot.controlState = {};
+  bot.setControlState = (k, v) => { bot.controlState[k] = v; if (k === 'forward' && v) setTimeout(() => { bot.entity.position = new V(1.5, 75.4, 0.5); bot.entity.onGround = false; bot.entity.velocity = new V(0.1, -0.5, 0); bot.emit('physicsTick'); setTimeout(() => { bot.entity.position = new V(1.5, 64, 0.5); bot.entity.onGround = true; bot.entity.velocity = new V(0, -0.08, 0); bot.emit('physicsTick'); }, 250); }, 60); };
+  const lines = [], log = console.log; console.log = (...a) => { lines.push(a.join(' ')); log(...a); };
+  try { await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig: async () => {}, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'observe' } } }) }); }
+  finally { console.log = log; }
+  const sides = lines.find(l => l.includes("the drop's sides from"));
+  assert.ok(sides, lines.filter(l => l.includes('drop')).join('\n'));
+  assert.doesNotMatch(sides, /east: 12 down, the pool/);
+});
