@@ -555,7 +555,17 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   };
   // The column's blocks under the feet, up to six.
   const columnDepth = () => { const f = bot.entity.position.floored(); let n = 0; while (n < 6 && SCAFFOLD_UNDER.test(bot.blockAt(f.offset(0, -1 - n, 0))?.name || '') && !(bot.blockAt(f.offset(0, -1 - n, 0))?.name === 'end_stone' && f.y - 1 - n < 66 && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => bot.blockAt(f.offset(dx, -2 - n, dz))?.boundingBox === 'block'))) n++; return n; };
-  // On the recorded column's own cell, the record alive, a block under the feet.
+  // The hole by the fountain (note 1592): two deep, the body in it out of the
+  // dragon's wings and under the breath's cloud; out of it is two blocks laid.
+  const holeHere = () => { const f = bot.entity.position.floored(); const solidAt = c => bot.blockAt(c)?.boundingBox === 'block'; return [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => solidAt(f.offset(dx, 0, dz)) && solidAt(f.offset(dx, 1, dz))) && solidAt(f.offset(0, -1, 0)) && !solidAt(f.offset(0, 2, 0)); };
+  const outOfTheHole = async () => {
+    if (!holeHere()) return true;
+    const from = Math.floor(bot.entity.position.y);
+    try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    console.log(`[end combat] up out of the hole: ${Math.floor(bot.entity.position.y) - from} blocks up at ${bot.entity.position.floored()}`);
+    return !holeHere();
+  };
+  // On the recorded column's own cell, the record alive, a block under the feet.  // On the recorded column's own cell, the record alive, a block under the feet.
   const onColumnCell = () => { const u = bot._pillarUp; if (!u || u.until < Date.now()) return false; const f = bot.entity.position.floored(); return f.x === u.x && f.z === u.z && bot.blockAt(f.offset(0, -1, 0))?.boundingBox === 'block'; };
   // The breath's cloud under the feet (note 1576): a cloud lies half a block
   // deep where the fireball burst and lasts about thirty seconds, and a body
@@ -2434,6 +2444,37 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           } };
       }
     }
+    // The wait in a hole by the fountain (note 1592): the dragon's wings push
+    // every body in their boxes 4 / d² and hurt it 5, and as it takes off from
+    // its perch its body throws what stands beside it high. 25588 (dragon-136,
+    // 2026-10-14 07:05Z, seven crystals broken) ran under the head from 19
+    // blocks, the dragon took off as it came within 8, and the body went to
+    // y 90 and fell 28, dead; dragon-121 and 130 ended the same way at six
+    // crystals. A body two deep in the island's ground is below the wings'
+    // boxes and below the breath's cloud (half a block deep where it bursts);
+    // the perch goes on while a player stands within 20, hole or no hole;
+    // out of the hole is two blocks laid, about a second. Offered on the
+    // island's ground within 24 of the fountain while the dragon flies.
+    if (actions.dig && fountain && !onOwnPillar() && !onObsidianTop() && !holeHere() && !(dragon && perched(bot, dragon)) && byFountain <= 24 && byFountain >= 6 && blocksCarried(bot) >= 2) {
+      const feet = bot.entity.position.floored();
+      const thick = [1, 2, 3, 4, 5, 6].every(dy => bot.blockAt(feet.offset(0, -dy, 0))?.boundingBox === 'block');
+      const wallsHold = [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => bot.blockAt(feet.offset(dx, -1, dz))?.boundingBox === 'block' && bot.blockAt(feet.offset(dx, -2, dz))?.boundingBox === 'block');
+      if (thick && wallsHold && voidEdge(bot, bot.entity.position, 4) === null) tree.wait_in_hole = {
+        description: { action: `Dig two blocks down under the feet here, ${Math.round(byFountain)} blocks from the fountain, and wait in the hole for the dragon to perch: two deep in the ground the body is below the wings' push (4 over the squared distance a tick, 5 of hurt, the throw off the island) and below the breath's cloud; the dragon keeps its perch while a player stands within 20 of it, in a hole or not; the way out is two blocks laid, about a second, and the run to the fountain from here ${Math.round(byFountain / 5.6 * 10) / 10} s more. The wait is a second a question, as observe is.`,
+          blocksFromFountain: Math.round(byFountain), health: bot.health, blocksCarried: blocksCarried(bot), dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null,
+          record: 'the take-off\'s throw ended dragon-121, 130 and 136 on 2026-10-14 at six or seven crystals, each standing in the open by the fountain or on its way to it' },
+        run: async () => {
+          goal.step = { action: 'wait_in_hole', at: { ...feet } }; save();
+          for (const dy of [1, 2]) { check(); await actions.dig(bot, task, feet.offset(0, -dy, 0), { requireDrops: false }); }
+          for (let i = 0; i < 20 && Math.floor(bot.entity.position.y) > feet.y - 2; i++) await sleep(50);
+          state.hole = { x: feet.x, y: feet.y - 2, z: feet.z, at: Date.now() }; save();
+          console.log(`[end combat] in the hole at ${bot.entity.position.floored()}, ${Math.round(byFountain)} from the fountain: ${holeHere() ? 'walled on four sides' : 'a side open'}`);
+          progress = true;
+        } };
+    }
+    // In the hole: the wait is its own option, said; every other option climbs out first (the dispatch below).
+    if (holeHere()) tree.stay_in_hole = { description: { action: `Stay in the hole another second: two deep in the ground, below the dragon's wings and the breath's cloud; the fountain ${fountain ? Math.round(byFountain) : '?'} blocks off, the way out two blocks laid`, health: bot.health, dragonPerched: !!(dragon && perched(bot, dragon)), dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null },
+      run: async () => { for (let n = 0; n < 10; n++) { check(); if (dragon && perched(bot, dragon)) break; await sleep(100); } } };
     // Under the island's rock with a pickaxe (note 1488): the way up to the sky,
     // the blocks over the head dug and the column laid under the feet
     // (pillarUp with end stone diggable). 25588 (dragon-66, 2026-10-13 16:30Z)
@@ -2728,6 +2769,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       console.log(`[end combat] only observe: standing on ${bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || 'nothing'} at ${bot.entity.position.floored()}, column ${JSON.stringify(bot._pillarUp)}, own pillar ${onOwnPillar()}, obsidian top ${onObsidianTop()}, safe ${safe}${safe ? '' : ` (${unsafeBecause(bot, bot.entity.position).slice(0, 3).join(', ')})`}, crystals ${crystals.length} (${crystals.slice(0, 3).map(c => `${c.id}@${Math.round(c.position.distanceTo(bot.entity.position))} bedrock:${bot.blockAt(c.position.floored().offset(0, -1, 0))?.name || 'unloaded'} caged:${caged(bot, c)}`).join('; ')}), ${blocksCarried(bot)} blocks; wet ${wet}, dragon phase ${dragon ? metadata(bot, dragon, 'phase') : 'none'} ${dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : '-'} off, head ${head ? `${Math.round(head.position.distanceTo(bot.entity.position))} off` : 'none'}, hostiles ${hostileEntities(bot, 64).map(e => `${e.name} ${Math.round(e.position.distanceTo(bot.entity.position))}`).join(', ') || 'none'}, routes ${JSON.stringify(state.routeLook || {})}, quarry ${state.quarryLook && Date.now() - state.quarryLook.at < 5000 ? JSON.stringify(state.quarryLook) : 'not looked'}, no shot: ${noShot}`);
     }
     goal.step = { action: 'end_combat', selected: decision.path, dragonHealth: beforeDragon, observedCrystals: crystals.length }; save();
+    // Out of the hole first for anything but the stay (note 1592).
+    if (holeHere() && !['stay_in_hole', 'observe'].includes([].concat(decision.path).at(-1))) { try { await outOfTheHole(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
     try { await decision.action.run(); }
     catch (err) {
       if (['Cancelled', 'Blocked', 'EndEmergency'].includes(err.name)) throw err;

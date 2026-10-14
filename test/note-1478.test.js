@@ -629,3 +629,32 @@ test('in the cloud one block up a short column with blocks carried, the body goe
   assert.ok(lines.some(l => l.includes('up out of the breath on the short column')), lines.filter(l => l.includes('end combat')).join('\n'));
   assert.equal(dug.filter(p => p.x === 0 && p.z === 0 && p.y === 64).length, 0, `dug the column down into the cloud: ${dug.map(String).join(' ')}`);
 });
+
+test('by the fountain the hole is offered; chosen, two blocks are dug and the body stands in it; the stay is offered there and a move climbs out first (note 1592)', async () => {
+  const { bot, goal, task } = fixture();
+  delete bot._pillarUp;
+  // On the island's thick ground 14 blocks from the fountain at (0, 0); the dragon circling far off.
+  bot.entity.position = new Vec3(14.5, 64, 0.5);
+  const removed = new Set(), placed = new Set();
+  bot.blockAt = p => { const f = p.floored(), k = `${f.x},${f.y},${f.z}`; if (removed.has(k)) return { name: 'air', boundingBox: 'empty', position: f }; if (placed.has(k)) return { name: 'cobblestone', boundingBox: 'block', position: f }; if (f.y === 63 && f.x === 0 && f.z === 0) return { name: 'bedrock', boundingBox: 'block', position: f }; return { name: f.y < 64 ? 'end_stone' : 'air', boundingBox: f.y < 64 ? 'block' : 'empty', position: f }; };
+  bot.entities[20].position = new Vec3(-60, 90, -60);
+  delete bot.entities[30];
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, arenaCenter: { x: 0, y: 64, z: 0 } };
+  const dug = [];
+  const dig = async (b, t, p) => { dug.push(p.clone()); removed.add(`${p.x},${p.y},${p.z}`); if (p.x === 14 && p.z === 0) bot.entity.position = new Vec3(14.5, p.y, 0.5); };
+  bot.placeBlock = async (ref, face) => { const c = ref.position.plus(face); placed.add(`${c.x},${c.y},${c.z}`); if (c.x === 14 && c.z === 0) bot.entity.position = new Vec3(14.5, c.y + 1, 0.5); };
+  bot.setControlState = () => {};
+  let seen = [];
+  const client = { systemOne: async ({ questions }) => { const keys = Object.keys(questions.branch_0.criteria); seen.push(keys); const pick = keys.includes('wait_in_hole') ? 'wait_in_hole' : keys.includes('stay_in_hole') ? (seen.length < 3 ? 'stay_in_hole' : keys.find(k => k.startsWith('move_')) || 'observe') : 'observe'; return { answers: { branch_0: { choice: pick } } }; } };
+  const step = () => fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig, place: async () => {} }, client);
+  await step();
+  assert.ok(seen[0].includes('wait_in_hole'), seen[0].join(','));
+  assert.equal(dug.filter(p => p.x === 14 && p.z === 0 && (p.y === 63 || p.y === 62)).length, 2, `dug: ${dug.map(String).join(' ')}`);
+  assert.equal(Math.floor(bot.entity.position.y), 62, 'the body in the hole');
+  await step();
+  assert.ok(seen[1].includes('stay_in_hole'), seen[1].join(','));
+  assert.equal(Math.floor(bot.entity.position.y), 62, 'stayed');
+  await step();
+  const lastPick = seen[2].find(k => k.startsWith('move_')) || 'observe';
+  if (lastPick !== 'observe') assert.ok(placed.size >= 1 && Math.floor(bot.entity.position.y) >= 64, `climbed out before the move: placed ${[...placed].join(' ')}, y ${bot.entity.position.y}`);
+});
