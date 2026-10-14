@@ -1714,18 +1714,22 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // to its death. The climb's jumps (a move of their own) are left upright.
   // Water standing within reach of the eye goes back into an empty bucket (notes 1495, 1535); the cell taken, or null.
   // The water left standing walked back to and taken into the empty bucket (note 1644): the climb with no full bucket has no pool and comes down by the dig, and 25588 (dragon-178, 2026-10-14 15:40Z) poured its last bucket at an enderman's feet, walked off, and was offered the walk back fourteen times without taking it, two empty buckets toward the next climb. Called by the climb before its walk when no bucket is full.
+  // The drop's own pool is not 'water left' while its column stands (note 1658): the pool is poured from the last full bucket, and a reflex that fetches water back when no bucket is full took the pool itself. 25588 (dragon-194, 2026-10-14 18:47Z, three crystals broken) poured its pool at (-30, 60, -19) beside its column, '0 full buckets left', was blown off the climb by a fireball, and the next step took 'the water left at (-30, 60, -19) back into the bucket before the climb (0 full carried)': the pick-up got nothing, the record was dropped as taken, and the fight went on with two empty buckets and 'no pool under the way down' beside the water. A pick-up that fills nothing leaves the record and is not tried again for thirty seconds.
+  const poolInUse = w => !!(state.pool && state.pool.x === w.x && state.pool.z === w.z && Date.now() - state.pool.at < 15 * 60000 && bot._pillarUp && bot._pillarUp.until > Date.now());
   const reclaimWaterLeft = async ({ within = 60 } = {}) => {
     if (countOf(bot, 'water_bucket') > 0 || countOf(bot, 'bucket') === 0 || !Array.isArray(state.poolsLeft) || !state.poolsLeft.length) return false;
     state.poolsLeft = state.poolsLeft.filter(w => Date.now() - w.at < 20 * 60000 && bot.blockAt(new Vec3(w.x, w.y, w.z))?.name === 'water');
-    const here = bot.entity.position, w = state.poolsLeft.map(w => ({ w, d: here.distanceTo(new Vec3(w.x + .5, w.y, w.z + .5)) })).filter(x => x.d <= within).sort((a, b) => a.d - b.d)[0];
+    const here = bot.entity.position, w = state.poolsLeft.filter(w => !poolInUse(w) && !(w.triedAt > Date.now() - 30000)).map(w => ({ w, d: here.distanceTo(new Vec3(w.x + .5, w.y, w.z + .5)) })).filter(x => x.d <= within).sort((a, b) => a.d - b.d)[0];
     if (!w) return false;
     const p = new Vec3(w.w.x, w.w.y, w.w.z);
     goal.step = { action: 'take_back_water', to: { x: p.x, y: p.y, z: p.z }, blocks: Math.round(w.d) }; save();
     try { await actions.navigate(bot, task, new goals.GoalNear(p.x, p.y, p.z, 2), { timeoutMs: 25000, stallMs: 5000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
     const eye = bot.entity.position.offset(0, 1.62, 0);
     if (eye.distanceTo(p.offset(.5, .5, .5)) > 4.3) { console.log(`[end combat] the water left at ${p} was not reached before the climb: ${Math.round(bot.entity.position.distanceTo(p.offset(.5, 0, .5)))} blocks off`); return false; }
+    const before = countOf(bot, 'water_bucket');
     try { await require('./water').fillWaterBucket(bot, task, p, { timeoutMs: 1500 }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     const full = countOf(bot, 'water_bucket');
+    if (full <= before) { w.w.triedAt = Date.now(); save(); console.log(`[end combat] the water left at ${p} was not taken back: the bucket stayed empty (${bot.blockAt(p)?.name || 'nothing'} there now); not tried again for thirty seconds`); return false; }
     console.log(`[end combat] the water left at ${p} taken back into the bucket before the climb (${full} full carried)`);
     state.poolsLeft = state.poolsLeft.filter(x => x !== w.w); if (state.pool && state.pool.x === p.x && state.pool.z === p.z) delete state.pool; save();
     return full > 0;
@@ -1786,7 +1790,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             const p = new Vec3(w.w.x, w.w.y, w.w.z);
             try { await actions.navigate(bot, task, new goals.GoalNear(p.x, p.y, p.z, 2), { timeoutMs: 8000, stallMs: 3000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the walk back to the water left at ${p} from ${bot.entity.position.floored()}: ${String(err.message || err).slice(0, 80)}`); }
             const eye2 = bot.entity.position.offset(0, 1.62, 0);
-            if (eye2.distanceTo(p.offset(.5, .5, .5)) <= 4.3) { await fillWaterBucket(bot, task, p, { timeoutMs: 1500 }); console.log(`[end combat] the water left at ${p} taken back into the bucket (${countOf(bot, 'water_bucket')} full carried)`); state.poolsLeft = state.poolsLeft.filter(x => x !== w.w); if (state.pool && state.pool.x === p.x && state.pool.z === p.z) delete state.pool; save(); }
+            if (eye2.distanceTo(p.offset(.5, .5, .5)) <= 4.3) { const before2 = countOf(bot, 'water_bucket'); await fillWaterBucket(bot, task, p, { timeoutMs: 1500 }); const full2 = countOf(bot, 'water_bucket'); if (full2 > before2) { console.log(`[end combat] the water left at ${p} taken back into the bucket (${full2} full carried)`); state.poolsLeft = state.poolsLeft.filter(x => x !== w.w); if (state.pool && state.pool.x === p.x && state.pool.z === p.z) delete state.pool; } else { w.w.triedAt = Date.now(); console.log(`[end combat] the water left at ${p} was not taken back: the bucket stayed empty (${bot.blockAt(p)?.name || 'nothing'} there now)`); } save(); }
           }
         }
         if (!near && state.pool && Date.now() - state.pool.at < 15 * 60000) {
