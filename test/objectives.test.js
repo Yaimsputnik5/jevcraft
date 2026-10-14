@@ -94,7 +94,7 @@ test('saved task survives a new store instance with its fixed blueprint', () => 
   try {
     const file = path.join(dir, 'goal.json');
     const goal = { version: 1, kind: 'house', status: 'running', blueprint: houseBlueprint(new Vec3(2, 64, 3)) };
-    new GoalStore(file).save(goal);
+    const saving = new GoalStore(file); saving.save(goal); saving.flushSync(); // the store writes off the loop (note 1588); flushed for the read
     assert.deepEqual(new GoalStore(file).read(), goal);
   } finally { fs.rmSync(dir, { recursive: true }); }
 });
@@ -138,7 +138,8 @@ test('a saved goal holding a value that loops back on itself is saved without it
     const file = path.join(dir, 'goal.json');
     const cell = new Vec3(1, 64, 2); cell.route = [cell];
     const goal = { version: 1, kind: 'win', status: 'running', step: { action: 'leave_lava', to: cell } };
-    assert.doesNotThrow(() => new GoalStore(file).save(goal));
+    const saving = new GoalStore(file);
+    assert.doesNotThrow(() => { saving.save(goal); saving.flushSync(); });
     const read = new GoalStore(file).read();
     assert.equal(read.step.action, 'leave_lava');
     assert.equal(read.step.to.x, 1);

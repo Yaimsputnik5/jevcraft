@@ -1129,6 +1129,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // (dragon-93, 2026-10-13 23:36Z) fell 21 with no pool, 18 of fall damage
     // against 17.3, dead on the rim.
     if (side.fall - 3 >= bot.health - 1 && !side.pool && !inCloud) { const dig = side.fall - 3 - Math.floor(bot.health - 1) + 1; console.log(`[end combat] the water drop held at the step-off: the health is ${bot.health.toFixed(1)} now, a fall of ${side.fall} takes about ${side.fall - 3}, no pool under the way down; ${dig} dug first`); waterDrop.tooHighBy = dig; return false; }
+    // The dragon's body about to pass (note 1589): a body in the air is in its wings' push, and 25588 (dragon-133, 2026-10-14 06:22Z) stepped off crystal 9's column at (35, 82, -23) as the dragon came, took its blow at 81 and was carried five east and four north of its pool, dead at (40, 56, -19). Out of the cloud, the step waits up to two and a half seconds for the body to pass; in the cloud it goes.
+    if (!inCloud && breathThreat(bot)?.name !== 'area_effect_cloud' && dragonThreat(bot)) {
+      const t0 = Date.now(); let waited = 0;
+      while (Date.now() - t0 < 2500 && dragonThreat(bot)) { check(); await sleep(100); waited = Date.now() - t0; }
+      console.log(`[end combat] the step off waited ${waited} ms for the dragon's body to pass${dragonThreat(bot) ? ' (still coming: the step goes)' : ''}`);
+    }
     bot._dropping = true;
     // The step's emergency check set aside for the step off (note 1550): the
     // drop is the answer to the fireball and the breath, and the move's own

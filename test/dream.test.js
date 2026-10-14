@@ -220,7 +220,7 @@ test('a custom dream needs the same bar as a built-in one to be set', async () =
 test('the custom dream is stored beside the old ones and survives a restart', () => {
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'dream-')), 'w-dream.json');
   const store = new GoalStore(file);
-  store.save({ version: 1, dream: 'custom', text: 'find a cherry biome', setBy: 'Player', setAt: '2026-09-28T00:00:00Z', failures: 1 });
+  store.save({ version: 1, dream: 'custom', text: 'find a cherry biome', setBy: 'Player', setAt: '2026-09-28T00:00:00Z', failures: 1 }); store.flushSync();
   assert.deepEqual({ ...new GoalStore(file).read(), updatedAt: undefined }, { version: 1, dream: 'custom', text: 'find a cherry biome', setBy: 'Player', setAt: '2026-09-28T00:00:00Z', failures: 1, updatedAt: undefined });
   fs.writeFileSync(file, JSON.stringify({ version: 1, dream: 'beat_the_game', setBy: 'Player', setAt: '2026-09-01T00:00:00Z' }));
   assert.equal(new GoalStore(file).read().dream, 'beat_the_game', 'a file from before custom dreams still loads');

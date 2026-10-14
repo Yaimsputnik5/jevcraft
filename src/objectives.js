@@ -191,22 +191,68 @@ async function interpret(client, request, from, username, context = {}) {
   return spec;
 }
 
+// The goal written at most once a second and a half, off the event loop
+// (note 1588): the saved goal of a dragon stage is 2.8 MB (the fortress
+// map, the decisions, the recovery advice), save() is called at every step,
+// and the stall profiler (note 1587) caught the first stall it saw in it:
+// 25588 (dragon-133, 2026-10-14 06:23Z) held the loop 2.2 s, 'rename 1971
+// ms, writeFileUtf8 1032 ms', the goal's save 3.1 s of a 20 s window. The
+// first save of a quiet spell goes at once; the ones that follow within the
+// spell are coalesced into one trailing write; the text is compact; the
+// write and the rename are asynchronous; the last pending goal is written
+// synchronously at exit. read() sees a pending goal before the disk does.
+const SAVE_EVERY_MS = 1500;
 class GoalStore {
-  constructor(file) { this.file = file; }
+  constructor(file) { this.file = file; this.pending = null; this.timer = null; this.lastWriteAt = 0; this.writing = null; if (!GoalStore.exitHooked) { GoalStore.exitHooked = true; GoalStore.stores = new Set(); process.once('exit', () => { for (const s of GoalStore.stores) { try { s.flushSync(); } catch (_) { /* nothing */ } } }); } GoalStore.stores?.add(this); }
   read() {
+    if (this.pending) return JSON.parse(this.serialize(this.pending));
     if (!fs.existsSync(this.file)) return null;
     const goal = JSON.parse(fs.readFileSync(this.file, 'utf8'));
     if (goal.version !== 1) throw new Error('Unsupported saved goal version');
     return goal;
   }
   save(goal) {
-    fs.mkdirSync(path.dirname(this.file), { recursive: true });
     goal.updatedAt = new Date().toISOString();
+    // A change of status (running to cancelled, blocked, done) or of the survival's pause goes to disk at once, and the first save of a store: the stop said in chat must be on disk before the world is ready (recovery.test.js); the steps between coalesce.
+    const mark = `${goal.status}|${goal.paused}`;
+    const terminal = goal.status !== undefined && !['running', 'pending', 'recovering'].includes(goal.status);
+    if (terminal || mark !== this.lastMark) { this.lastMark = mark; this.pending = goal; this.flushSync(); return; }
+    this.pending = goal;
+    const due = Math.max(0, this.lastWriteAt + SAVE_EVERY_MS - Date.now());
+    if (this.timer) return;
+    this.timer = setTimeout(() => { this.timer = null; this.flush(); }, due);
+    this.timer.unref?.();
+  }
+  // The pending goal to disk, asynchronously; a write under way is followed by another when it ends.
+  flush() {
+    const goal = this.pending; if (!goal) return this.writing || Promise.resolve();
+    if (this.writing) return this.writing.then(() => this.flush());
+    this.pending = null; this.lastWriteAt = Date.now();
+    const text = this.serialize(goal);
+    this.writing = (async () => {
+      try {
+        await fs.promises.mkdir(path.dirname(this.file), { recursive: true });
+        await fs.promises.writeFile(`${this.file}.tmp`, text);
+        await fs.promises.rename(`${this.file}.tmp`, this.file);
+      } catch (err) { console.error(`[bug] the goal was not saved: ${err.message}`); }
+      finally { this.writing = null; }
+    })();
+    return this.writing;
+  }
+  flushSync() {
+    if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    const goal = this.pending; if (!goal) return;
+    this.pending = null; this.lastWriteAt = Date.now();
+    fs.mkdirSync(path.dirname(this.file), { recursive: true });
+    fs.writeFileSync(`${this.file}.tmp`, this.serialize(goal));
+    fs.renameSync(`${this.file}.tmp`, this.file);
+  }
+  serialize(goal) {
     // A value that loops back on itself is dropped and said, not thrown: a
     // throw here ended the process with the bot in lava (note 569's route
     // kept on a cell that its own route held, 2026-09-28).
     let text;
-    try { text = JSON.stringify(goal, null, 2); } catch (err) {
+    try { text = JSON.stringify(goal); } catch (err) {
       const seen = new WeakSet(), dropped = [];
       text = JSON.stringify(goal, function (key, value) {
         if (value && typeof value === 'object') {
@@ -214,11 +260,10 @@ class GoalStore {
           seen.add(value);
         }
         return value;
-      }, 2);
+      });
       console.error('[bug] saved goal had a value that loops back on itself; dropped:', dropped.slice(0, 5).join(', '));
     }
-    fs.writeFileSync(`${this.file}.tmp`, text);
-    fs.renameSync(`${this.file}.tmp`, this.file);
+    return text;
   }
 }
 
