@@ -1613,6 +1613,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     bot.clearControlStates?.(); bot.pathfinder?.setGoal?.(null);
     for (let i = 0; i < 12 && !bot.entity.onGround; i++) { check(); await sleep(50); }
     if (!bot.entity.onGround) { console.log(`[end combat] up out of the breath on the column not tried at ${bot.entity.position.floored()}: the body in the air`); return 0; }
+    // Centred on the column before the jump (note 1676, as note 1651 before the dig): a body off the middle of a one-wide column jumps off it. 25588 (dragon-211, 2026-10-14 23:22Z, six crystals broken) at (12, 81, 33) beside its column at (12, 34), 14 health, jumped for the two blocks, '-3 blocks up', and fell 23 to its death; dragon-209 (22:42Z) fell the same way from 87.
+    if (bot._pillarUp && !(await centreOnColumn(0.2, { maxMs: 500 }))) { console.log(`[end combat] up out of the breath on the column not tried at ${bot.entity.position.floored()}: not centred on the column in half a second`); return 0; }
     const from = Math.floor(bot.entity.position.y);
     try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     const rose = Math.floor(bot.entity.position.y) - from;
