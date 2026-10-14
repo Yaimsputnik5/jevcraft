@@ -1139,7 +1139,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       bot.setControlState?.('sneak', false);
       await require('./motion').move(bot, task, { label: 'water_drop', keys: ['forward'], sneak: false, why: 'off the column onto the island by its foot, the water bucket in hand for the landing (note 1484)',
         // The fall is the move's purpose (note 1490): refused as a 'deadly fall ahead', 25588 (dragon-67, 2026-10-13 16:45Z) stood on its column top at 103 'still up' twice and dug instead.
-        look: side.edge.offset(0.5, 1.0, 0.5), maxMs: 2000, tick: 25, intoFall: true, until: () => !bot.entity.onGround && bot.entity.position.y < startY - 0.5 });
+        // Aimed far along the drop's axis, not at the next cell's middle (note 1585): from a body 0.3 off the column's middle the next cell's middle is 17 degrees off the axis, and over a fall of 41 blocks (the walk-off lands 2.7 to 3.0 out, the arena's drop drill, 2026-10-14) that is two blocks sideways. 25588 (dragon-130, 06:00Z, six crystals broken) stepped south off crystal 64's column at (7, 97, 39) and landed at (5, 58, 44), a cell west of its three-wide trench, dead.
+        look: new Vec3(bot._pillarUp.x + .5 + side.dx * 12, bot.entity.position.y + 1.0, bot._pillarUp.z + .5 + side.dz * 12), maxMs: 2000, tick: 25, intoFall: true, until: () => !bot.entity.onGround && bot.entity.position.y < startY - 0.5 });
     } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the water drop's step off ended: ${err.name || ''} ${String(err.message || err).slice(0, 100)}`); }
     finally { bot._dropping = false; task.interruptCheck = dropInterrupt; }
     let wet = false;
