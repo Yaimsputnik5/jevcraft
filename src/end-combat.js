@@ -1593,6 +1593,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const f0 = bot.entity.position.floored();
     for (const dy of [2, 3]) { const r = bot.blockAt(f0.offset(0, dy, 0)); if (r?.boundingBox === 'block') { if (/bedrock|obsidian|end_portal/.test(r.name)) return 0; try { await actions.dig(bot, task, r.position, { requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; return 0; } } }
     goal.step = { action: 'up_out_of_breath_on_column', health: bot.health }; save();
+    // The feet on the ground first (note 1669, as note 1640 on the ground): knocked or dropping, the climb refused 'air under the feet'. 25588 (dragon-204, 2026-10-14 21:33Z) at (-4, 67, 12), 12.9 health, 10 blocks carried: '0 blocks up' twice in the cloud, then the hold and a fall to 8.3.
+    bot.clearControlStates?.(); bot.pathfinder?.setGoal?.(null);
+    for (let i = 0; i < 12 && !bot.entity.onGround; i++) { check(); await sleep(50); }
+    if (!bot.entity.onGround) { console.log(`[end combat] up out of the breath on the column not tried at ${bot.entity.position.floored()}: the body in the air`); return 0; }
     const from = Math.floor(bot.entity.position.y);
     try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     const rose = Math.floor(bot.entity.position.y) - from;
