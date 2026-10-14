@@ -974,6 +974,24 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     console.log(`[end combat] the drop's sides from ${f}: ${verdicts.join('; ')}${best ? `; ${best.name} taken` : '; none'}${state.pool ? ` (the pool recorded at (${state.pool.x}, ${state.pool.y}, ${state.pool.z}), ${state.pool.dx === 1 ? 'east' : state.pool.dx === -1 ? 'west' : state.pool.dz === 1 ? 'south' : 'north'} of the column)` : ''}`);
     return best;
   };
+  // Up out of the water onto the nearest rim (notes 1559, 1561, 1570): sideways
+  // to the side whose rim stands a block up with air over it, forward and the
+  // jump. Called after the drop's landing, and at the step's start whenever the
+  // body is in water or its breath is going: 25588 (dragon-118, 2026-10-14
+  // 03:49Z) quarried on with its head under water at (48, 55, 12), oxygen 17
+  // to 0, and the survival's 'swim_to_land' spun 21 times a second without a
+  // step; drowned at full health in twelve seconds.
+  const outOfTheWater = async () => {
+    const feet = bot.entity.position.floored();
+    const ways = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dz]) => { for (let d = 1; d <= 2; d++) { const c = feet.offset(dx * d, 0, dz * d); if (bot.blockAt(c)?.boundingBox === 'block' && bot.blockAt(c.offset(0, 1, 0))?.boundingBox !== 'block' && bot.blockAt(c.offset(0, 2, 0))?.boundingBox !== 'block') return { dx, dz, d }; if (bot.blockAt(c)?.name !== 'water') break; } return null; }).filter(Boolean).sort((a, b) => a.d - b.d);
+    const way = ways[0];
+    const toward = way ? feet.offset(way.dx * (way.d + 1) + .5, 1.5, way.dz * (way.d + 1) + .5) : bot.entity.position.offset(2, 1, 0);
+    try {
+      await require('./motion').move(bot, task, { label: 'out_of_the_trench', keys: ['forward', 'jump'], sneak: false, why: 'up out of the water onto the rim before anything else (notes 1559, 1570)', look: toward, maxMs: 2500, tick: 25, until: () => !inWater() && bot.entity.onGround });
+    } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    console.log(`[end combat] out of the trench: ${inWater() ? 'still in the water' : 'on the rim'} at ${bot.entity.position.floored()}${way ? ` (${way.dx === 1 ? 'east' : way.dx === -1 ? 'west' : way.dz === 1 ? 'south' : 'north'}, the rim ${way.d} off)` : ' (no rim found beside)'}`);
+    return !inWater();
+  };
   const waterDrop = async ({ inCloud = false } = {}) => {
     let side = waterDropSide();
     if (side?.clearFirst && actions.dig) {
@@ -1041,20 +1059,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // -37), took a fireball's cloud there, 'evade breath straight' twice, moved
     // 1.4 blocks in four seconds, 20 to none. The rim is a block up and a block
     // or two off: forward and the jump, toward the column's foot.
-    if (down && inWater()) {
-      // Sideways to the rim (note 1561), not toward the column: the trench runs
-      // to the column's foot, and 25588 (dragon-112, 2026-10-14 02:35Z) walked
-      // from (-8, 59, 37) to (-10, 59, 37) along it, 'still in the water'. The
-      // way out is the nearest side whose rim stands a block up with air over it.
-      const feet = bot.entity.position.floored();
-      const ways = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dz]) => { for (let d = 1; d <= 2; d++) { const c = feet.offset(dx * d, 0, dz * d); if (bot.blockAt(c)?.boundingBox === 'block' && bot.blockAt(c.offset(0, 1, 0))?.boundingBox !== 'block' && bot.blockAt(c.offset(0, 2, 0))?.boundingBox !== 'block') return { dx, dz, d }; if (bot.blockAt(c)?.name !== 'water') break; } return null; }).filter(Boolean).sort((a, b) => a.d - b.d);
-      const way = ways[0];
-      const toward = way ? feet.offset(way.dx * (way.d + 1) + .5, 1.5, way.dz * (way.d + 1) + .5) : bot.entity.position.offset(2, 1, 0);
-      try {
-        await require('./motion').move(bot, task, { label: 'out_of_the_trench', keys: ['forward', 'jump'], sneak: false, why: 'up out of the pool\'s trench onto the rim before anything else (note 1559)', look: toward, maxMs: 2500, tick: 25, until: () => !inWater() && bot.entity.onGround });
-      } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
-      console.log(`[end combat] out of the trench: ${inWater() ? 'still in the water' : 'on the rim'} at ${bot.entity.position.floored()}${way ? ` (${way.dx === 1 ? 'east' : way.dx === -1 ? 'west' : way.dz === 1 ? 'south' : 'north'}, the rim ${way.d} off)` : ' (no rim found beside)'}`);
-    }
+    if (down && inWater()) await outOfTheWater();
     if (down && countOf(bot, 'bucket') > 0 && !breathThreat(bot) && !dragonThreat(bot)) { try { await takeBackWaterNear(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
     return down;
   };
@@ -1307,6 +1312,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // 2026-10-13, four crystals broken) lost one bucket at 17:01Z in an
     // evasion and the other at 17:13Z, each the water left where it was
     // poured, and died at 17:21Z, 'no water bucket carried', on its column.
+    // The body in water, or its breath going, at the step's start (note 1570): out first.
+    if ((inWater() || (bot.oxygenLevel ?? 20) < 18) && !onOwnPillar()) { try { await outOfTheWater(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
     if (countOf(bot, 'bucket') > 0 && !breathThreat(bot) && !dragonThreat(bot)) {
       try {
         const { fillWaterBucket } = require('./water');
@@ -1868,6 +1875,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
                 for (const p of cells) {
                   check();
                   if (hostileNear()) { console.log(`[end combat] the quarry stopped for a ${hostile.name} ${Math.round(hostile.position.distanceTo(bot.entity.position))} blocks off`); break; }
+                  if (inWater() || (bot.oxygenLevel ?? 20) < 18) { console.log(`[end combat] the quarry stopped: the body in the water at ${bot.entity.position.floored()}, breath ${bot.oxygenLevel}`); break; }
                   if (bot.blockAt(p)?.name !== 'end_stone') { skipped++; continue; }
                   try { await actions.dig(bot, task, p, { requireDrops: false }); dug++; } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] quarry stopped at ${p}: ${String(err.message || err).slice(0, 120)}`); break; }
                 }
