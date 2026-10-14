@@ -896,7 +896,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
     const poured = bot.blockAt(best.cell)?.name === 'water';
     console.log(`[end combat] the pool for the drop ${poured ? 'poured' : 'not poured'} at ${best.cell} beside the column at (${column.x}, ${column.z})${best.obsidian ? `, ${best.obsidian} obsidian that way` : ''}; ${countOf(bot, 'water_bucket')} full bucket${countOf(bot, 'water_bucket') === 1 ? '' : 's'} left`);
-    if (poured) { state.pool = { x: best.cell.x, y: best.cell.y, z: best.cell.z, dx: best.dx, dz: best.dz, at: Date.now(), ...(best.reach ? { reach: best.reach } : {}) }; save(); return state.pool; }
+    if (poured) { state.pool = { x: best.cell.x, y: best.cell.y, z: best.cell.z, dx: best.dx, dz: best.dz, at: Date.now(), ...(best.reach ? { reach: best.reach } : {}) }; (state.poolsLeft ||= []).push({ x: best.cell.x, y: best.cell.y, z: best.cell.z, at: Date.now() }); save(); return state.pool; }
     return null;
   };
   // Whether a pool can be poured at a pillar's foot, read from the foot cell on the bot's side of it (note 1539).
@@ -1309,6 +1309,22 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         // left where it was poured it is a bucket gone, and 25588 (dragon-82,
         // 2026-10-13 20:49Z) poured its third pool with '0 full buckets left',
         // the second standing at (-28, 61, -25) where the climb was given up.
+        // Every pool and clutch left behind, remembered and walked back to (note
+        // 1564), not the drop's pool alone: 25588 (dragon-113, 2026-10-14 02:51Z)
+        // caught its 45-block drop with the bucket at (8, 61, -33), landed at
+        // 17 health with the dragon coming, and that water was never a pool to
+        // return to; its next pour at (-8, 59, 39) was left when the climb went
+        // up another column; both buckets empty by the fifth crystal.
+        if (!near && Array.isArray(state.poolsLeft) && state.poolsLeft.length && bot.health >= 10 && !onOwnPillar()) {
+          state.poolsLeft = state.poolsLeft.filter(w => Date.now() - w.at < 15 * 60000 && bot.blockAt(new Vec3(w.x, w.y, w.z))?.name === 'water');
+          const here = bot.entity.position, w = state.poolsLeft.map(w => ({ w, d: here.distanceTo(new Vec3(w.x + .5, w.y, w.z + .5)) })).filter(x => x.d <= 16).sort((a, b) => a.d - b.d)[0];
+          if (w) {
+            const p = new Vec3(w.w.x, w.w.y, w.w.z);
+            try { await actions.navigate(bot, task, new goals.GoalNear(p.x, p.y, p.z, 2), { timeoutMs: 8000, stallMs: 3000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the walk back to the water left at ${p} from ${bot.entity.position.floored()}: ${String(err.message || err).slice(0, 80)}`); }
+            const eye2 = bot.entity.position.offset(0, 1.62, 0);
+            if (eye2.distanceTo(p.offset(.5, .5, .5)) <= 4.3) { await fillWaterBucket(bot, task, p, { timeoutMs: 1500 }); console.log(`[end combat] the water left at ${p} taken back into the bucket (${countOf(bot, 'water_bucket')} full carried)`); state.poolsLeft = state.poolsLeft.filter(x => x !== w.w); if (state.pool && state.pool.x === p.x && state.pool.z === p.z) delete state.pool; save(); }
+          }
+        }
         if (!near && state.pool && Date.now() - state.pool.at < 15 * 60000) {
           const p = new Vec3(state.pool.x, state.pool.y, state.pool.z), d = bot.entity.position.distanceTo(p.offset(.5, 0, .5));
           if (bot.blockAt(p)?.name !== 'water') delete state.pool;

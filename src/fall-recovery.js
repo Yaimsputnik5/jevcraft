@@ -140,9 +140,11 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
           goal.fallRecoveries ||= []; goal.fallRecoveries.push(evidence); goal.fallRecoveries = goal.fallRecoveries.slice(-20); save();
           bot.emit('fall_recovery', evidence);
           if (refill) {
-            await fillWaterBucket(bot, task, used.position, { guard: check });
-            evidence.bucketRecovered = true; save();
+            try { await fillWaterBucket(bot, task, used.position, { guard: check }); evidence.bucketRecovered = true; save(); }
+            catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
           }
+          // The clutch's water remembered as a pool left (note 1564) where it was not taken back.
+          if (!evidence.bucketRecovered && goal.endCombat) { (goal.endCombat.poolsLeft ||= []).push({ x: used.position.x, y: used.position.y, z: used.position.z, at: Date.now() }); save(); }
           ended = true; return true;
         }
       } else wetSince = 0;
@@ -178,9 +180,10 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
           if (!used) console.log(`[fall] landed dry at ${bot.entity.position.floored()} with no water poured, ${initialHealth.toFixed(1)} to ${bot.health.toFixed(1)}: ${(bot._clutchWhy || []).slice(-6).join('; ') || 'the clutch was never asked (the bucket not in hand, or not falling)'}`);
           else if (!converted) console.log(`[fall] landed dry at ${bot.entity.position.floored()}, ${initialHealth.toFixed(1)} to ${bot.health.toFixed(1)}: clicked ${used.clicks || 1} time${(used.clicks || 1) === 1 ? '' : 's'} at ${used.position} from ${used.serverPosition.floored()}, no water came of it (the server refused the placing)`);
           if (refill && converted && used) {
-            await fillWaterBucket(bot, task, used.position, { guard: check });
-            evidence.bucketRecovered = true; save();
+            try { await fillWaterBucket(bot, task, used.position, { guard: check }); evidence.bucketRecovered = true; save(); }
+            catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
           }
+          if (converted && used && !evidence.bucketRecovered && goal.endCombat) { (goal.endCombat.poolsLeft ||= []).push({ x: used.position.x, y: used.position.y, z: used.position.z, at: Date.now() }); save(); }
           ended = true; return false;
         }
       } else dryLanding = undefined;
