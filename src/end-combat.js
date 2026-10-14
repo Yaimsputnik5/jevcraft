@@ -2638,9 +2638,77 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           progress = true;
         } };
     }
-    // In the hole: the wait is its own option, said; every other option climbs out first (the dispatch below).
-    if (holeHere()) tree.stay_in_hole = { description: { action: `Stay in the hole another second: two deep in the ground, below the dragon's wings and the breath's cloud; the fountain ${fountain ? Math.round(byFountain) : '?'} blocks off, the way out two blocks laid`, health: bot.health, dragonPerched: !!(dragon && perched(bot, dragon)), dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null },
-      run: async () => { for (let n = 0; n < 10; n++) { check(); if (dragon && perched(bot, dragon)) break; await sleep(100); } } };
+    // The sword from the hole (note 1618): the perched head sits a block under
+    // the dragon's middle and 6.5 before it, and the dragon turns to the player
+    // it sees within twenty; from a hole two deep at 7 from the fountain's
+    // middle the eyes are 1.4 under the head's centre and the sword's three
+    // reach it, with the body below the wings' boxes and the breath's cloud
+    // (half a block deep on the surface). Every run under the head from the
+    // open was lifted or breathed on (dragon-151, 153, 154 and 155, 2026-10-14,
+    // none struck; the arena's run drill of 10:08Z lost 10 to 20 in two to
+    // four seconds in five runs of six).
+    const strikeFromHole = async ms => {
+      const sword = bot.inventory.items().find(i => /_sword$/.test(i.name) && durable(bot.registry, i));
+      if (!sword || !dragon) return 0;
+      await bot.equip(sword, 'hand'); check();
+      const until = Date.now() + ms; let swings = 0, lastSeen = Date.now(), ever = false;
+      while (Date.now() < until) {
+        check();
+        if (!holeHere()) break;
+        const fresh = live(bot, dragon) && perchedHead(bot, dragon);
+        if (fresh) {
+          lastSeen = Date.now(); ever = true;
+          if (canStrike(bot, fresh)) { if (typeof bot.lookAt === 'function') await bot.lookAt(fresh.position.offset(0, .5, 0), true); bot.attack(fresh); swings++; for (let n = 0; n < 7; n++) { check(); await sleep(100); } continue; }
+        } else if (ever && Date.now() - lastSeen > 4000) break;
+        else if (!ever && ![2, 3, 5, 6, 7].includes(metadata(bot, dragon, 'phase')) && Date.now() - lastSeen > 15000) break;
+        await sleep(100);
+      }
+      if (swings) { state.headSwings = (state.headSwings || 0) + swings; const t = state.holeHead ||= { tries: 0, dugIn: 0, swings: 0 }; t.swings += swings; save(); }
+      return swings;
+    };
+    // In the hole: the wait is its own option, said; every other option climbs out first (the dispatch below). The head in reach is struck from it (note 1618).
+    if (holeHere()) tree.stay_in_hole = { description: { action: `Stay in the hole another second: two deep in the ground, below the dragon's wings and the breath's cloud; the fountain ${Math.round(byFountain)} blocks off, the way out two blocks laid${head && canStrike(bot, head) ? '; the perched head is within the sword\'s reach from here and is struck for as long as it sits' : head ? `; the perched head is ${Math.round(head.position.distanceTo(bot.entity.position.offset(0, 1.62, 0)) * 10) / 10} from the eyes, out of the sword's three` : ''}`, health: bot.health, dragonPerched: !!(dragon && perched(bot, dragon)), dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null, headSwingsFromHoles: state.holeHead?.swings || 0 },
+      run: async () => { if (head && canStrike(bot, head)) { const n = await strikeFromHole(60000); console.log(`[end combat] from the hole at ${bot.entity.position.floored()}: ${n} swings at the perched head, dragon ${beforeDragon} to ${dragon && live(bot, dragon) ? Math.round(dragon.health ?? beforeDragon) : '?'}`); if (n) progress = true; return; } for (let n = 0; n < 10; n++) { check(); if (dragon && perched(bot, dragon)) break; await sleep(100); } } };
+    {
+      const sword = bot.inventory.items().find(i => /_sword$/.test(i.name) && durable(bot.registry, i));
+      const phase = dragon && live(bot, dragon) ? metadata(bot, dragon, 'phase') : null;
+      const coming = phase !== null && ([2, 3].includes(phase) || !!head);
+      const solid = c => bot.blockAt(c)?.boundingBox === 'block';
+      const thickAt = f => !!f && [1, 2, 3, 4, 5, 6].every(dy => solid(f.offset(0, -dy, 0))) && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => solid(f.offset(dx, -1, dz)) && solid(f.offset(dx, -2, dz))) && voidEdge(bot, f, 4) === null;
+      if (actions.dig && sword && coming && !holeHere() && !onOwnPillar() && !onObsidianTop() && byFountain >= 4 && byFountain <= 30 && blocksCarried(bot) >= 2) {
+        const ux = (bot.entity.position.x - centre.x) / byFountain, uz = (bot.entity.position.z - centre.z) / byFountain;
+        const cell = { x: Math.floor(centre.x + ux * 7.2), z: Math.floor(centre.z + uz * 7.2) };
+        let top = null; for (let y = Math.floor(bot.entity.position.y) + 3; y >= Math.floor(bot.entity.position.y) - 6 && top === null; y--) if (solid(new Vec3(cell.x, y, cell.z))) top = y;
+        const feetAt = top === null ? null : new Vec3(cell.x, top + 1, cell.z);
+        if (thickAt(feetAt) && !solid(feetAt) && !solid(feetAt.offset(0, 1, 0))) {
+          const walk = Math.round(feetAt.offset(.5, 0, .5).distanceTo(bot.entity.position));
+          const t = state.holeHead || { tries: 0, dugIn: 0, swings: 0 };
+          tree.hole_under_head = {
+            description: { action: `Walk ${walk} blocks to the cell 7 from the fountain's middle on the bot's own side, dig two down and strike the dragon's head from the hole for as long as it sits: sitting, the dragon turns to the player it sees within twenty, its head a block under its middle and 6.5 before it, so from the hole two deep the eyes are about 1.4 under the head's centre, within the sword's three; the body in the hole is below the wings' boxes and the breath's cloud. The dig is two seconds; the way out two blocks laid.`,
+              dragonNow: head ? 'perched now' : 'coming down to land now', walkBlocks: walk, holeBlocksFromFountain: 7, blocksFromFountain: Math.round(byFountain), health: bot.health, dragonHealth: beforeDragon, blocksCarried: blocksCarried(bot),
+              headHitThroughArmourWorn: headHit(bot), perchRule: 'the dragon stays at its perch only while a player stands within 20 blocks of it; alone there five seconds, it takes off',
+              record: `runs under the head from the open on 2026-10-14: dragon-151, 153, 154 and 155 reached it none and three were thrown by the take-off, dead; the arena's run drill (10:08Z) lost 10 to 20 of health in two to four seconds in five runs of six, breathed on and lifted. The arena's hole drill (09:30Z): in a hole two deep at 11 from the fountain the landing and the take-off moved the body 0 and took 0, three of three. From holes this fight: ${t.tries} tr${t.tries === 1 ? 'y' : 'ies'}, ${t.dugIn} dug in, ${t.swings} swing${t.swings === 1 ? '' : 's'} at the head.` },
+            run: async () => {
+              const tally = state.holeHead ||= { tries: 0, dugIn: 0, swings: 0 }; tally.tries++;
+              goal.step = { action: 'hole_under_head', at: { x: feetAt.x, y: feetAt.y, z: feetAt.z } }; save();
+              try { await actions.navigate(bot, task, new goals.GoalBlock(feetAt.x, feetAt.y, feetAt.z), { timeoutMs: 9000, stallMs: 2500, sprint: true }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+              const feet = bot.entity.position.floored();
+              if (Math.abs(feet.x - feetAt.x) > 1 || Math.abs(feet.z - feetAt.z) > 1) throw new Error(`The hole's cell at (${feetAt.x}, ${feetAt.z}) was not reached: the body at ${feet}`);
+              if (!thickAt(feet)) throw new Error(`The ground at ${feet} is not the hole's: thin, open beside, or the void within four`);
+              await centreOn(feet.x, feet.z, 0.12);
+              for (const dy of [1, 2]) { check(); await actions.dig(bot, task, feet.offset(0, -dy, 0), { requireDrops: false, dropInto: true }); }
+              for (let i = 0; i < 30 && Math.floor(bot.entity.position.y) > feet.y - 2; i++) await sleep(50);
+              const inIt = Math.floor(bot.entity.position.y) <= feet.y - 2;
+              console.log(`[end combat] ${inIt ? 'in the hole under the head' : 'not down into the hole under the head'} at ${bot.entity.position.floored()}, ${Math.round(Math.hypot(bot.entity.position.x - centre.x, bot.entity.position.z - centre.z) * 10) / 10} from the fountain's middle${inIt ? '' : ': the body still on the rim'}`);
+              if (!inIt) throw new Error('The body did not go down into the hole');
+              state.hole = { x: feet.x, y: feet.y - 2, z: feet.z, at: Date.now() }; tally.dugIn++; save();
+              const n = await strikeFromHole(90000);
+              console.log(`[end combat] from the hole under the head at ${bot.entity.position.floored()}: ${n} swings, dragon ${beforeDragon} to ${dragon && live(bot, dragon) ? Math.round(dragon.health ?? beforeDragon) : '?'}, ${bot.health.toFixed(1)} health`);
+              progress = true;
+            } };
+        }
+      }
+    }
     // Under the island's rock with a pickaxe (note 1488): the way up to the sky,
     // the blocks over the head dug and the column laid under the feet
     // (pillarUp with end stone diggable). 25588 (dragon-66, 2026-10-13 16:30Z)

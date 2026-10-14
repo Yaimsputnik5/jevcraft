@@ -579,6 +579,34 @@ test('between two pockets the column is still the bot\'s own by its record: the 
   assert.ok(!lines.some(l => l.includes('only observe')), lines.filter(l => l.includes('only observe')).join('\n').slice(0, 300));
 });
 
+test('the dragon perched: the hole under the head is offered 7 from the fountain, chosen it is dug there, the body drops in and strikes the head (note 1618)', async () => {
+  const { bot, goal, task } = fixture();
+  delete bot._pillarUp;
+  // Thick ground at 64 round the fountain at (0, 0); the bot 14 east; the dragon perched at the fountain facing east (yaw pi/2: the head at x 6.5).
+  bot.entity.position = new Vec3(14.5, 64, 0.5);
+  const removed = new Set();
+  bot.blockAt = p => { const f = p.floored(), k = `${f.x},${f.y},${f.z}`; if (removed.has(k)) return { name: 'air', boundingBox: 'empty', position: f }; if (f.y === 63 && f.x === 0 && f.z === 0) return { name: 'bedrock', boundingBox: 'block', position: f }; return { name: f.y < 64 ? 'end_stone' : 'air', boundingBox: f.y < 64 ? 'block' : 'empty', position: f }; };
+  bot.entities[20].position = new Vec3(0.5, 65, 0.5); bot.entities[20].yaw = Math.PI / 2;
+  bot.entities[20].metadata[registry.entitiesByName.ender_dragon.metadataKeys.indexOf('phase')] = 6;
+  delete bot.entities[30];
+  bot.inventory.items = () => [{ name: 'diamond_sword', count: 1, durabilityUsed: 0, maxDurability: 1561 }, { name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 20 }];
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, arenaCenter: { x: 0, y: 64, z: 0 }, perchedSince: Date.now() - 2000 };
+  const dug = [], swings = [];
+  const dig = async (b, t, p) => { dug.push(p.clone()); removed.add(`${p.x},${p.y},${p.z}`); if (p.x === 7 && p.z === 0) bot.entity.position = new Vec3(7.5, p.y, 0.5); };
+  bot.attack = e => { swings.push(e.id); if (swings.length >= 2) bot.entities[20].metadata[registry.entitiesByName.ender_dragon.metadataKeys.indexOf('phase')] = 0; };
+  bot.setControlState = () => {};
+  const navigate = async (b, t, g) => { bot.entity.position = new Vec3(g.x + .5, g.y, g.z + .5); };
+  let seen = null;
+  const client = { systemOne: async ({ questions }) => { seen = questions.branch_0.criteria; return { answers: { branch_0: { choice: seen.hole_under_head ? 'hole_under_head' : 'observe' } } }; } };
+  await fightEndStep(bot, task, goal, () => {}, { navigate, dig, place: async () => {} }, client);
+  assert.ok(seen && seen.hole_under_head, Object.keys(seen || {}).join(','));
+  assert.match(seen.hole_under_head.action, /7 from the fountain's middle/);
+  assert.equal(dug.filter(p => p.x === 7 && p.z === 0 && (p.y === 63 || p.y === 62)).length, 2, `dug: ${dug.map(String).join(' ')}`);
+  assert.equal(Math.floor(bot.entity.position.y), 62, 'the body in the hole');
+  assert.ok(swings.length >= 1, `swings at the head from the hole: ${swings.length}`);
+  assert.equal(swings[0], 21, 'the head part is the dragon\'s id + 1');
+});
+
 test('the pillars offered are the three cheapest by lift and walk, not the two nearest (note 1582)', async () => {
   const { bot, goal, task } = fixture();
   delete bot._pillarUp;
