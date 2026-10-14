@@ -814,7 +814,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (!item) return { laid: 0, closed: 0 };
     const d = dragonThreat(bot) || Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
     const away = d ? { x: bot.entity.position.x - d.position.x, z: bot.entity.position.z - d.position.z } : null;
-    const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].sort((a, b) => away ? (b[0] * away.x + b[1] * away.z) - (a[0] * away.x + a[1] * away.z) : 0);
+    // The pool's side left open (note 1601): the drop is the pocket's one fast
+    // way out, and a wall there is two blocks to dig in the breath. 25588
+    // (dragon-142, 2026-10-14 08:17Z, two crystals broken) had its pool south
+    // of crystal 12's column, the pocket walled all four sides, took the
+    // breath on the top after the blow, 'the breath in the pocket: two down
+    // out of it before the drop's wall is dug', and died in three seconds at
+    // 82 with a bucket in hand and the pool below. The push is away from the
+    // dragon's body; a body pushed out the pool's side comes down in the pool.
+    const poolSide = state.pool && Date.now() - state.pool.at < 15 * 60000 ? [state.pool.dx, state.pool.dz] : null;
+    const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => !poolSide || dx !== poolSide[0] || dz !== poolSide[1]).sort((a, b) => away ? (b[0] * away.x + b[1] * away.z) - (a[0] * away.x + a[1] * away.z) : 0);
     let laid = 0;
     for (const [dx, dz] of sides) {
       // From the lowest open cell up: the post beside the under block, then the two beside the body.
@@ -834,7 +843,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       }
     }
     const closed = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, 0, dz))?.boundingBox === 'block' && bot.blockAt(f.offset(dx, 1, dz))?.boundingBox === 'block').length;
-    return { laid, closed };
+    return { laid, closed, poolSideOpen: !!poolSide };
   };
   const roofOverhead = async () => {
     const f = bot.entity.position.floored(), cell = f.offset(0, 2, 0);
@@ -1319,7 +1328,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // And the pocket's walls (note 1575), from 70 up (the island's top is 64 and under; every carry that killed began at 71 to 95).
     // Only against the dragon's body coming, never against a fireball (note 1584): the cloud reaches through the walls, and a body sealed in with it has seconds of digging to get out. 25588 (dragon-127, 2026-10-14 05:13Z) died in its first pocket so; dragon-130 (05:49Z) left one at 0.3 health.
     if (onOwnPillar() && !onObsidianTop() && bot.entity.position.y >= 70 && dragonThreat(bot) && !breathThreat(bot)) {
-      try { const t0 = Date.now(), r = await pocketOnColumn(); console.log(`[end combat] a pocket against the wings on the column at ${bot.entity.position.floored()}: ${r.laid} blocks laid, ${r.closed} of 4 sides closed, ${Date.now() - t0} ms, ${blocksCarried(bot)} blocks left`); }
+      try { const t0 = Date.now(), r = await pocketOnColumn(); console.log(`[end combat] a pocket against the wings on the column at ${bot.entity.position.floored()}: ${r.laid} blocks laid, ${r.closed} of 4 sides closed${r.poolSideOpen ? ' (the pool\'s side left open for the drop)' : ''}, ${Date.now() - t0} ms, ${blocksCarried(bot)} blocks left`); }
       catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     }
     goal.step = { action: 'hold_on_pillar', hazard: endEmergency(bot), health: bot.health }; save();
