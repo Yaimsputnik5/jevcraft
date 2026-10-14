@@ -549,6 +549,7 @@ test('inside the pocket the column still reads as the bot\'s own, the dig goes d
   try { await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig: digWalls, place: async () => {} }, { systemOne: async ({ questions }) => { seen = JSON.stringify(questions); return { answers: { branch_0: { choice: 'water_drop' } } }; } }); }
   finally { console.log = log; }
   assert.ok(seen && seen.includes('pillar_down') && seen.includes('water_drop'), seen && seen.slice(0, 400));
+  assert.ok(!seen.includes('open_walls'), 'the pocket is not a box to open (note 1579)');
   const sides = lines.find(l => l.includes("the drop's sides from"));
   assert.ok(sides && /south.*walled by the bot's own blocks: dug first/.test(sides), lines.filter(l => l.includes('drop')).join('\n'));
   for (const y of [75, 76, 77]) assert.ok(dug.some(p => p.x === 0 && p.z === 1 && p.y === y), `the south wall and post dug: ${dug.map(String).join(' ')}`);

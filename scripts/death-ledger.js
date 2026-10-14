@@ -111,7 +111,14 @@ function mechanism(damages, dead) {
       if (l.startsWith('{"death"')) { try { const d = JSON.parse(l).death; deaths.push({ at: Date.parse(d.at), position: d.position, crystals }); } catch (_) {} }
     }
     const minutes = r1((run.end - run.start) / 60000);
-    perRun.push({ n: run.n, start: new Date(run.start).toISOString(), minutes, crystals, deaths: deaths.length });
+    // The process held (event loop stalls of two seconds or more) during the run, from its flight files.
+    const runFiles = flights.filter(x => x.b >= run.start - 5000 && x.b <= run.end);
+    const stalls = [];
+    for (const x of runFiles) {
+      const rl = readline.createInterface({ input: fs.createReadStream(x.f), crlfDelay: Infinity });
+      for await (const line of rl) { if (line.includes('"kind":"lag"')) { const m = line.match(/"lagMs":(\d+)/); if (m) stalls.push(Number(m[1])); } }
+    }
+    perRun.push({ n: run.n, start: new Date(run.start).toISOString(), minutes, crystals, deaths: deaths.length, stalls: stalls.length, stallMax: stalls.length ? Math.max(...stalls) : 0 });
     for (const d of deaths) {
       const files = filesAt(d.at);
       // Sixty seconds back for the decisions (a question comes every few seconds); twelve for the damage.
@@ -148,7 +155,7 @@ function mechanism(damages, dead) {
   for (const r of rows) (byMech[r.mechanism] ||= []).push(r);
   const ranking = Object.entries(byMech).map(([m, rs]) => ({ mechanism: m, deaths: rs.length, runs: rs.map(r => r.run), perRun: r1(rs.length / Math.max(1, runs.length) * 100) / 100, crystalsBeforeAvg: r1(rs.reduce((n, r) => n + r.crystalsBefore, 0) / rs.length), lastFive: rs.filter(r => r.run > (runs.at(-1)?.n || 0) - 5).length })).sort((a, b) => b.deaths - a.deaths);
   // The rates: the last five runs against the five before.
-  const rate = list => { const n = list.length || 1, mins = list.reduce((s, r) => s + r.minutes, 0) || 1; return { runs: list.length, crystals: list.reduce((s, r) => s + r.crystals, 0), crystalsPerRun: r1(list.reduce((s, r) => s + r.crystals, 0) / n), crystalsPerMinute: r1(list.reduce((s, r) => s + r.crystals, 0) / mins * 10) / 10, deathsPerCrystal: r1(list.reduce((s, r) => s + r.deaths, 0) / Math.max(1, list.reduce((s, r) => s + r.crystals, 0)) * 100) / 100, minutesPerRun: r1(mins / n) }; };
+  const rate = list => { const n = list.length || 1, mins = list.reduce((s, r) => s + r.minutes, 0) || 1; return { runs: list.length, crystals: list.reduce((s, r) => s + r.crystals, 0), crystalsPerRun: r1(list.reduce((s, r) => s + r.crystals, 0) / n), crystalsPerMinute: Math.round(list.reduce((s, r) => s + r.crystals, 0) / mins * 100) / 100, deathsPerCrystal: Math.round(list.reduce((s, r) => s + r.deaths, 0) / Math.max(1, list.reduce((s, r) => s + r.crystals, 0)) * 100) / 100, minutesPerRun: r1(mins / n), stallsPerRun: r1(list.reduce((s, r) => s + (r.stalls || 0), 0) / n), stallsPerMinute: Math.round(list.reduce((s, r) => s + (r.stalls || 0), 0) / mins * 100) / 100 }; };
   const last5 = perRun.slice(-5), prev5 = perRun.slice(-10, -5), all = perRun;
   const report = { port, runs: perRun.length, deaths: rows.length, ranking, rates: { all: rate(all), prev5: rate(prev5), last5: rate(last5) } };
 
@@ -157,8 +164,10 @@ function mechanism(damages, dead) {
   md.push(`# Death ledger, port ${port}: ${perRun.length} runs, ${rows.length} deaths (${new Date().toISOString()})`, '');
   md.push('## Ranking by mechanism', '', '| mechanism | deaths | per run | last 5 runs | crystals before (avg) | runs |', '|---|---|---|---|---|---|');
   for (const r of ranking) md.push(`| ${r.mechanism} | ${r.deaths} | ${r.perRun} | ${r.lastFive} | ${r.crystalsBeforeAvg} | ${r.runs.slice(-12).join(' ')}${r.runs.length > 12 ? ' …' : ''} |`);
-  md.push('', '## Rates', '', '| window | runs | crystals/run | crystals/min | deaths/crystal | min/run |', '|---|---|---|---|---|---|');
-  for (const [k, v] of Object.entries(report.rates)) md.push(`| ${k} | ${v.runs} | ${v.crystalsPerRun} | ${v.crystalsPerMinute} | ${v.deathsPerCrystal} | ${v.minutesPerRun} |`);
+  md.push('', '## Rates', '', '| window | runs | crystals/run | crystals/min | deaths/crystal | min/run | stalls/run | stalls/min |', '|---|---|---|---|---|---|---|---|');
+  for (const [k, v] of Object.entries(report.rates)) md.push(`| ${k} | ${v.runs} | ${v.crystalsPerRun} | ${v.crystalsPerMinute} | ${v.deathsPerCrystal} | ${v.minutesPerRun} | ${v.stallsPerRun} | ${v.stallsPerMinute} |`);
+  md.push('', '## Runs', '', '| run | start | min | crystals | deaths | stalls (max ms) |', '|---|---|---|---|---|---|');
+  for (const r of perRun) md.push(`| ${r.n} | ${r.start.slice(5, 16)} | ${r.minutes} | ${r.crystals} | ${r.deaths} | ${r.stalls} (${r.stallMax}) |`);
   md.push('', '## Rows', '', '| run | at | min in | crystals | where | class | step | mechanism | damage (s before, cause, health, y) | pick (w) | none_good | lag (ms) |', '|---|---|---|---|---|---|---|---|---|---|---|---|');
   for (const r of rows) md.push(`| ${r.run} | ${r.at.slice(5, 19)} | ${r.minutesIn} | ${r.crystalsBefore} | ${r.where} | ${r.positionClass} | ${r.step || ''} | ${r.mechanism} | ${r.damage.join('; ')} | ${r.pick || ''}${r.pickWeight !== null ? ` (${r.pickWeight})` : ''} | ${r.noneGood ?? ''} | ${r.lagMs || ''} |`);
   const lagged = rows.filter(r => r.lagMs >= 500);

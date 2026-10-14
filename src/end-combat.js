@@ -2413,7 +2413,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           } };
       }
     }
-    if (box && !tree.shoot_dragon && !Object.keys(tree).some(k => /^(crystal_|move_|strike_head|bed_bomb)/.test(k))) {
+    // Not in the bot's own pocket on its column (note 1579): its ways out are the drop through the pool side's wall and the dig down, both offered; opening the roof is the fireball's way in. 25588 (dragon-127, 2026-10-14 05:13Z) took open_walls at 0.55 in its pocket under the breath and died at 77.
+    if (box && !onColumnCell() && !tree.shoot_dragon && !Object.keys(tree).some(k => /^(crystal_|move_|strike_head|bed_bomb)/.test(k))) {
       const toward = (focus === fountain ? dragon : focus)?.position || focus || (state.arenaCenter && vector(state.arenaCenter)) || bot.entity.position.offset(1, 0, 0);
       const feet = bot.entity.position.floored(), dx = toward.x - (feet.x + .5), dz = toward.z - (feet.z + .5);
       const side = Math.abs(dx) >= Math.abs(dz) ? new Vec3(Math.sign(dx) || 1, 0, 0) : new Vec3(0, 0, Math.sign(dz) || 1);
