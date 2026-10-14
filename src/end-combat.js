@@ -2440,6 +2440,23 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       for (let n = 0; n < 10; n++) { check(); await sleep(100); }
       return;
     }
+    // An enderman's blow within five seconds, and one within twelve (note 1567):
+    // the fight is the only business until it is over. The quarry, the climbs
+    // and the walks between its blows were the deaths of dragon-97, 100 and
+    // 115 (25588, 2026-10-14): six to seven blows of 4.5 each over ten seconds,
+    // the body digging, walking or eating between them, never more than two
+    // sword blows landed. What stays: the fight, the water at the feet, the
+    // pocket, and the watch in the water.
+    {
+      const hitAt = bot._hurtBy?.enderman || 0;
+      const foeNear = hostileEntities(bot, 12).some(e => live(bot, e) && e.name === 'enderman');
+      if (foeNear && Date.now() - hitAt < 5000 && (tree.fight_enderman || tree.water_at_feet || tree.hide_from_enderman)) {
+        const keep = new Set(['fight_enderman', 'water_at_feet', 'hide_from_enderman', 'observe']);
+        const dropped = Object.keys(tree).filter(k => !keep.has(k));
+        for (const k of dropped) delete tree[k];
+        if (dropped.length && !(state.endermanStanceSaid > Date.now() - 10000)) { state.endermanStanceSaid = Date.now(); console.log(`[end combat] an enderman's blow ${Math.round((Date.now() - hitAt) / 100) / 10} s ago and one within twelve: the fight first; set aside ${dropped.join(', ')}`); }
+      }
+    }
     const decision = await decide('dragon_fight', { client, bot, goal, tree, context: { safe }, interrupt: check, watchMs: 50,
       state: endDecisionState({ request: goal.request, health: bot.health, food: bot.food, arrows: countOf(bot, 'arrow'),
         position: { ...bot.entity.position }, safe, dragon: state.dragon,
