@@ -1179,6 +1179,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         // 43 to the shelf at 35, dead.
         if (!inTheWay && !overEdge) { let floor = null; for (let dy = fall - 1; dy <= fall + 6; dy++) { if (bot.blockAt(f.offset(dx * k, -dy, dz * k))?.boundingBox === 'block') { floor = dy; break; } } if (floor === null) overEdge = { cell: f.offset(dx * k, -fall, dz * k), k }; }
       }
+      // The edge within the fall's carry is no side at all (note 1605): the body comes down about a cell out for every twelve of fall plus one, and a floor that falls away inside that is the fall it goes on into. 25588 (dragon-145, 2026-10-14 08:42Z, three crystals broken) took 'north: 7 down, the floor falls away 2 out (the edge)' as the only side with ground, came down past the ledge and fell 23 more, 20 to none; 1569 had penalised the side, not set it aside.
+      const carry = Math.round(1 + fall / 12);
+      if (overEdge && overEdge.k <= carry + 1) { verdicts.push(`${name}: ${fall} down, the floor falls away ${overEdge.k} out (the edge) within the fall's carry of about ${carry}: no side`); continue; }
       const score = fall + obsidian * 20 - (pool ? 100 : 0) + (inTheWay ? 200 : 0) + (overEdge ? 300 : 0);
       verdicts.push(`${name}: ${fall} down${pool ? ', the pool' : ''}${shortTrench ? `, the pool's trench of ${recorded.reach} short of the landing about ${Math.round(fall / 8)} out` : ''}${obsidian ? `, ${obsidian} obsidian` : ''}${overEdge ? `, the floor falls away ${overEdge.k} out (the edge)` : ''}${inTheWay ? `, ${bot.blockAt(inTheWay.cell)?.name} in the fall's way at ${inTheWay.cell}, ${inTheWay.over} over the floor` : ''}`);
       if (!best || score < best.score) best = { dx, dz, fall, obsidian, pool: pool && !inTheWay && !overEdge, inTheWay, overEdge, score, edge: f.offset(dx, 0, dz), name };
