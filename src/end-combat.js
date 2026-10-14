@@ -600,11 +600,22 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   const roofCell = () => bot.entity.position.floored().offset(0, 2, 0);
   const roofed = () => bot.blockAt(roofCell())?.boundingBox === 'block';
   const roofHole = async on => {
-    const c = roofCell();
+    let c = roofCell();
     if (on) {
       if (roofed()) return true;
       const name = blocksCarriedName(bot); const item = name && bot.inventory.items().find(i => i.name === name);
       if (!item || typeof bot.placeBlock !== 'function') return false;
+      // Over a hole two deep the roof's cell is a block over the ground with only air beside it to set the block against (the arena's test of 2026-10-14 12:20Z: all four references air, nothing laid in dragon-161 to 163). The hole is dug a block deeper first, and the roof goes in the top dug cell against the ground beside it (note 1631); the way out is then three blocks.
+      const solidBeside = p => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => bot.blockAt(p.offset(dx, 0, dz))?.boundingBox === 'block');
+      if (!solidBeside(c) && actions.dig) {
+        const f = bot.entity.position.floored(), under = f.offset(0, -1, 0);
+        if (bot.blockAt(under)?.boundingBox === 'block' && bot.blockAt(under.offset(0, -1, 0))?.boundingBox === 'block') {
+          try { await actions.dig(bot, task, under, { requireDrops: false, dropInto: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+          for (let i = 0; i < 20 && Math.floor(bot.entity.position.y) > f.y - 1; i++) await sleep(50);
+          if (state.hole && state.hole.x === f.x && state.hole.z === f.z) { state.hole.y = Math.floor(bot.entity.position.y); save(); }
+          c = roofCell();
+        }
+      }
       for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const ref = bot.blockAt(c.offset(dx, 0, dz)); if (ref?.boundingBox !== 'block') continue;
         try { await bot.equip(item, 'hand'); if (typeof bot.lookAt === 'function') await bot.lookAt(c.offset(.5, .5, .5), true); await bot.placeBlock(ref, new Vec3(-dx, 0, -dz)); } catch (_) { continue; }
@@ -621,7 +632,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (!holeHere()) return true;
     if (roofed() && actions.dig) await roofHole(false);
     const from = Math.floor(bot.entity.position.y);
-    try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    const depth = [1, 2, 3].filter(dy => bot.blockAt(bot.entity.position.floored().offset(1, dy - 1, 0))?.boundingBox === 'block' || bot.blockAt(bot.entity.position.floored().offset(-1, dy - 1, 0))?.boundingBox === 'block').length;
+    try { await require('./pillar-recovery').pillarUp(bot, task, from + Math.max(2, depth), { dig: actions.dig, maxBlocks: Math.max(2, depth), threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     console.log(`[end combat] up out of the hole: ${Math.floor(bot.entity.position.y) - from} blocks up at ${bot.entity.position.floored()}`);
     return !holeHere();
   };

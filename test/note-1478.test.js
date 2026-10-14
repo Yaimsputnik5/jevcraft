@@ -607,7 +607,7 @@ test('the dragon perched: the hole under the head is offered 7 from the fountain
   assert.ok(seen && seen.hole_under_head, Object.keys(seen || {}).join(','));
   assert.match(seen.hole_under_head.action, /7 from the fountain's middle/);
   assert.equal(dug.filter(p => p.x === 7 && p.z === 0 && (p.y === 63 || p.y === 62)).length, 2, `dug: ${dug.map(String).join(' ')}`);
-  assert.equal(Math.floor(bot.entity.position.y), 62, 'the body in the hole');
+  assert.ok([61, 62].includes(Math.floor(bot.entity.position.y)), `the body in the hole (two or, roofed, three deep): y ${bot.entity.position.y}`);
   assert.ok(swings.length >= 1, `swings at the head from the hole: ${swings.length}`);
   assert.equal(swings[0], 21, 'the head part is the dragon\'s id + 1');
 });
@@ -727,10 +727,10 @@ test('by the fountain the hole is offered; chosen, two blocks are dug and the bo
   await step();
   assert.ok(seen[0].includes('wait_in_hole'), seen[0].join(','));
   assert.equal(dug.filter(p => p.x === 14 && p.z === 0 && (p.y === 63 || p.y === 62)).length, 2, `dug: ${dug.map(String).join(' ')}`);
-  assert.equal(Math.floor(bot.entity.position.y), 62, 'the body in the hole');
+  assert.ok([61, 62].includes(Math.floor(bot.entity.position.y)), `the body in the hole (two or, roofed, three deep): y ${bot.entity.position.y}`);
   await step();
   assert.ok(seen[1].includes('stay_in_hole'), seen[1].join(','));
-  assert.equal(Math.floor(bot.entity.position.y), 62, 'stayed');
+  assert.ok([61, 62].includes(Math.floor(bot.entity.position.y)), 'stayed');
   await step();
   const lastPick = seen[2].find(k => k.startsWith('move_')) || 'observe';
   if (lastPick !== 'observe') assert.ok(placed.size >= 1 && Math.floor(bot.entity.position.y) >= 64, `climbed out before the move: placed ${[...placed].join(' ')}, y ${bot.entity.position.y}`);
