@@ -652,6 +652,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const p = bot.entity.position;
     return Object.values(bot.entities).find(e => e.name === 'area_effect_cloud' && e.isValid !== false && p.y - e.position.y >= 0.5 && p.y - e.position.y <= blocks + 0.5 && Math.hypot(p.x - e.position.x, p.z - e.position.z) <= cloudRadius(bot, e) + 0.3) || null;
   };
+  // A cloud within three below the feet and within its reach plus two aside (note 1648): wider than cloudUnderfoot, which asks the cloud's own radius; the stub built out of the breath stands at a cloud's edge, and the body dug down to its foot is in the breath's margin again.
+  const cloudNearBelow = (blocks = 3) => { const p = bot.entity.position; return Object.values(bot.entities).find(e => e.name === 'area_effect_cloud' && e.isValid !== false && p.y - e.position.y >= 0.5 && p.y - e.position.y <= blocks + 0.5 && Math.hypot(p.x - e.position.x, p.z - e.position.z) <= cloudRadius(bot, e) + 2) || null; };
   const cloudUnderfootSays = c => c ? `the breath's cloud lies ${Math.round((bot.entity.position.y - c.position.y) * 10) / 10} blocks below the feet, ${Math.round(cloudRadius(bot, c) * 10) / 10} wide: a dig down ends in it, and a cloud lasts about thirty seconds and takes six a second` : null;
   // On an obsidian pillar's top (not the bot's own column): the top is a
   // small flat place high over the island, with the bot's column at its edge.
@@ -1523,6 +1525,13 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // pillar beside a crystal's). The pass is held through instead, crouched
     // with the shield up, a second and a half; the step then goes on, to the
     // climb or the way down.
+    // The stub out of the breath is held, not dug (note 1648): the two laid out of the cloud (note 1636) made a column of two, the fireball's or the cloud's emergency on it was answered with the dig down three, and the body went back into the cloud at the foot, up two, down two, until dead; 25588 (dragon-182, 2026-10-14 16:26Z, no crystal broken) at (62, 48 to 50, -27), and dragon-171 and 174 before it. With the column short and a cloud within three below, the body holds on the stub, crouched, until the cloud is gone.
+    else if (onOwnPillar() && ['dragon_breath_cloud', 'incoming_dragon_fireball'].includes(endEmergency(bot)) && columnDepth() <= 3 && cloudNearBelow(3) && breathThreat(bot)?.name !== 'area_effect_cloud') {
+      goal.step = { action: 'hold_on_stub_over_cloud', health: bot.health }; save();
+      console.log(`[end combat] held on the stub at ${bot.entity.position.floored()}: ${cloudUnderfootSays(cloudNearBelow(3))}`);
+      if (endEmergency(bot) === 'incoming_dragon_fireball') await roofOverhead();
+      await holdOnColumn();
+    }
     else if (onOwnPillar() && ['dragon_breath_cloud', 'incoming_dragon_fireball'].includes(endEmergency(bot))) {
       // The breath on the column, or a fireball coming (its cloud lands where
       // the bot stands): a shield does not stop it (Instant Damage, magic),
