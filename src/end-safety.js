@@ -45,8 +45,9 @@ function dragonThreat(bot) {
     // rehearsals of 2026-10-04 (02:25 to 02:40Z) nine of fourteen runs to
     // the perched head began too far off and ended "took off before".
     if ([2, 3].includes(phase)) return distance < LANDING_CLEAR && height > -6 && height < 14;
+    // Twelve, not eighteen (note 1649): the wings' boxes reach about ten aside of the body and six fore and aft, and the day's lifts came at six and nine blocks from it (dragon-154, 164, 2026-10-14); at eighteen every pass over the island cut the quarry and the walk, and 25588 (dragon-183, 16:30 to 16:45Z) had quarry_blocks cut so eleven times with no block carried and dug none in fifteen minutes.
     return phase === 8 && distance < 72 && height > -12 && height < 32 ||
-      distance < 18 && height > -6 && height < 14;
+      distance < 12 && height > -6 && height < 14;
   });
 }
 function endEmergency(bot) {

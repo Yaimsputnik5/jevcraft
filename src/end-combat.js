@@ -2805,7 +2805,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           if (canStrike(bot, fresh)) { if (typeof bot.lookAt === 'function') await bot.lookAt(fresh.position.offset(0, .5, 0), true); bot.attack(fresh); swings++; for (let n = 0; n < 7; n++) { check(); await sleep(100); } continue; }
           // Out of reach from the floor (note 1633): the dragon sits with its belly at 65 on the fountain and its head a block under, 3.4 over the eyes of a body two deep (dragon-163, 2026-10-14 12:55Z: 'from the hole under the head: 0 swings' three times while the runs from the ground beside struck it ten times). Up out of the hole onto its cell for the sword while it sits, and two dug again when it rises.
           const gap = fresh.position.distanceTo(bot.entity.position.offset(0, 1.62, 0));
-          if (gap <= 5 && blocksCarried(bot) >= 2 && actions.dig && bot.health >= 12) {
+          // Not under a cloud on the rim (note 1650): the climb out for the sword put the body into the breath's cloud lying on the rim, and 25588 (dragon-183, 2026-10-14 16:46Z, one crystal broken) went 12 to 2.4 to none coming up at (5, 59, 10) with the cloud at (6, 61, 7).
+          const rimCell = bot.entity.position.floored().offset(0, 2, 0);
+          const cloudOnRim = Object.values(bot.entities).some(e => e.name === 'area_effect_cloud' && e.isValid !== false && Math.abs(e.position.y - rimCell.y) <= 1.5 && Math.hypot(e.position.x - rimCell.x - .5, e.position.z - rimCell.z - .5) <= cloudRadius(bot, e) + 1);
+          if (gap <= 5 && blocksCarried(bot) >= 2 && actions.dig && bot.health >= 12 && !cloudOnRim) {
             const cell = bot.entity.position.floored();
             console.log(`[end combat] the head ${Math.round(gap * 10) / 10} from the eyes in the hole, out of the sword's three: up onto the rim for it`);
             if (await outOfTheHole()) {
