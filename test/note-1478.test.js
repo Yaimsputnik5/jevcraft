@@ -658,3 +658,21 @@ test('by the fountain the hole is offered; chosen, two blocks are dug and the bo
   const lastPick = seen[2].find(k => k.startsWith('move_')) || 'observe';
   if (lastPick !== 'observe') assert.ok(placed.size >= 1 && Math.floor(bot.entity.position.y) >= 64, `climbed out before the move: placed ${[...placed].join(' ')}, y ${bot.entity.position.y}`);
 });
+
+test('a pool recorded far below the landing is no pool under the drop (note 1597)', async () => {
+  const { bot, goal, task } = fixture();
+  // The column at (0, 64..75), the island at 64; a pool recorded east at y 40, twenty-four below the landing.
+  const blockAt = bot.blockAt;
+  bot.blockAt = p => { const f = p.floored(); if (f.x === 1 && f.y === 40 && f.z === 0) return { name: 'water', boundingBox: 'empty', position: f }; return blockAt(p); };
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 20 }, { name: 'bucket', count: 2 }];
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'water_drop', at: Date.now() }, pool: { x: 1, y: 40, z: 0, dx: 1, dz: 0, at: Date.now() } };
+  bot.entities[20].position = new Vec3(60, 90, 60);
+  let seen = null;
+  const client = { systemOne: async ({ questions }) => { seen = JSON.stringify(questions.branch_0.criteria); return { answers: { branch_0: { choice: 'observe' } } }; } };
+  const lines = [], log = console.log; console.log = (...a) => { lines.push(a.join(' ')); log(...a); };
+  try { await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig: async () => {}, place: async () => {} }, client); }
+  finally { console.log = log; }
+  assert.ok(!/"water_drop":\{[^}]*"pool":true/.test(seen || ''), seen && seen.slice(0, 500));
+  const sides = lines.find(l => l.includes("the drop's sides from"));
+  assert.ok(!sides || /lies 24 blocks below this side's landing/.test(sides) || !/the pool/.test(sides), sides);
+});
