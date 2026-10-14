@@ -133,6 +133,11 @@ function safeEndPoint(bot, p, hazards = endHazards(bot)) {
 // has to cross to strike. The End kit carries a bucket for this. Poured
 // only on solid ground into the bot's own open cell; taken back once no
 // turned mob is near, so the bucket is there for the next one.
+// The sides of the feet's cell that drop two or more: water poured at the feet runs off them.
+function runOffSides(bot, feet) {
+  const solid = c => bot.blockAt(c)?.boundingBox === 'block';
+  return [['east', 1, 0], ['west', -1, 0], ['south', 0, 1], ['north', 0, -1]].filter(([, dx, dz]) => !solid(feet.offset(dx, -1, dz)) && !solid(feet.offset(dx, -2, dz))).map(([n]) => n);
+}
 async function pourAtFeet(bot, check, { urgent = false } = {}) {
   const bucket = bot.inventory.items().find(i => i.name === 'water_bucket');
   // One bucket stays full for a knocked-back landing, unless the enderman is
@@ -144,6 +149,15 @@ async function pourAtFeet(bot, check, { urgent = false } = {}) {
   if (!bucket || (countOf(bot, 'water_bucket') < 2 && !urgent)) return null;
   const feet = bot.entity.position.floored(), below = feet.offset(0, -1, 0);
   if (bot.blockAt(below)?.boundingBox !== 'block' || bot.blockAt(feet)?.name !== 'air') return null;
+  // Not on a top the water runs off (note 1657): water poured on a column's
+  // top or a ledge's edge falls down its open sides and the flow carries the
+  // body down with it, and an enderman cannot stand beside such a top to strike.
+  // 25588 (dragon-192, 2026-10-14 18:12Z, 7 crystals standing) poured against
+  // an enderman on its own column's top at (32, 64, -20), four blocks high, was
+  // carried down to (30, 60, -20) into the breath's cloud, and died there in
+  // three seconds; the pours of dragon-177, 179 and 189 were made on columns too.
+  const runOff = runOffSides(bot, feet);
+  if (runOff.length >= 2) { console.log(`[end combat] no water at the feet at ${vector(feet)}: it would run off the ${runOff.join(' and ')} sides, two or more down, and carry the body with it`); return null; }
   await bot.equip(bucket, 'hand'); check();
   await bot.lookAt(below.offset(.5, 1, .5), true); await sleep(100);
   bot.activateItem();
@@ -750,7 +764,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const centred = await centreOnColumn(inCloudNow ? 0.2 : 0.1, { maxMs: inCloudNow ? 800 : 5000 });
     if (!centred && inCloudNow && blocksCarried(bot) >= 2) {
       const from = Math.floor(bot.entity.position.y);
-      try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+      try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
       console.log(`[end combat] not centred in the cloud: ${Math.floor(bot.entity.position.y) - from} blocks up out of it instead at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
       return;
     }
@@ -1419,7 +1433,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // The bot's own roof over the head dug first (a block or two, half a second each), the jump stopped under it otherwise.
     for (const dy of [2, 3]) { const r = bot.blockAt(f0.offset(0, dy, 0)); if (r?.boundingBox === 'block' && actions.dig && !/bedrock|obsidian|end_portal/.test(r.name)) { try { await actions.dig(bot, task, r.position); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } } }
     const from = Math.floor(bot.entity.position.y);
-    try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     const rose = Math.floor(bot.entity.position.y) - from;
     console.log(`[end combat] up out of the breath on the short column: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
     if (rose < 1) state.shortColumnUpFailedAt = Date.now();
@@ -1611,7 +1625,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           if (roofAt2 && actions.dig) { const r = bot.blockAt(f0.offset(0, 2, 0)); if (!/bedrock|obsidian|end_portal/.test(r.name)) { try { await actions.dig(bot, task, r.position, { requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } } }
           const up = roofAt3 && !roofAt2 ? 1 : 2;
           const from = Math.floor(bot.entity.position.y);
-          try { await require('./pillar-recovery').pillarUp(bot, task, from + up, { dig: actions.dig, maxBlocks: up, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+          try { await require('./pillar-recovery').pillarUp(bot, task, from + up, { dig: actions.dig, maxBlocks: up, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
           const rose = Math.floor(bot.entity.position.y) - from;
           console.log(`[end combat] up out of the breath first: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
           if (rose >= 1) return;
@@ -1655,7 +1669,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           if (inBreath() && blocksCarried(bot) >= 2 && !roofed && !onObsidianTop()) {
             goal.step = { action: 'up_out_of_breath_on_ground', health: bot.health }; save();
             const from = Math.floor(bot.entity.position.y);
-            try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+            try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
             const rose = Math.floor(bot.entity.position.y) - from;
             console.log(`[end combat] up out of the breath on ${thick ? 'the ground' : 'thin ground'}: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
             if (rose >= 1) return;
@@ -1919,12 +1933,14 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         const off = Math.round(foe.position.distanceTo(bot.entity.position) * 10) / 10, buckets = countOf(bot, 'water_bucket');
         const facts = { endermanBlocksOff: off, endermanHealth: 40, swordBlow: 7, blowsToKill: 6, itsBlowThroughIron: 4.5, health: bot.health, waterBucketsCarried: buckets,
           record: 'an enderman killed 25588 four times on 2026-10-13/14 (dragon-31 in 5 s through leather, dragon-37 in 3 s, dragon-85 five blows in 4 s while the quarry dug on, dragon-97 six blows in 10 s, dragon-100 six blows in 13 s while it ate); fought with the sword from the first blow it dies in six blows, about five seconds; standing in water it takes damage and teleports off and does not come into it' };
+        const runOff = runOffSides(bot, bot.entity.position.floored());
+        if (runOff.length >= 2) facts.waterNotOffered = `water poured at the feet here would run off the ${runOff.join(' and ')} sides, two or more down, and carry the body with it (dragon-192 was carried off its column's top into the breath so); an enderman cannot stand beside such a top to strike`;
         tree.fight_enderman = { description: { action: `Turn on the enderman ${off} blocks off and fight it with the ${sword.name.replaceAll('_', ' ')}: it has 40 health, a blow takes 7, six blows kill it, about five seconds; its blow takes 4.5 through iron and it teleports behind the body between blows. The shield up when it is not struck.`, ...facts },
           run: async () => { goal.step = { action: 'fight_enderman', distance: off }; save(); const until = Date.now() + 8000; while (Date.now() < until) { check(); const e = hostileEntities(bot, 16).find(x => live(bot, x) && x.name === 'enderman'); if (!e) break; if (e.position.distanceTo(bot.entity.position) > 3.5) { try { await actions.navigate(bot, task, new goals.GoalNear(e.position.x, e.position.y, e.position.z, 2), { timeoutMs: 2500, stallMs: 1200 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; } } await defendHere(1500); } progress = true; } };
         // Not within eight of the void (note 1586): poured water runs down the slope to the rim and carries the body with it. 25588 (dragon-131, 2026-10-14 06:04Z) poured against an enderman at (35, 57, -20) on the eastern rim, was carried down the cliff in the flow from 55 to 30 and off the island, dead in the void at -221.
         // And never on the island's low shelf (note 1607): the shelf at 28 to 46 slopes to the void beyond eight blocks, and poured water runs down it. 25588 (dragon-147, 2026-10-14 08:51Z) poured against an enderman at (43, 30, -17), 'no void within eight', was carried east in the flow to (46, 28, -21) and off the island, dead at -224.
         const voidNear = voidEdge(bot, bot.entity.position, 8), onTheShelf = bot.entity.position.y < 50;
-        if (buckets > 0 && !inWater() && voidNear === null && !onTheShelf) tree.water_at_feet = { description: { action: `Pour a bucket of water at the feet and stand in it: an enderman in water takes damage and teleports away, and will not step into it; the sword still reaches one that comes to its edge. ${buckets} water bucket${buckets === 1 ? '' : 's'} carried, this one taken back when none is near within eight. Poured water runs downhill and carries a body standing in it; no void lies within eight blocks here.`, ...facts },
+        if (buckets > 0 && !inWater() && voidNear === null && !onTheShelf && runOff.length < 2) tree.water_at_feet = { description: { action: `Pour a bucket of water at the feet and stand in it: an enderman in water takes damage and teleports away, and will not step into it; the sword still reaches one that comes to its edge. ${buckets} water bucket${buckets === 1 ? '' : 's'} carried, this one taken back when none is near within eight. Poured water runs downhill and carries a body standing in it; no void lies within eight blocks here.`, ...facts },
           run: async () => { goal.step = { action: 'water_at_feet', against: 'enderman' }; save(); const at = await pourAtFeet(bot, check, { urgent: off <= 4 }); if (at) { state.water = { at: { ...at }, poured: Date.now() }; state.pours = (state.pours || 0) + 1; save(); console.log(`[end combat] water poured at ${vector(at)} at Jev's word against the enderman ${off} blocks off (${countOf(bot, 'water_bucket')} full left)`); } await defendHere(4000); progress = true; } };
         if (actions.dig && !inWater()) tree.hide_from_enderman = { description: { action: 'Dig a pocket two high into the ground here and wait in it: an enderman cannot follow into a space two high, and leaves off; about four seconds to dig, and the fight stands still while it waits.', ...facts },
           run: async () => { const { endPocket } = require('./end-pocket'); goal.step = { action: 'hide_from_enderman' }; save(); try { if (await endPocket(bot, task, { dig: actions.dig, check, hostileEntities, report: a => { goal.step = a; save(); } })) { state.pockets = (state.pockets || 0) + 1; progress = true; } } catch (err) { if (['Cancelled', 'NeedsAir'].includes(err.name)) throw err; state.pocketFailedAt = Date.now(); save(); } } };
@@ -3260,4 +3276,4 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   }
 }
 
-module.exports = { spanSteps, PUNCH_RECORD, punchRecordSays, dragonNearRoute, enclosed, dropOffs, leaveHighGround, voidEdge, endermenNearRoute, metadata, perched, perchedHead, repeatedCrystalMiss, observeArena, endHazards, safeEndPoint, arenaMovement, arenaRoutes, fightEndStep };
+module.exports = { runOffSides, spanSteps, PUNCH_RECORD, punchRecordSays, dragonNearRoute, enclosed, dropOffs, leaveHighGround, voidEdge, endermenNearRoute, metadata, perched, perchedHead, repeatedCrystalMiss, observeArena, endHazards, safeEndPoint, arenaMovement, arenaRoutes, fightEndStep };

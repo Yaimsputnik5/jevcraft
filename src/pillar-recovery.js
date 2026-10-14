@@ -163,10 +163,17 @@ const diggableAbove = block => DIGGABLE_ABOVE.test(block.name) && block.diggable
 // question, 0.6 seconds on with the hoglin at 2.7, took the fight; two
 // blows ended it (note 587).
 const FALLS = /^(sand|red_sand|gravel|suspicious_sand|suspicious_gravel)$/;
-function climbStop(bot, feet, { canDig = diggableAbove } = {}) {
+// Water beside the climb let through on 'wet' (note 1657): the climb out of the
+// dragon's breath is refused for water in or beside the cells, and the cloud
+// takes six a second where water only pushes. 25588 (dragon-192, 2026-10-14
+// 18:12Z) stood in the cloud at (30, 60, -20) beside the remnant of its own
+// enderman pour, 'stopped before the first block: water at 31, 61, -20' twice,
+// and went 20 to 14.7 to 9 to 3.3 to none in three seconds with 5 blocks carried.
+// Lava is never let through.
+function climbStop(bot, feet, { canDig = diggableAbove, wet: throughWater = false } = {}) {
   const head = feet.offset(0, 2, 0), above = bot.blockAt(head);
   if (!above) return 'the block over the head is not loaded';
-  const liquid = c => /lava|water/.test(bot.blockAt(c)?.name || '');
+  const liquid = c => (throughWater ? /lava/ : /lava|water/).test(bot.blockAt(c)?.name || '');
   const passing = [feet.offset(0, 1, 0), head, head.offset(0, 1, 0)];
   const wet = passing.find(liquid) || passing.slice(0, 2).flatMap(c => directions.map(d => c.plus(d))).find(liquid);
   if (wet) return `${bot.blockAt(wet).name.replaceAll('_', ' ')} at ${wet.x}, ${wet.y}, ${wet.z}, in or beside the cells the body rises through`;
@@ -175,7 +182,7 @@ function climbStop(bot, feet, { canDig = diggableAbove } = {}) {
   if (FALLS.test(above.name) || FALLS.test(bot.blockAt(head.offset(0, 1, 0))?.name || '')) return `${above.name.replaceAll('_', ' ')} over the head with a block that falls in it or over it`;
   return null;
 }
-async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = true, canDig = diggableAbove, blocks = SCAFFOLD } = {}) {
+async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = true, canDig = diggableAbove, blocks = SCAFFOLD, wet = false } = {}) {
   const { move } = require('./motion');
   let placed = 0;
   let rested = false;
@@ -187,7 +194,7 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     // Why a climb stops, said once when it placed nothing (note 1417): 25588
     // (dragon-7, 2026-10-13 05:55Z) was 'stopped 35 blocks short, 0 up' with
     // 80 cobblestone carried and no word of why.
-    const why = climbStop(bot, feet, { canDig });
+    const why = climbStop(bot, feet, { canDig, wet });
     if (why) { if (!placed) console.log(`[pillar up] stopped before the first block: ${why}`); break; }
     if (!dryPassable(above)) {
       await dig(bot, task, head, { requireDrops: false });
