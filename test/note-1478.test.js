@@ -238,9 +238,11 @@ test('a block standing one up in the pool\'s row is dug down before the pour (no
   assert.equal(Math.floor(bot.entity.position.x), 18, 'the climb begins on the foot cell');
   assert.ok(dug.some(p => p.y === 64 && (Math.abs(p.x - 18) === 2 || Math.abs(p.z) === 2)), `the raised block dug: ${dug.map(String).join(' ') || 'nothing'}`);
   assert.ok(goal.endCombat?.pool, 'the pool poured and recorded');
-  // The row dug one deep into a trench, the water in it (note 1540).
+  // The row dug one deep into a trench, the water in it (note 1540), three wide (note 1553).
   const trench = dug.filter(p => p.y === 63);
   assert.ok(trench.length >= 2, `the trench dug: ${dug.map(String).join(' ')}`);
+  const rowCells = trench.filter(p => p.z === 0), sideCells = trench.filter(p => Math.abs(p.z) === 1);
+  assert.ok(sideCells.length >= rowCells.length * 2 - 2 && sideCells.length >= 2, `the trench's sides dug: ${sideCells.length} beside ${rowCells.length}`);
   assert.equal(goal.endCombat.pool.y, 63, JSON.stringify(goal.endCombat.pool));
 });
 

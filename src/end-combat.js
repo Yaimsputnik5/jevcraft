@@ -855,6 +855,23 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           await actions.dig(bot, task, t, { requireDrops: false }); dug++;
         } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the pool's trench stopped at ${t}: ${String(err.message || err).slice(0, 80)}`); break; }
       }
+      // Three wide (note 1553), not one: a body 0.6 wide comes down anywhere in
+      // its cell, and over a trench one wide its box straddles the rim and it
+      // stands on the rim's stone with the water below its feet. 25588
+      // (dragon-101, 2026-10-14 00:59Z, and dragon-102, 01:06Z) each came down
+      // on the third cell of a trench whose four cells were all water, at
+      // x -10.82 over the cell -11 to -10, and died at the rim's height, the
+      // clutch holding its click for the water it saw below.
+      let sides = 0;
+      for (const t of trench.slice(0, dug)) for (const [sx, sz] of [[best.dz, best.dx], [-best.dz, -best.dx]]) {
+        const c = t.offset(sx, 0, sz);
+        if (bot.blockAt(c)?.name !== 'end_stone' || bot.blockAt(c.offset(0, -1, 0))?.boundingBox !== 'block' || bot.blockAt(c.offset(0, 1, 0))?.boundingBox === 'block') continue;
+        try {
+          if (bot.entity.position.offset(0, 1.62, 0).distanceTo(c.offset(.5, .5, .5)) > 4.3) await actions.navigate(bot, task, new goals.GoalNear(c.x, c.y + 1, c.z, 2), { timeoutMs: 6000, stallMs: 3000 });
+          await actions.dig(bot, task, c, { requireDrops: false }); sides++;
+        } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the pool's trench side not dug at ${c}: ${String(err.message || err).slice(0, 80)}`); }
+      }
+      if (sides) console.log(`[end combat] the pool's trench widened: ${sides} side cells dug`);
       if (dug >= 2) { best.cell = trench[Math.floor((dug - 1) / 2)].clone(); best.reach = dug; console.log(`[end combat] the pool's trench dug: ${dug} cells from ${trench[0]} out from the column at (${column.x}, ${column.z}); the water goes in at ${best.cell}${dug < len ? ` (${len} wanted: the row ends there)` : ''}`); }
     }
     const eye = bot.entity.position.offset(0, 1.62, 0), target = best.cell.offset(.5, -.01, .5);
