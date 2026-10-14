@@ -25,9 +25,12 @@ async function main() {
   // seconds on its way home, under water, and came back drowning with no
   // breath (2026-09-26). Any stall of two seconds or more is said, with
   // what the bot was doing, so the code that held it can be found.
+  // And caught in the act (note 1587): a CPU profile kept rolling, the window of a stall written out with its hottest frames.
+  const stallProfiler = process.env.JEV_STALL_PROFILE === '0' ? null : require('./src/stall-profiler').startStallProfiler({ directory: path.join(__dirname, 'artifacts', 'stall-profiles') });
   let tickAt = Date.now();
   setInterval(() => {
     const lag = Date.now() - tickAt - 250;
+    if (lag >= 1500) stallProfiler?.stalled(lag);
     if (lag >= 2000) {
       // The work's step beside the survival layer's, and the slow search that
       // ended in the hold where there was one (note 795: 655 of 2,818 holds
