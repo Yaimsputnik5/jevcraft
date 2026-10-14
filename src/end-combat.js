@@ -1002,6 +1002,21 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         if (bot.blockAt(t)?.boundingBox === 'block') { console.log(`[end combat] the pool's trench cell ${t} stayed solid after two digs: the row ends before it`); dug = i; break; }
         console.log(`[end combat] the pool's trench cell ${t} was still solid and is dug now`);
       }
+      // The fall's way over the row cleared (note 1599): a block standing one to
+      // three over the trench's floor along the row is 'in the fall's way'
+      // (note 1543) and the pool's side is set aside for it. 25588 (dragon-141,
+      // 2026-10-14 08:05Z, three crystals broken) poured its pool north of
+      // crystal 117's column, had 'end_stone in the fall's way at (-36, 61,
+      // 19), 1 over the floor', took the west side with no pool and no bucket
+      // left, and dug 24 blocks down the column.
+      let cleared = 0;
+      for (const t of trench.slice(0, dug)) for (let dy = 1; dy <= 3; dy++) {
+        const c = t.offset(0, dy, 0), b = bot.blockAt(c);
+        if (b?.boundingBox !== 'block' || /obsidian|bedrock/.test(b.name)) continue;
+        try { check(); if (bot.entity.position.offset(0, 1.62, 0).distanceTo(c.offset(.5, .5, .5)) > 4.3) await actions.navigate(bot, task, new goals.GoalNear(c.x, c.y, c.z, 2), { timeoutMs: 6000, stallMs: 3000 }); await actions.dig(bot, task, c, { requireDrops: false }); cleared++; }
+        catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+      }
+      if (cleared) console.log(`[end combat] the fall's way over the pool's row cleared: ${cleared} block${cleared === 1 ? '' : 's'} dug`);
       if (dug >= 2) { best.cell = trench[Math.floor((dug - 1) / 2)].clone(); best.reach = dug; console.log(`[end combat] the pool's trench dug: ${dug} cells from ${trench[0]} out from the column at (${column.x}, ${column.z}); the water goes in at ${best.cell}${dug < len ? ` (${len} wanted: the row ends there)` : ''}`); }
     }
     const eye = bot.entity.position.offset(0, 1.62, 0), target = best.cell.offset(.5, -.01, .5);
