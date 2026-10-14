@@ -957,13 +957,21 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // against 17.3, dead on the rim.
     if (side.fall - 3 >= bot.health - 1 && !side.pool && !inCloud) { const dig = side.fall - 3 - Math.floor(bot.health - 1) + 1; console.log(`[end combat] the water drop held at the step-off: the health is ${bot.health.toFixed(1)} now, a fall of ${side.fall} takes about ${side.fall - 3}, no pool under the way down; ${dig} dug first`); waterDrop.tooHighBy = dig; return false; }
     bot._dropping = true;
+    // The step's emergency check set aside for the step off (note 1550): the
+    // drop is the answer to the fireball and the breath, and the move's own
+    // check threw 'EndEmergency' at its first tick with a fireball in flight,
+    // swallowed here, 'the water drop ended still up'. 25588 (dragon-99,
+    // 2026-10-14 00:48Z, two crystals broken) stood on its column at 80 with
+    // the pool beside it, pressed nothing for two seconds, and took the
+    // fireball's cloud there, 20 to none in three seconds.
+    const dropInterrupt = task.interruptCheck; task.interruptCheck = undefined;
     try {
       bot.setControlState?.('sneak', false);
       await require('./motion').move(bot, task, { label: 'water_drop', keys: ['forward'], sneak: false, why: 'off the column onto the island by its foot, the water bucket in hand for the landing (note 1484)',
         // The fall is the move's purpose (note 1490): refused as a 'deadly fall ahead', 25588 (dragon-67, 2026-10-13 16:45Z) stood on its column top at 103 'still up' twice and dug instead.
         look: side.edge.offset(0.5, 1.0, 0.5), maxMs: 2000, tick: 25, intoFall: true, until: () => !bot.entity.onGround && bot.entity.position.y < startY - 0.5 });
-    } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
-    finally { bot._dropping = false; }
+    } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the water drop's step off ended: ${err.name || ''} ${String(err.message || err).slice(0, 100)}`); }
+    finally { bot._dropping = false; task.interruptCheck = dropInterrupt; }
     let wet = false;
     try { wet = await recoverFall(bot, task, goal, save, { refill: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the water drop's landing: ${String(err.message || err).slice(0, 120)}`); }
     for (let i = 0; i < 60 && !bot.entity.onGround; i++) await sleep(50);
