@@ -35,11 +35,11 @@ function dragonNow(dragon, position) {
   return `the dragon is ${what} now${off === null ? '' : `, ${off} blocks off`}, and the bot stands ${Math.round(byFountain)} blocks from the fountain: its body comes down over the fountain and the ground within about twelve of it, and its wings push a body in the open there (4 over the squared distance a tick, 5 of hurt, the throw off the ground); 25588 standing in the open within twenty of the fountain at a landing or a take-off was struck and thrown each time, dead (dragon-121, 130, 136 and 149, 2026-10-14); two deep in a hole the body is below the wings (the arena's drill of 2026-10-14: in the hole 0 moved and 0 lost in three of three; standing in the open eleven from the fountain, thrown 9 and 6 blocks and 15 and 10 lost in two of three), and the dragon keeps its perch while a player is within twenty of it`;
 }
 
-function endDecisionState({ request, health, food, arrows, position, safe, dragon, head, crystals, combat }) {
+function endDecisionState({ request, health, food, arrows, position, safe, dragon, head, crystals, combat, headNotSought }) {
   const known = Object.values(combat.knownCrystals || {});
   return {
     request, task: 'Defeat the Ender Dragon and remain alive.', health, food, arrows, position,
-    dragonNow: dragonNow(dragon, position),
+    dragonNow: dragonNow(dragon, position), headNotSought,
     survival: { maximumHealth: 20, currentFootingSafe: safe, needsHealing: health < 16,
       naturalRegenerationPossible: health < 20 && food >= 18, immediateEmergenciesHandledByCode: true },
     dragon: dragon && { ...dragon, phaseName: PHASES[dragon.phase] || 'unknown',

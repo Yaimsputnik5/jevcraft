@@ -2126,7 +2126,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // was 8 to 20 blocks from the head at each of six perches and never
     // under it.
     const swordCarried = bot.inventory.items().some(i => /_sword$/.test(i.name) && durable(bot.registry, i));
-    if (atHand && head && !canStrike(bot, head) && swordCarried && head.position.distanceTo(bot.entity.position) <= 40) {
+    // Not while a crystal stands (note 1656): the head's blows are healed back in seconds (note 1629) and the run to it is the take-off's throw; with the record on the option (note 1654) 25588 still took it, and dragon-176, 188, 189 and 191 (2026-10-14, 15:13 to 18:06Z) died so within three hours, four of the hour's five deaths at the end, none with a point of lasting damage. The head is sought when the crystals are down; the state says so.
+    if (atHand && head && !canStrike(bot, head) && swordCarried && head.position.distanceTo(bot.entity.position) <= 40 && !crystals.length) {
       // The head's line (note 1617): the dragon's wings are boxes four wide, grown four each way and two up and down, at its sides; in the game's code they push every body in them 4 / d² and lift it 0.2 a tick, perched or not. They reach six fore and aft of the body and ten aside, so the ground under the head is out of them only at 6.1 forward or more, and a run that comes in from the side passes through them. 25588 (dragon-154, 2026-10-14 09:58Z, all ten crystals broken) ran in from the side at 13 blocks, was lifted at 6 from the body to y 72, 20 to 13.6, 'out of the sword's reach', and the next run ended it; dragon-151 and 153 the same. The stand is 7.2 forward on the line; the run comes to a point 11 forward first, in front of the head.
       const axis = { x: Math.sin(dragon.yaw || 0), z: Math.cos(dragon.yaw || 0) };
       const stand0 = dragon.position.offset(axis.x * 7.2, 0, axis.z * 7.2);
@@ -2858,7 +2859,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     {
       const sword = bot.inventory.items().find(i => /_sword$/.test(i.name) && durable(bot.registry, i));
       const phase = dragon && live(bot, dragon) ? metadata(bot, dragon, 'phase') : null;
-      const coming = phase !== null && ([2, 3].includes(phase) || !!head);
+      const coming = phase !== null && ([2, 3].includes(phase) || !!head) && !crystals.length;
       const solid = c => bot.blockAt(c)?.boundingBox === 'block';
       const thickAt = f => !!f && [1, 2, 3, 4, 5, 6].every(dy => solid(f.offset(0, -dy, 0))) && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => solid(f.offset(dx, -1, dz)) && solid(f.offset(dx, -2, dz))) && voidEdge(bot, f, 4) === null;
       if (actions.dig && sword && coming && !holeHere() && !onOwnPillar() && !onObsidianTop() && byFountain >= 4 && byFountain <= 30 && blocksCarried(bot) >= 2) {
@@ -3191,7 +3192,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // The landing or take-off said on every option (note 1609), not only the hole's.
     { const now = dragonNow(state.dragon, bot.entity.position); if (now) for (const o of Object.values(tree)) if (o && o.description && typeof o.description === 'object') o.description.dragonNow = now; }
     const decision = await decide('dragon_fight', { client, bot, goal, tree, context: { safe }, interrupt: check, watchMs: 50,
-      state: endDecisionState({ request: goal.request, health: bot.health, food: bot.food, arrows: countOf(bot, 'arrow'),
+      state: endDecisionState({ request: goal.request, health: bot.health, food: bot.food, arrows: countOf(bot, 'arrow'), headNotSought: crystals.length ? `the head is not offered while a crystal stands: its blows are healed back in seconds by the nearest crystal, and the run to it threw dragon-176, 188, 189 and 191 to their deaths on 2026-10-14 with no lasting damage done; the crystals come first` : undefined,
         position: { ...bot.entity.position }, safe, dragon: state.dragon,
         // The footing here (note 1557): how many cells of ground within six are open to step to, and whether the void lies beside the feet. The ledge under the entry platform had none, and 25588 (dragon-106, 2026-10-14 01:26Z) chose to shoot from it with two arrows and died in the breath there with no step to take.
         footing: state.routeLook && Date.now() - (state.routeLook.at || 0) < 10000 ? `${state.routeLook.allowed} cell${state.routeLook.allowed === 1 ? '' : 's'} of ground within six to step to${voidEdge(bot, bot.entity.position, 3) !== null ? ', the void within three of the feet' : ''}` : (voidEdge(bot, bot.entity.position, 3) !== null ? 'the void within three of the feet' : undefined),
