@@ -811,9 +811,17 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         if (k <= want) cell = new Vec3(cx, g + 1, cz);
       }
       if (bot.blockAt(cell)?.name !== 'air' && !raised.some(r => r.equals(cell))) continue;
-      if (voidEdge(bot, cell.offset(.5, 0, .5), 8) !== null) continue;
+      // The void three away, not eight, and level ground two about, not four,
+      // where the trench holds the water (note 1555): nothing runs off. The
+      // eight was the open pour's, whose spread ran seven cells to the rim and
+      // over; and at the island's eastern rim pillars (9, 11, 12, 14 of this
+      // world) it left every climb with no pool, the clutch alone for the way
+      // down, and 25588 died on that drop six times on 2026-10-13/14
+      // (dragon-84, 90, 93, 104 among them).
+      const clear = actions.dig ? 3 : 8, about = actions.dig ? 2 : 4;
+      if (voidEdge(bot, cell.offset(.5, 0, .5), clear) !== null) continue;
       let level = true, obsidian = 0;
-      for (let ox = -4; ox <= 4 && level; ox++) for (let oz = -4; oz <= 4 && level; oz++) { const gg = ground(x + ox, z + oz); if (gg === null || gg < g - 1) level = false; }
+      for (let ox = -about; ox <= about && level; ox++) for (let oz = -about; oz <= about && level; oz++) { const gg = ground(x + ox, z + oz); if (gg === null || gg < g - 1) level = false; }
       if (!level) continue;
       for (let k = 1; k <= 3; k++) for (let dy = -1; dy <= 3; dy++) if (bot.blockAt(new Vec3(x + dx * k, g + dy, z + dz * k))?.name === 'obsidian') obsidian++;
       const score = obsidian * 10 + raised.length * 2 + bot.entity.position.distanceTo(cell.offset(.5, 0, .5));
