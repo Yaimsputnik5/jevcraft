@@ -1562,6 +1562,19 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // dragon-111 (02:28Z) on the ledge under the entry platform the same,
       // 20 to none in three seconds, the way up never reached.
       const inBreath = () => breathThreat(bot)?.name === 'area_effect_cloud' || (breathThreat(bot) && bot._lastDragonHurtAt && Date.now() - bot._lastDragonHurtAt < 1500);
+      // Up two first in the cloud (note 1636): the walking escapes are tried for 0.7 and 1.6 seconds before the two blocks up (note 1583), and the cloud takes six a second. 25588 (dragon-165, 2026-10-14 12:57Z, no crystal broken) stood in its pool's pit at (-13, 59, 35) as a fireball's cloud filled it, 20 to 15 to 9.6 to 3.8 to none in three seconds, 'hurt without a survival response', 34 blocks carried; dragon-160 (11:34Z) the same in its pit. Two blocks laid are half a second and the body is out of a cloud half a block deep.
+      {
+        const f0 = bot.entity.position.floored();
+        const roofedHere = [2, 3].some(dy => bot.blockAt(f0.offset(0, dy, 0))?.boundingBox === 'block');
+        if (inBreath() && blocksCarried(bot) >= 2 && !roofedHere && !onObsidianTop()) {
+          goal.step = { action: 'up_out_of_breath_first', health: bot.health }; save();
+          const from = Math.floor(bot.entity.position.y);
+          try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+          const rose = Math.floor(bot.entity.position.y) - from;
+          console.log(`[end combat] up out of the breath first: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
+          if (rose >= 1) return;
+        }
+      }
       try { await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) && safeFromHostiles(bot, p, endMobs(bot)), timeoutMs: inBreath() ? 700 : 1600 }); }
       catch (err) {
         if (err.name !== 'NoEscape') throw err;
