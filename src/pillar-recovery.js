@@ -229,7 +229,8 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
       // The server has the position a tick behind: placed the moment the feet
       // cleared the cell here, it still saw the body in it and refused.
       await new Promise(resolve => setTimeout(resolve, 60 + attempt * 60));
-      try { await place(); placed++; bot._pillarUp = { x: feet.x, z: feet.z, until: Date.now() + 600000 }; }
+      // The column's base kept with the record (note 1610): the lowest block laid, so that its own end stone above it is told from the island's without reading the sides.
+      try { await place(); placed++; const prev = bot._pillarUp; bot._pillarUp = { x: feet.x, z: feet.z, until: Date.now() + 600000, base: prev && prev.x === feet.x && prev.z === feet.z && prev.base != null && prev.until > Date.now() ? Math.min(prev.base, feet.y) : feet.y }; }
       catch (err) { task.check(); }
       for (let i = 0; i < 20 && !bot.entity.onGround; i++) { task.check(); await new Promise(resolve => setTimeout(resolve, 25)); }
       if (bot.entity.position.floored().y > start) break;

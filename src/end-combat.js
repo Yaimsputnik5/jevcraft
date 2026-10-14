@@ -52,7 +52,7 @@ const { canStrike, defendNearby, raiseShield, lowerShield } = require('./combat'
 const { durable, carriedEquipment } = require('./mob-policy');
 const { fallDanger, recoverFall } = require('./fall-recovery');
 const { cloudRadius, hazardDistance, endEmergency, checkEndEmergency, evadeDragon, dragonThreat, breathThreat } = require('./end-safety');
-const { endDecisionState } = require('./decisions/end-state');
+const { endDecisionState, dragonNow } = require('./decisions/end-state');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const blocked = message => Object.assign(new Error(message), { name: 'Blocked' });
 const vector = p => new Vec3(p.x, p.y, p.z);
@@ -542,6 +542,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (under?.boundingBox !== 'block' || !SCAFFOLD_UNDER.test(under.name) || under.name === 'end_stone' && f.y < 70 && !onColumnCell) return false;
     if (Math.hypot(u.x + .5 - p.x, u.z + .5 - p.z) > 2.5) return false;
     if (u.x !== f.x || u.z !== f.z) bot._pillarUp = { ...u, x: f.x, z: f.z };
+    // On the recorded cell with two of the column's own blocks or more under the
+    // feet, the column is the bot's by its record (note 1610), with no drop
+    // beside it asked: a column pocketed at two or three heights on the way up
+    // and down has a lower pocket's walls under every side between them, and
+    // the drop read from one to three under the feet ends on them. 25588
+    // (dragon-150, 2026-10-14 09:08Z, two crystals broken) on its column at
+    // (-10, 77, -38) with pockets at 72, 77, 79 and 82 was 'own pillar false',
+    // offered the dig to the sky and observe only, climbed 'out of the hole'
+    // with its last block, and the dragon's body threw it off at 78, dead.
+    if (onColumnCell && columnDepth() >= 2) return true;
     // Two of the four cells round the feet open at least (a pillar laid up
     // against a round obsidian pillar's side has one or two of them solid),
     // and a drop of three or more off one of them (note 1458): at the
@@ -574,7 +584,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   const columnDepth = () => { const f = bot.entity.position.floored(); let n = 0; while (n < 6 && SCAFFOLD_UNDER.test(bot.blockAt(f.offset(0, -1 - n, 0))?.name || '') && !(bot.blockAt(f.offset(0, -1 - n, 0))?.name === 'end_stone' && f.y - 1 - n < 66 && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => bot.blockAt(f.offset(dx, -2 - n, dz))?.boundingBox === 'block'))) n++; return n; };
   // The hole by the fountain (note 1592): two deep, the body in it out of the
   // dragon's wings and under the breath's cloud; out of it is two blocks laid.
-  const holeHere = () => { const f = bot.entity.position.floored(); const solidAt = c => bot.blockAt(c)?.boundingBox === 'block'; return [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => solidAt(f.offset(dx, 0, dz)) && solidAt(f.offset(dx, 1, dz))) && solidAt(f.offset(0, -1, 0)) && !solidAt(f.offset(0, 2, 0)); };
+  // Not on the bot's own column (note 1610): the pocket's walls round the feet are the hole's shape, and out of it is up onto the wings' reach with the blocks the way down keeps.
+  const holeHere = () => { if (onColumnCell()) return false; const f = bot.entity.position.floored(); const solidAt = c => bot.blockAt(c)?.boundingBox === 'block'; return [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => solidAt(f.offset(dx, 0, dz)) && solidAt(f.offset(dx, 1, dz))) && solidAt(f.offset(0, -1, 0)) && !solidAt(f.offset(0, 2, 0)); };
   const outOfTheHole = async () => {
     if (!holeHere()) return true;
     const from = Math.floor(bot.entity.position.y);
@@ -2786,6 +2797,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         gap = 0;
         if (!SCAFFOLD_UNDER.test(name)) break;
         // The sides read from one under the block (note 1581): the pocket's posts (note 1575) stand beside the block under the feet, and with them every side read 'solid within three', the column's end stone read as the island's, and 25588 (dragon-129, 2026-10-14 05:35Z) on its column at 88 had no pillar_down, 'only observe'.
+        // With the column's base on its record (note 1610), the island begins below the base and the sides are not read: a lower pocket's walls beside the column read as the island's ground, and 25588 (dragon-150, 2026-10-14 09:08Z) had 'depth 0' between its pockets at 72 and 77.
+        const base = bot._pillarUp && bot._pillarUp.until > Date.now() && bot._pillarUp.x === feet.x && bot._pillarUp.z === feet.z ? bot._pillarUp.base : null;
+        if (base != null) { if (c.y < base) break; continue; }
         if (name === 'end_stone' && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => { for (let dy = 1; dy <= 3; dy++) if (bot.blockAt(c.offset(dx, -dy, dz))?.boundingBox === 'block') return true; return false; })) break;
       }
       depth -= gap;
@@ -2881,6 +2895,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         if (dropped.length && !(state.endermanStanceSaid > Date.now() - 10000)) { state.endermanStanceSaid = Date.now(); console.log(`[end combat] an enderman's blow ${Math.round((Date.now() - hitAt) / 100) / 10} s ago and one within twelve: the fight first; set aside ${dropped.join(', ')}`); }
       }
     }
+    // The landing or take-off said on every option (note 1609), not only the hole's.
+    { const now = dragonNow(state.dragon, bot.entity.position); if (now) for (const o of Object.values(tree)) if (o && o.description && typeof o.description === 'object') o.description.dragonNow = now; }
     const decision = await decide('dragon_fight', { client, bot, goal, tree, context: { safe }, interrupt: check, watchMs: 50,
       state: endDecisionState({ request: goal.request, health: bot.health, food: bot.food, arrows: countOf(bot, 'arrow'),
         position: { ...bot.entity.position }, safe, dragon: state.dragon,

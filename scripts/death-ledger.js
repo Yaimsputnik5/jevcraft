@@ -108,7 +108,8 @@ function mechanism(damages, dead) {
     const deaths = [];
     for (const l of lines) {
       if (/\[end combat\] crystal \d+ struck from/.test(l) || /\[end combat\] crystal \d+ (shot|hit).*gone/.test(l)) { crystals++; struckAt.push(crystals); }
-      if (l.startsWith('{"death"')) { try { const d = JSON.parse(l).death; deaths.push({ at: Date.parse(d.at), position: d.position, crystals }); } catch (_) {} }
+      // One death, not its recovery's second record a second later (dragon-150, 2026-10-14: two rows 1.3 s apart for one fall).
+      if (l.startsWith('{"death"')) { try { const d = JSON.parse(l).death; const at = Date.parse(d.at); if (!deaths.length || at - deaths[deaths.length - 1].at > 5000) deaths.push({ at, position: d.position, crystals }); } catch (_) {} }
     }
     const minutes = r1((run.end - run.start) / 60000);
     // The process held (event loop stalls of two seconds or more) during the run, from its flight files.

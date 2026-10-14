@@ -18,10 +18,28 @@ const endDecisionInstructions = {
   ],
 };
 
+// The dragon's landing or take-off said as what it does to a body in the
+// open by the fountain (note 1609): 'dragonPhase: 3' on an option says
+// nothing a reader can weigh. 25588 (dragon-149, 2026-10-14 09:01Z, one
+// crystal broken) stood on the island's ground 10 to 19 blocks from the
+// fountain as the dragon came down on it (phase 3, 13 blocks off), took
+// pillar_punch_78 at 0.37 with wait_in_hole at 0.11, was struck twice and
+// thrown fifteen blocks by the body, dead at 16.6 health; dragon-121, 130
+// and 136 the same at the take-off.
+function dragonNow(dragon, position) {
+  if (!dragon || !position || ![2, 3, 4].includes(dragon.phase)) return undefined;
+  const byFountain = Math.hypot(position.x || 0, position.z || 0);
+  if (byFountain > 24) return undefined;
+  const off = dragon.position ? Math.round(Math.hypot(dragon.position.x - position.x, dragon.position.z - position.z)) : null;
+  const what = dragon.phase === 4 ? 'taking off from the fountain' : 'coming down to land on the fountain';
+  return `the dragon is ${what} now${off === null ? '' : `, ${off} blocks off`}, and the bot stands ${Math.round(byFountain)} blocks from the fountain: its body comes down over the fountain and the ground within about twelve of it, and its wings push a body in the open there (4 over the squared distance a tick, 5 of hurt, the throw off the ground); 25588 standing in the open within twenty of the fountain at a landing or a take-off was struck and thrown each time, dead (dragon-121, 130, 136 and 149, 2026-10-14); two deep in a hole the body is below the wings, and the dragon keeps its perch while a player is within twenty of it`;
+}
+
 function endDecisionState({ request, health, food, arrows, position, safe, dragon, head, crystals, combat }) {
   const known = Object.values(combat.knownCrystals || {});
   return {
     request, task: 'Defeat the Ender Dragon and remain alive.', health, food, arrows, position,
+    dragonNow: dragonNow(dragon, position),
     survival: { maximumHealth: 20, currentFootingSafe: safe, needsHealing: health < 16,
       naturalRegenerationPossible: health < 20 && food >= 18, immediateEmergenciesHandledByCode: true },
     dragon: dragon && { ...dragon, phaseName: PHASES[dragon.phase] || 'unknown',
@@ -39,4 +57,4 @@ function endDecisionState({ request, health, food, arrows, position, safe, drago
   };
 }
 
-module.exports = { endDecisionInstructions, endDecisionState };
+module.exports = { endDecisionInstructions, endDecisionState, dragonNow };

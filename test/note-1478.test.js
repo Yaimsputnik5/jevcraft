@@ -558,6 +558,27 @@ test('inside the pocket the column still reads as the bot\'s own, the dig goes d
   assert.ok(lines.some(l => /the water drop from \(0, 76, 0\)/.test(l)), lines.filter(l => l.includes('water drop')).join('\n'));
 });
 
+test('between two pockets the column is still the bot\'s own by its record: the dig goes down, no hole, no dig to the sky (note 1610)', async () => {
+  const { bot, dig, goal, task } = fixture();
+  // Pockets at 72 (walls 72 and 73, posts 71) and 76 (walls 76 and 77, posts 75) on every side; the feet at 76 on the column of end stone; no pool; the dragon far off.
+  const walls = new Set();
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const dy of [71, 72, 73, 75, 76, 77]) walls.add(`${dx},${dy},${dz}`);
+  const blockAt = bot.blockAt;
+  bot.blockAt = p => { const f = p.floored(), k = `${f.x},${f.y},${f.z}`; if (walls.has(k)) return { name: 'cobblestone', boundingBox: 'block', position: f }; if (f.x === 0 && f.z === 0 && f.y >= 64 && f.y < 76) return { name: 'end_stone', boundingBox: 'block', position: f }; return blockAt(p); };
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 1 }, { name: 'water_bucket', count: 1 }];
+  bot.entities[20].position = new Vec3(60, 90, 60);
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'pillar_down', at: Date.now() } };
+  bot._pillarUp = { x: 0, z: 0, until: Date.now() + 600000, base: 64 };
+  let seen = null;
+  const lines = [], log = console.log; console.log = (...a) => { lines.push(a.join(' ')); log(...a); };
+  try { await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig, place: async () => {} }, { systemOne: async ({ questions }) => { seen = JSON.stringify(questions); return { answers: { branch_0: { choice: 'observe' } } }; } }); }
+  finally { console.log = log; }
+  assert.ok(seen && seen.includes('"pillar_down":{'), `pillar_down offered between the pockets: ${seen && seen.slice(0, 500)}`);
+  assert.ok(!seen.includes('dig_to_sky') && !seen.includes('stay_in_hole'), `no sky, no hole on the column: ${seen.slice(0, 500)}`);
+  assert.ok(!lines.some(l => l.includes('out of the hole')), lines.filter(l => l.includes('hole')).join('\n'));
+  assert.ok(!lines.some(l => l.includes('only observe')), lines.filter(l => l.includes('only observe')).join('\n').slice(0, 300));
+});
+
 test('the pillars offered are the three cheapest by lift and walk, not the two nearest (note 1582)', async () => {
   const { bot, goal, task } = fixture();
   delete bot._pillarUp;
