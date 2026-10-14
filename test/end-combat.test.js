@@ -360,3 +360,19 @@ test('a turned enderman within sixteen is Jev\'s question: the fight, the water 
   assert.ok(said.hide_from_enderman, 'the pocket offered with a pickaxe');
   assert.match(said.fight_enderman.record, /dragon-100/);
 });
+
+test('the water at the feet is not offered within eight of the void: poured water runs downhill and carries the body (note 1586)', async () => {
+  const { bot, goal, task } = fixture();
+  bot.inventory.items = () => [{ name: 'water_bucket', count: 1 }, { name: 'diamond_sword', count: 1, type: registry.itemsByName.diamond_sword.id, durabilityUsed: 0 }, { name: 'iron_pickaxe', count: 1 }, { name: 'cooked_beef', count: 8 }];
+  bot.equip = async item => { bot.heldItem = item; }; bot.lookAt = async () => {}; bot.setControlState = () => {}; bot.controlState = {}; bot.activateItem = () => {};
+  // The island ends six blocks east of the feet: the void from x 6 on.
+  bot.blockAt = p => ({ name: p.y < 64 && p.x < 6 ? 'end_stone' : 'air', boundingBox: p.y < 64 && p.x < 6 ? 'block' : 'empty' });
+  entity(bot, 8, 'enderman', new Vec3(-10, 64, .5), { creepy: true });
+  bot._hurtBy = { enderman: Date.now() };
+  let said = null;
+  const client = { systemOne: async ({ questions }) => { said = questions.branch_0.criteria; return { answers: { branch_0: { choice: 'observe' } } }; } };
+  await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig: async () => {} }, client).catch(() => {});
+  assert.ok(said, 'Jev was asked');
+  assert.ok(said.fight_enderman, Object.keys(said).join(','));
+  assert.equal(said.water_at_feet, undefined, 'no water at the feet by the void');
+});
