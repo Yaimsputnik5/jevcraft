@@ -1515,6 +1515,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     bot.setControlState?.('sneak', false);
     return { waited, ms: Date.now() - t0, why };
   };
+  // On the ground, not on the bot's own column, its cell or an obsidian top (note 1662): there a far fireball is no emergency.
+  const onTheGround = () => !onOwnPillar() && !onColumnCell() && !onObsidianTop();
   const holdOnColumn = async () => {
     // The roof first, on the bot's own column (note 1445): the dragon that
     // comes at the column breathes at it, and the fireball not seen in
@@ -1842,7 +1844,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // the bot's own column or an obsidian top, told on the climb's option.
     { const h = bot.health, was = state.lastHealthSeen; state.lastHealthSeen = h;
       if (Number.isFinite(was) && h < was - 0.05 && (onOwnPillar() || onObsidianTop())) { const c = state.columnDamage ||= { hits: 0, total: 0, max: 0 }; const d = Math.round((was - h) * 10) / 10; c.hits++; c.total = Math.round((c.total + d) * 10) / 10; c.max = Math.max(c.max, d); save(); } }
-    if (endEmergency(bot) && !holeAnswers()) { await respond(); return; }
+    if (endEmergency(bot, { ground: onTheGround() }) && !holeAnswers()) { await respond(); return; }
     // The water poured against an enderman taken back once it is gone (note 1646): the pick-up reached five blocks and the walk back was left to the question, and 25588 (dragon-178 and 179, 2026-10-14 15:40 to 15:58Z) each walked off from their last bucket's water and were offered the walk back for minutes without taking it. With no full bucket, an empty one, no enderman within twelve and the water within sixteen, the body goes back for it first.
     if (countOf(bot, 'water_bucket') === 0 && countOf(bot, 'bucket') > 0 && (state.poolsLeft || []).length && !onOwnPillar() && !onObsidianTop() && !hostileEntities(bot, 12).some(e => live(bot, e) && e.name === 'enderman') && !(dragon && dragonThreat(bot))) {
       if (await reclaimWaterLeft({ within: 16 })) return;
@@ -1851,7 +1853,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       oldInterrupt?.();
       if (dimension(bot) !== 'end' || bot.health <= 0) throw blocked('End combat interrupted by dimension change or death');
       if (holeAnswers()) return;
-      checkEndEmergency(bot);
+      checkEndEmergency(bot, { ground: onTheGround() });
     };
     if (safeHere()) {
       if (await maintainVitals(bot, task, action => { goal.survivalAction = { ...action, at: new Date().toISOString() }; save(); }, { client, goal, save })) return;

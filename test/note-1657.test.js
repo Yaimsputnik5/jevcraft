@@ -43,3 +43,25 @@ test('the island along the push from a point: short by the rim, the full carry i
   // The dragon east of the body: the push goes west, inland, however near the east rim.
   assert.equal(carryFloor(island, new Vec3(9.5, 64, 0.5), { position: new Vec3(30, 70, 0) }), CARRY);
 });
+
+test('a far fireball is no emergency on the ground unless it is coming; on the column it is at 48 (note 1662)', async () => {
+  const { fireballNear } = require('../src/end-safety');
+  const bot = { entity: { position: new Vec3(0.5, 64, 0.5) } };
+  const ball = { name: 'dragon_fireball', position: new Vec3(40, 70, 0) };
+  assert.equal(fireballNear(bot, ball, { ground: false }), true, 'on the column, 40 off is near');
+  assert.equal(fireballNear(bot, ball, { ground: true }), false, 'first sight on the ground: not yet');
+  await new Promise(r => setTimeout(r, 200));
+  ball.position = new Vec3(36, 69.4, 0); // 4 blocks in 0.2 s, 20 a second, toward the body: 1.8 s off
+  assert.equal(fireballNear(bot, ball, { ground: true }), true, 'coming at the body in under 2.5 s');
+  const away = { name: 'dragon_fireball', position: new Vec3(40, 70, 0) };
+  assert.equal(fireballNear(bot, away, { ground: true }), false);
+  await new Promise(r => setTimeout(r, 200));
+  away.position = new Vec3(44, 70, 0);
+  assert.equal(fireballNear(bot, away, { ground: true }), false, 'going away');
+  const wide = { name: 'dragon_fireball', position: new Vec3(40, 70, 20) };
+  assert.equal(fireballNear(bot, wide, { ground: true }), false);
+  await new Promise(r => setTimeout(r, 200));
+  wide.position = new Vec3(36, 70, 20); // passing 20 blocks aside
+  assert.equal(fireballNear(bot, wide, { ground: true }), false, 'passing wide');
+  assert.equal(fireballNear(bot, { name: 'dragon_fireball', position: new Vec3(15, 66, 0) }, { ground: true }), true, 'within 20 is near');
+});

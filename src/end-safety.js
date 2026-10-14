@@ -23,10 +23,28 @@ function hazardDistance(point, entity) {
   if (point.y - entity.position.y > 1.2 || entity.position.y - point.y > 1.8) return Infinity;
   return Math.hypot(point.x - entity.position.x, point.z - entity.position.z);
 }
-function breathThreat(bot) {
+// A fireball on the ground is an emergency only when it is coming (note 1662): within 20 blocks, or on a line that passes within 7 of the body in under two and a half seconds, read from its last two places. At 48 (note 1469, for the roof on the column) every fireball in the arena cut the walk, the quarry and the climb: 143 cuts on the ground in runs 167 to 197, 109 of them walks, quarries and climbs; 25588 (dragon-197, 2026-10-14 19:17 to 19:40Z) had 23 of them and no crystal in 23 minutes, its walks to crystals 98 and 129 cut seven times. The column keeps 48.
+const BALLS = new WeakMap();
+function fireballNear(bot, ball, { ground = false } = {}) {
+  const here = bot.entity.position, d = ball.position.distanceTo(here);
+  if (!ground) return d < 48;
+  if (d < 20) return true;
+  const now = Date.now(), seen = BALLS.get(ball);
+  if (!seen) { BALLS.set(ball, { t0: now, p0: ball.position.clone(), t: now, p: ball.position.clone() }); return false; }
+  if (!ball.position.equals(seen.p)) { seen.t = now; seen.p = ball.position.clone(); }
+  const dt = (seen.t - seen.t0) / 1000;
+  if (dt < 0.15) return false;
+  const v = seen.p.minus(seen.p0).scaled(1 / dt), speed = v.norm();
+  if (speed < 2) return false;
+  const u = v.scaled(1 / speed), r = here.offset(0, 0.9, 0).minus(seen.p), along = r.dot(u);
+  if (along <= 0) return false;
+  const miss = r.minus(u.scaled(along)).norm();
+  return along / speed < 2.5 && miss < 7;
+}
+function breathThreat(bot, { ground = false } = {}) {
   const entities = Object.values(bot.entities).filter(e => e.isValid !== false);
   return entities.find(e => e.name === 'area_effect_cloud' && hazardDistance(bot.entity.position, e) <= cloudRadius(bot, e)) ||
-    entities.find(e => e.name === 'dragon_fireball' && e.position.distanceTo(bot.entity.position) < 48); // 48, not 18 (note 1469): the roof wants the ball seen while it is still far; at 18 it was a second off, and 25588 (dragon-51, 2026-10-13 13:44Z) took the cloud at its feet on the climb, 20 to 2 in two seconds.
+    entities.find(e => e.name === 'dragon_fireball' && fireballNear(bot, e, { ground })); // 48, not 18 (note 1469): the roof wants the ball seen while it is still far; at 18 it was a second off, and 25588 (dragon-51, 2026-10-13 13:44Z) took the cloud at its feet on the climb, 20 to 2 in two seconds.
 }
 
 function dragonThreat(bot) {
@@ -50,15 +68,15 @@ function dragonThreat(bot) {
       distance < 12 && height > -6 && height < 14;
   });
 }
-function endEmergency(bot) {
+function endEmergency(bot, opts = {}) {
   if (fallDanger(bot)) return 'dangerous_fall';
-  const breath = breathThreat(bot);
+  const breath = breathThreat(bot, opts);
   if (breath) return breath.name === 'area_effect_cloud' ? 'dragon_breath_cloud' : 'incoming_dragon_fireball';
   if (dragonThreat(bot)) return 'dragon_charge_or_contact';
   return null;
 }
-function checkEndEmergency(bot) {
-  const reason = endEmergency(bot);
+function checkEndEmergency(bot, opts = {}) {
+  const reason = endEmergency(bot, opts);
   if (reason) throw Object.assign(new Error(reason), { name: 'EndEmergency' });
 }
 
@@ -443,4 +461,4 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600 } 
     return true;
   } finally { bot.clearControlStates(); }
 }
-module.exports = { deepBeside, voidSides, knockedIntoVoid, carryFloor, CARRY, cloudEdgeCells, straightAway, cloudRadius, hazardDistance, breathThreat, dragonThreat, endEmergency, checkEndEmergency, dodgeRoutes, evadeOverTerrain, evadeDragon };
+module.exports = { deepBeside, voidSides, knockedIntoVoid, carryFloor, CARRY, fireballNear, cloudEdgeCells, straightAway, cloudRadius, hazardDistance, breathThreat, dragonThreat, endEmergency, checkEndEmergency, dodgeRoutes, evadeOverTerrain, evadeDragon };
