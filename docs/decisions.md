@@ -1608,6 +1608,9 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | `dig_to_sky` | root | dig up through the island's rock to the open sky, the column laid under the feet | two or more blocks of rock over the head, a pickaxe and a block carried (note 1488) |
 | `open_walls` | root | dig out of the blocks the bot is walled in by: the one over its head and the wall toward the arena | a block on every side of the body and over the head, and no shot, strike, bed or walk on offer |
 | `strike_head` | root | strike the perched dragon's head | the head is within sword reach |
+| `fight_enderman` | root | turn on the nearest turned enderman and fight it with the sword | a turned enderman within sixteen and a sword carried (note 1551); said with its health, the sword's blow, its blow through iron and the day's record |
+| `water_at_feet` | root | pour a bucket of water at the feet and stand in it against the enderman | a turned enderman within sixteen, a water bucket carried, not already in water (note 1551) |
+| `hide_from_enderman` | root | dig a pocket two high and wait in it until the enderman leaves off | a turned enderman within sixteen and a pickaxe carried (note 1551) |
 | `move_[a-z0-9_,.:-]+` (pattern: names the route, by where it goes) | root | move along this checked route | a safe surveyed route toward a crystal, the dragon or away from danger |
 | `observe` | root | wait one second and watch | on a safe spot with the dragon in view, fewer than five idle watches in a row |
 

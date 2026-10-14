@@ -855,7 +855,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           await actions.dig(bot, task, t, { requireDrops: false }); dug++;
         } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the pool's trench stopped at ${t}: ${String(err.message || err).slice(0, 80)}`); break; }
       }
-      if (dug >= 2) { best.cell = trench[Math.floor((dug - 1) / 2)].clone(); console.log(`[end combat] the pool's trench dug: ${dug} cells from ${trench[0]} out from the column at (${column.x}, ${column.z}); the water goes in at ${best.cell}`); }
+      if (dug >= 2) { best.cell = trench[Math.floor((dug - 1) / 2)].clone(); best.reach = dug; console.log(`[end combat] the pool's trench dug: ${dug} cells from ${trench[0]} out from the column at (${column.x}, ${column.z}); the water goes in at ${best.cell}${dug < len ? ` (${len} wanted: the row ends there)` : ''}`); }
     }
     const eye = bot.entity.position.offset(0, 1.62, 0), target = best.cell.offset(.5, -.01, .5);
     if (eye.distanceTo(target) > 4.3) {
@@ -869,7 +869,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
     const poured = bot.blockAt(best.cell)?.name === 'water';
     console.log(`[end combat] the pool for the drop ${poured ? 'poured' : 'not poured'} at ${best.cell} beside the column at (${column.x}, ${column.z})${best.obsidian ? `, ${best.obsidian} obsidian that way` : ''}; ${countOf(bot, 'water_bucket')} full bucket${countOf(bot, 'water_bucket') === 1 ? '' : 's'} left`);
-    if (poured) { state.pool = { x: best.cell.x, y: best.cell.y, z: best.cell.z, dx: best.dx, dz: best.dz, at: Date.now() }; save(); return state.pool; }
+    if (poured) { state.pool = { x: best.cell.x, y: best.cell.y, z: best.cell.z, dx: best.dx, dz: best.dz, at: Date.now(), ...(best.reach ? { reach: best.reach } : {}) }; save(); return state.pool; }
     return null;
   };
   // Whether a pool can be poured at a pillar's foot, read from the foot cell on the bot's side of it (note 1539).
@@ -910,6 +910,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // The pool's row is the body's row (note 1545): along the side one to six out, and a cell at most to either hand. The trench is one wide, and 25588 (dragon-96, 2026-10-14 00:20Z, two crystals broken) dropped east from its column at (-9, -40) 'into the pool' recorded at (-8, 60, -42), the trench of an earlier column two cells south, fell 26 onto dry stone at (-6, 61, -40), 20 to none.
       const along = recorded ? (recorded.x - u.x) * dx + (recorded.z - u.z) * dz : 0, aside = recorded ? Math.abs((recorded.x - u.x) * dz) + Math.abs((recorded.z - u.z) * dx) : 0;
       let pool = !!recorded && recorded.dx === dx && recorded.dz === dz && along >= 1 && along <= 6 && aside <= 1;
+      // The trench's reach (note 1552): the body comes down about a cell out for every eight of fall, and a trench shorter than that is no pool under it. 25588 (dragon-101, 2026-10-14 00:59Z, two crystals broken) had a trench of two cells west of its column at (-13, -36), fell 27 toward it and came down on the third cell, 18.3 to none.
+      let shortTrench = false;
+      if (pool && recorded.reach && Math.round(fall / 8) > recorded.reach) { pool = false; shortTrench = true; }
       // With a pool recorded, its side alone is the pool's (note 1531): the pool's spread reaches the cells of the next side too, and 25588 (dragon-89, 2026-10-13 22:32Z, two crystals broken) had 'west: the pool; south: the pool' with the pool poured south, took west, the first of equals, and fell 26 onto stone, dead.
       if (!pool && !recorded) for (let k = 1; k <= 3 && !pool; k++) for (let dy = -1; dy <= 1 && !pool; dy++) if (bot.blockAt(f.offset(dx * k, -fall + dy, dz * k))?.name === 'water') pool = true;
       // The cells along the body's way out (note 1543), a block out for every
@@ -923,7 +926,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         for (let dy = 0; dy < fall - 1; dy++) { const bl = bot.blockAt(f.offset(dx * k, -dy, dz * k)); if (bl?.boundingBox === 'block') { inTheWay = { cell: f.offset(dx * k, -dy, dz * k), over: fall - 1 - dy }; break; } }
       }
       const score = fall + obsidian * 20 - (pool ? 100 : 0) + (inTheWay ? 200 : 0);
-      verdicts.push(`${name}: ${fall} down${pool ? ', the pool' : ''}${obsidian ? `, ${obsidian} obsidian` : ''}${inTheWay ? `, ${bot.blockAt(inTheWay.cell)?.name} in the fall's way at ${inTheWay.cell}, ${inTheWay.over} over the floor` : ''}`);
+      verdicts.push(`${name}: ${fall} down${pool ? ', the pool' : ''}${shortTrench ? `, the pool's trench of ${recorded.reach} short of the landing about ${Math.round(fall / 8)} out` : ''}${obsidian ? `, ${obsidian} obsidian` : ''}${inTheWay ? `, ${bot.blockAt(inTheWay.cell)?.name} in the fall's way at ${inTheWay.cell}, ${inTheWay.over} over the floor` : ''}`);
       if (!best || score < best.score) best = { dx, dz, fall, obsidian, pool: pool && !inTheWay, inTheWay, score, edge: f.offset(dx, 0, dz), name };
     }
     // Said (note 1522): 25588 (dragon-83, 2026-10-13 21:17Z, six crystals broken) poured its pool south of the column at (-30, -22), dropped from 79 and landed three blocks east of it, dead, and no line said which side was stepped off or why.
@@ -1320,6 +1323,27 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     state.dragon = dragon && { id: dragon.id, position: { ...dragon.position }, health: beforeDragon, phase: metadata(bot, dragon, 'phase') };
     const tree = {}, safe = safeHere(), wet = safe && !safeEndPoint(bot, bot.entity.position);
     const guardShot = () => { check(); if (!safeHere()) throw new Error('End firing position became unsafe'); };
+    // A turned enderman within sixteen is Jev's question (note 1551), not the
+    // reflex's alone: the reflex fights within six for two seconds and the
+    // step goes back to the quarry, the walk or the meal, and the enderman
+    // comes again. 25588 (dragon-97, 2026-10-14 00:36Z, four crystals broken)
+    // took six blows of 4.5 in ten seconds, three sword blows landed, both
+    // buckets in pools, Jev asked about the quarry and a watch; dragon-100
+    // (00:52Z) took six in thirteen seconds, Jev choosing a meal twice.
+    {
+      const foe = hostileEntities(bot, 16).filter(e => live(bot, e) && e.name === 'enderman').sort((a, b) => a.position.distanceTo(bot.entity.position) - b.position.distanceTo(bot.entity.position))[0];
+      if (foe && sword) {
+        const off = Math.round(foe.position.distanceTo(bot.entity.position) * 10) / 10, buckets = countOf(bot, 'water_bucket');
+        const facts = { endermanBlocksOff: off, endermanHealth: 40, swordBlow: 7, blowsToKill: 6, itsBlowThroughIron: 4.5, health: bot.health, waterBucketsCarried: buckets,
+          record: 'an enderman killed 25588 four times on 2026-10-13/14 (dragon-31 in 5 s through leather, dragon-37 in 3 s, dragon-85 five blows in 4 s while the quarry dug on, dragon-97 six blows in 10 s, dragon-100 six blows in 13 s while it ate); fought with the sword from the first blow it dies in six blows, about five seconds; standing in water it takes damage and teleports off and does not come into it' };
+        tree.fight_enderman = { description: { action: `Turn on the enderman ${off} blocks off and fight it with the ${sword.name.replaceAll('_', ' ')}: it has 40 health, a blow takes 7, six blows kill it, about five seconds; its blow takes 4.5 through iron and it teleports behind the body between blows. The shield up when it is not struck.`, ...facts },
+          run: async () => { goal.step = { action: 'fight_enderman', distance: off }; save(); const until = Date.now() + 8000; while (Date.now() < until) { check(); const e = hostileEntities(bot, 16).find(x => live(bot, x) && x.name === 'enderman'); if (!e) break; if (e.position.distanceTo(bot.entity.position) > 3.5) { try { await actions.navigate(bot, task, new goals.GoalNear(e.position.x, e.position.y, e.position.z, 2), { timeoutMs: 2500, stallMs: 1200 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; } } await defendHere(1500); } progress = true; } };
+        if (buckets > 0 && !inWater()) tree.water_at_feet = { description: { action: `Pour a bucket of water at the feet and stand in it: an enderman in water takes damage and teleports away, and will not step into it; the sword still reaches one that comes to its edge. ${buckets} water bucket${buckets === 1 ? '' : 's'} carried, this one taken back when none is near within eight.`, ...facts },
+          run: async () => { goal.step = { action: 'water_at_feet', against: 'enderman' }; save(); const at = await pourAtFeet(bot, check, { urgent: off <= 4 }); if (at) { state.water = { at: { ...at }, poured: Date.now() }; state.pours = (state.pours || 0) + 1; save(); console.log(`[end combat] water poured at ${vector(at)} at Jev's word against the enderman ${off} blocks off (${countOf(bot, 'water_bucket')} full left)`); } await defendHere(4000); progress = true; } };
+        if (actions.dig && !inWater()) tree.hide_from_enderman = { description: { action: 'Dig a pocket two high into the ground here and wait in it: an enderman cannot follow into a space two high, and leaves off; about four seconds to dig, and the fight stands still while it waits.', ...facts },
+          run: async () => { const { endPocket } = require('./end-pocket'); goal.step = { action: 'hide_from_enderman' }; save(); try { if (await endPocket(bot, task, { dig: actions.dig, check, hostileEntities, report: a => { goal.step = a; save(); } })) { state.pockets = (state.pockets || 0) + 1; progress = true; } } catch (err) { if (['Cancelled', 'NeedsAir'].includes(err.name)) throw err; state.pocketFailedAt = Date.now(); save(); } } };
+      }
+    }
     const shoot = async target => {
       guardShot();
       if (target === dragon && perched(bot, dragon)) throw new Error('The dragon perched before the shot');

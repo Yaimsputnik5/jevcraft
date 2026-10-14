@@ -342,3 +342,21 @@ test('the enderman\'s water left seven blocks behind is walked back to and taken
   assert.equal(items.filter(i => i.name === 'water_bucket').length, 2);
   assert.equal(goal.endCombat.water, undefined);
 });
+
+test('a turned enderman within sixteen is Jev\'s question: the fight, the water at the feet and the pocket are offered with the facts (note 1551)', async () => {
+  const { bot, goal, task } = fixture();
+  bot.inventory.items = () => [{ name: 'water_bucket', count: 1 }, { name: 'diamond_sword', count: 1, type: registry.itemsByName.diamond_sword.id, durabilityUsed: 0 }, { name: 'iron_pickaxe', count: 1 }, { name: 'cooked_beef', count: 8 }];
+  bot.equip = async item => { bot.heldItem = item; }; bot.lookAt = async () => {}; bot.setControlState = () => {}; bot.controlState = {}; bot.activateItem = () => {};
+  entity(bot, 8, 'enderman', new Vec3(10, 64, .5), { creepy: true });
+  bot._hurtBy = { enderman: Date.now() };
+  let said = null;
+  const client = { systemOne: async ({ questions }) => { said = questions.branch_0.criteria; return { answers: { branch_0: { choice: 'observe' } } }; } };
+  await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig: async () => {} }, client).catch(() => {});
+  assert.ok(said, 'Jev was asked');
+  assert.ok(said.fight_enderman, Object.keys(said).join(','));
+  assert.equal(said.fight_enderman.blowsToKill, 6);
+  assert.match(said.fight_enderman.action, /fight it with the diamond sword/);
+  assert.ok(said.water_at_feet, 'the water offered with a bucket carried');
+  assert.ok(said.hide_from_enderman, 'the pocket offered with a pickaxe');
+  assert.match(said.fight_enderman.record, /dragon-100/);
+});
