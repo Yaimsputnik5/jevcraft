@@ -1228,7 +1228,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         if (!near && state.pool && Date.now() - state.pool.at < 15 * 60000) {
           const p = new Vec3(state.pool.x, state.pool.y, state.pool.z), d = bot.entity.position.distanceTo(p.offset(.5, 0, .5));
           if (bot.blockAt(p)?.name !== 'water') delete state.pool;
-          else if (d <= 16 && !onOwnPillar()) {
+          // Not under ten health (note 1554): the walk is out in the open with the dragon about, and one breath is six. 25588 (dragon-103, 2026-10-14 01:14Z, two crystals broken) walked back to its pool at (-11, 59, 36) at 5.3 health and took the breath there, dead.
+          else if (d <= 16 && !onOwnPillar() && bot.health >= 10) {
             try { await actions.navigate(bot, task, new goals.GoalNear(p.x, p.y, p.z, 2), { timeoutMs: 8000, stallMs: 3000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the walk back to the pool at ${p} from ${bot.entity.position.floored()}: ${String(err.message || err).slice(0, 80)}`); }
             if (eye.distanceTo(p.offset(.5, .5, .5)) <= 4.3 || bot.entity.position.offset(0, 1.62, 0).distanceTo(p.offset(.5, .5, .5)) <= 4.3) { await fillWaterBucket(bot, task, p, { timeoutMs: 1500 }); console.log(`[end combat] the pool at ${p} taken back into the bucket (${countOf(bot, 'water_bucket')} full carried)`); delete state.pool; save(); }
           }
@@ -1297,7 +1298,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       const at = vector(state.water.at), far = bot.entity.position.distanceTo(at);
       if (bot.blockAt(at)?.name !== 'water') { delete state.water; }
       else {
-        if (far > 4 && far <= 12 && countOf(bot, 'bucket') > 0) { try { await actions.navigate(bot, task, new goals.GoalNear(at.x, at.y, at.z, 2), { timeoutMs: 8000, stallMs: 3000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; } }
+        if (far > 4 && far <= 12 && countOf(bot, 'bucket') > 0 && bot.health >= 10) { try { await actions.navigate(bot, task, new goals.GoalNear(at.x, at.y, at.z, 2), { timeoutMs: 8000, stallMs: 3000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; } }
         const taken = await takeWaterBack(bot, check, state.water.at);
         if (taken) console.log(`[end combat] the enderman's water at ${at} taken back into the bucket (${countOf(bot, 'water_bucket')} full carried)`);
         if (taken || countOf(bot, 'bucket') === 0 || bot.entity.position.distanceTo(at) > 12) delete state.water;
