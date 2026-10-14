@@ -344,7 +344,7 @@ async function evadeOverTerrain(bot, task, goal, save, dragon, { allowed = () =>
   } finally { bot.pathfinder.setGoal(null); bot.clearControlStates(); Object.assign(movement, previous); }
 }
 
-async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600 } = {}) {
+async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600, dig = null } = {}) {
   task.check();
   const dimension = bot.game.dimension;
   bot.pathfinder.setGoal(null); bot.clearControlStates(); bot.stopDigging?.();
@@ -438,7 +438,22 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600 } 
       if (route && route.floor < 8 && route.floor < here) { console.log(`[end safety] the dragon's body coming: no run with more island beyond it along the push than here (${here} blocks); the best, ${dirName(route)} ${Math.round(route.distance * 10) / 10} blocks, has ${route.floor}; the body stays and crouches`); route = null; }
       else if (route) console.log(`[end safety] the dragon's body coming: the run ${dirName(route)} ${Math.round(route.distance * 10) / 10} blocks to (${Math.round(route.destination.x)}, ${Math.round(route.destination.z)}), ${route.floor >= CARRY ? `${CARRY} or more` : route.floor} blocks of island beyond it along the push (here ${here >= CARRY ? `${CARRY} or more` : here})`);
       else console.log(`[end safety] the dragon's body coming: no run of two blocks from ${bot.entity.position.floored()}; ${here >= CARRY ? 'the island holds' : `${here} blocks of island along the push`} here`);
-      if (!route) { bot.setControlState?.('sneak', true); goal.step = { action: 'crouch_for_the_body', hazard: dragon.name, islandAlongThePush: here }; save(); await sleep(400); bot.setControlState?.('sneak', false); return true; }
+      // No run: the hole dug under the feet (note 1665): a hole two deep is untouched by the body (the drill of note 1616), and the call of the body comes again and again while the dragon is about. 25588 (dragon-200, 2026-10-14 20:26 to 20:27Z, four crystals broken) stood in its quarry's pit at (-32, 61, -21) at 6.9 health, 'no run of two blocks' ten times in eighty seconds, crouched each time and quarried between, and two blows of the body took 6.9 to none. On thick ground with no void within four the body digs under its feet, one block a call, to a hole two deep, and crouches in it.
+      if (!route) {
+        const f = bot.entity.position.floored();
+        const solid = c => bot.blockAt(c)?.boundingBox === 'block';
+        const sidesClosed = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(f.offset(dx, 0, dz)) && solid(f.offset(dx, 1, dz))).length;
+        const thick = [1, 2, 3, 4, 5, 6].every(dy => solid(f.offset(0, -dy, 0)));
+        if (dig && sidesClosed < 4 && thick && voidSides(bot, bot.entity.position) === 0 && !deepBeside(bot, bot.entity.position) && bot.entity.onGround) {
+          goal.step = { action: 'hole_for_the_body', hazard: dragon.name, sidesClosed }; save();
+          console.log(`[end safety] the dragon's body coming: no run; a block dug under the feet at ${f} toward a hole two deep (${sidesClosed} of 4 sides closed now)`);
+          try { await dig(bot, task, f.offset(0, -1, 0), { dropInto: true, openPit: true, requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+          for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50);
+          bot.setControlState?.('sneak', true); await sleep(200); bot.setControlState?.('sneak', false);
+          return true;
+        }
+        bot.setControlState?.('sneak', true); goal.step = { action: 'crouch_for_the_body', hazard: dragon.name, islandAlongThePush: here, sidesClosed }; save(); await sleep(400); bot.setControlState?.('sneak', false); return true;
+      }
     }
     if (!route) return await evadeOverTerrain(bot, task, goal, save, dragon, { allowed });
     const start = bot.entity.position.clone();

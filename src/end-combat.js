@@ -1683,7 +1683,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           if (rose >= 1) return;
         }
       }
-      try { await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) && safeFromHostiles(bot, p, endMobs(bot)), timeoutMs: inBreath() ? 700 : 1600 }); }
+      try { await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) && safeFromHostiles(bot, p, endMobs(bot)), timeoutMs: inBreath() ? 700 : 1600, dig: actions.dig }); }
       catch (err) {
         if (err.name !== 'NoEscape') throw err;
         try { if (inBreath()) throw Object.assign(new Error('No surveyed walking escape from the dragon on loaded terrain'), { name: 'NoEscape' }); await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) }); }
