@@ -632,9 +632,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // when the block under it is dug (the drills of 2026-10-13, 04:52 and
   // 05:02Z, one dug and no drop). Short bursts of the forward key at a
   // crouch, the look set to the column's middle each time.
-  const centreOnColumn = async (tolerance = 0.1) => {
-    const u = bot._pillarUp; if (!u) return false;
-    const col = () => new Vec3(u.x + .5, bot.entity.position.y, u.z + .5), off = () => Math.hypot(col().x - bot.entity.position.x, col().z - bot.entity.position.z);
+  // Onto a cell's middle at a crouch, the look set each pulse (note 1603): the hole's own nudges without the pause between them left the body 0.83 off, out of its cell (dragon-141 and 144, 2026-10-14).
+  const centreOn = async (cx, cz, tolerance = 0.1) => {
+    const col = () => new Vec3(cx + .5, bot.entity.position.y, cz + .5), off = () => Math.hypot(col().x - bot.entity.position.x, col().z - bot.entity.position.z);
     for (let i = 0; i < 24 && off() > tolerance; i++) {
       check();
       if (typeof bot.lookAt === 'function') await bot.lookAt(col().offset(0, 1.6, 0), true);
@@ -644,8 +644,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       await sleep(80);
     }
     bot.setControlState?.('sneak', false);
-    return off() <= 0.15;
+    return off() <= Math.max(0.15, tolerance);
   };
+  const centreOnColumn = async (tolerance = 0.1) => { const u = bot._pillarUp; if (!u) return false; return centreOn(u.x, u.z, tolerance); };
   const digDownColumn = async ({ limit = 64 } = {}) => {
     let passes = 0, aborts = 0;
     const digFromY = Math.floor(bot.entity.position.y), digFromHealth = bot.health;
@@ -2562,8 +2563,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           goal.step = { action: 'wait_in_hole', at: { ...feet } }; save();
           // Centred on the cell first (note 1595): a body 0.6 wide at a cell's edge stands on the rim when the cell under it is dug, and 25588 (dragon-139, 2026-10-14 07:35Z) dug its hole at (10, 60, 16) and stayed at 60, 'a side open'.
           const centre = feet.offset(.5, 0, .5), off = () => Math.hypot(centre.x - bot.entity.position.x, centre.z - bot.entity.position.z);
-          for (let i = 0; i < 20 && off() > 0.12; i++) { check(); try { await bot.lookAt(centre.offset(0, 1.6, 0), true); } catch (_) { /* looked */ } bot.setControlState?.('sneak', true); bot.setControlState?.('forward', true); await sleep(off() > 0.4 ? 100 : 50); bot.setControlState?.('forward', false); await sleep(60); }
-          bot.setControlState?.('sneak', false);
+          await centreOn(feet.x, feet.z, 0.12);
           for (const dy of [1, 2]) { check(); await actions.dig(bot, task, feet.offset(0, -dy, 0), { requireDrops: false }); }
           for (let i = 0; i < 30 && Math.floor(bot.entity.position.y) > feet.y - 2; i++) await sleep(50);
           const inIt = Math.floor(bot.entity.position.y) <= feet.y - 2;
