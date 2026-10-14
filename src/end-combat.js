@@ -1026,6 +1026,17 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
       }
       if (cleared) console.log(`[end combat] the fall's way over the pool's row cleared: ${cleared} block${cleared === 1 ? '' : 's'} dug`);
+      // A floor under every cell of the row (note 1602): the quarry's pits run under the rows, a pour into a cell with no floor goes a block lower and the row stays dry. 25588 (dragon-143, 2026-10-14 08:24Z, four crystals broken) had its water go in '1 below the row at 60', the pour again went astray, and climbed with no bucket and no pool, dead at 94.
+      let floored = 0;
+      for (const t of trench.slice(0, dug)) {
+        const under = t.offset(0, -1, 0); if (bot.blockAt(under)?.boundingBox === 'block') continue;
+        const name = blocksCarriedName(bot), item = name && bot.inventory.items().find(i => i.name === name); if (!item) break;
+        const ref = [[0, -1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]].map(([dx, dy, dz]) => ({ b: bot.blockAt(under.offset(dx, dy, dz)), face: new Vec3(-dx, -dy, -dz) })).find(r => r.b?.boundingBox === 'block');
+        if (!ref) continue;
+        try { check(); await bot.equip(item, 'hand'); await bot.lookAt(ref.b.position.offset(.5 + ref.face.x * .5, .5 + ref.face.y * .5, .5 + ref.face.z * .5), true); await bot.placeBlock(ref.b, ref.face); await sleep(60); if (bot.blockAt(under)?.boundingBox === 'block') floored++; }
+        catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+      }
+      if (floored) console.log(`[end combat] the pool's row floored: ${floored} block${floored === 1 ? '' : 's'} laid under it`);
       if (dug >= 2) { best.cell = trench[Math.floor((dug - 1) / 2)].clone(); best.reach = dug; console.log(`[end combat] the pool's trench dug: ${dug} cells from ${trench[0]} out from the column at (${column.x}, ${column.z}); the water goes in at ${best.cell}${dug < len ? ` (${len} wanted: the row ends there)` : ''}`); }
     }
     const eye = bot.entity.position.offset(0, 1.62, 0), target = best.cell.offset(.5, -.01, .5);
@@ -1067,7 +1078,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         console.log(`[end combat] the water went in at ${src}, ${best.cell.y - src.y} below the row at ${best.cell.y}: no pool in the row from there; taken back and poured again`);
         try { await require('./water').fillWaterBucket(bot, task, src, { timeoutMs: 1500 }); } catch (_) { /* left */ }
         water = bot.inventory.items().find(i => i.name === 'water_bucket');
-        if (water) { try { await pourOnce(); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; } poured = bot.blockAt(best.cell)?.name === 'water' && isSource(bot.blockAt(best.cell)); }
+        if (water) {
+          try { await pourOnce(); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+          poured = bot.blockAt(best.cell)?.name === 'water' && isSource(bot.blockAt(best.cell));
+          if (!poured) {
+            // The second pour astray too: its source found and taken back, the bucket kept (note 1602).
+            const again = bot.findBlocks({ matching: bot.registry.blocksByName.water.id, maxDistance: 6, count: 8, useExtraInfo: isSource }).map(p => p.floored()).filter(p => Math.abs(p.x - best.cell.x) <= 3 && Math.abs(p.z - best.cell.z) <= 3 && Math.abs(p.y - best.cell.y) <= 3 && !(state.poolsLeft || []).some(w => w.x === p.x && w.y === p.y && w.z === p.z)).sort((p, q) => p.distanceTo(best.cell) - q.distanceTo(best.cell))[0];
+            if (again && again.y >= best.cell.y) { console.log(`[end combat] the second pour went in at ${again}: the pool is there`); best.cell = again; poured = true; }
+            else if (again) { console.log(`[end combat] the second pour went in at ${again} too, below the row: taken back, the bucket kept`); try { await require('./water').fillWaterBucket(bot, task, again, { timeoutMs: 1500 }); } catch (_) { /* left */ } }
+          }
+        }
       }
     }
     // The row holds water where the body comes down (note 1600): the cells of the trench read back after the pour.
