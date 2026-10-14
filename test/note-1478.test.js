@@ -605,3 +605,27 @@ test('in the cloud on thick ground with no run, the body goes two up before any 
   assert.match(up, /up out of the breath on the ground: \d blocks up/);
   assert.equal(dug.filter(p => p.x === 0 && p.z === 0 && p.y < 64).length, 0, `dug down into the ground: ${dug.map(String).join(' ')}`);
 });
+
+test('in the cloud one block up a short column with blocks carried, the body goes two up, not one down into it (note 1590)', async () => {
+  const { bot, goal, task } = fixture();
+  // A one-block column at (0, 64) on the island at 64: the feet at 65, the cloud at the feet; the dragon over the island, a pass coming.
+  bot._pillarUp = { x: 0, z: 0, until: Date.now() + 600000 };
+  bot.entity.position = new Vec3(0.5, 65, 0.5);
+  const placed = new Set();
+  // The quarry's pit east of the column, three deep: the column reads as the bot's own (a drop of three beside it).
+  bot.blockAt = p => { const f = p.floored(), k = `${f.x},${f.y},${f.z}`; if (placed.has(k)) return { name: 'cobblestone', boundingBox: 'block', position: f }; if (f.x === 0 && f.z === 0 && f.y === 64) return { name: 'cobblestone', boundingBox: 'block', position: f }; if (f.x === 1 && f.z === 0 && f.y >= 61) return { name: 'air', boundingBox: 'empty', position: f }; return { name: f.y < 64 ? 'end_stone' : 'air', boundingBox: f.y < 64 ? 'block' : 'empty', position: f }; };
+  bot.placeBlock = async (ref, face) => { const c = ref.position.plus(face); placed.add(`${c.x},${c.y},${c.z}`); if (c.x === 0 && c.z === 0) bot.entity.position = new Vec3(0.5, c.y + 1, 0.5); };
+  bot.setControlState = () => {};
+  bot.entities[20].position = new Vec3(6, 72, 0);
+  const cloud = { id: 40, name: 'area_effect_cloud', position: new Vec3(0.5, 65, 0.5), isValid: true, metadata: {} };
+  cloud.metadata[registry.entitiesByName.area_effect_cloud.metadataKeys.indexOf('radius')] = 3;
+  bot.entities[40] = cloud;
+  const dug = [];
+  const dig = async (b, t, p) => { dug.push(p.clone()); };
+  const lines = [], log = console.log; console.log = (...a) => { lines.push(a.join(' ')); log(...a); };
+  try { await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'observe' } } }) }); }
+  catch (err) { if (!['NoEscape', 'Cancelled', 'Blocked'].includes(err.name)) throw err; }
+  finally { console.log = log; }
+  assert.ok(lines.some(l => l.includes('up out of the breath on the short column')), lines.filter(l => l.includes('end combat')).join('\n'));
+  assert.equal(dug.filter(p => p.x === 0 && p.z === 0 && p.y === 64).length, 0, `dug the column down into the cloud: ${dug.map(String).join(' ')}`);
+});

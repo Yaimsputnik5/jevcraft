@@ -553,6 +553,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     }
     return false;
   };
+  // The column's blocks under the feet, up to six.
+  const columnDepth = () => { const f = bot.entity.position.floored(); let n = 0; while (n < 6 && SCAFFOLD_UNDER.test(bot.blockAt(f.offset(0, -1 - n, 0))?.name || '') && !(bot.blockAt(f.offset(0, -1 - n, 0))?.name === 'end_stone' && f.y - 1 - n < 66 && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => bot.blockAt(f.offset(dx, -2 - n, dz))?.boundingBox === 'block'))) n++; return n; };
   // On the recorded column's own cell, the record alive, a block under the feet.
   const onColumnCell = () => { const u = bot._pillarUp; if (!u || u.until < Date.now()) return false; const f = bot.entity.position.floored(); return f.x === u.x && f.z === u.z && bot.blockAt(f.offset(0, -1, 0))?.boundingBox === 'block'; };
   // The breath's cloud under the feet (note 1576): a cloud lies half a block
@@ -1177,7 +1179,22 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     return down;
   };
   // The way down the column as Jev chose it for this fight (column_descent): the drop where chosen and possible, the dig otherwise.
+  // Up two instead of down on a short column (note 1590): the cloud lies at
+  // the feet, the dig down ends in it for three blocks and the column has
+  // fewer, and two laid are under a second. 25588 (dragon-134, 2026-10-14
+  // 06:35Z, two crystals broken) stood one up its column at (-13, 63, 42)
+  // with no pool under the way and no bucket, dug its one block down into
+  // the cloud, 20 to 14 to 8.6 to 2.8 to none in three seconds, 24 blocks carried.
+  const upOutOfBreathOnShortColumn = async () => {
+    if (breathThreat(bot)?.name !== 'area_effect_cloud' || blocksCarried(bot) < 2 || columnDepth() >= 4) return false;
+    goal.step = { action: 'up_out_of_breath_on_column', health: bot.health }; save();
+    const from = Math.floor(bot.entity.position.y);
+    try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    console.log(`[end combat] up out of the breath on the short column: ${Math.floor(bot.entity.position.y) - from} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
+    return true;
+  };
   const wayDown = async (opts) => {
+    if (await upOutOfBreathOnShortColumn()) return;
     const dropChosen = state.descent?.pick === 'water_drop' && Date.now() - state.descent.at < 30 * 60000;
     // From the column's own cell whatever onOwnPillar says of it (note 1573):
     // at the top against a thick pillar, the roof's post and the obsidian
