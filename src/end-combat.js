@@ -1639,6 +1639,35 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     console.log(`[end combat] the stub at ${bot.entity.position.floored()} roofed against the next fireball: ${roofed ? 'laid' : 'not laid'}, ${Date.now() - t0} ms, ${blocksCarried(bot)} blocks left`);
     return roofed;
   };
+  // The hole dug before the pass (note 1674): the body's call comes within 12 blocks, under a second before the blow, and the hole of note 1667 gets one block a call; the dragon in flight is seen coming from 32 blocks, two and a half seconds off at 13 a second, time for two blocks with the iron pickaxe. 25588 (dragon-208, 2026-10-14 22:29Z, one crystal broken) took three passes of the body in a minute on open ground, 14.6 to 9.2, 6.5 to 3.8, and 11.8 to 6.4 a second after it left its roofed hole to quarry, and was carried 90 blocks into the void; dragon-200, 202 and 204 died of the body on open ground the same evening. On diggable ground clear of the void and water, with the dragon flying within 32 and closing at four a second or more, a block is dug under the feet toward a hole two deep; in a hole two deep the body holds while the dragon is within 24. Nothing is dug on the bot's own column, its cell or an obsidian top, nor in a hole already.
+  const holeBeforeThePass = async () => {
+    if (!actions.dig || !onTheGround() || inWater()) return false;
+    const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
+    if (!d || perched(bot, d)) { state.dragonTrack = null; return false; }
+    const p = bot.entity.position, flat = Math.hypot(d.position.x - p.x, d.position.z - p.z), now = Date.now();
+    const last = state.dragonTrack; state.dragonTrack = { t: now, flat };
+    const closing = last && now - last.t > 0 && now - last.t < 3000 ? (last.flat - flat) / ((now - last.t) / 1000) : 0;
+    const f = p.floored(), solid = c => bot.blockAt(c)?.boundingBox === 'block';
+    const sidesClosed = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(f.offset(dx, 0, dz)) && solid(f.offset(dx, 1, dz))).length;
+    if (sidesClosed >= 4) {
+      if (flat > 24 || Math.abs(d.position.y - p.y) > 30) return false;
+      if (!(state.holdInHoleSaid > now - 5000)) { state.holdInHoleSaid = now; console.log(`[end combat] held in the hole at ${f}: the dragon ${Math.round(flat)} blocks off${closing > 0 ? `, closing at ${Math.round(closing)} a second` : ''}`); }
+      goal.step = { action: 'hold_in_hole_for_the_pass', dragonBlocksOff: Math.round(flat) }; save();
+      bot.setControlState?.('sneak', true); await sleep(300); bot.setControlState?.('sneak', false);
+      return true;
+    }
+    if (!(flat < 32 && closing >= 4 && Math.abs(d.position.y - p.y) < 30)) return false;
+    const thick = [1, 2, 3, 4, 5, 6].every(dy => solid(f.offset(0, -dy, 0)));
+    const { voidSides, deepBeside } = require('./end-safety');
+    const wet = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => /water/.test(bot.blockAt(f.offset(dx, 0, dz))?.name || '') || /water/.test(bot.blockAt(f.offset(dx, -1, dz))?.name || ''));
+    if (!thick || wet || voidSides(bot, p) > 0 || deepBeside(bot, p) || !bot.entity.onGround) return false;
+    goal.step = { action: 'hole_before_the_pass', dragonBlocksOff: Math.round(flat), closing: Math.round(closing), sidesClosed }; save();
+    console.log(`[end combat] the dragon coming at ${Math.round(closing)} a second, ${Math.round(flat)} blocks off: a block dug under the feet at ${f} toward a hole before the pass (${sidesClosed} of 4 sides closed now)`);
+    bot.clearControlStates?.(); bot.pathfinder?.setGoal?.(null);
+    try { await actions.dig(bot, task, f.offset(0, -1, 0), { dropInto: true, openPit: true, requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
+    for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50);
+    return true;
+  };
   const respond = async () => {
     // Emergency handlers must not trip the guard that interrupted ordinary
     // planning. They still retain cancellation and the caller's guard.
@@ -1909,6 +1938,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     { const h = bot.health, was = state.lastHealthSeen; state.lastHealthSeen = h;
       if (Number.isFinite(was) && h < was - 0.05 && (onOwnPillar() || onObsidianTop())) { const c = state.columnDamage ||= { hits: 0, total: 0, max: 0 }; const d = Math.round((was - h) * 10) / 10; c.hits++; c.total = Math.round((c.total + d) * 10) / 10; c.max = Math.max(c.max, d); save(); } }
     if (endEmergency(bot, { ground: onTheGround() }) && !holeAnswers()) { await respond(); return; }
+    if (await holeBeforeThePass()) return;
     // The water poured against an enderman taken back once it is gone (note 1646): the pick-up reached five blocks and the walk back was left to the question, and 25588 (dragon-178 and 179, 2026-10-14 15:40 to 15:58Z) each walked off from their last bucket's water and were offered the walk back for minutes without taking it. With no full bucket, an empty one, no enderman within twelve and the water within sixteen, the body goes back for it first.
     if (countOf(bot, 'water_bucket') === 0 && countOf(bot, 'bucket') > 0 && (state.poolsLeft || []).length && !onOwnPillar() && !onObsidianTop() && !hostileEntities(bot, 12).some(e => live(bot, e) && e.name === 'enderman') && !(dragon && dragonThreat(bot))) {
       if (await reclaimWaterLeft({ within: 16 })) return;
