@@ -2241,6 +2241,29 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             delete bot._pillarUp;
             if (Math.floor(bot.entity.position.x) === best.step.x && Math.floor(bot.entity.position.z) === best.step.z) { progress = true; console.log(`[end combat] up onto the island's top at ${bot.entity.position.floored()}`); }
             else throw new Error(`The step onto the top was not taken: at ${bot.entity.position.floored()}`);
+            // In off the cliff's lip in the same run (note 1571): the top's edge
+            // is where the first pass after the climb lands, a fireball's cloud
+            // on arrival with the void a step back and the escape pillar's
+            // foot on the lip. 25588 died there four times on 2026-10-14
+            // (dragon-98, 116, 118 drowned off it, 119 at (48, 49, -26),
+            // 14.5 to 0 by breath under its own pillar). Six blocks toward the
+            // island's middle, the ground within three of the top's level.
+            {
+              const centre = state.arenaCenter ? vector(state.arenaCenter) : new Vec3(0, best.step.y, 0);
+              const dx = centre.x - (best.step.x + .5), dz = centre.z - (best.step.z + .5), len = Math.hypot(dx, dz) || 1;
+              let inward = null;
+              for (const d of [6, 5, 4, 3]) {
+                const x = Math.floor(best.step.x + .5 + dx / len * d), z = Math.floor(best.step.z + .5 + dz / len * d);
+                const y = top(x, z); if (y === null || Math.abs(y - best.step.y) > 3) continue;
+                if (bot.blockAt(new Vec3(x, y, z))?.boundingBox === 'block' || bot.blockAt(new Vec3(x, y + 1, z))?.boundingBox === 'block') continue;
+                inward = new Vec3(x, y, z); break;
+              }
+              if (inward) {
+                try { await actions.navigate(bot, task, new goals.GoalBlock(inward.x, inward.y, inward.z), { timeoutMs: 12000, stallMs: 4000 }); }
+                catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+                console.log(`[end combat] in off the cliff's lip: ${Math.round(bot.entity.position.distanceTo(best.step.offset(.5, 0, .5)))} blocks in at ${bot.entity.position.floored()} (${inward} wanted)`);
+              } else console.log(`[end combat] in off the cliff's lip: no level ground found within six toward the island's middle`);
+            }
           } };
       }
     }

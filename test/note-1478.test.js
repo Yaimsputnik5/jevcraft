@@ -396,3 +396,30 @@ test('the floor falling away beyond the landing is the island\'s edge, and that 
   assert.match(sides, /east: 12 down.*the floor falls away 2 out \(the edge\)/);
   assert.doesNotMatch(sides, /east taken/);
 });
+
+test('up onto the top, the run walks in off the cliff\'s lip toward the island\'s middle (note 1571)', async () => {
+  const { bot, goal, task } = fixture();
+  // On the shelf at 45 east of the middle, the cliff's face west of the feet rising to the top at 52; no column of its own.
+  delete bot._pillarUp;
+  bot.entity.position = new Vec3(50.5, 45, -26.5);
+  bot.blockAt = p => {
+    const f = p.floored();
+    if (f.x >= 20 && f.x <= 49 && f.y < 52) return { name: 'end_stone', boundingBox: 'block', position: f };
+    if (f.x >= 50 && f.x <= 58 && f.y < 45) return { name: 'end_stone', boundingBox: 'block', position: f };
+    return { name: 'air', boundingBox: 'empty', position: f };
+  };
+  bot.entities[30].position = new Vec3(-30.5, 85, 0.5);
+  bot.entities[20].position = new Vec3(0, 90, 0);
+  const pr = require('../src/pillar-recovery'), up = pr.pillarUp;
+  pr.pillarUp = async (b, t, y) => { b.entity.position = new Vec3(50.5, y, -26.5); };
+  bot.setControlState = (k, v) => { if (k === 'forward' && v) bot.entity.position = new Vec3(49.5, 52, -26.5); };
+  const walks = [];
+  const navigate = async (b, t, g) => { walks.push({ x: g.x, y: g.y, z: g.z }); if (g.x === 50 && g.y === 45) b.entity.position = new Vec3(50.5, 45, -26.5); else b.entity.position = new Vec3(g.x + .5, g.y, g.z + .5); };
+  const lines = [], log = console.log; console.log = (...a) => { lines.push(a.join(' ')); log(...a); };
+  try { await fightEndStep(bot, task, goal, () => {}, { navigate, dig: async () => {}, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'climb_to_the_top' } } }) }); }
+  finally { console.log = log; pr.pillarUp = up; }
+  assert.ok(lines.some(l => l.includes("up onto the island's top")), lines.filter(l => l.includes('end combat')).join('\n'));
+  const inward = walks.find(w => w.y === 52 && w.x <= 44);
+  assert.ok(inward, `no walk inward: ${JSON.stringify(walks)}`);
+  assert.match(lines.find(l => l.includes("in off the cliff's lip")) || '', /\d+ blocks in at/);
+});
