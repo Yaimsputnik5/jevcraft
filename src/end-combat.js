@@ -699,9 +699,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // 05:02Z, one dug and no drop). Short bursts of the forward key at a
   // crouch, the look set to the column's middle each time.
   // Onto a cell's middle at a crouch, the look set each pulse (note 1603): the hole's own nudges without the pause between them left the body 0.83 off, out of its cell (dragon-141 and 144, 2026-10-14).
-  const centreOn = async (cx, cz, tolerance = 0.1) => {
+  const centreOn = async (cx, cz, tolerance = 0.1, { maxMs = 5000 } = {}) => {
     const col = () => new Vec3(cx + .5, bot.entity.position.y, cz + .5), off = () => Math.hypot(col().x - bot.entity.position.x, col().z - bot.entity.position.z);
-    for (let i = 0; i < 24 && off() > tolerance; i++) {
+    const t0 = Date.now();
+    for (let i = 0; i < 24 && off() > tolerance && Date.now() - t0 < maxMs; i++) {
       check();
       if (typeof bot.lookAt === 'function') await bot.lookAt(col().offset(0, 1.6, 0), true);
       bot.setControlState?.('sneak', true); bot.setControlState?.('forward', true);
@@ -712,7 +713,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     bot.setControlState?.('sneak', false);
     return off() <= Math.max(0.15, tolerance);
   };
-  const centreOnColumn = async (tolerance = 0.1) => { const u = bot._pillarUp; if (!u) return false; return centreOn(u.x, u.z, tolerance); };
+  const centreOnColumn = async (tolerance = 0.1, opts = {}) => { const u = bot._pillarUp; if (!u) return false; return centreOn(u.x, u.z, tolerance, opts); };
   const digDownColumn = async ({ limit = 64 } = {}) => {
     let passes = 0, aborts = 0;
     const digFromY = Math.floor(bot.entity.position.y), digFromHealth = bot.health;
@@ -739,7 +740,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // No dig down under water at the feet (note 1643): the water follows the body into the shaft, the roof laid against the fireball seals it, and 25588 (dragon-177, 2026-10-14 15:19Z, no crystal broken) drowned in its own column at (31, 45, -23), oxygen 0 for six seconds at the bottom, 'swim_up' with nowhere to rise to. The water goes back into the bucket first, enderman or no enderman; left, the dig is not made.
     if (inWater()) { await takeBackWaterNear({ force: true }); if (inWater()) { console.log(`[end combat] no dig down at ${bot.entity.position.floored()}: water at the feet that the bucket did not take back`); return; } }
     // Centred to 0.2 in the cloud too (note 1651): at 0.45 off the middle a body 0.6 wide hangs a quarter block over the column's edge, and when the block under it is dug it drops down the outside of the column, not into the cell. 25588 (dragon-184, 2026-10-14 17:02Z, three crystals broken) took the breath at 88, dug down, and fell from (-11, 88, -44) beside its column at (-11, -43), 11.7 to 6.6 on a ledge at 80 and to none at 61; dragon-168, 169 and 172 fell from their columns the same way after the breath.
-    if (!await centreOnColumn(breathThreat(bot)?.name === 'area_effect_cloud' ? 0.2 : 0.1)) console.log(`[end combat] not centred on the column before the dig: ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off`);
+    // In the cloud the centring gets eight tenths of a second, and a body not centred by then goes two up out of the cloud instead of digging off its middle (note 1652): the nudging ran up to five seconds in the breath, and 25588 (dragon-185, 2026-10-14 17:05Z, no crystal broken) went 20 to 2.4 on crystal 11's top at 82 between 'the breath at the feet during the hold: down the column' and the fall, the body nudged from x 34 to 36 across the cell; dragon-168, 169, 172 and 184 lost their columns the same way.
+    const inCloudNow = breathThreat(bot)?.name === 'area_effect_cloud';
+    const centred = await centreOnColumn(inCloudNow ? 0.2 : 0.1, { maxMs: inCloudNow ? 800 : 5000 });
+    if (!centred && inCloudNow && blocksCarried(bot) >= 2) {
+      const from = Math.floor(bot.entity.position.y);
+      try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+      console.log(`[end combat] not centred in the cloud: ${Math.floor(bot.entity.position.y) - from} blocks up out of it instead at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
+      return;
+    }
+    if (!centred) console.log(`[end combat] not centred on the column before the dig: ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off`);
     console.log(`[end combat] down the column from ${bot.entity.position.floored()}, ${bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || 'nothing'} under the feet, column ${JSON.stringify(bot._pillarUp)}`);
     for (; n < limit; n++) {
       check();
