@@ -164,6 +164,20 @@ async function pourAtFeet(bot, check, { urgent = false } = {}) {
   for (let n = 0; n < 20; n++) { check(); if (bot.blockAt(feet)?.name === 'water') return feet; await sleep(50); }
   return null;
 }
+// Water poured on the ground at the enderman's own feet (note 1671), where the bot's feet are a top it would run off (note 1657): the enderman in water takes damage and teleports off, and the water lies where it stands. 25588 (dragon-205, 2026-10-14 21:55Z, no crystal broken, 9 health) stood on its two-block stub at (11, 62, 11), 'no water at the feet: it would run off', fought the enderman with the sword, two blows, and took three of its, 9 to 4.9 to 0.9 to none in two seconds.
+async function pourAtEndermanFeet(bot, check, enderman) {
+  const bucket = bot.inventory.items().find(i => i.name === 'water_bucket');
+  if (!bucket || !enderman) return null;
+  const feet = enderman.position.floored(), below = feet.offset(0, -1, 0);
+  if (bot.blockAt(below)?.boundingBox !== 'block' || !/^(air|short_grass|grass)$/.test(bot.blockAt(feet)?.name || '')) return null;
+  const eye = bot.entity.position.offset(0, 1.62, 0);
+  if (eye.distanceTo(below.offset(.5, 1, .5)) > 4.5) return null;
+  await bot.equip(bucket, 'hand'); check();
+  await bot.lookAt(below.offset(.5, 1, .5), true); await sleep(100);
+  bot.activateItem();
+  for (let n = 0; n < 20; n++) { check(); if (bot.blockAt(feet)?.name === 'water') return feet; await sleep(50); }
+  return null;
+}
 async function takeWaterBack(bot, check, at) {
   const p = vector(at), bucket = bot.inventory.items().find(i => i.name === 'bucket');
   if (!bucket || bot.blockAt(p)?.name !== 'water' || bot.entity.position.distanceTo(p.offset(.5, .5, .5)) > 4) return false;
@@ -1975,8 +1989,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const lastWater = state.water && vector(state.water.at);
     const waterStands = lastWater && bot.blockAt(lastWater)?.name === 'water' && lastWater.distanceTo(bot.entity.position) <= 6;
     if (turned && !waterStands) {
-      const at = await pourAtFeet(bot, check, { urgent: turned.position.distanceTo(bot.entity.position) <= 4 });
+      let at = await pourAtFeet(bot, check, { urgent: turned.position.distanceTo(bot.entity.position) <= 4 });
       if (at) { state.water = { at: { ...at }, poured: Date.now() }; state.pours = (state.pours || 0) + 1; goal.step = { action: 'end_water', against: 'enderman', at: { ...at } }; save(); console.log(`[end combat] water poured at ${vector(at)} against the enderman ${Math.round(turned.position.distanceTo(bot.entity.position))} blocks off (${countOf(bot, 'water_bucket')} full left)`); }
+      else if (runOffSides(bot, bot.entity.position.floored()).length >= 2 && turned.position.distanceTo(bot.entity.position) <= 4.5 && (countOf(bot, 'water_bucket') >= 2 || bot.health < 12)) {
+        at = await pourAtEndermanFeet(bot, check, turned);
+        if (at) { state.water = { at: { ...at }, poured: Date.now() }; state.pours = (state.pours || 0) + 1; (state.poolsLeft ||= []).push({ x: at.x, y: at.y, z: at.z, at: Date.now() }); goal.step = { action: 'end_water', against: 'enderman', at: { ...at }, atItsFeet: true }; save(); console.log(`[end combat] water poured at ${vector(at)} at the enderman's own feet, ${Math.round(turned.position.distanceTo(bot.entity.position))} blocks off, the bot's top a run-off (${countOf(bot, 'water_bucket')} full left)`); }
+      }
     }
     // Within eight (note 1462): one at six struck the bot held 'unsafe' with none within six.
     // Six again (note 1467): at eight the defence began and its loop, wanting six, ended at once, 21 passes a second (dragon-46).
