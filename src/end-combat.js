@@ -1570,6 +1570,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         const roofedHere = [2, 3].some(dy => bot.blockAt(f0.offset(0, dy, 0))?.boundingBox === 'block');
         if (inBreath() && blocksCarried(bot) >= 2 && !roofedHere && !onObsidianTop()) {
           goal.step = { action: 'up_out_of_breath_first', health: bot.health }; save();
+          // The feet on the ground first (note 1640): the body arrives in the cloud at a run or off a step, and the climb refused 'air under the feet' while it was in the air (dragon-171 and 174, 2026-10-14, each dead in the cloud a second later). The keys let go and up to half a second waited for the ground.
+          bot.clearControlStates(); bot.pathfinder?.setGoal?.(null);
+          for (let i = 0; i < 10 && !bot.entity.onGround; i++) { check(); await sleep(50); }
           const from = Math.floor(bot.entity.position.y);
           try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
           const rose = Math.floor(bot.entity.position.y) - from;
