@@ -1035,12 +1035,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // 1.4 blocks in four seconds, 20 to none. The rim is a block up and a block
     // or two off: forward and the jump, toward the column's foot.
     if (down && inWater()) {
-      const u = bot._pillarUp || (state.pool && { x: state.pool.x - (state.pool.dx || 0), z: state.pool.z - (state.pool.dz || 0) });
-      const toward = u ? new Vec3(u.x + .5, bot.entity.position.y + 1, u.z + .5) : bot.entity.position.offset(2, 1, 0);
+      // Sideways to the rim (note 1561), not toward the column: the trench runs
+      // to the column's foot, and 25588 (dragon-112, 2026-10-14 02:35Z) walked
+      // from (-8, 59, 37) to (-10, 59, 37) along it, 'still in the water'. The
+      // way out is the nearest side whose rim stands a block up with air over it.
+      const feet = bot.entity.position.floored();
+      const ways = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dz]) => { for (let d = 1; d <= 2; d++) { const c = feet.offset(dx * d, 0, dz * d); if (bot.blockAt(c)?.boundingBox === 'block' && bot.blockAt(c.offset(0, 1, 0))?.boundingBox !== 'block' && bot.blockAt(c.offset(0, 2, 0))?.boundingBox !== 'block') return { dx, dz, d }; if (bot.blockAt(c)?.name !== 'water') break; } return null; }).filter(Boolean).sort((a, b) => a.d - b.d);
+      const way = ways[0];
+      const toward = way ? feet.offset(way.dx * (way.d + 1) + .5, 1.5, way.dz * (way.d + 1) + .5) : bot.entity.position.offset(2, 1, 0);
       try {
         await require('./motion').move(bot, task, { label: 'out_of_the_trench', keys: ['forward', 'jump'], sneak: false, why: 'up out of the pool\'s trench onto the rim before anything else (note 1559)', look: toward, maxMs: 2500, tick: 25, until: () => !inWater() && bot.entity.onGround });
       } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
-      console.log(`[end combat] out of the trench: ${inWater() ? 'still in the water' : 'on the rim'} at ${bot.entity.position.floored()}`);
+      console.log(`[end combat] out of the trench: ${inWater() ? 'still in the water' : 'on the rim'} at ${bot.entity.position.floored()}${way ? ` (${way.dx === 1 ? 'east' : way.dx === -1 ? 'west' : way.dz === 1 ? 'south' : 'north'}, the rim ${way.d} off)` : ' (no rim found beside)'}`);
     }
     if (down && countOf(bot, 'bucket') > 0 && !breathThreat(bot) && !dragonThreat(bot)) { try { await takeBackWaterNear(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
     return down;
