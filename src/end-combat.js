@@ -452,7 +452,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   const dragons = Object.values(bot.entities).filter(e => live(bot, e) && e.name === 'ender_dragon');
   if (dragons.length > 1) { policy.restore(); throw blocked('More than one observed dragon; target is ambiguous'); }
   const dragon = dragons[0], beforeDragon = dragon && metadata(bot, dragon, 'health');
-  let progress = false, chose = false;
+  let progress = false, chose = false, breathWatch = null;
   const motion = new Map();
   const moved = entity => {
     if (entity !== dragon) return;
@@ -3010,8 +3010,25 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     goal.step = { action: 'end_combat', selected: decision.path, dragonHealth: beforeDragon, observedCrystals: crystals.length }; save();
     // Out of the hole first for anything but the stay (note 1592).
     if (holeHere() && !['stay_in_hole', 'observe'].includes([].concat(decision.path).at(-1))) { try { await outOfTheHole(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
-    try { await decision.action.run(); }
+    // The breath's cloud cuts the run within a tick (note 1619): the emergency
+    // was read at the step's start and wherever a run happened to call the
+    // task's check, and a quarry's dig or a walk in the pathfinder calls it
+    // seldom. 25588 (dragon-155, 2026-10-14 10:12Z, four crystals broken, and
+    // dragon-156, 10:24Z, three) each stood still under the cloud for three
+    // seconds mid-run, 20 to 14 to 8 to 2 to none, 'hurt without a survival
+    // response', nothing pressed. The run is raced against a tick watch; the
+    // cloud at the feet ends it and the response runs. Not during the drop
+    // (the landing is its own matter), and not in a hole two deep, under it.
+    let cutRun = null, raced = false; const cut = new Promise((_, reject) => { cutRun = reject; }); cut.catch(() => {});
+    // Not on the bot's own column, an obsidian top or in a hole: the hold, the dig down and the stand in the hole answer the breath themselves (notes 1478, 1576, 1618); the ground's runs do not.
+    breathWatch = () => { try { if (!raced && !bot._dropping && !bot._fallRecovery && !onOwnPillar() && !onObsidianTop() && !holeHere() && breathThreat(bot)?.name === 'area_effect_cloud') { raced = true; cutRun(Object.assign(new Error('dragon_breath_cloud'), { name: 'EndEmergency' })); } } catch (_) { /* nothing */ } };
+    bot.on('physicsTick', breathWatch);
+    try {
+      const running = Promise.resolve().then(() => decision.action.run()); running.catch(() => {});
+      await Promise.race([running, cut]);
+    }
     catch (err) {
+      if (err.name === 'EndEmergency') { bot.pathfinder.setGoal(null); bot.clearControlStates(); console.log(`[end combat] ${[].concat(decision.path).join('/')} cut by the breath's cloud at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`); }
       if (['Cancelled', 'Blocked', 'EndEmergency'].includes(err.name)) throw err;
       // Moving targets, a newly visible cloud or an obstructed route require
       // a fresh bounded choice. They do not invalidate the retained goal.
@@ -3038,7 +3055,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     state.noProgress = progress ? 0 : (state.noProgress || 0) + (chose ? 1 : 0);
     state.lastActionAt = started; save();
     clearInterval(crouchKeeper);
-    bot.removeListener('entityMoved', moved); bot.removeListener('physicsTick', falling); task.interruptCheck = oldInterrupt;
+    bot.removeListener('entityMoved', moved); bot.removeListener('physicsTick', falling); if (breathWatch) bot.removeListener('physicsTick', breathWatch); task.interruptCheck = oldInterrupt;
     bot.pathfinder.setGoal(null); bot.clearControlStates(); policy.restore();
   }
 }

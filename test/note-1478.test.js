@@ -44,7 +44,9 @@ test('the hold on the column lets go the moment the breath is at the feet, and t
     bot.entities[40] = cloud; bot.health = 14.6;
   }, 250);
   const t0 = Date.now();
-  await fightEndStep(bot, task, goal, save, { navigate: async () => {}, dig, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'observe' } } }) });
+  // Two dug, the body is two under the cloud and out of it (note 1619); the fixture's dragon, which never leaves on its own, goes then, or the hold is held pass after pass.
+  const digThenGone = async (...a) => { await dig(...a); if (dug.length >= 2) bot.entities[20].position = new Vec3(80, 90, 80); };
+  await fightEndStep(bot, task, goal, save, { navigate: async () => {}, dig: digThenGone, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'observe' } } }) });
   assert.ok(steps.includes('hold_on_pillar'), steps.join(','));
   assert.ok(steps.includes('down_out_of_breath'), steps.join(','));
   assert.ok(dug.length >= 2, `dug ${dug.length}: ${dug.map(String).join(' ')}`);

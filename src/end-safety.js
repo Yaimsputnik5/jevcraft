@@ -19,7 +19,8 @@ function cloudRadius(bot, entity) {
 // cloud it had just climbed out of, 14.6 to none in four seconds.
 function hazardDistance(point, entity) {
   if (entity.name !== 'area_effect_cloud') return point.distanceTo(entity.position);
-  if (point.y - entity.position.y > 1.2 || entity.position.y - point.y > 2) return Infinity;
+  // Two deep in a hole the body's top (1.8 over the feet) is under the cloud's floor (note 1619): read as in it at exactly two under, the sword from the hole (note 1618) would be cut by its own cloud.
+  if (point.y - entity.position.y > 1.2 || entity.position.y - point.y > 1.8) return Infinity;
   return Math.hypot(point.x - entity.position.x, point.z - entity.position.z);
 }
 function breathThreat(bot) {
