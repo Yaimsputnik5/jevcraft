@@ -2340,7 +2340,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       description: { action: 'Wait one second without attacking or moving',
         health: bot.health, canRegenerate: bot.health < 20 && bot.food >= 18,
         usefulAttackAvailableNow: !!tree.shoot_dragon || !!tree.strike_head || crystals.some(c => tree[`crystal_${c.id}`]),
-        dragonPhase: metadata(bot, dragon, 'phase'), pausesWithoutProgress: state.idleObservations || 0 }, run: async () => {
+        dragonPhase: metadata(bot, dragon, 'phase'), pausesWithoutProgress: state.idleObservations || 0,
+        // Said where the wait is on the bot's own column or a pillar's top (note 1566): the dragon's pass there is its body, and the wait at 95 cost 25588 its life. dragon-114 (2026-10-14 03:27Z, six crystals broken) waited twice at 6.5 to 8.3 health on crystal 119's column top with no bucket and no pool, took two blows of the pass (9.8 to 4.6) and was flung 32 blocks down; dragon-112 (02:39Z) the same at 71, carried 30 blocks.
+        ...((onOwnPillar() || onObsidianTop()) ? { standingHere: `on ${onObsidianTop() ? 'a pillar\'s top' : 'the bot\'s own column'} at ${Math.floor(bot.entity.position.y)}, ${Math.floor(bot.entity.position.y) - 62} over the island, where the dragon's pass is its body and the breath: 25588 waited so twice today and was carried off both times, 30 blocks (dragon-112, 02:39Z) and 32 (dragon-114, 03:27Z, at 6.5 health), dead; the ways down are the dig (pillar_down, about a second and a half a block) and the drop into a pool where one lies` } : {}) }, run: async () => {
       state.idleObservations = (state.idleObservations || 0) + 1;
       bot.clearControlStates(); for (let n = 0; n < 10; n++) { check(); if (!safeHere()) break; await sleep(100); }
     } };
