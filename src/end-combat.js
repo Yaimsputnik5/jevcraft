@@ -1624,6 +1624,22 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           tally.lost += Math.max(0, healthAtStart - bot.health); save();
           if (!h) throw new Error('The dragon took off before the bot was under its head');
           tally.reached++; save();
+          // The last blocks closed on foot (note 1558): the walk ended within its
+          // goal's radius but not under the head, and 25588 (dragon-108,
+          // 2026-10-14 02:05Z, eight crystals broken, the fight's one run that
+          // reached the dragon) stood 3.6 blocks from the head's box, 'out of
+          // the sword's reach', and was flung by the take-off. Said with the
+          // geometry either way.
+          const gapTo = head => { const e = bot.entity.position.offset(0, 1.62, 0); return Math.round((Math.hypot(Math.max(0, Math.abs(head.position.x - e.x) - .5), Math.max(0, Math.abs(head.position.z - e.z) - .5))) * 10) / 10; };
+          if (!canStrike(bot, h) && gapTo(h) > 1.2) {
+            try {
+              await require('./motion').move(bot, task, { label: 'under_head_close', keys: ['forward', 'sprint'], sneak: false, why: 'the last blocks to the ground under the perched head (note 1558)', look: h.position.offset(0, -2, 0), maxMs: 3000, tick: 25,
+                until: () => { const hh = live(bot, dragon) && perchedHead(bot, dragon); return !hh || canStrike(bot, hh) || gapTo(hh) <= 1.0; } });
+            } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+            h = live(bot, dragon) && perchedHead(bot, dragon);
+            if (!h) throw new Error('The dragon took off before the bot was under its head');
+          }
+          console.log(`[end combat] under the head: the head modelled at ${h.position.floored()} (dragon at ${dragon.position.floored()}, yaw ${Math.round((dragon.yaw || 0) * 100) / 100}), the body at ${bot.entity.position.floored()}, ${gapTo(h)} aside and ${Math.round((h.position.y - (bot.entity.position.y + 1.62)) * 10) / 10} over the eyes, ${canStrike(bot, h) ? 'in reach' : 'out of reach'}`);
           // Under it and a block or two short of it: up on blocks laid under
           // the feet (note 1176). The head sits three to four blocks over
           // the ground by the fountain, and the sword reaches three from the
