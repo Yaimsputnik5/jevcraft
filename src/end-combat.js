@@ -1172,10 +1172,19 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // seven to twenty blocks off, found "no surveyed walking escape"
       // twenty-six times and stood by the fountain as the dragon came down
       // on it, 20 health to none in four touches.
-      try { await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) && safeFromHostiles(bot, p, endMobs(bot)) }); }
+      // In the breath on the ground (note 1560): one short run, and where it
+      // goes nowhere, down or up at once, not a second survey. The breath's
+      // cloud is read a tick late, and each survey with its run is a second
+      // and a half in a cloud that takes six a second: 25588 (dragon-110,
+      // 2026-10-14 02:27Z, two crystals broken) stood among its quarry's pits,
+      // 'evade breath straight' four times, moved nowhere, 20 to none;
+      // dragon-111 (02:28Z) on the ledge under the entry platform the same,
+      // 20 to none in three seconds, the way up never reached.
+      const inBreath = () => breathThreat(bot)?.name === 'area_effect_cloud' || (breathThreat(bot) && bot._lastDragonHurtAt && Date.now() - bot._lastDragonHurtAt < 1500);
+      try { await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) && safeFromHostiles(bot, p, endMobs(bot)), timeoutMs: inBreath() ? 700 : 1600 }); }
       catch (err) {
         if (err.name !== 'NoEscape') throw err;
-        try { await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) }); }
+        try { if (inBreath()) throw Object.assign(new Error('No surveyed walking escape from the dragon on loaded terrain'), { name: 'NoEscape' }); await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) }); }
         catch (err2) {
           if (err2.name !== 'NoEscape' || !actions.dig) throw err2;
           // No walk out of the cloud on the ground (note 1475): two blocks dug
@@ -1197,14 +1206,14 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           // (88, 45, 2), the void beside every cell, 'No surveyed walking
           // escape' three times, 28 blocks carried, and died in the cloud,
           // 20 to none in three seconds.
-          if (endEmergency(bot) === 'dragon_breath_cloud' && !(thick && voidEdge(bot, bot.entity.position, 4) === null) && blocksCarried(bot) >= 2) {
+          if (inBreath() && !(thick && voidEdge(bot, bot.entity.position, 4) === null) && blocksCarried(bot) >= 2) {
             goal.step = { action: 'up_out_of_breath_on_ground', health: bot.health }; save();
             const from = Math.floor(bot.entity.position.y);
             try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
             console.log(`[end combat] up out of the breath on thin ground: ${Math.floor(bot.entity.position.y) - from} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
             return;
           }
-          if (endEmergency(bot) === 'dragon_breath_cloud' && thick && voidEdge(bot, bot.entity.position, 4) === null) {
+          if (inBreath() && thick && voidEdge(bot, bot.entity.position, 4) === null) {
             goal.step = { action: 'down_out_of_breath_on_ground', health: bot.health }; save();
             for (let n = 0; n < 2; n++) { const under = bot.entity.position.floored().offset(0, -1, 0); if (bot.blockAt(under)?.boundingBox !== 'block' || bot.blockAt(under.offset(0, -1, 0))?.boundingBox !== 'block') break; try { await actions.dig(bot, task, under, { dropInto: true, openPit: true, requireDrops: false }); } catch (e3) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(e3.name)) throw e3; break; } for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50); }
             return;
@@ -1255,6 +1264,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (state.pool && near.x === state.pool.x && near.z === state.pool.z) { delete state.pool; save(); }
     return near;
   };
+  // The dragon's hurts on the body, timed (note 1560): the breath's cloud is read a tick late and its hurt is not.
+  if (!bot._dragonHurtHook && bot._client?.on) {
+    bot._dragonHurtHook = true;
+    bot._client.on('damage_event', packet => { try { if (packet?.entityId === bot.entity?.id) { const cause = bot.entities?.[(packet.sourceCauseId || 0) - 1]; if (cause?.name === 'ender_dragon') bot._lastDragonHurtAt = Date.now(); } } catch (_) { /* nothing */ } });
+  }
   const crouchKeeper = setInterval(() => {
     try { if (!bot._controller && !bot._dropping && bot.entity?.onGround && (onOwnPillar() || onObsidianTop()) && !bot.controlState?.sneak) bot.setControlState?.('sneak', true); } catch (_) { /* nothing to hold */ }
   }, 50);
