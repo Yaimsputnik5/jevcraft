@@ -573,9 +573,12 @@ test('between two pockets the column is still the bot\'s own by its record: the 
   bot._pillarUp = { x: 0, z: 0, until: Date.now() + 600000, base: 64 };
   let seen = null;
   const lines = [], log = console.log; console.log = (...a) => { lines.push(a.join(' ')); log(...a); };
-  try { await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig, place: async () => {} }, { systemOne: async ({ questions }) => { seen = JSON.stringify(questions); return { answers: { branch_0: { choice: 'observe' } } }; } }); }
+  // And pillar_down chosen digs the column's end stone under the feet in the pocket (note 1620): the pocket closes every side, and the dig read the column's stone as the island's and broke off with nothing dug.
+  const dugHere = []; const dig2 = async (b, t, p) => { dugHere.push(p.clone()); await dig(b, t, p); };
+  try { await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig: dig2, place: async () => {} }, { systemOne: async ({ questions }) => { seen = JSON.stringify(questions); return { answers: { branch_0: { choice: 'pillar_down' } } }; } }); }
   finally { console.log = log; }
   assert.ok(seen && seen.includes('"pillar_down":{'), `pillar_down offered between the pockets: ${seen && seen.slice(0, 500)}`);
+  assert.ok(dugHere.some(p => p.x === 0 && p.z === 0 && p.y === 75), `the column dug under the feet in the pocket: ${dugHere.map(String).join(' ')} | ${lines.filter(l => l.includes('down the column')).join(' | ').slice(0, 300)}`);
   assert.ok(!seen.includes('dig_to_sky') && !seen.includes('stay_in_hole'), `no sky, no hole on the column: ${seen.slice(0, 500)}`);
   assert.ok(!lines.some(l => l.includes('out of the hole')), lines.filter(l => l.includes('hole')).join('\n'));
   assert.ok(!lines.some(l => l.includes('only observe')), lines.filter(l => l.includes('only observe')).join('\n').slice(0, 300));

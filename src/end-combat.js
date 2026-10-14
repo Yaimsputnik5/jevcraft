@@ -426,8 +426,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       return raw(entity, ...rest);
     };
   }
+  let stepCut = null;
   const check = () => {
     task.check(); checkAir(bot);
+    // A run cut by the breath's watch (note 1619) ends at its next check, or it runs on beside the response (dragon-158, 2026-10-14 10:46Z: the quarry cut at 20 health dug its ten cells on while the response ran) (note 1620).
+    if (stepCut) throw Object.assign(new Error(stepCut), { name: 'EndEmergency' });
     if (dimension(bot) !== 'end' || bot.game.gameMode !== 'survival' || bot.health <= 0 || bot.isAlive === false) throw blocked('End combat requires a living Survival player in the End');
   };
   // In the End the fight is the answer to what hurts the bot: it owns every
@@ -675,7 +678,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // observe' through 58 failed escapes, 20 to 11. On the island's own
     // ground (under 70, the cells about the feet solid) end stone is the
     // island, not the column.
-    const scaffold = { test: name => SCAFFOLD_UNDER.test(name || '') && !(name === 'end_stone' && columnEnded()) };
+    // The column's end stone told from the island's by the record's base where there is one (note 1620, as 1610 for the depth): the pocket's walls close every side, columnEnded read true, and the dig broke off at once. 25588 (dragon-157, 2026-10-14 10:40Z, five crystals broken) in its pocket at (-30, 84, 24) with the dragon beating on it logged 'down the column: 0 dug' and took six blows of the body there over 75 seconds, 20 to none.
+    const base = bot._pillarUp && bot._pillarUp.until > Date.now() && bot._pillarUp.base != null ? bot._pillarUp.base : null;
+    const scaffold = { test: (name, y) => SCAFFOLD_UNDER.test(name || '') && !(name === 'end_stone' && (base != null && Number.isFinite(y) ? y < base : columnEnded())) };
     // Ended where the ground is, not at a height (note 1471): the island's
     // ground runs from 36 to 60, and 25588 (dragon-53, 2026-10-13 14:03Z,
     // crystal 12 broken) had its end-stone column at 69 read as the island
@@ -711,7 +716,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       const onCell = u && Math.hypot(u.x + .5 - p0.x, u.z + .5 - p0.z) <= 0.95 && bot.blockAt(new Vec3(u.x, f0.y - 1, u.z))?.boundingBox === 'block';
       if (onCell && (f0.x !== u.x || f0.z !== u.z)) { await centreOnColumn(); }
       const underFoot = onCell ? new Vec3(u.x, Math.floor(bot.entity.position.y) - 1, u.z) : bot.entity.position.floored().offset(0, -1, 0);
-      if (!scaffold.test(bot.blockAt(underFoot)?.name || '')) break;
+      if (!scaffold.test(bot.blockAt(underFoot)?.name || '', underFoot.y)) break;
       // A roof kept over the head on the way down (note 1455), laid again
       // when the one above is three or more over: the breath that kills on
       // the column comes with no fireball seen in flight, and the way down is
@@ -786,7 +791,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       for (let i = 0; i < 30 && Math.floor(bot.entity.position.y) >= yBefore; i++) { check(); await sleep(100); }
       for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50);
       // On the island already (the column's last block on the ground): done.
-      if (Math.floor(bot.entity.position.y) >= yBefore && bot.blockAt(underFoot.offset(0, -1, 0))?.boundingBox === 'block' && !scaffold.test(bot.blockAt(underFoot.offset(0, -1, 0))?.name || '')) { n++; break; }
+      if (Math.floor(bot.entity.position.y) >= yBefore && bot.blockAt(underFoot.offset(0, -1, 0))?.boundingBox === 'block' && !scaffold.test(bot.blockAt(underFoot.offset(0, -1, 0))?.name || '', underFoot.y - 1)) { n++; break; }
       if (Math.floor(bot.entity.position.y) >= yBefore) {
         {
           const q = bot.entity.position, f = q.floored();
@@ -797,7 +802,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     }
     bot.setControlState?.('sneak', false);
     // The record kept on the obsidian (note 1473): the way back to the column from the top can fail, and the record dropped there left 25588 (dragon-55, 2026-10-13 14:22Z, crystal 9 broken) 'only observe' on the top, 'column undefined'.
-    { const un = bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || ''; if (!scaffold.test(un) && !/^(obsidian|bedrock|iron_bars)$/.test(un)) delete bot._pillarUp; }
+    { const un = bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || ''; if (!scaffold.test(un, Math.floor(bot.entity.position.y) - 1) && !/^(obsidian|bedrock|iron_bars)$/.test(un)) delete bot._pillarUp; }
     console.log(`[end combat] down the column: ${n} dug, now at ${bot.entity.position.floored()}`);
     // The descent's record for the way-down question (note 1484).
     { const from = digFromY, to = Math.floor(bot.entity.position.y); (state.descents ||= []).push({ at: Date.now(), kind: 'dig', from, to, dug: n, down: from - to >= Math.min(limit, 3), fell: from - to > n + 2, lost: Math.round((digFromHealth - bot.health) * 10) / 10 }); state.descents = state.descents.slice(-20); }
@@ -1447,7 +1452,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   const respond = async () => {
     // Emergency handlers must not trip the guard that interrupted ordinary
     // planning. They still retain cancellation and the caller's guard.
-    task.interruptCheck = oldInterrupt;
+    task.interruptCheck = oldInterrupt; stepCut = null;
     if (fallDanger(bot)) await recoverFall(bot, task, goal, save);
     // On its own pillar, nothing but air round the feet (note 1414): there
     // is no walking escape from the dragon's pass, and looking for one threw
@@ -3021,7 +3026,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // (the landing is its own matter), and not in a hole two deep, under it.
     let cutRun = null, raced = false; const cut = new Promise((_, reject) => { cutRun = reject; }); cut.catch(() => {});
     // Not on the bot's own column, an obsidian top or in a hole: the hold, the dig down and the stand in the hole answer the breath themselves (notes 1478, 1576, 1618); the ground's runs do not.
-    breathWatch = () => { try { if (!raced && !bot._dropping && !bot._fallRecovery && !onOwnPillar() && !onObsidianTop() && !holeHere() && breathThreat(bot)?.name === 'area_effect_cloud') { raced = true; cutRun(Object.assign(new Error('dragon_breath_cloud'), { name: 'EndEmergency' })); } } catch (_) { /* nothing */ } };
+    breathWatch = () => { try { if (!raced && !bot._dropping && !bot._fallRecovery && !onOwnPillar() && !onObsidianTop() && !holeHere() && breathThreat(bot)?.name === 'area_effect_cloud') { raced = true; stepCut = 'dragon_breath_cloud'; cutRun(Object.assign(new Error('dragon_breath_cloud'), { name: 'EndEmergency' })); } } catch (_) { /* nothing */ } };
     bot.on('physicsTick', breathWatch);
     try {
       const running = Promise.resolve().then(() => decision.action.run()); running.catch(() => {});
