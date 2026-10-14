@@ -531,3 +531,26 @@ test('a cloud under the feet is said in pillar_down, and the dig down stops over
   assert.equal(dug.length, 0, `dug into the cloud: ${dug.map(String).join(' ')}`);
   assert.ok(lines.some(l => l.includes('the dig down stops at')), lines.filter(l => l.includes('end combat')).join('\n'));
 });
+
+test('inside the pocket the column still reads as the bot\'s own, the dig goes down, and the drop digs the pool side\'s wall and its post (note 1577)', async () => {
+  const { bot, dug, dig, goal, task } = fixture();
+  // The pocket round the top at 76: walls at 76 and 77 on every side, posts at 75; the pool south at (0, 64, 1); the dragon far off.
+  const walls = new Set();
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const dy of [75, 76, 77]) walls.add(`${dx},${dy},${dz}`);
+  walls.add('0,78,0');
+  const blockAt = bot.blockAt;
+  bot.blockAt = p => { const f = p.floored(), k = `${f.x},${f.y},${f.z}`; if (walls.has(k)) return { name: 'cobblestone', boundingBox: 'block', position: f }; if (f.x === 0 && f.y === 64 && f.z === 1) return { name: 'water', boundingBox: 'empty', position: f }; return blockAt(p); };
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 20 }, { name: 'bucket', count: 2 }];
+  bot.entities[20].position = new Vec3(60, 90, 60);
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'water_drop', at: Date.now() }, pool: { x: 0, y: 64, z: 1, dx: 0, dz: 1, at: Date.now() } };
+  const digWalls = async (b, t, p) => { walls.delete(`${p.x},${p.y},${p.z}`); dug.push(p.clone()); };
+  let seen = null;
+  const lines = [], log = console.log; console.log = (...a) => { lines.push(a.join(' ')); log(...a); };
+  try { await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig: digWalls, place: async () => {} }, { systemOne: async ({ questions }) => { seen = JSON.stringify(questions); return { answers: { branch_0: { choice: 'water_drop' } } }; } }); }
+  finally { console.log = log; }
+  assert.ok(seen && seen.includes('pillar_down') && seen.includes('water_drop'), seen && seen.slice(0, 400));
+  const sides = lines.find(l => l.includes("the drop's sides from"));
+  assert.ok(sides && /south.*walled by the bot's own blocks: dug first/.test(sides), lines.filter(l => l.includes('drop')).join('\n'));
+  for (const y of [75, 76, 77]) assert.ok(dug.some(p => p.x === 0 && p.z === 1 && p.y === y), `the south wall and post dug: ${dug.map(String).join(' ')}`);
+  assert.ok(lines.some(l => /the water drop from \(0, 76, 0\)/.test(l)), lines.filter(l => l.includes('water drop')).join('\n'));
+});

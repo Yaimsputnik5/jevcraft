@@ -245,12 +245,30 @@ function arenaMovement(bot, center) {
   // to ground five blocks off. A cell with the void within three is no step
   // of a walk; the bot's own cell is, to leave it.
   const own = bot.entity.position.floored();
-  const rim = point => { const f = point.floored(); const under = bot.blockAt(f.offset(0, -1, 0)); return under?.name === 'end_stone' && (deepBeside(bot, point) || (!f.equals(own) && voidEdge(bot, point, 3) !== null)); };
+  // The rim read once a cell (note 1578): the path search asks allowedPoint
+  // of every cell it expands, and voidEdge reads up to 960 blocks a cell
+  // (three rings, eight ways, forty down). The CPU profile of the arena
+  // drill of 2026-10-14 05:13Z had 21 of 33 busy seconds in the search's
+  // getNeighbors, 10 of them in this rim test: the event loop held two to
+  // four seconds at a time, and the live runs' stalls (dragon-124's 2.2 s in
+  // the breath, 126's 2.5 s at the blow) were these searches. The cells'
+  // verdicts are kept a second and a half; the hazards are read once in 150 ms.
+  const rimCache = new Map(); let rimCacheAt = 0, hazards = null, hazardsAt = 0;
+  const rim = point => {
+    const f = point.floored(), now = Date.now();
+    if (now - rimCacheAt > 1500) { rimCache.clear(); rimCacheAt = now; }
+    const key = `${f.x},${f.y},${f.z}`;
+    if (rimCache.has(key)) return rimCache.get(key);
+    const under = bot.blockAt(f.offset(0, -1, 0));
+    const v = under?.name === 'end_stone' && (deepBeside(bot, point) || (!f.equals(own) && voidEdge(bot, point, 3) !== null));
+    rimCache.set(key, v); return v;
+  };
+  const hazardsNow = () => { const now = Date.now(); if (!hazards || now - hazardsAt > 150) { hazards = endHazards(bot); hazardsAt = now; } return hazards; };
   const allowedPoint = point => {
     return point.y >= start.y - 3 && point.distanceTo(start) <= 64 && !rim(point) &&
       (!center || Math.hypot(point.x - center.x, point.z - center.z) <= Math.max(96, Math.hypot(start.x - center.x, start.z - center.z))) &&
       (!previous.allowedPosition || previous.allowedPosition(point.floored())) &&
-      endHazards(bot).every(({ entity, radius }) =>
+      hazardsNow().every(({ entity, radius }) =>
         hazardDistance(point, entity) >= Math.min(radius, hazardDistance(bot.entity.position, entity) - .1));
   };
   const allowed = p => allowedPoint(vector(p).offset(.5, 0, .5));
@@ -522,10 +540,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // 83 broken) on its own column at (-10, 88, -38) was 'own pillar false',
     // 'only observe', never crouched there, and was pushed off it at 81 in
     // the breath, 19 blocks to its death.
-    const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block');
-    if (sides.length < 1) return false;
-    const drop = ([dx, dz]) => { for (let dy = 1; dy <= 6; dy++) if (bot.blockAt(f.offset(dx, -dy, dz))?.boundingBox === 'block') return dy - 1; return 6; };
-    return Math.max(...sides.map(drop)) >= 3;
+    // Read at three depths (note 1577): the pocket's walls and posts close the cells beside the feet.
+    return openDropBeside(f);
+  };
+  // A drop of three or more off one of the four cells beside the column, read
+  // from one, two or three under the feet (the pocket's posts stand one under).
+  const openDropBeside = f => {
+    for (let from = 1; from <= 3; from++) {
+      const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, -from, dz))?.boundingBox !== 'block');
+      const drop = ([dx, dz]) => { for (let dy = from; dy <= from + 5; dy++) if (bot.blockAt(f.offset(dx, -dy, dz))?.boundingBox === 'block') return dy - from; return 6; };
+      if (sides.length && Math.max(...sides.map(drop)) >= 3) return true;
+    }
+    return false;
   };
   // On the recorded column's own cell, the record alive, a block under the feet.
   const onColumnCell = () => { const u = bot._pillarUp; if (!u || u.until < Date.now()) return false; const f = bot.entity.position.floored(); return f.x === u.x && f.z === u.z && bot.blockAt(f.offset(0, -1, 0))?.boundingBox === 'block'; };
@@ -615,7 +641,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // 'under 70', the record dropped, and stood 'only observe' eleven blocks
     // up. The column has ended when no open side drops three or more.
     // By the drop alone (note 1474): the roof's post beside the column and the obsidian made two solid sides, and 25588 (dragon-55, 2026-10-13 14:28Z, crystals 9 and 67 broken) had its end-stone column at 69 read as ended, 'column undefined'.
-    const columnEnded = () => { const f = bot.entity.position.floored(); const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block'); const drop = ([dx, dz]) => { for (let dy = 1; dy <= 6; dy++) if (bot.blockAt(f.offset(dx, -dy, dz))?.boundingBox === 'block') return dy - 1; return 6; }; return Math.max(0, ...sides.map(drop)) < 3; };
+    // The column's sides read at three depths (note 1577): the pocket's posts (note 1575) close every cell beside the feet one down, and 25588 (dragon-127, 2026-10-14 05:13Z) in its pocket with the breath at its feet had 'down the column: 0 dug', the column read as ended, and died in the cloud.
+    const columnEnded = () => !openDropBeside(bot.entity.position.floored());
     let n = 0;
     // In the cloud, a body within 0.45 of the middle stands wholly on the block and is dug down at once (note 1481).
     if (!await centreOnColumn(breathThreat(bot)?.name === 'area_effect_cloud' ? 0.45 : 0.1)) console.log(`[end combat] not centred on the column before the dig: ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off`);
@@ -997,7 +1024,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       const name = dx === 1 ? 'east' : dx === -1 ? 'west' : dz === 1 ? 'south' : 'north';
       if (bot.blockAt(f.offset(dx, 0, dz))?.boundingBox === 'block' || bot.blockAt(f.offset(dx, 1, dz))?.boundingBox === 'block') {
         // The pool's side walled by the bot's own blocks (a roof's post, note 1556): those are dug before the drop, not another side taken.
-        const own = [0, 1].map(dy => f.offset(dx, dy, dz)).filter(c => { const b = bot.blockAt(c); return b?.boundingBox === 'block' && SCAFFOLD_UNDER.test(b.name) && b.name !== 'obsidian'; });
+        // And the post one under them (note 1577): the pocket's wall stands on a post beside the under block, and left standing it is 'a floor 0 down' where the drop goes. 25588 (dragon-127, 2026-10-14 05:13Z) dug its two wall blocks and had no fall.
+        const own = [-1, 0, 1].map(dy => f.offset(dx, dy, dz)).filter(c => { const b = bot.blockAt(c); return b?.boundingBox === 'block' && SCAFFOLD_UNDER.test(b.name) && b.name !== 'obsidian' && !(c.y <= f.y - 1 && bot.blockAt(c.offset(0, -1, 0))?.boundingBox === 'block'); });
         const poolHere = state.pool && Date.now() - state.pool.at < 15 * 60000 && state.pool.dx === dx && state.pool.dz === dz;
         if (poolHere && own.length && [0, 1].every(dy => { const b = bot.blockAt(f.offset(dx, dy, dz)); return b?.boundingBox !== 'block' || own.some(c => c.equals(f.offset(dx, dy, dz))); })) clearFirst = { cells: own, name };
         verdicts.push(`${name}: ${bot.blockAt(f.offset(dx, 0, dz))?.name}/${bot.blockAt(f.offset(dx, 1, dz))?.name} beside${poolHere ? ' (the pool\'s side)' : ''}`); continue;
@@ -1147,6 +1175,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // 04:15Z, crystal 108 broken) at (16, 103, -36) with its pool at (19, 59,
     // -36) was dug down 44 blocks without a look at the drop.
     if (dropChosen && (onOwnPillar() || onColumnCell())) {
+      // In the cloud with the drop's side walled by the pocket (note 1577): two down first, out of the cloud in a second, the walls dug after. Three wall blocks dug in the cloud are nine health.
+      if (breathThreat(bot)?.name === 'area_effect_cloud' && waterDropSide()?.clearFirst) { console.log(`[end combat] the breath in the pocket at ${bot.entity.position.floored()}: two down out of it before the drop's wall is dug`); await digDownColumn({ limit: 2 }); }
       if (!onOwnPillar()) { const f = bot.entity.position.floored(); console.log(`[end combat] on the column's cell at ${f} but not 'on own pillar': under ${bot.blockAt(f.offset(0, -1, 0))?.name}, ${[[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block').length} open sides at the feet`); }
       if (await waterDrop({ inCloud: breathThreat(bot)?.name === 'area_effect_cloud' })) return;
       // Too high for the drop: dug down to where a dry fall is borne, then the
@@ -2567,13 +2597,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // and what lies under it.
       if (depth >= 2 && onOwnPillar()) {
         const side = waterDropSide(), water = countOf(bot, 'water_bucket');
-        if (side && !side.clearFirst && (water || side.pool)) {
-          const dir = side.dx === 1 ? 'east' : side.dx === -1 ? 'west' : side.dz === 1 ? 'south' : 'north';
+        // The pool's side walled by the pocket's own blocks (notes 1575, 1577): offered still, the wall dug first.
+        const walled = side?.clearFirst && state.pool && Date.now() - state.pool.at < 15 * 60000 ? { dx: state.pool.dx, dz: state.pool.dz, fall: Math.max(0, Math.floor(bot.entity.position.y) - state.pool.y), edge: { x: bot._pillarUp.x + state.pool.dx, z: bot._pillarUp.z + state.pool.dz }, pool: true, cells: side.clearFirst.length } : null;
+        if (side && (walled || (!side.clearFirst && (water || side.pool)))) {
+          const s0 = walled || side;
+          const dir = s0.dx === 1 ? 'east' : s0.dx === -1 ? 'west' : s0.dz === 1 ? 'south' : 'north';
           tree.water_drop = {
-            description: { action: `Step off the column's ${dir} edge, ${side.fall} blocks down onto the island at (${side.edge.x}, ${side.edge.z})${side.pool ? ', into the pool poured at the foot: the landing in water takes nothing' : `, no pool under it: the bucket is clicked under the body in the last blocks of the fall, a click the server refuses about one time in three, and a dry landing takes about ${Math.max(0, side.fall - 3)}`}; a second or two, against the dig's ${Math.round(depth * 1.5)} seconds on the column where the breath and the passes land`,
-              fall: side.fall, pool: !!side.pool, waterBuckets: water, health: bot.health, dragonHealth: beforeDragon },
+            description: { action: `${walled ? `Dig the ${walled.cells} blocks of the bot's own pocket on the column's ${dir} side (a second or two), then step` : 'Step'} off the column's ${dir} edge, ${s0.fall} blocks down onto the island at (${s0.edge.x}, ${s0.edge.z})${s0.pool ? ', into the pool poured at the foot: the landing in water takes nothing' : `, no pool under it: the bucket is clicked under the body in the last blocks of the fall, a click the server refuses about one time in three, and a dry landing takes about ${Math.max(0, s0.fall - 3)}`}; a second or two, against the dig's ${Math.round(depth * 1.5)} seconds on the column where the breath and the passes land`,
+              fall: s0.fall, pool: !!s0.pool, walled: !!walled, waterBuckets: water, health: bot.health, dragonHealth: beforeDragon },
             run: async () => {
-              goal.step = { action: 'water_drop_chosen', from: { ...bot.entity.position }, fall: side.fall }; save();
+              goal.step = { action: 'water_drop_chosen', from: { ...bot.entity.position }, fall: (walled || side).fall }; save();
               if (!await waterDrop({ inCloud: breathThreat(bot)?.name === 'area_effect_cloud' })) throw new Error('The water drop was not taken: no side with ground under it, or the fall too long for the health with no pool');
             } };
         }
