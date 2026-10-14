@@ -1234,8 +1234,19 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // top with both buckets empty, the water of a pour and of a landing left
     // where it lay.
     if (state.water && !require('./end-pocket').angryEndermen(bot, 8, hostileEntities).some(e => live(bot, e))) {
-      if (!await takeWaterBack(bot, check, state.water.at) && bot.entity.position.distanceTo(vector(state.water.at)) > 4) delete state.water;
-      else if (countOf(bot, 'water_bucket')) delete state.water;
+      // Walked back to within twelve (note 1542), as the drop's pool is (note
+      // 1519): forgotten at four blocks, the water was a bucket gone, and
+      // 25588 (dragon-95, 2026-10-13 23:56Z) poured for an enderman at about
+      // (15, 61, -24) in a walk, moved on, and poured its next pool with '0
+      // full buckets left', no word of the pour in the log.
+      const at = vector(state.water.at), far = bot.entity.position.distanceTo(at);
+      if (bot.blockAt(at)?.name !== 'water') { delete state.water; }
+      else {
+        if (far > 4 && far <= 12 && countOf(bot, 'bucket') > 0) { try { await actions.navigate(bot, task, new goals.GoalNear(at.x, at.y, at.z, 2), { timeoutMs: 8000, stallMs: 3000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; } }
+        const taken = await takeWaterBack(bot, check, state.water.at);
+        if (taken) console.log(`[end combat] the enderman's water at ${at} taken back into the bucket (${countOf(bot, 'water_bucket')} full carried)`);
+        if (taken || countOf(bot, 'bucket') === 0 || bot.entity.position.distanceTo(at) > 12) delete state.water;
+      }
       save();
     }
     // Two or more turned, or one with the health low: the pocket two high,
@@ -1260,7 +1271,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const waterStands = lastWater && bot.blockAt(lastWater)?.name === 'water' && lastWater.distanceTo(bot.entity.position) <= 6;
     if (turned && !waterStands) {
       const at = await pourAtFeet(bot, check, { urgent: turned.position.distanceTo(bot.entity.position) <= 4 });
-      if (at) { state.water = { at: { ...at }, poured: Date.now() }; state.pours = (state.pours || 0) + 1; goal.step = { action: 'end_water', against: 'enderman', at: { ...at } }; save(); }
+      if (at) { state.water = { at: { ...at }, poured: Date.now() }; state.pours = (state.pours || 0) + 1; goal.step = { action: 'end_water', against: 'enderman', at: { ...at } }; save(); console.log(`[end combat] water poured at ${vector(at)} against the enderman ${Math.round(turned.position.distanceTo(bot.entity.position))} blocks off (${countOf(bot, 'water_bucket')} full left)`); }
     }
     // Within eight (note 1462): one at six struck the bot held 'unsafe' with none within six.
     // Six again (note 1467): at eight the defence began and its loop, wanting six, ended at once, 21 passes a second (dragon-46).
