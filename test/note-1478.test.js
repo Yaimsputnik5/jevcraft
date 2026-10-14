@@ -372,3 +372,27 @@ test('the quarry reaches out to seven when the ring two to four out is the pit o
   assert.ok(goal.endCombat.quarryLook?.cells >= 4, JSON.stringify(goal.endCombat.quarryLook));
   assert.ok(seen?.quarry_blocks_30, Object.keys(seen || {}).join(','));
 });
+
+test('the floor falling away beyond the landing is the island\'s edge, and that side is set aside (note 1569)', async () => {
+  const { bot, goal, task } = fixture();
+  const V = require('vec3').Vec3;
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'water_drop', at: Date.now() } };
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 20 }, { name: 'water_bucket', count: 2 }];
+  bot.entity.velocity = new V(0, -0.08, 0);
+  bot.entities[20].position = new V(80, 90, 80);
+  const cloud = { id: 40, name: 'area_effect_cloud', position: new V(0.5, 76, 0.5), isValid: true, metadata: {} };
+  cloud.metadata[registry.entitiesByName.area_effect_cloud.metadataKeys.indexOf('radius')] = 3;
+  bot.entities[40] = cloud;
+  // East of the column the island ends at x 1: nothing under the cells from x 2 on.
+  const was = bot.blockAt;
+  bot.blockAt = p => { const f = p.floored(); if (f.x >= 2 && f.y < 64 && f.z === 0) return { name: 'air', boundingBox: 'empty', position: f }; return was(p); };
+  bot.equip = async () => {}; bot.stopDigging = () => {}; bot.controlState = {};
+  bot.setControlState = (k, v) => { bot.controlState[k] = v; if (k === 'forward' && v) setTimeout(() => { bot.entity.position = new V(-1.5, 75.4, 0.5); bot.entity.onGround = false; bot.entity.velocity = new V(-0.1, -0.5, 0); bot.emit('physicsTick'); setTimeout(() => { bot.entity.position = new V(-1.5, 64, 0.5); bot.entity.onGround = true; bot.entity.velocity = new V(0, -0.08, 0); bot.emit('physicsTick'); }, 250); }, 60); };
+  const lines = [], log = console.log; console.log = (...a) => { lines.push(a.join(' ')); log(...a); };
+  try { await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig: async () => {}, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'observe' } } }) }); }
+  finally { console.log = log; }
+  const sides = lines.find(l => l.includes("the drop's sides from"));
+  assert.ok(sides, lines.filter(l => l.includes('drop')).join('\n'));
+  assert.match(sides, /east: 12 down.*the floor falls away 2 out \(the edge\)/);
+  assert.doesNotMatch(sides, /east taken/);
+});
