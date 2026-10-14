@@ -590,6 +590,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // Not on the bot's own column (note 1610): the pocket's walls round the feet are the hole's shape, and out of it is up onto the wings' reach with the blocks the way down keeps.
   // A roofed hole is a hole too (note 1623): the block over its mouth is the bot's own, laid while the dragon flies.
   const holeHere = () => { if (onColumnCell()) return false; const f = bot.entity.position.floored(); const solidAt = c => bot.blockAt(c)?.boundingBox === 'block'; return [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => solidAt(f.offset(dx, 0, dz)) && solidAt(f.offset(dx, 1, dz))) && solidAt(f.offset(0, -1, 0)) && !solidAt(f.offset(0, 3, 0)); };
+  // In the recorded hole (notes 1621, 1628): the cell dug and dropped into within the last two minutes, the feet at its floor.
+  const inRecordedHole = () => { const h = state.hole; if (!h || Date.now() - h.at > 120000) return false; const f = bot.entity.position.floored(); return f.x === h.x && f.z === h.z && f.y <= h.y + 0.5; };
+  // The hole answers the dragon's body (note 1628): two deep, the body is below the wings and the throw (the arena's drills of 2026-10-14), so the dragon within eighteen is no emergency there. 25588 (dragon-161, 2026-10-14 11:45Z) struck the perched head from its hole at (5, 60, -6), the take-off read 'dragon_charge_or_contact', the stand was cut and the next step climbed out into the open at the take-off.
+  const holeAnswers = () => (holeHere() || inRecordedHole()) && endEmergency(bot) === 'dragon_charge_or_contact';
   // The roof over the hole's mouth (note 1623): a fireball comes to the body and its cloud fills the hole it bursts in; 25588 (dragon-159, 2026-10-14 11:07Z) lost 16 in a hole 40 blocks from the fountain with the dragon flying, and had its stand in the hole by the fountain cut by a cloud at the feet (11:09Z, 13.6 to 11.6). With a block two over the feet the ball bursts on it and the cloud lies above; the sword wants it off, so it is laid while the dragon flies and taken off when it sits.
   const roofCell = () => bot.entity.position.floored().offset(0, 2, 0);
   const roofed = () => bot.blockAt(roofCell())?.boundingBox === 'block';
@@ -1262,8 +1266,19 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     try {
       await require('./motion').move(bot, task, { label: 'out_of_the_trench', keys: ['forward', 'jump'], sneak: false, why: 'up out of the water onto the rim before anything else (notes 1559, 1570)', look: toward, maxMs: 2500, tick: 25, until: () => !inWater() && bot.entity.onGround });
     } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
-    console.log(`[end combat] out of the trench: ${inWater() ? 'still in the water' : 'on the rim'} at ${bot.entity.position.floored()}${way ? ` (${way.dx === 1 ? 'east' : way.dx === -1 ? 'west' : way.dz === 1 ? 'south' : 'north'}, the rim ${way.d} off)` : ' (no rim found beside)'}`);
-    return !inWater();
+    // Up out of the pit as well as the water (note 1627): the pool's trench is a pit a block deep and some cells wide, and 'on the rim' was said of a body standing dry on its floor. 25588 (dragon-160, 2026-10-14 11:34Z, four crystals broken) came down its column to the pit at (-38, 56, -30), had the water back in the bucket, 'out of the trench: on the rim at (-38, 57, -29) (no rim found beside)' three times at the pit's floor, and the breath's cloud took it there 8 to 2 to none, the two blocks up laid none in the pit; dragon-155 (10:12Z) the same in its pit's water. The rim is the nearest cell within three whose block stands at the feet's level with two of air over it, walked to.
+    const solidAt = c => bot.blockAt(c)?.boundingBox === 'block';
+    const inPit = () => { const f = bot.entity.position.floored(); return [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solidAt(f.offset(dx, 0, dz))).length >= 2; };
+    if (!inWater() && inPit() && actions.navigate) {
+      const f = bot.entity.position.floored(); let rim = null;
+      for (let r = 1; r <= 3 && !rim; r++) for (let dx = -r; dx <= r && !rim; dx++) for (let dz = -r; dz <= r && !rim; dz++) { if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue; const c = f.offset(dx, 0, dz); if (solidAt(c) && !solidAt(c.offset(0, 1, 0)) && !solidAt(c.offset(0, 2, 0)) && voidEdge(bot, c.offset(.5, 1, .5), 3) === null) rim = c; }
+      if (rim) {
+        try { await actions.navigate(bot, task, new goals.GoalBlock(rim.x, rim.y + 1, rim.z), { timeoutMs: 4000, stallMs: 2000 }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
+        console.log(`[end combat] up out of the pit: ${inPit() ? 'still in it' : 'on the rim'} at ${bot.entity.position.floored()} (the rim at ${rim.offset(0, 1, 0)})`);
+      }
+    }
+    console.log(`[end combat] out of the trench: ${inWater() ? 'still in the water' : inPit() ? 'dry on the pit\'s floor' : 'on the rim'} at ${bot.entity.position.floored()}${way ? ` (${way.dx === 1 ? 'east' : way.dx === -1 ? 'west' : way.dz === 1 ? 'south' : 'north'}, the rim ${way.d} off)` : ' (no rim found beside)'}`);
+    return !inWater() && !inPit();
   };
   const waterDrop = async ({ inCloud = false } = {}) => {
     let side = waterDropSide();
@@ -1685,10 +1700,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // the bot's own column or an obsidian top, told on the climb's option.
     { const h = bot.health, was = state.lastHealthSeen; state.lastHealthSeen = h;
       if (Number.isFinite(was) && h < was - 0.05 && (onOwnPillar() || onObsidianTop())) { const c = state.columnDamage ||= { hits: 0, total: 0, max: 0 }; const d = Math.round((was - h) * 10) / 10; c.hits++; c.total = Math.round((c.total + d) * 10) / 10; c.max = Math.max(c.max, d); save(); } }
-    if (endEmergency(bot)) { await respond(); return; }
+    if (endEmergency(bot) && !holeAnswers()) { await respond(); return; }
     task.interruptCheck = () => {
       oldInterrupt?.();
       if (dimension(bot) !== 'end' || bot.health <= 0) throw blocked('End combat interrupted by dimension change or death');
+      if (holeAnswers()) return;
       checkEndEmergency(bot);
     };
     if (safeHere()) {
@@ -3057,7 +3073,6 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     let cutRun = null, raced = false; const cut = new Promise((_, reject) => { cutRun = reject; }); cut.catch(() => {});
     // Not on the bot's own column, an obsidian top or in a hole: the hold, the dig down and the stand in the hole answer the breath themselves (notes 1478, 1576, 1618); the ground's runs do not.
     // In the recorded hole as well as a walled one (note 1621): a hole beside an older hole has a side open and holeHere says no, and 25588 (dragon-158, 2026-10-14 10:46Z) had hole_under_head and stay_in_hole cut in its hole at (2, 60, -7). The cloud is named on the cut, to learn where the breath's cloud forms against a body in a hole.
-    const inRecordedHole = () => { const h = state.hole; if (!h || Date.now() - h.at > 120000) return false; const f = bot.entity.position.floored(); return f.x === h.x && f.z === h.z && f.y <= h.y + 0.5; };
     let cutCloud = null;
     // Cut only with the body in the cloud itself (note 1622), not within the two blocks of margin breathThreat keeps: at the margin 25588 (dragon-159, 2026-10-14 10:55Z) had its walks cut eight times in six minutes at 20 health, each cut a response and a question over again.
     breathWatch = () => { try { if (!raced && !bot._dropping && !bot._fallRecovery && !onOwnPillar() && !onColumnCell() && !onObsidianTop() && !holeHere() && !inRecordedHole()) { const c = breathThreat(bot); if (c?.name === 'area_effect_cloud' && hazardDistance(bot.entity.position, c) <= cloudRadius(bot, c) - 2 + 0.3) { raced = true; cutCloud = c; stepCut = 'dragon_breath_cloud'; cutRun(Object.assign(new Error('dragon_breath_cloud'), { name: 'EndEmergency' })); } } } catch (_) { /* nothing */ } };
