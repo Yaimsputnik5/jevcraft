@@ -429,6 +429,23 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600, d
     let route = dodgeRoutes(bot, dragon, allowed)[0];
     // The run from the dragon's body chosen by the island beyond it along the push (note 1661): the body struck is shoved away from the dragon's centre and carried along its flight, 14 blocks (dragon-194) to 70 (dragon-189), and a run that ends by the rim ends in the void. Of the 30 runs 167 to 196 five died on the ground within seconds of the charge's call: 25588 (dragon-195, 2026-10-14 19:13Z) was cut at (-5, 61, -43), ran eight blocks north to the rim unsaid, took two blows at (-7, 61, -51) and went over the edge into the void; dragon-189 (17:53Z) at the fountain was carried 75 blocks into the void; dragon-181 (16:22Z) carried off the fountain's ground and dropped; dragon-176 and 180 the same. Among the routes with two blocks or more, the one with the most island along the push from its end is taken, and the run is said in the log.
     if (dragon.name === 'ender_dragon') {
+      // The hole before the run (note 1667): a run of three to six blocks aside stays under the wings, which reach ten aside (the drill of note 1414), and the body's call comes again and again while the dragon is about; a hole two deep is untouched by it (note 1616's drill). 25588 (dragon-202, 2026-10-14 20:53Z, five crystals broken, 1665 live) ran 'west 3.6 blocks' and 'east 3.6 blocks' seven times over in twenty seconds at (-14, 60, 34), was struck twice and carried 70 blocks west to (-84, 47), dead of the fall; dragon-200 (20:27Z) crouched ten times and died the same. On thick ground clear of the void and water, a block is dug under the feet at each call until the hole is two deep; the run is for ground that cannot be dug.
+      {
+        const f = bot.entity.position.floored();
+        const solid = c => bot.blockAt(c)?.boundingBox === 'block';
+        const sidesClosed = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(f.offset(dx, 0, dz)) && solid(f.offset(dx, 1, dz))).length;
+        const thick = [1, 2, 3, 4, 5, 6].every(dy => solid(f.offset(0, -dy, 0)));
+        const wet = /water/.test(bot.blockAt(f)?.name || '') || [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => /water/.test(bot.blockAt(f.offset(dx, 0, dz))?.name || '') || /water/.test(bot.blockAt(f.offset(dx, -1, dz))?.name || ''));
+        if (dig && thick && !wet && voidSides(bot, bot.entity.position) === 0 && !deepBeside(bot, bot.entity.position) && bot.entity.onGround) {
+          if (sidesClosed >= 4) { bot.setControlState?.('sneak', true); goal.step = { action: 'in_the_hole_for_the_body', hazard: dragon.name }; save(); await sleep(400); bot.setControlState?.('sneak', false); return true; }
+          goal.step = { action: 'hole_for_the_body', hazard: dragon.name, sidesClosed }; save();
+          console.log(`[end safety] the dragon's body coming: a block dug under the feet at ${f} toward a hole two deep (${sidesClosed} of 4 sides closed now), not a run under the wings`);
+          try { await dig(bot, task, f.offset(0, -1, 0), { dropInto: true, openPit: true, requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+          for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50);
+          bot.setControlState?.('sneak', true); await sleep(150); bot.setControlState?.('sneak', false);
+          return true;
+        }
+      }
       const routes = dodgeRoutes(bot, dragon, allowed).map(r => ({ ...r, floor: carryFloor(bot, r.destination, dragon) }));
       const here = carryFloor(bot, bot.entity.position, dragon);
       routes.sort((a, b) => (Math.min(b.floor, CARRY) - Math.min(a.floor, CARRY)) || (b.distance - a.distance));
