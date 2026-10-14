@@ -1099,7 +1099,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       }
     }
     // The row holds water where the body comes down (note 1600): the cells of the trench read back after the pour.
-    if (poured && best.reach) { const dx = best.dx, dz = best.dz, base = new Vec3(column.x, rowY, column.z); const wet = []; for (let k = 1; k <= best.reach; k++) wet.push(bot.blockAt(base.offset(dx * k, 0, dz * k))?.name === 'water'); if (wet.filter(Boolean).length < Math.max(2, best.reach - 1)) { console.log(`[end combat] the pool's row holds water in ${wet.filter(Boolean).length} of ${best.reach} cells (${wet.map(w => w ? '~' : '.').join('')}): no pool recorded`); poured = false; } }
+    if (poured && best.reach) {
+      const dx = best.dx, dz = best.dz, base = new Vec3(column.x, rowY, column.z); const wet = []; for (let k = 1; k <= best.reach; k++) wet.push(bot.blockAt(base.offset(dx * k, 0, dz * k))?.name === 'water');
+      if (wet.filter(Boolean).length < Math.max(2, best.reach - 1)) {
+        // And the water taken back (note 1606): a pool refused and left is a bucket gone. 25588 (dragon-146, 2026-10-14 08:47Z) had 'the pool's row holds water in 1 of 2 cells: no pool recorded', climbed crystal 11's column with no bucket and no pool, and died at 82.
+        console.log(`[end combat] the pool's row holds water in ${wet.filter(Boolean).length} of ${best.reach} cells (${wet.map(w => w ? '~' : '.').join('')}): no pool recorded, the water taken back`);
+        try { await require('./water').fillWaterBucket(bot, task, best.cell, { timeoutMs: 1500 }); } catch (_) { /* left */ }
+        poured = false;
+      }
+    }
     console.log(`[end combat] the pool for the drop ${poured ? 'poured' : 'not poured'} at ${best.cell} beside the column at (${column.x}, ${column.z})${best.obsidian ? `, ${best.obsidian} obsidian that way` : ''}; ${countOf(bot, 'water_bucket')} full bucket${countOf(bot, 'water_bucket') === 1 ? '' : 's'} left`);
     if (poured) { state.pool = { x: best.cell.x, y: best.cell.y, z: best.cell.z, dx: best.dx, dz: best.dz, at: Date.now(), ...(best.reach ? { reach: best.reach } : {}) }; (state.poolsLeft ||= []).push({ x: best.cell.x, y: best.cell.y, z: best.cell.z, at: Date.now() }); save(); return state.pool; }
     return null;
