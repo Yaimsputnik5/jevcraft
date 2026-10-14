@@ -77,10 +77,13 @@ test('perched head geometry uses the actual part id and sitting phase; flying or
   const { bot } = fixture(), dragon = entity(bot, 20, 'ender_dragon', new Vec3(0, 65, 0), { phase: 6 });
   const head = perchedHead(bot, dragon); assert.equal(head.id, 21); assert.deepEqual(head.position, new Vec3(0, 64, 6.5));
   assert.equal(metadata(bot, dragon, 'phase'), 6);
-  for (const phase of [0, 3, 5, 9]) {
+  for (const phase of [0, 3, 9]) {
     dragon.metadata[registry.entitiesByName.ender_dragon.metadataKeys.indexOf('phase')] = phase;
     assert.equal(perchedHead(bot, dragon), null);
   }
+  // Scanning at its perch (phase 5) the head is there too (note 1604).
+  dragon.metadata[registry.entitiesByName.ender_dragon.metadataKeys.indexOf('phase')] = 5;
+  assert.equal(perchedHead(bot, dragon)?.id, 21);
 });
 
 test('arena routes seek a shallower angle for high crystals instead of only approaching the pillar', async () => {

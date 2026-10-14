@@ -215,8 +215,15 @@ function unsafeBecause(bot, p, hazards = endHazards(bot)) {
 // In a stationary sitting phase the head is 6.5 blocks forward and one below
 // the root. Flying head positions additionally use server flight history, so
 // never manufacture a melee target for a moving/flying dragon.
+// The head in every sitting phase (note 1604): the dragon sits scanning
+// (phase 5) for most of a perch, then rears (6) and breathes (7) and scans
+// again, twenty to fifty seconds in all with a player within twenty (the
+// perches of 2026-10-14 at 19 to 23 blocks: 52, 33, 27, 20 and 47 s). With
+// the head read only in 6 and 7, every run under it that arrived in a
+// scanning second ended 'the dragon took off before the bot was under its
+// head' while the dragon sat on: eight runs of eight that day, none struck.
 function perchedHead(bot, dragon) {
-  if (![6, 7].includes(metadata(bot, dragon, 'phase'))) return null;
+  if (![5, 6, 7].includes(metadata(bot, dragon, 'phase'))) return null;
   return { id: dragon.id + 1, name: 'ender_dragon_head', width: 1, height: 1, isValid: true,
     position: dragon.position.offset(Math.sin(dragon.yaw) * 6.5, -1, Math.cos(dragon.yaw) * 6.5) };
 }
