@@ -510,7 +510,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   const falling = () => {
     try {
       if (bot._fallRecovery || bot.entity?.onGround !== false || !fallDanger(bot) || !bot.inventory.items().some(i => i.name === 'water_bucket')) return;
-      console.log(`[end combat] falling from ${bot.entity.position.floored()} at ${bot.health.toFixed(1)} health: the water bucket under the body`);
+      { const u = bot._pillarUp, p = bot.entity.position; const off = u ? Math.round(Math.hypot(u.x + .5 - p.x, u.z + .5 - p.z) * 100) / 100 : null; const keys = ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint'].filter(k => bot.controlState?.[k]);
+        // The fall's start said with the body's offset from its column's middle, the step under way and the keys held (note 1678): three falls off a column during the dig down in the breath on 2026-10-14 (dragon-209 at 87, 211 at 81, 212 at 73), each from a cell beside the column, and how the body left its cell is unproven.
+        console.log(`[end combat] falling from ${p.floored()} at ${bot.health.toFixed(1)} health: the water bucket under the body${u ? ` (${off} off the column (${u.x}, ${u.z})'s middle` : ' (no column'}; step ${goal.step?.action || 'none'}; keys ${keys.join('+') || 'none'}; ${bot.entity.velocity ? `velocity ${[bot.entity.velocity.x, bot.entity.velocity.y, bot.entity.velocity.z].map(v => Math.round(v * 100) / 100).join(', ')}` : ''})`); }
       // The bucket filled again from the pool at once (note 1485): left, the water runs down the island's slopes with the body in it. 25588 (dragon-65, 2026-10-13 16:19Z) landed in its water at (35, 58, -22) on the eastern slope, was carried five blocks east in three seconds, over the slope's edge, and from the shelf below over the rim into the void.
       recoverFall(bot, task, goal, save, { refill: true }).then(r => console.log(`[end combat] the fall ended ${r ? 'in the water' : 'dry'} at ${bot.entity.position.floored()}, health ${bot.health.toFixed(1)}`), err => console.log(`[end combat] the water under the fall: ${String(err.message || err).slice(0, 120)}`));
     } catch (_) { /* nothing to catch */ }
@@ -875,6 +877,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // dragon_charge_or_contact' at 3 health, was asked again at 8 and
       // climbed, and the breath at the top took the rest.
       bot.setControlState?.('sneak', true);
+      { const u = bot._pillarUp, p = bot.entity.position; if (u) { const off = Math.hypot(u.x + .5 - p.x, u.z + .5 - p.z); if (off > 0.3) console.log(`[end combat] the dig down at ${p.floored()} begins ${Math.round(off * 100) / 100} off the column's middle`); } }
       try { await actions.dig(bot, task, underFoot, { dropInto: true, openPit: true, requireDrops: false }); }
       catch (err) {
         bot.setControlState?.('sneak', false);
