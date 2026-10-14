@@ -136,6 +136,10 @@ function mechanism(damages, dead) {
       const lastSnap = (damages.at(-1) || dead || recs.at(-1))?.snapshot || null;
       const step = lastSnap?.goal?.step?.action || recs.filter(r => r.snapshot?.step?.action && r.snapshot.step.action !== 'end_combat').at(-1)?.snapshot?.step?.action || recs.filter(r => r.snapshot?.goal?.step?.action).at(-1)?.snapshot?.goal?.step?.action || null;
       const first = damages[0]?.snapshot;
+      // The dragon's body near the fall with no hurt recorded (note 1580): a landing or sitting dragon's wings push without hurting (EnderDragon.knockBack hurts only when not sitting), and dragon-128 (2026-10-14 05:26Z) was pushed off a pillar's top by the dragon coming to its perch, 'fall, unhurt before'. The last question's state says where the dragon was.
+      const lastState = lastDec?.snapshot?.decision?.state;
+      const dragonOff = lastState?.dragon?.position && lastState?.position ? Math.round(Math.hypot(lastState.dragon.position.x - lastState.position.x, lastState.dragon.position.y - lastState.position.y, lastState.dragon.position.z - lastState.position.z)) : null;
+      const sinceDecision = lastDec ? r1((d.at - Date.parse(lastDec.at)) / 1000) : null;
       // The process held (the event loop stalled) in the last twelve seconds: a body that cannot step out of a cloud.
       const lags = recs.filter(r => r.kind === 'lag' && Date.parse(r.at) >= d.at - WINDOW_MS).map(r => ({ s: r1((Date.parse(r.at) - d.at) / 1000), ms: r.detail?.lagMs, work: r.detail?.work }));
       rows.push({
@@ -146,7 +150,8 @@ function mechanism(damages, dead) {
         damage: damages.map(x => `${r1((Date.parse(x.at) - d.at) / 1000)}s ${cause(x.label)} h${r1(x.snapshot?.health ?? 0)} y${Math.round(x.snapshot?.position?.y ?? 0)}`),
         healthBefore: first ? r1(first.health) : null,
         pick, pickWeight, noneGood, decisionsInWindow: decisions.length,
-        mechanism: mechanism(damages, dead), files: files.length,
+        dragonOffAtLastQuestion: dragonOff, secondsSinceLastQuestion: sinceDecision,
+        mechanism: (() => { const m = mechanism(damages, dead); return m === 'fall, unhurt before' && dragonOff !== null && dragonOff <= 16 && sinceDecision !== null && sinceDecision <= 20 ? 'fall after the dragon\'s body (pushed, no hurt)' : m; })(), files: files.length,
       });
     }
   }

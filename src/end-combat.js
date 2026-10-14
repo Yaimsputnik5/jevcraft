@@ -2573,7 +2573,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         if (b?.boundingBox !== 'block') { if (++gap > 6) break; continue; }
         gap = 0;
         if (!SCAFFOLD_UNDER.test(name)) break;
-        if (name === 'end_stone' && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => { for (let dy = 0; dy <= 3; dy++) if (bot.blockAt(c.offset(dx, -dy, dz))?.boundingBox === 'block') return dy < 3; return false; })) break;
+        // The sides read from one under the block (note 1581): the pocket's posts (note 1575) stand beside the block under the feet, and with them every side read 'solid within three', the column's end stone read as the island's, and 25588 (dragon-129, 2026-10-14 05:35Z) on its column at 88 had no pillar_down, 'only observe'.
+        if (name === 'end_stone' && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => { for (let dy = 1; dy <= 3; dy++) if (bot.blockAt(c.offset(dx, -dy, dz))?.boundingBox === 'block') return true; return false; })) break;
       }
       depth -= gap;
       if (!SCAFFOLD_UNDER.test(bot.blockAt(feet.offset(0, -1, 0))?.name || '')) depth = 0;
