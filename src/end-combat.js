@@ -2632,6 +2632,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             if (Math.floor(bot.entity.position.y) < feetY) throw new Error(`The pillar stopped ${feetY - Math.floor(bot.entity.position.y)} blocks short, ${Math.floor(bot.entity.position.y) - from} up`);
             if (!live(bot, target)) throw new Error('The crystal was gone before the blow');
             let aim = target.position.offset(0, .4, 0);
+            // The pocket at the top before the blow, under the bedrock (note 1675): the stand's walls of note 1664 are for the top-stand case only, and the pillars of radius two, struck from under the bedrock beside them, are most of the field; no run of 200 to 210 laid a wall. 25588 (dragon-210, 2026-10-14 22:45Z) struck crystal 9 from (35, 82, -23) with 17 blocks carried, a fireball was called four seconds on, the body struck it and carried it 24 west and 20 down, dead; dragon-207 (22:10Z) and 201 (20:37Z) were struck at the top the same way after their blows. With eight blocks carried and the dragon not perched the pocket is built round the column cell first (notes 1655, 1659), and after the blow the body holds in it for the pass to clear before the way down.
+            if (under && blocksCarried(bot) >= 8 && !(dragon && perched(bot, dragon))) {
+              try { const t0 = Date.now(), r = await pocketOnColumn(); console.log(`[end combat] the pocket at the top before the blow at ${bot.entity.position.floored()}: ${r.laid} blocks laid, ${r.closed} of 4 sides closed, ${Date.now() - t0} ms, ${blocksCarried(bot)} blocks left`); }
+              catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
+            }
             if (!under) {
               // Onto the top and to two blocks from the bedrock at a crouch (no walk
               // off an edge): the pathfinder's goal on a pillar's top was not reached
@@ -2726,6 +2731,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // Gone after the blow is destroyed, the blast's packet seen or not
             // (note 1429): 25588 (dragon-13, 2026-10-13 06:55Z) broke crystal 2,
             // 'no blast seen, it is gone', and the fight kept it as standing.
+            if (under) { const wait = await waitForThePass(15000); if (wait.waited) console.log(`[end combat] after the blow at crystal ${target.id} the body held in its pocket ${(wait.ms / 1000).toFixed(1)} s for the dragon's pass: ${wait.why}`); }
             if (!live(bot, target)) {
               const evidence = { at: Date.now(), id: target.id, position: { ...target.position }, source: explosion ? 'explosion_and_entity_removed' : 'entity_removed_after_blow', by: 'hand' };
               state.destroyedCrystals.push(evidence); bot.emit('end_combat', { crystal: evidence }); progress = true;
