@@ -137,7 +137,13 @@ function dodgeRoutes(bot, dragon, allowed = () => true) {
 // with a solid block at most two under the feet's level or one over it (a
 // step down or up, never the void) and not walled two high. -> Vec3 or null
 const RUN_BLOCKS = 6;
-function straightAway(bot, start, bearing, allowed = () => true, blocks = RUN_BLOCKS) {
+// Rough (note 1549): a cell a block up is taken too, with the run's jump, three
+// cells at most, when no smooth run of six is to be had. On the island's top
+// by the eastern cliff the ground steps up and down a block every few cells,
+// and 25588 (dragon-98, 2026-10-14 00:39Z) stood at (58, 53, 9) seventeen
+// seconds, 'No surveyed walking escape' twenty-six times, and died in the
+// breath's cloud there, 19.3 to none in three seconds, never a step.
+function straightAway(bot, start, bearing, allowed = () => true, blocks = RUN_BLOCKS, { rough = false } = {}) {
   const solid = (x, y, z) => bot.blockAt(new Vec3(x, y, z))?.boundingBox === 'block';
   const feet = Math.floor(start.y);
   for (const angle of [Math.PI, Math.PI * .75, -Math.PI * .75, Math.PI / 2, -Math.PI / 2]) {
@@ -156,7 +162,7 @@ function straightAway(bot, start, bearing, allowed = () => true, blocks = RUN_BL
       // (dragon-24, 2026-10-13 08:58Z), down its column to the island's
       // ground in a hollow, ran one block into the hollow's side from a
       // fireball and stood in the cloud, 12 to none.
-      const floor = [y - 1, y - 2].find(fy => solid(x, fy, z) && !solid(x, fy + 1, z) && !solid(x, fy + 2, z));
+      const floor = (rough ? [y, y - 1, y - 2] : [y - 1, y - 2]).find(fy => solid(x, fy, z) && !solid(x, fy + 1, z) && !solid(x, fy + 2, z));
       if (floor === undefined || !allowed(new Vec3(x + .5, floor + 1, z + .5)) || deepBeside(bot, new Vec3(x + .5, floor + 1, z + .5))) ok = false; else y = floor + 1;
     }
     if (ok) return new Vec3(start.x + dx * blocks, y, start.z + dz * blocks);
@@ -275,7 +281,7 @@ async function evadeOverTerrain(bot, task, goal, save, dragon, { allowed = () =>
     // 2026-10-03 (23:02:09 to 23:02:22Z) stood on the island's slope in the
     // dragon's breath, "No surveyed walking escape" twelve times in a row,
     // 20 health to none without a step.
-    const away = straightAway(bot, start, bearing, allowed);
+    const away = straightAway(bot, start, bearing, allowed) || straightAway(bot, start, bearing, allowed, 3, { rough: true });
     if (away) {
       goal.step = { action: 'evade_dragon_straight', from: { ...start }, toward: { x: away.x, y: away.y, z: away.z } }; save();
       try {
@@ -354,7 +360,7 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600 } 
       let runBlocks = RUN_BLOCKS;
       let away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks);
       if (!away) { runBlocks = 3; away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks); }
-      if (!away) { runBlocks = 2; away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks); }
+      if (!away) { runBlocks = 2; away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks) || straightAway(bot, start, bearing, allowed || (() => true), runBlocks, { rough: true }); }
       if (away) {
         goal.step = { action: 'evade_breath_straight', hazard: dragon.name, from: { ...start }, toward: { x: away.x, y: away.y, z: away.z } }; save();
         // No jump, and the floor a step ahead read each tick (note 1428): at a
