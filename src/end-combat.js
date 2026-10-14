@@ -875,7 +875,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // out of it before the drop's wall is dug', and died in three seconds at
     // 82 with a bucket in hand and the pool below. The push is away from the
     // dragon's body; a body pushed out the pool's side comes down in the pool.
-    const poolSide = state.pool && Date.now() - state.pool.at < 15 * 60000 ? [state.pool.dx, state.pool.dz] : null;
+    // The pool's side left open only when it is not the push's way (note 1630): the wings shove the body away from the dragon, and a body shoved out the open side is carried. 25588 (dragon-162, 2026-10-14 11:52Z, two crystals broken) stood in its pocket at (-32, 83, 28), three sides closed and the pool's open, and was pushed out of it and carried 80 blocks to y 105, dead on the fall. The side within 60 degrees of the push's way is closed, pool or not.
+    let poolSide = state.pool && Date.now() - state.pool.at < 15 * 60000 ? [state.pool.dx, state.pool.dz] : null;
+    if (poolSide && away) { const len = Math.hypot(away.x, away.z) || 1; if ((poolSide[0] * away.x + poolSide[1] * away.z) / len > 0.5) poolSide = null; }
     const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => !poolSide || dx !== poolSide[0] || dz !== poolSide[1]).sort((a, b) => away ? (b[0] * away.x + b[1] * away.z) - (a[0] * away.x + a[1] * away.z) : 0);
     let laid = 0;
     for (const [dx, dz] of sides) {
