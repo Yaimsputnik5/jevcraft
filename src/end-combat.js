@@ -1111,7 +1111,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     }
     // The row holds water where the body comes down (note 1600): the cells of the trench read back after the pour.
     if (poured && best.reach) {
-      const dx = best.dx, dz = best.dz, base = new Vec3(column.x, rowY, column.z); const wet = []; for (let k = 1; k <= best.reach; k++) wet.push(bot.blockAt(base.offset(dx * k, 0, dz * k))?.name === 'water');
+      // The row read after the water has run (note 1611): a source spreads a cell every five ticks, and the row read the moment the source showed held 'water in 1 of 3 cells (.~.)' with the neighbours still dry; 25588 (dragon-146, 149, 150 and 151, 2026-10-14) refused and took back a pool each time, climbed with no pool, and came down dry (dragon-151, 09:13Z, 19 to 17) or dug the column down under the fireballs. Read every 100 ms until the count holds for 300 ms, two seconds at the most.
+      const dx = best.dx, dz = best.dz, base = new Vec3(column.x, rowY, column.z); let wet = [];
+      const readRow = () => { const w = []; for (let k = 1; k <= best.reach; k++) w.push(bot.blockAt(base.offset(dx * k, 0, dz * k))?.name === 'water'); return w; };
+      { let last = -1, held = 0; for (let n = 0; n < 20; n++) { check(); wet = readRow(); const c = wet.filter(Boolean).length; if (c >= best.reach) break; if (c === last) { if (++held >= 3) break; } else { last = c; held = 0; } await sleep(100); } }
       if (wet.filter(Boolean).length < Math.max(2, best.reach - 1)) {
         // And the water taken back (note 1606): a pool refused and left is a bucket gone. 25588 (dragon-146, 2026-10-14 08:47Z) had 'the pool's row holds water in 1 of 2 cells: no pool recorded', climbed crystal 11's column with no bucket and no pool, and died at 82.
         console.log(`[end combat] the pool's row holds water in ${wet.filter(Boolean).length} of ${best.reach} cells (${wet.map(w => w ? '~' : '.').join('')}): no pool recorded, the water taken back`);
@@ -2002,7 +2005,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           const tally = state.underHead ||= { tries: 0, reached: 0, struck: 0, lost: 0 }; tally.tries++; const healthAtStart = bot.health;
           bot._underHeadRun = true; setTimeout(() => { bot._underHeadRun = false; }, 60000);
           const reached = () => { const h = live(bot, dragon) && perchedHead(bot, dragon); return !h || canStrike(bot, h); };
-          try { await actions.navigate(bot, task, new goals.GoalNear(Math.floor(ground.x), ground.y, Math.floor(ground.z), 1), { timeoutMs: 9000, stallMs: 2500, sprint: true, stopWhen: () => reached() || hostileEntities(bot, 4).some(e => live(bot, e)) }); }
+          // The run stopped for a mob within four, not for the dragon itself (note 1612): the dragon counts among the hostiles, and the run to the ground under its head passes within four of its body on the way, so the run ended there, beside the body and eight from the head, 'out of the sword's reach', and the take-off's throw followed (25588, dragon-151, 2026-10-14 09:14Z, the body at (-4, 63, 1), the dragon at (-1, 65, 0), the head at (3, 64, 5); dead at 14.6 health 50 blocks off).
+          try { await actions.navigate(bot, task, new goals.GoalNear(Math.floor(ground.x), ground.y, Math.floor(ground.z), 1), { timeoutMs: 9000, stallMs: 2500, sprint: true, stopWhen: () => reached() || hostileEntities(bot, 4).some(e => live(bot, e) && e.name !== 'ender_dragon') }); }
           catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency'].includes(err.name)) throw err; }
           let h = live(bot, dragon) && perchedHead(bot, dragon);
           tally.lost += Math.max(0, healthAtStart - bot.health); save();
