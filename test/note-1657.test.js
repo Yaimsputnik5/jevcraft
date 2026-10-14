@@ -32,3 +32,14 @@ test('the climb is refused for water beside it, and let through on wet; lava nev
   const lava = world(p => p.y <= 59 ? 'end_stone' : (p.x === 1 && p.y === 61 && p.z === 0 ? 'lava' : null));
   assert.match(climbStop({ blockAt: lava.blockAt }, new Vec3(0, 60, 0), { wet: true }) || '', /lava at 1, 61, 0/);
 });
+
+test('the island along the push from a point: short by the rim, the full carry inland (note 1661)', () => {
+  const { carryFloor, CARRY } = require('../src/end-safety');
+  // The island: solid at y 63 and under for x <= 10, void beyond; the dragon west of the body.
+  const island = world(p => (p.y <= 63 && p.x <= 10) ? 'end_stone' : null);
+  const dragon = { position: new Vec3(-20, 70, 0) };
+  assert.equal(carryFloor(island, new Vec3(8.5, 64, 0.5), dragon), 2, 'two cells of island east of (8, 64) before the void');
+  assert.equal(carryFloor(island, new Vec3(-10.5, 64, 0.5), dragon), CARRY, 'the full carry inland');
+  // The dragon east of the body: the push goes west, inland, however near the east rim.
+  assert.equal(carryFloor(island, new Vec3(9.5, 64, 0.5), { position: new Vec3(30, 70, 0) }), CARRY);
+});

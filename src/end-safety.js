@@ -207,6 +207,25 @@ function knockedIntoVoid(bot, p, dragon) {
 // (102.5, 49, 2.5), the void on five of its eight sides and on the far side
 // from the dragon, was knocked off it by the next blow and fell out of the
 // world. On a bridge the knock runs along it; at a corner, over the side.
+// The island along the push from a point (note 1661): the cells from the point away from the dragon's centre, counted until one has no floor within DEEP below, up to CARRY.
+const CARRY = 14;
+function carryFloor(bot, p, dragon) {
+  const away = p.minus(dragon.position); away.y = 0;
+  if (away.norm() < .01) return CARRY;
+  const u = away.unit(), fy = Math.floor(p.y);
+  for (let n = 1; n <= CARRY; n++) {
+    const c = p.plus(u.scaled(n)).floored();
+    let floor = false, loaded = true;
+    for (let y = fy + 2; y >= fy - DEEP; y--) {
+      const b = bot.blockAt(new Vec3(c.x, y, c.z));
+      if (!b) { loaded = false; break; }
+      if (b.boundingBox === 'block') { floor = true; break; }
+    }
+    if (loaded && !floor) return n - 1;
+  }
+  return CARRY;
+}
+
 function cloudEdgeCells(bot, start, dragon, allowed = () => true) {
   const here = hazardDistance(start, dragon), out = cloudRadius(bot, dragon) - 2, feet = start.floored(), edge = [];
   const shover = Object.values(bot.entities || {}).find(e => e.name === 'ender_dragon' && e.isValid !== false) || dragon;
@@ -389,7 +408,19 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600 } 
         }
       }
     }
-    const route = dodgeRoutes(bot, dragon, allowed)[0];
+    let route = dodgeRoutes(bot, dragon, allowed)[0];
+    // The run from the dragon's body chosen by the island beyond it along the push (note 1661): the body struck is shoved away from the dragon's centre and carried along its flight, 14 blocks (dragon-194) to 70 (dragon-189), and a run that ends by the rim ends in the void. Of the 30 runs 167 to 196 five died on the ground within seconds of the charge's call: 25588 (dragon-195, 2026-10-14 19:13Z) was cut at (-5, 61, -43), ran eight blocks north to the rim unsaid, took two blows at (-7, 61, -51) and went over the edge into the void; dragon-189 (17:53Z) at the fountain was carried 75 blocks into the void; dragon-181 (16:22Z) carried off the fountain's ground and dropped; dragon-176 and 180 the same. Among the routes with two blocks or more, the one with the most island along the push from its end is taken, and the run is said in the log.
+    if (dragon.name === 'ender_dragon') {
+      const routes = dodgeRoutes(bot, dragon, allowed).map(r => ({ ...r, floor: carryFloor(bot, r.destination, dragon) }));
+      const here = carryFloor(bot, bot.entity.position, dragon);
+      routes.sort((a, b) => (Math.min(b.floor, CARRY) - Math.min(a.floor, CARRY)) || (b.distance - a.distance));
+      route = routes[0] || null;
+      const dirName = r => { const d = r.direction; return Math.abs(d.x) >= Math.abs(d.z) ? (d.x > 0 ? 'east' : 'west') : (d.z > 0 ? 'south' : 'north'); };
+      if (route && route.floor < CARRY && route.floor <= here) { console.log(`[end safety] the dragon's body coming: no run with more island beyond it along the push than here (${here} blocks); the best, ${dirName(route)} ${Math.round(route.distance * 10) / 10} blocks, has ${route.floor}; the body stays and crouches`); route = null; }
+      else if (route) console.log(`[end safety] the dragon's body coming: the run ${dirName(route)} ${Math.round(route.distance * 10) / 10} blocks to (${Math.round(route.destination.x)}, ${Math.round(route.destination.z)}), ${route.floor >= CARRY ? `${CARRY} or more` : route.floor} blocks of island beyond it along the push (here ${here >= CARRY ? `${CARRY} or more` : here})`);
+      else console.log(`[end safety] the dragon's body coming: no run of two blocks from ${bot.entity.position.floored()}; ${here >= CARRY ? 'the island holds' : `${here} blocks of island along the push`} here`);
+      if (!route) { bot.setControlState?.('sneak', true); goal.step = { action: 'crouch_for_the_body', hazard: dragon.name, islandAlongThePush: here }; save(); await sleep(400); bot.setControlState?.('sneak', false); return true; }
+    }
     if (!route) return await evadeOverTerrain(bot, task, goal, save, dragon, { allowed });
     const start = bot.entity.position.clone();
     // use normal movement packets, never position edits
@@ -412,4 +443,4 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600 } 
     return true;
   } finally { bot.clearControlStates(); }
 }
-module.exports = { deepBeside, voidSides, knockedIntoVoid, cloudEdgeCells, straightAway, cloudRadius, hazardDistance, breathThreat, dragonThreat, endEmergency, checkEndEmergency, dodgeRoutes, evadeOverTerrain, evadeDragon };
+module.exports = { deepBeside, voidSides, knockedIntoVoid, carryFloor, CARRY, cloudEdgeCells, straightAway, cloudRadius, hazardDistance, breathThreat, dragonThreat, endEmergency, checkEndEmergency, dodgeRoutes, evadeOverTerrain, evadeDragon };
