@@ -226,11 +226,16 @@ test('a block standing one up in the pool\'s row is dug down before the pour (no
   bot.lookAt = async p => { looked = p; };
   bot.activateItem = () => { if (looked) water.add(`${Math.floor(looked.x)},${Math.ceil(looked.y)},${Math.floor(looked.z)}`); };
   const dug = [];
-  const dig = async (b, t, p) => { dug.push(p.clone()); removed.add(`${p.x},${p.y},${p.z}`); };
+  const dig = async (b, t, p) => { dug.push(p.clone()); removed.add(`${p.x},${p.y},${p.z}`); bot.entity.position = new V(p.x + .5, 64, p.z + .5); };
   const place = async () => { throw Object.assign(new Error('stop here'), { name: 'Cancelled' }); };
+  // The trench's digs walk the body out along the row; the climb wants it back on the foot cell (note 1548).
+  const walks = [];
+  const navigate = async (b, t, g) => { walks.push(g); if (g.constructor.name === 'GoalBlock') bot.entity.position = new V(g.x + .5, g.y, g.z + .5); else if (g.constructor.name === 'GoalNear') bot.entity.position = new V(g.x + .5, 64, g.z + .5); };
   try {
-    await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig, place }, { systemOne: async ({ questions }) => ({ answers: { branch_0: { choice: JSON.stringify(questions).includes('pillar_punch_30') ? 'pillar_punch_30' : 'water_drop' } } }) });
+    await fightEndStep(bot, task, goal, () => {}, { navigate, dig, place }, { systemOne: async ({ questions }) => ({ answers: { branch_0: { choice: JSON.stringify(questions).includes('pillar_punch_30') ? 'pillar_punch_30' : 'water_drop' } } }) });
   } catch (err) { if (err.name !== 'Cancelled') throw err; }
+  assert.ok(walks.some(g => g.x === 18 && g.z === 0), `walked back to the foot cell: ${walks.map(g => `${g.x},${g.z}`).join(' ')}`);
+  assert.equal(Math.floor(bot.entity.position.x), 18, 'the climb begins on the foot cell');
   assert.ok(dug.some(p => p.y === 64 && (Math.abs(p.x - 18) === 2 || Math.abs(p.z) === 2)), `the raised block dug: ${dug.map(String).join(' ') || 'nothing'}`);
   assert.ok(goal.endCombat?.pool, 'the pool poured and recorded');
   // The row dug one deep into a trench, the water in it (note 1540).

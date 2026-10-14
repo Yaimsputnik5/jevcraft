@@ -1776,7 +1776,19 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             if (flat > radius + 2.2) { (state.punchUnreached ||= {})[target.id] = Date.now(); save(); throw new Error(`The pillar's foot was not reached: ${Math.round(flat)} blocks from its middle, its radius ${radius}`); }
             const from = Math.floor(p.y);
             await descentChoice(feetY - from);
-            if (state.descent?.pick === 'water_drop') { try { await poolForTheDrop(bot.entity.position.floored(), feetY - from); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; } }
+            const footCell = bot.entity.position.floored();
+            if (state.descent?.pick === 'water_drop') { try { await poolForTheDrop(footCell, feetY - from); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; } }
+            // Back onto the foot cell before the climb (note 1548): the trench and
+            // the pour walk the body up to five cells out along the row, and the
+            // column rises where the body stands. 25588 (dragon-97, 2026-10-14
+            // 00:36Z, four crystals broken) had the obsidian beside its feet at
+            // (-32, 61, -21), dug its trench out to (-32, -16), and raised its
+            // column at (-29, -27): 'the stand on the pillar's top was not
+            // reached: 5.7 from the bedrock'.
+            if (Math.hypot(footCell.x + .5 - bot.entity.position.x, footCell.z + .5 - bot.entity.position.z) > 0.8) {
+              try { await actions.navigate(bot, task, new goals.GoalBlock(footCell.x, footCell.y, footCell.z), { timeoutMs: 8000, stallMs: 3000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+              console.log(`[end combat] back to the foot cell ${footCell} for the climb: ${Math.round(Math.hypot(footCell.x + .5 - bot.entity.position.x, footCell.z + .5 - bot.entity.position.z) * 10) / 10} off${obsidianBeside() ? ', the obsidian beside the feet' : ''}`);
+            }
             // A climb stops at one block the server refused (pillarUp); taken up
             // again, three times at most, before it is given up.
             for (let tries = 0; tries < 3 && Math.floor(bot.entity.position.y) < feetY; tries++) {
