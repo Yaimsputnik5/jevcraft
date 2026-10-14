@@ -1490,6 +1490,31 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (f.y < 70 || Math.hypot(u.x + .5 - p.x, u.z + .5 - p.z) > 1.5) return false;
     return [1, 2].every(dy => bot.blockAt(new Vec3(u.x, f.y - dy, u.z))?.boundingBox === 'block') && bot.blockAt(new Vec3(u.x, f.y, u.z))?.boundingBox !== 'block';
   };
+  // The dragon's pass waited out (note 1660): while it is within 40 blocks flat and within 30 of the body's height and not receding, the body holds crouched where it is, the roof over its head; returns how long and why it ended.
+  const waitForThePass = async (maxMs = 25000) => {
+    const phaseKey = bot.registry.entitiesByName.ender_dragon.metadataKeys.indexOf('phase');
+    const theDragon = () => Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
+    const t0 = Date.now(); let waited = false, why = 'no dragon in sight', roofed = false;
+    for (;;) {
+      check();
+      const d = theDragon(); if (!d) break;
+      const phase = d.metadata?.[phaseKey];
+      if ([5, 6, 7, 9, 10].includes(phase)) { why = `the dragon perched (phase ${phase})`; break; }
+      const p = bot.entity.position, flat0 = Math.hypot(d.position.x - p.x, d.position.z - p.z), height = d.position.y - p.y;
+      if (flat0 > 40 || Math.abs(height) > 30) { why = `the dragon ${Math.round(flat0)} blocks off, ${Math.round(height)} ${height >= 0 ? 'above' : 'below'}`; break; }
+      if (Date.now() - t0 > maxMs) { why = `${Math.round(maxMs / 1000)} s passed with the dragon still about, ${Math.round(flat0)} blocks off`; break; }
+      await sleep(250);
+      const d2 = theDragon(); if (!d2) break;
+      const q = bot.entity.position, flat1 = Math.hypot(d2.position.x - q.x, d2.position.z - q.z);
+      const closing = (flat0 - flat1) / 0.25;
+      // A pass is the dragon within 24, or coming in at three a second or more from within 40; a circle held at 30 is not waited on.
+      if (!(flat1 < 24 || (closing > 3 && flat1 < 40))) { why = waited ? `the dragon ${Math.round(flat1)} blocks off, ${closing < 0 ? `going away at ${Math.round(-closing)}` : `closing at ${Math.round(closing)}`} a second` : 'no pass coming'; break; }
+      if (!waited) { waited = true; bot.setControlState?.('sneak', true); goal.step = { action: 'wait_for_the_pass', health: bot.health, dragonBlocksOff: Math.round(flat1) }; save(); }
+      if (!roofed) { roofed = true; try { await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
+    }
+    bot.setControlState?.('sneak', false);
+    return { waited, ms: Date.now() - t0, why };
+  };
   const holdOnColumn = async () => {
     // The roof first, on the bot's own column (note 1445): the dragon that
     // comes at the column breathes at it, and the fireball not seen in
@@ -2484,7 +2509,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             }
             // A climb stops at one block the server refused (pillarUp); taken up
             // again, three times at most, before it is given up.
-            for (let tries = 0; tries < 3 && Math.floor(bot.entity.position.y) < feetY; tries++) {
+            // The last six blocks and the blow wait below the top for the dragon's pass to clear (note 1660): the charge is called within 12 blocks (note 1649), under a second before the body strikes, and nothing laid in a second stands against it. Of the 30 runs 167 to 196 ten died within seconds of 'cut by the emergency dragon_charge_or_contact', five of them at the top of a climb: 25588 (dragon-196, 2026-10-14 19:16Z) was cut at (33, 82, -23) at 20 health and struck in the same second, 20 to 13.6, and carried 50 blocks over the void; dragon-194 (18:59Z) the same at (-34, 85, 21), dragon-190 at (33, 82, -28), dragon-187 at (30, 81, -24). The body waits crouched six under the top, with the roof, while the dragon is within 40 and not going away, up to 25 seconds; a perched dragon is no pass.
+            const climbTo = async y => { for (let tries = 0; tries < 3 && Math.floor(bot.entity.position.y) < y; tries++) {
               check();
               // A caged crystal's bars reach out over the climb's cells at the top
               // (note 1419): dug through where a pickaxe is carried. 25588
@@ -2492,8 +2518,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               // the head, which the climb does not dig', three times.
               const pr = require('./pillar-recovery');
               const canDig = b => !!b && ((pr.DIGGABLE_ABOVE.test(b.name) && b.diggable) || (isCaged && !!pickForBars && b.name === 'iron_bars'));
-              await pr.pillarUp(bot, task, feetY, { dig: actions.dig, maxBlocks: Math.max(1, feetY - Math.floor(bot.entity.position.y)), threats: false, canDig });
+              await pr.pillarUp(bot, task, y, { dig: actions.dig, maxBlocks: Math.max(1, y - Math.floor(bot.entity.position.y)), threats: false, canDig });
+            } };
+            const belowTop = feetY - 6;
+            if (belowTop > Math.floor(bot.entity.position.y) + 2) {
+              await climbTo(belowTop);
+              const wait = await waitForThePass(25000);
+              if (wait.waited) console.log(`[end combat] the climb to crystal ${target.id} waited ${(wait.ms / 1000).toFixed(1)} s six under the top at ${bot.entity.position.floored()} for the dragon's pass: ${wait.why}`);
             }
+            await climbTo(feetY);
             if (Math.floor(bot.entity.position.y) < feetY) throw new Error(`The pillar stopped ${feetY - Math.floor(bot.entity.position.y)} blocks short, ${Math.floor(bot.entity.position.y) - from} up`);
             if (!live(bot, target)) throw new Error('The crystal was gone before the blow');
             let aim = target.position.offset(0, .4, 0);
