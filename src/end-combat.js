@@ -1629,6 +1629,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     goal.step = { action: 'down_out_of_breath', health: bot.health }; save();
     await wayDown({ limit: 3 });
   };
+  // The stub roofed after the climb out of the cloud (note 1672): the dragon in flight aims its fireballs at the body, the next one lands on the stub's top where the body stands, and the climb is asked again, two blocks a time; 25588's runs 193, 197 and 203 of 2026-10-14 climbed out 27, 44 and 14 times, and dragon-206 (22:07Z) went up one and dug one by turns on its stub at (-20, 64, 34) as the clouds came, 20 to none. Standing two blocks over a cloud's base is safe (209 readings of 'the cloud lies 2 blocks below' today with no hit after, one with); the next ball is the danger. With six blocks carried and the dragon not perched, the roof is laid over the head (its post up the stub's side where nothing stands beside), and the next ball bursts on it.
+  const roofTheStub = async () => {
+    const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
+    if (!d || perched(bot, d) || blocksCarried(bot) < 6) return false;
+    const t0 = Date.now();
+    let roofed = false;
+    try { roofed = await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    console.log(`[end combat] the stub at ${bot.entity.position.floored()} roofed against the next fireball: ${roofed ? 'laid' : 'not laid'}, ${Date.now() - t0} ms, ${blocksCarried(bot)} blocks left`);
+    return roofed;
+  };
   const respond = async () => {
     // Emergency handlers must not trip the guard that interrupted ordinary
     // planning. They still retain cancellation and the caller's guard.
@@ -1718,7 +1728,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           try { await require('./pillar-recovery').pillarUp(bot, task, from + up, { dig: actions.dig, maxBlocks: up, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
           const rose = Math.floor(bot.entity.position.y) - from;
           console.log(`[end combat] up out of the breath first: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
-          if (rose >= 1) return;
+          if (rose >= 1) { await roofTheStub(); return; }
         }
       }
       try { await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) && safeFromHostiles(bot, p, endMobs(bot)), timeoutMs: inBreath() ? 700 : 1600, dig: actions.dig }); }
@@ -1762,7 +1772,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
             const rose = Math.floor(bot.entity.position.y) - from;
             console.log(`[end combat] up out of the breath on ${thick ? 'the ground' : 'thin ground'}: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
-            if (rose >= 1) return;
+            if (rose >= 1) { await roofTheStub(); return; }
           }
           if (inBreath() && thick && voidEdge(bot, bot.entity.position, 4) === null) {
             goal.step = { action: 'down_out_of_breath_on_ground', health: bot.health }; save();
