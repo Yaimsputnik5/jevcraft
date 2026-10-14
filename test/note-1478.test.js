@@ -719,7 +719,7 @@ test('by the fountain the hole is offered; chosen, two blocks are dug and the bo
   goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, arenaCenter: { x: 0, y: 64, z: 0 } };
   const dug = [];
   const dig = async (b, t, p) => { dug.push(p.clone()); removed.add(`${p.x},${p.y},${p.z}`); if (p.x === 14 && p.z === 0) bot.entity.position = new Vec3(14.5, p.y, 0.5); };
-  bot.placeBlock = async (ref, face) => { const c = ref.position.plus(face); placed.add(`${c.x},${c.y},${c.z}`); if (c.x === 14 && c.z === 0) bot.entity.position = new Vec3(14.5, c.y + 1, 0.5); };
+  bot.placeBlock = async (ref, face) => { const c = ref.position.plus(face); placed.add(`${c.x},${c.y},${c.z}`); if (c.x === 14 && c.z === 0 && c.y < bot.entity.position.y) bot.entity.position = new Vec3(14.5, c.y + 1, 0.5); };
   bot.setControlState = () => {};
   let seen = [];
   const client = { systemOne: async ({ questions }) => { const keys = Object.keys(questions.branch_0.criteria); seen.push(keys); const pick = keys.includes('wait_in_hole') ? 'wait_in_hole' : keys.includes('stay_in_hole') ? (seen.length < 3 ? 'stay_in_hole' : keys.find(k => k.startsWith('move_')) || 'observe') : 'observe'; return { answers: { branch_0: { choice: pick } } }; } };
