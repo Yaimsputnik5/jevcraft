@@ -295,7 +295,17 @@ function enclosed(bot) {
 // upright, the landing waited for. -> true when the bot came down.
 const DROP_MOST = 14, DROP_KEEPS = 8;
 // Few arrows: a stack or less. By the fountain: this far from its middle, clear of the landing dragon's head (six and a half blocks before its body, ten health a touch), within the twenty it stays seated for, and a few steps from the head once it sits.
-const FEW_ARROWS = 64, PERCH_RANGE = 16;
+// The wait eleven blocks from the fountain, not sixteen (note 1596): the
+// game's sitting dragon looks for a player within twenty blocks of ITSELF
+// and leaves after five seconds without one; a wait 'about 16' from the
+// fountain's middle ended at 19 to 20 (dragon-136, 2026-10-14 07:05Z, at
+// 19.8), the dragon lost the player and took off four and a half seconds
+// after perching, and of the seven runs under the head in runs 100 to 139
+// of that day six ended 'the dragon took off before the bot was under its
+// head', none struck. Within twenty it sits on: a second and a quarter
+// scanning, two seconds rearing, up to ten seconds of breath, then the
+// take-off; the run from eleven blocks is two seconds.
+const FEW_ARROWS = 64, PERCH_RANGE = 11;
 function dropOffs(bot, center = null) {
   const here = bot.entity.position, feet = here.floored();
   const solid = c => bot.blockAt(c)?.boundingBox === 'block';
@@ -2362,7 +2372,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         ? 'Approach a previously observed crystal location to check whether the crystal remains. Loss of entity tracking did not establish destruction.'
         : !safe ? 'Escape the unsafe current position along this surveyed route'
         : focus?.name === 'ender_dragon_head' ? 'Approach the perched head to get within sword reach'
-        : focus?.name === 'fountain' ? `Go to stand about ${PERCH_RANGE} blocks from the fountain the dragon perches on, and wait there for the sword at its head when it lands (it stays perched only while a player is within 20 blocks of it, and alone there leaves after five seconds; within the 20 it breathes toward the player every few seconds): ${focus.arrows} arrow${focus.arrows === 1 ? ' is' : 's are'} left, the sword reaches the dragon only at its perch, and at its perch arrows do nothing to it${focus.crystals ? `; ${focus.crystals} healing crystal${focus.crystals === 1 ? ' still stands' : 's still stand'} on ${focus.crystals === 1 ? 'its pillar' : 'their pillars'}, out of the sword's reach, and ${focus.crystals === 1 ? 'heals' : 'heal'} the dragon while it flies near` : ''}`
+        : focus?.name === 'fountain' ? `Go to stand about ${PERCH_RANGE} blocks from the fountain the dragon perches on, and wait there for the sword at its head when it lands (it stays perched only while a player is within 20 blocks of it, and alone there leaves after five seconds: a wait that ended at 19 to 20 lost it, and six of seven runs under its head today began too far and ended 'took off'; within the 20 it sits a second scanning, two rearing, up to ten breathing toward the player, then takes off): ${focus.arrows} arrow${focus.arrows === 1 ? ' is' : 's are'} left, the sword reaches the dragon only at its perch, and at its perch arrows do nothing to it${focus.crystals ? `; ${focus.crystals} healing crystal${focus.crystals === 1 ? ' still stands' : 's still stand'} on ${focus.crystals === 1 ? 'its pillar' : 'their pillars'}, out of the sword's reach, and ${focus.crystals === 1 ? 'heals' : 'heal'} the dragon while it flies near` : ''}`
         : focus?.name === 'end_crystal' ? (throwing ? 'Go closer under an observed healing crystal, within a throw of it' : 'Change firing position for an observed healing crystal')
         : 'Reposition along this surveyed route to gain a future attack opportunity',
         position: { ...route.p }, visits: state.visits[route.key] || 0, target: focus?.name,
