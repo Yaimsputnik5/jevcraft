@@ -1388,7 +1388,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (!inCloud && breathThreat(bot)?.name !== 'area_effect_cloud' && dragonThreat(bot)) {
       const t0 = Date.now(); let waited = 0;
       while (Date.now() - t0 < 2500 && dragonThreat(bot)) { check(); await sleep(100); waited = Date.now() - t0; }
-      console.log(`[end combat] the step off waited ${waited} ms for the dragon's body to pass${dragonThreat(bot) ? ' (still coming: the step goes)' : ''}`);
+      // Still coming after the wait, the step is not taken (note 1670): a body in the air for a second and a half is in the wings' push, and a blow there puts it off the pool. 25588 (dragon-204, 2026-10-14 21:35Z, three crystals broken) at (-32, 83, 21), 'the dragon charges the column, 13 off, the pool below: off into it', waited 2517 ms, 'still coming: the step goes', was struck at 81 in the air, landed dry four blocks from the pool at (-27, 62, 23), 20 to none. The hold in the pocket (notes 1655, 1659) answers the body on the column; the drop is for after it has passed.
+      if (dragonThreat(bot)) { console.log(`[end combat] the step off waited ${waited} ms and the dragon's body still comes: not taken; the hold on the column instead`); bot.setControlState?.('sneak', false); return false; }
+      console.log(`[end combat] the step off waited ${waited} ms for the dragon's body to pass`);
     }
     bot._dropping = true;
     // The step's emergency check set aside for the step off (note 1550): the
