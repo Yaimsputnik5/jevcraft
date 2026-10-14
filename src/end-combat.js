@@ -1654,7 +1654,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             const byWater = p => [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0], [0, -1, 0]].some(([ax, ay, az]) => /water/.test(bot.blockAt(p.offset(ax, ay, az))?.name || ''));
             let inPit = false;
             for (let dx = -4; dx <= 4 && !inPit; dx++) for (let dz = -4; dz <= 4 && !inPit; dz++) if ((dx || dz) && bot.blockAt(feet.offset(dx, 0, dz))?.boundingBox === 'block') inPit = true;
-            if (skyOver(feet.offset(0, -1, 0))) for (let r = 2; r <= 4 && cells.length < want; r++) for (let dx = -r; dx <= r && cells.length < want; dx++) for (let dz = -r; dz <= r && cells.length < want; dz++) {
+            // Out to seven (note 1547), not four: in the pits the earlier quarries left, the ring two to four out is air at the feet's level, and 25588 (dragon-97, 2026-10-14 00:32Z, four crystals broken, 32 blocks, 21 wanted) stood at (7, 60, 17) 'only observe', 'quarry cells 2'.
+            if (skyOver(feet.offset(0, -1, 0))) for (let r = 2; r <= 7 && cells.length < want; r++) for (let dx = -r; dx <= r && cells.length < want; dx++) for (let dz = -r; dz <= r && cells.length < want; dz++) {
               if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
               for (const dy of inPit ? [1, 0] : [1, 0, -1]) {
                 const p = feet.offset(dx, dy, dz);
@@ -1672,7 +1673,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             }
             state.quarryLook = { crystal: target.id, cells: cells.length, want, inPit, sky: skyOver(feet.offset(0, -1, 0)), at: Date.now() }; state.quarryCells = cells.map(c => ({ x: c.x, y: c.y, z: c.z }));
             if (cells.length >= Math.min(want, 4)) tree[`quarry_blocks_${target.id}`] = {
-              description: { action: `Dig ${cells.length} end stone from the island's ground within four blocks of where the bot stands, with the ${pickForBars.name.replace('_', ' ')}, for the climb beside crystal ${target.id}'s pillar: ${lift} blocks up to its stand, ${carried} carried. The floor cells dug have rock under them and no void beside; the dragon's passes and breath go on while it digs (about a second a block). The crystal is ${out} blocks off.`,
+              description: { action: `Dig ${cells.length} end stone from the island's ground within seven blocks of where the bot stands, with the ${pickForBars.name.replace('_', ' ')}, for the climb beside crystal ${target.id}'s pillar: ${lift} blocks up to its stand, ${carried} carried. The floor cells dug have rock under them and no void beside; the dragon's passes and breath go on while it digs (about a second a block). The crystal is ${out} blocks off.`,
                 blocksWanted: lift, blocksCarried: carried, cellsToDig: cells.length, health: bot.health, dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null },
               run: async () => {
                 const before = blocksCarried(bot);

@@ -340,3 +340,28 @@ test('a pool recorded two cells to one side of the drop\'s row is not the drop\'
   assert.ok(sides, lines.filter(l => l.includes('drop')).join('\n'));
   assert.doesNotMatch(sides, /east: 12 down, the pool/);
 });
+
+
+test('the quarry reaches out to seven when the ring two to four out is the pit of an earlier quarry (note 1547)', async () => {
+  const { bot, goal, task, dig } = fixture();
+  const V = require('vec3').Vec3;
+  bot.entity.position = new V(0.5, 64, 0.5);
+  bot._pillarUp = null;
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'water_drop', at: Date.now() } };
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'end_stone', count: 6 }, { name: 'water_bucket', count: 1 }];
+  bot.entities[20].position = new V(60, 90, 60);
+  // A pit: the ground at 63 within four of the feet (the feet at 64 on its floor), the island's top at 64 from five out.
+  bot.blockAt = p => {
+    const f = p.floored();
+    if (f.x === 20 && f.z === 0 && f.y === 84) return { name: 'bedrock', boundingBox: 'block', position: f };
+    if (f.x === 20 && f.z === 0 && f.y >= 64 && f.y <= 83) return { name: 'obsidian', boundingBox: 'block', position: f };
+    const r = Math.max(Math.abs(f.x), Math.abs(f.z));
+    const top = r <= 4 ? 63 : 64;
+    return { name: f.y <= top ? 'end_stone' : 'air', boundingBox: f.y <= top ? 'block' : 'empty', position: f };
+  };
+  let seen = null;
+  const client = { systemOne: async ({ questions }) => { seen = questions.branch_0.criteria; return { answers: { branch_0: { choice: 'observe' } } }; } };
+  await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig, place: async () => {} }, client);
+  assert.ok(goal.endCombat.quarryLook?.cells >= 4, JSON.stringify(goal.endCombat.quarryLook));
+  assert.ok(seen?.quarry_blocks_30, Object.keys(seen || {}).join(','));
+});
