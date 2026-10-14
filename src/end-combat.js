@@ -145,7 +145,7 @@ async function pourAtFeet(bot, check, { urgent = false } = {}) {
   const feet = bot.entity.position.floored(), below = feet.offset(0, -1, 0);
   if (bot.blockAt(below)?.boundingBox !== 'block' || bot.blockAt(feet)?.name !== 'air') return null;
   await bot.equip(bucket, 'hand'); check();
-  await bot.lookAt(below.offset(.5, 1, .5), true);
+  await bot.lookAt(below.offset(.5, 1, .5), true); await sleep(100);
   bot.activateItem();
   for (let n = 0; n < 20; n++) { check(); if (bot.blockAt(feet)?.name === 'water') return feet; await sleep(50); }
   return null;
@@ -930,7 +930,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     return best;
   };
   const poolForTheDrop = async (column, lift = 20) => {
-    const water = bot.inventory.items().find(i => i.name === 'water_bucket');
+    let water = bot.inventory.items().find(i => i.name === 'water_bucket');
     if (!water) return null;
     const best = poolCellFor(new Vec3(column.x, Math.floor(bot.entity.position.y), column.z), lift);
     if (!best) { console.log(`[end combat] no pool for the drop at the foot of (${column.x}, ${column.z}): no level cell beside the column's base clear of the void`); return null; }
@@ -986,11 +986,22 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (eye.distanceTo(target) > 4.3) {
       try { await actions.navigate(bot, task, new goals.GoalNear(best.cell.x, best.cell.y, best.cell.z, 2), { timeoutMs: 8000, stallMs: 3000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
     }
-    try {
+    // The look given three ticks to reach the server before the click (note 1593): clicked on the heels of lookAt the server still has the old look, and the water goes in at the feet. 'The water went in at ... not at' (note 1574) said so nine times in runs 120 to 138 of 2026-10-14; at 07:21Z (dragon-138) it went in at the column's own foot cell and the climb buried it, 'no pool' at the top. A source in the bot's own cell is taken back and poured once more.
+    const pourOnce = async () => {
       await bot.equip(water, 'hand'); check();
-      await bot.lookAt(target, true);
+      await bot.lookAt(target, true); await sleep(150);
       bot.activateItem();
       for (let n = 0; n < 20; n++) { check(); if (bot.blockAt(best.cell)?.name === 'water') break; await sleep(50); }
+    };
+    try {
+      await pourOnce();
+      const feetCell = bot.entity.position.floored();
+      if (bot.blockAt(best.cell)?.name !== 'water' && bot.blockAt(feetCell)?.name === 'water' && !feetCell.equals(best.cell)) {
+        console.log(`[end combat] the water went in at the feet ${feetCell}, not at ${best.cell}: taken back and poured again`);
+        try { await require('./water').fillWaterBucket(bot, task, feetCell, { timeoutMs: 1500 }); } catch (_) { /* left */ }
+        water = bot.inventory.items().find(i => i.name === 'water_bucket');
+        if (water) await pourOnce();
+      }
     } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
     // The pool is where the source went in, not where the flow reached (note
     // 1574): the click put the water at the feet, it ran down into the trench,
