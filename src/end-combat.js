@@ -1601,6 +1601,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       if (endEmergency(bot) === 'incoming_dragon_fireball') await roofOverhead();
       await holdOnColumn();
     }
+    // A fireball at a short column (note 1663): the way down by the drop puts the body in the pool's trench, an open hole beside the column, and a fireball's cloud lands in open holes (the drill of note 1616); the column's own blocks are cobblestone, half a second each to a pickaxe, and two dug put the body under the cloud as in a hole. 25588 (dragon-197, 2026-10-14 19:45Z, no crystal in 28 minutes, no block carried) had a fireball called at (31, 61, -23), two up its column, 'a roof against the fireball over the head: not laid', dropped three into its pool at (31, 58, -20), 'out of the trench: still in the water (no rim found beside)', and the cloud took 20 to 14 to 8 to 2 to none in the water, 'hurt without a survival response'. With no cloud under the column the dig goes first on a column of four or under.
+    else if (onOwnPillar() && endEmergency(bot) === 'incoming_dragon_fireball' && columnDepth() >= 2 && columnDepth() <= 4 && !cloudNearBelow(3) && actions.dig && bot.blockAt(bot.entity.position.floored().offset(0, 2, 0))?.boundingBox !== 'block') {
+      goal.step = { action: 'down_the_short_column_from_fireball', health: bot.health, depth: columnDepth() }; save();
+      console.log(`[end combat] the fireball at the short column (${columnDepth()} high) at ${bot.entity.position.floored()}: two dug down into it, not the drop into the pool's trench`);
+      await digDownColumn({ limit: 2 });
+    }
     else if (onOwnPillar() && ['dragon_breath_cloud', 'incoming_dragon_fireball'].includes(endEmergency(bot))) {
       // The breath on the column, or a fireball coming (its cloud lands where
       // the bot stands): a shield does not stop it (Instant Damage, magic),
