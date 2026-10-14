@@ -1989,17 +1989,24 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // under it.
     const swordCarried = bot.inventory.items().some(i => /_sword$/.test(i.name) && durable(bot.registry, i));
     if (atHand && head && !canStrike(bot, head) && swordCarried && head.position.distanceTo(bot.entity.position) <= 40) {
+      // The head's line (note 1617): the dragon's wings are boxes four wide, grown four each way and two up and down, at its sides; in the game's code they push every body in them 4 / d² and lift it 0.2 a tick, perched or not. They reach six fore and aft of the body and ten aside, so the ground under the head is out of them only at 6.1 forward or more, and a run that comes in from the side passes through them. 25588 (dragon-154, 2026-10-14 09:58Z, all ten crystals broken) ran in from the side at 13 blocks, was lifted at 6 from the body to y 72, 20 to 13.6, 'out of the sword's reach', and the next run ended it; dragon-151 and 153 the same. The stand is 7.2 forward on the line; the run comes to a point 11 forward first, in front of the head.
+      const axis = { x: Math.sin(dragon.yaw || 0), z: Math.cos(dragon.yaw || 0) };
+      const stand0 = dragon.position.offset(axis.x * 7.2, 0, axis.z * 7.2);
       let ground = null;
       for (let y = Math.floor(head.position.y); y >= Math.floor(head.position.y) - 8 && !ground; y--) {
-        const p = new Vec3(Math.floor(head.position.x) + .5, y, Math.floor(head.position.z) + .5);
+        const p = new Vec3(Math.floor(stand0.x) + .5, y, Math.floor(stand0.z) + .5);
         if (dryStanding(bot, p)) ground = p;
       }
+      const alongAside = () => { const rel = { x: bot.entity.position.x - dragon.position.x, z: bot.entity.position.z - dragon.position.z }; return { along: rel.x * axis.x + rel.z * axis.z, aside: Math.abs(rel.x * axis.z - rel.z * axis.x) }; };
+      const inFront = () => { const { along, aside } = alongAside(); return along >= 6.5 && aside <= 2.5; };
+      const front = dragon.position.offset(axis.x * 11, 0, axis.z * 11);
       // Within the sword's reach from the ground, or from two blocks laid under the feet.
       if (ground && head.position.y - ground.y <= (actions.dig ? 6.4 : 4.5)) tree.under_head = {
         description: { action: 'Run to the ground under the perched dragon\'s head and strike it with the sword for as long as it sits: the sword reaches the dragon only here, its breath pools on the ground before its head, and it takes off within seconds',
           headBlocksOff: Math.round(head.position.distanceTo(bot.entity.position)), headBlocksOverItsGround: Math.round((head.position.y - ground.y) * 10) / 10, dragonHealth: beforeDragon, health: bot.health,
           voidEdgeBlocks: voidEdge(bot, ground), endermenNearRoute: endermenNearRoute(bot, bot.entity.position, ground), headHitThroughArmourWorn: headHit(bot),
-          perchedSeconds: Math.round((Date.now() - state.perchedSince) / 1000), runSeconds: Math.round(ground.distanceTo(bot.entity.position) / 5.6 * 10) / 10,
+          perchedSeconds: Math.round((Date.now() - state.perchedSince) / 1000), runSeconds: Math.round((inFront() ? ground.distanceTo(bot.entity.position) : front.distanceTo(bot.entity.position) + front.distanceTo(ground)) / 5.6 * 10) / 10,
+          wayIn: `${inFront() ? 'the bot stands in front of the head already' : `the run goes to a point 11 blocks in front of the dragon first (${Math.round(front.distanceTo(bot.entity.position))} blocks off) and comes in along its head's line`}: the wings' push boxes reach six fore and aft of the body and ten aside, lift what they hold 0.2 a tick and shove it 4 over the squared distance, and a run through them from the side was lifted to y 72 and thrown (dragon-154, 151, 153, 2026-10-14)`,
           // The perch's own rule (note 1537), from the game's code: sitting, the dragon looks for a player within twenty blocks of it (and within ten up or down); seeing one it stays, turns to it, and after a second and a quarter roars and breathes at it, four breaths and then off; seeing none for five seconds it takes off. Every run of 2026-10-13 began beyond twenty blocks, and the dragon, alone at its perch, left before the run arrived.
           perchRule: `the dragon stays at its perch only while a player stands within 20 blocks of it (and within 10 up or down): alone there five seconds, it takes off. It has sat ${Math.round((Date.now() - state.perchedSince) / 1000)} s; the bot is ${Math.round(Math.hypot(dragon.position.x - bot.entity.position.x, dragon.position.z - bot.entity.position.z))} blocks from it, ${Math.max(0, Math.round((Math.hypot(dragon.position.x - bot.entity.position.x, dragon.position.z - bot.entity.position.z) - 20) / 5.6 * 10) / 10)} s of running from the 20-block ring. Within the ring it turns to the bot and breathes at it every few seconds, the cloud on the ground before its head; after four breaths, or 50 damage taken while sitting, it takes off.`,
           takeoff: `it sits from about five seconds to most of a minute; as it takes off its body knocks what stands beside it high into the air, and ${countOf(bot, 'water_bucket') ? 'a water bucket is carried to land in' : 'no water bucket is carried to land in'}: the dragon stage of 2026-10-07 (25588) ran under it 18 seconds into a perch with none, arrived as it took off, was hit for 10 and thrown 56 blocks up, and died of the fall`,
@@ -2013,6 +2020,14 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           bot._underHeadRun = true; setTimeout(() => { bot._underHeadRun = false; }, 60000);
           const reached = () => { const h = live(bot, dragon) && perchedHead(bot, dragon); return !h || canStrike(bot, h); };
           // The run stopped for a mob within four, not for the dragon itself (note 1612): the dragon counts among the hostiles, and the run to the ground under its head passes within four of its body on the way, so the run ended there, beside the body and eight from the head, 'out of the sword's reach', and the take-off's throw followed (25588, dragon-151, 2026-10-14 09:14Z, the body at (-4, 63, 1), the dragon at (-1, 65, 0), the head at (3, 64, 5); dead at 14.6 health 50 blocks off).
+          // To the front of the head first (note 1617), unless the body is there already.
+          if (!inFront()) {
+            try { await actions.navigate(bot, task, new goals.GoalNear(Math.floor(front.x), ground.y, Math.floor(front.z), 1.5), { timeoutMs: 9000, stallMs: 2500, sprint: true, stopWhen: () => !(live(bot, dragon) && perchedHead(bot, dragon)) || inFront() || hostileEntities(bot, 4).some(e => live(bot, e) && e.name !== 'ender_dragon') }); }
+            catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency'].includes(err.name)) throw err; }
+            const { along, aside } = alongAside();
+            console.log(`[end combat] to the front of the perched head: ${Math.round(along * 10) / 10} forward, ${Math.round(aside * 10) / 10} aside of the dragon's line at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
+            if (!(live(bot, dragon) && perchedHead(bot, dragon))) throw new Error('The dragon took off before the bot was in front of its head');
+          }
           try { await actions.navigate(bot, task, new goals.GoalNear(Math.floor(ground.x), ground.y, Math.floor(ground.z), 1), { timeoutMs: 9000, stallMs: 2500, sprint: true, stopWhen: () => reached() || hostileEntities(bot, 4).some(e => live(bot, e) && e.name !== 'ender_dragon') }); }
           catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency'].includes(err.name)) throw err; }
           let h = live(bot, dragon) && perchedHead(bot, dragon);
