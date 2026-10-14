@@ -2698,6 +2698,25 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           progress = true;
         } };
     }
+    // The meal in the fight (note 1634): health comes back a point every four seconds only at hunger eighteen or more, and 25588 (dragon-163, 2026-10-14 12:29 to 12:33Z, all ten crystals broken, the dragon at 140) had its hunger fall to 17 and then 15 by the fountain, regenerated nothing more, took the dragon's blows 18 to 15 to 10 to 7 to 4.6 over four minutes with four cooked rabbit in its pockets, was never offered a meal (none_good 0.46 to 0.73), and died. Offered whenever hunger is under eighteen or health under ten with food carried; eaten where the body stands, in the hole without climbing out.
+    {
+      let meal = null; try { meal = require('./low-health').mealOf(bot); } catch (_) { meal = null; }
+      const food = bot.food ?? 20;
+      if (meal && (food < 18 || bot.health <= 10) && bot.health < 20) {
+        const secs = require('./survival').EAT_SECONDS;
+        tree.eat = { description: { action: `Eat the ${meal.item.name.replaceAll('_', ' ')} where the body stands, ${secs} seconds still${meal.after ? `, hunger ${food} to ${meal.after}` : ''}: health comes back a point every four seconds at hunger eighteen or more and not at all under it${holeHere() ? '; the body stays in its hole for it' : ''}`,
+            health: bot.health, hunger: food, regenerating: food >= 18 && bot.health < 20, foodCarried: bot.inventory.items().filter(i => i.name === meal.item.name).reduce((n, i) => n + i.count, 0), inHole: holeHere(), dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null,
+            record: 'dragon-163 (2026-10-14) bled 18 to 4.6 over four minutes at hunger 15 to 17 with four cooked rabbit carried and died by the fountain with the dragon at 140 of 200' },
+          run: async () => {
+            goal.step = { action: 'eat_in_the_fight', food, health: bot.health }; save();
+            const before = { food: bot.food, count: meal.item.count };
+            const r = await require('./meal').eatThrough(bot, task, meal.item, { eaten: () => (bot.food ?? 0) > before.food || (bot.inventory.items().find(i => i.name === meal.item.name)?.count ?? 0) < before.count });
+            console.log(`[end combat] ate the ${meal.item.name.replaceAll('_', ' ')}: hunger ${before.food} to ${bot.food}, ${bot.health.toFixed(1)} health${holeHere() ? ', in the hole' : ''}`);
+            if (!r.eaten) throw new Error('The meal was not eaten');
+            progress = true;
+          } };
+      }
+    }
     // The sword from the hole (note 1618): the perched head sits a block under
     // the dragon's middle and 6.5 before it, and the dragon turns to the player
     // it sees within twenty; from a hole two deep at 7 from the fountain's
@@ -3093,7 +3112,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     }
     goal.step = { action: 'end_combat', selected: decision.path, dragonHealth: beforeDragon, observedCrystals: crystals.length }; save();
     // Out of the hole first for anything but the stay (note 1592).
-    if (holeHere() && !['stay_in_hole', 'observe'].includes([].concat(decision.path).at(-1))) { try { await outOfTheHole(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
+    if (holeHere() && !['stay_in_hole', 'observe', 'eat'].includes([].concat(decision.path).at(-1))) { try { await outOfTheHole(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
     // The breath's cloud cuts the run within a tick (note 1619): the emergency
     // was read at the step's start and wherever a run happened to call the
     // task's check, and a quarry's dig or a walk in the pathfinder calls it
