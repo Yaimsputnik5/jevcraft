@@ -514,3 +514,20 @@ test('the hold on the column lays the pocket against the wings: two blocks on ev
   const firstWall = order.slice(roofAt + 1).find(c => c.y === 76 && (Math.abs(c.x) === 1 || Math.abs(c.z) === 1));
   assert.ok(firstWall && firstWall.x === -1, `the far side first: ${order.map(String).join(' ')}`);
 });
+
+test('a cloud under the feet is said in pillar_down, and the dig down stops over it (note 1576)', async () => {
+  const { bot, dug, dig, goal, task } = fixture();
+  // The cloud two below the column's top, where the fireball burst on the way up; the dragon far off.
+  bot.entities[20].position = new Vec3(60, 90, 60);
+  const cloud = { id: 40, name: 'area_effect_cloud', position: new Vec3(0.5, 74, 0.5), isValid: true, metadata: {} };
+  cloud.metadata[registry.entitiesByName.area_effect_cloud.metadataKeys.indexOf('radius')] = 3;
+  bot.entities[40] = cloud;
+  let seen = null;
+  const lines = [], log = console.log; console.log = (...a) => { lines.push(a.join(' ')); log(...a); };
+  try { await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig, place: async () => {} }, { systemOne: async ({ questions }) => { seen = JSON.stringify(questions); return { answers: { branch_0: { choice: 'pillar_down' } } }; } }); }
+  finally { console.log = log; }
+  assert.ok(seen && seen.includes('pillar_down'), seen && seen.slice(0, 300));
+  assert.match(seen, /the breath's cloud lies 2 blocks below the feet, 5 wide: a dig down ends in it/);
+  assert.equal(dug.length, 0, `dug into the cloud: ${dug.map(String).join(' ')}`);
+  assert.ok(lines.some(l => l.includes('the dig down stops at')), lines.filter(l => l.includes('end combat')).join('\n'));
+});

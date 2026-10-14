@@ -529,6 +529,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   };
   // On the recorded column's own cell, the record alive, a block under the feet.
   const onColumnCell = () => { const u = bot._pillarUp; if (!u || u.until < Date.now()) return false; const f = bot.entity.position.floored(); return f.x === u.x && f.z === u.z && bot.blockAt(f.offset(0, -1, 0))?.boundingBox === 'block'; };
+  // The breath's cloud under the feet (note 1576): a cloud lies half a block
+  // deep where the fireball burst and lasts about thirty seconds, and a body
+  // two blocks up is out of it. The dig down ends in it: 25588 (dragon-119,
+  // 2026-10-14 03:53Z) went two up out of the cloud at (48, 50, -27), 20 to
+  // 14, was asked 'observe or pillar_down' with no word of the cloud, took
+  // pillar_down at 0.55, dug back down into it and died in three seconds, 15
+  // to 9 to 4 to none; dragon-116 and 123 the same by the hold's own way down.
+  const cloudUnderfoot = (blocks = 3) => {
+    const p = bot.entity.position;
+    return Object.values(bot.entities).find(e => e.name === 'area_effect_cloud' && e.isValid !== false && p.y - e.position.y >= 0.5 && p.y - e.position.y <= blocks + 0.5 && Math.hypot(p.x - e.position.x, p.z - e.position.z) <= cloudRadius(bot, e) + 0.3) || null;
+  };
+  const cloudUnderfootSays = c => c ? `the breath's cloud lies ${Math.round((bot.entity.position.y - c.position.y) * 10) / 10} blocks below the feet, ${Math.round(cloudRadius(bot, c) * 10) / 10} wide: a dig down ends in it, and a cloud lasts about thirty seconds and takes six a second` : null;
   // On an obsidian pillar's top (not the bot's own column): the top is a
   // small flat place high over the island, with the bot's column at its edge.
   const onObsidianTop = () => { const f = bot.entity.position.floored(); return bot.blockAt(f.offset(0, -1, 0))?.name === 'obsidian' && !!bot._pillarUp && Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) <= 12; };
@@ -646,6 +658,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // cloud on crystal 91's column top at 85, began the way down at once,
       // and was a block down two seconds later, 20 to 14 to 8 to 2 to none.
       const inCloud = breathThreat(bot)?.name === 'area_effect_cloud';
+      // Not down into the cloud (note 1576): out of it, the dig waits over it.
+      const cloudBelow = !inCloud && cloudUnderfoot(2);
+      if (cloudBelow) { console.log(`[end combat] the dig down stops at ${bot.entity.position.floored()}: ${cloudUnderfootSays(cloudBelow)}`); break; }
       if (n % 3 === 0 && !inCloud) { const fh = bot.entity.position.floored(); if (![2, 3, 4].some(dy => bot.blockAt(fh.offset(0, dy, 0))?.boundingBox === 'block')) { try { await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } } }
       const yBefore = Math.floor(bot.entity.position.y);
       // A gap under the block dug is filled first (note 1434): the climb
@@ -1221,6 +1236,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   const holdOrDown = async () => {
     if (await chargeDrop()) return;
     if (await holdOnColumn() !== 'cloud') return;
+    // The cloud below the feet, the body out of it (note 1576): the way down would end in it; the hold stays.
+    if (breathThreat(bot)?.name !== 'area_effect_cloud') { const c = cloudUnderfoot(3); if (c) { console.log(`[end combat] the hold stays up at ${bot.entity.position.floored()}: ${cloudUnderfootSays(c)}`); return; } }
     console.log(`[end combat] the breath at the feet during the hold at ${bot.entity.position.floored()}, health ${bot.health.toFixed(1)}: down the column`);
     goal.step = { action: 'down_out_of_breath', health: bot.health }; save();
     await wayDown({ limit: 3 });
@@ -2562,7 +2579,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         }
       }
       if (depth >= 2) tree.pillar_down = {
-        description: { action: `Dig down the bot's own pillar a block at a time from under the feet, ${depth} blocks to its foot: no fall on the way`, blocks: depth, health: bot.health, dragonHealth: beforeDragon },
+        description: { action: `Dig down the bot's own pillar a block at a time from under the feet, ${depth} blocks to its foot: no fall on the way${cloudUnderfoot(depth) ? `; ${cloudUnderfootSays(cloudUnderfoot(depth))}` : ''}`, blocks: depth, health: bot.health, dragonHealth: beforeDragon, ...(cloudUnderfoot(depth) ? { breathAtTheFoot: true } : {}) },
         run: async () => {
           // The column's own way down (digDownColumn): a gap under the block filled, end stone counted, the dragon's pass held through (notes 1434, 1438, 1440).
           await digDownColumn({ limit: depth });
