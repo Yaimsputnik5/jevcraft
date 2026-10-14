@@ -681,6 +681,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // straight walk; said in the log either way.
   const backToColumn = async () => {
     const u = bot._pillarUp; if (!u) return false;
+    // The stand's walls (note 1664) between the body and the column dug first.
+    if (Array.isArray(state.standWalls) && state.standWalls.length && actions.dig) {
+      const f = bot.entity.position.floored(), toward = { x: Math.sign(u.x - f.x), z: Math.sign(u.z - f.z) };
+      for (const w of state.standWalls) {
+        if (Math.abs(w.y - f.y) > 1 || !((w.x - f.x === toward.x && w.z === f.z) || (w.z - f.z === toward.z && w.x === f.x))) continue;
+        const b = bot.blockAt(new Vec3(w.x, w.y, w.z)); if (b?.boundingBox !== 'block' || /obsidian|bedrock/.test(b.name)) continue;
+        try { await actions.dig(bot, task, b.position, { requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+      }
+      state.standWalls = []; save();
+    }
     const col = new Vec3(u.x + .5, bot.entity.position.y, u.z + .5), toCol = () => Math.hypot(col.x - bot.entity.position.x, col.z - bot.entity.position.z);
     if (toCol() < 0.2 && Math.floor(bot.entity.position.x) === u.x && Math.floor(bot.entity.position.z) === u.z) return true;
     // No pathfinder walk on an obsidian top (note 1476): crouched steps only,
@@ -1507,8 +1517,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       const d2 = theDragon(); if (!d2) break;
       const q = bot.entity.position, flat1 = Math.hypot(d2.position.x - q.x, d2.position.z - q.z);
       const closing = (flat0 - flat1) / 0.25;
-      // A pass is the dragon within 24, or coming in at three a second or more from within 40; a circle held at 30 is not waited on.
-      if (!(flat1 < 24 || (closing > 3 && flat1 < 40))) { why = waited ? `the dragon ${Math.round(flat1)} blocks off, ${closing < 0 ? `going away at ${Math.round(-closing)}` : `closing at ${Math.round(closing)}`} a second` : 'no pass coming'; break; }
+      // The climb goes on only with the dragon beyond 40, or beyond 28 and going away (note 1664): dragon-198 (2026-10-14 19:50Z) climbed its last six with the dragon beyond 40, and it came the 40 in the three seconds of the climb and struck at the top, 20 to 13.6 to 10.9; the dragon flies 13 to 20 blocks a second.
+      if (flat1 > 40 || (flat1 > 28 && closing < -2)) { why = waited ? `the dragon ${Math.round(flat1)} blocks off, ${closing < 0 ? `going away at ${Math.round(-closing)}` : `closing at ${Math.round(closing)}`} a second` : 'no pass coming'; break; }
       if (!waited) { waited = true; bot.setControlState?.('sneak', true); goal.step = { action: 'wait_for_the_pass', health: bot.health, dragonBlocksOff: Math.round(flat1) }; save(); }
       if (!roofed) { roofed = true; try { await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
     }
@@ -2535,6 +2545,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               if (wait.waited) console.log(`[end combat] the climb to crystal ${target.id} waited ${(wait.ms / 1000).toFixed(1)} s six under the top at ${bot.entity.position.floored()} for the dragon's pass: ${wait.why}`);
             }
             await climbTo(feetY);
+            // And once more at the top (note 1664): the stand, the walls and the blow are four seconds more in the open.
+            { const wait = await waitForThePass(25000); if (wait.waited) console.log(`[end combat] the blow at crystal ${target.id} waited ${(wait.ms / 1000).toFixed(1)} s at the top at ${bot.entity.position.floored()} for the dragon's pass: ${wait.why}`); }
             if (Math.floor(bot.entity.position.y) < feetY) throw new Error(`The pillar stopped ${feetY - Math.floor(bot.entity.position.y)} blocks short, ${Math.floor(bot.entity.position.y) - from} up`);
             if (!live(bot, target)) throw new Error('The crystal was gone before the blow');
             let aim = target.position.offset(0, .4, 0);
@@ -2579,6 +2591,21 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
                   }
                   const roofed = await roofOverhead();
                   console.log(`[end combat] a roof over the stand on the top at ${f0.offset(0, 2, 0)}: ${roofed ? 'laid' : 'not laid'}`);
+                  // Walls round the stand before the blow (note 1664): the dragon's body at the top comes under a second after its call and shoves the body off the tower; two blocks on each side but the crystal's, laid on the tower's top, hold it in its cell. 25588 (dragon-198, 2026-10-14 19:50Z) was struck at its stand at (35, 82, -24) twice in a second and knocked two cells, 20 to 10.9; dragon-194 (18:59Z) was carried off its stand to its death. The walls are recorded and the one toward the column is dug for the way back.
+                  if (blocksCarried(bot) >= 8) {
+                    let walls = 0; state.standWalls = [];
+                    for (const [sx, sz] of [[-dir.x, -dir.z], [dir.z, dir.x], [-dir.z, -dir.x]]) {
+                      for (let dy = 0; dy <= 1; dy++) {
+                        const cell = f0.offset(sx, dy, sz); if (bot.blockAt(cell)?.boundingBox === 'block') continue;
+                        const ref = bot.blockAt(cell.offset(0, -1, 0)); if (ref?.boundingBox !== 'block') break;
+                        const it = bot.inventory.items().find(i => i.name === name); if (!it) break;
+                        check(); await bot.equip(it, 'hand'); await bot.lookAt(ref.position.offset(.5, 1, .5), true); await bot.placeBlock(ref, new Vec3(0, 1, 0)); await sleep(60);
+                        if (bot.blockAt(cell)?.boundingBox === 'block') { walls++; state.standWalls.push({ x: cell.x, y: cell.y, z: cell.z }); }
+                      }
+                    }
+                    save();
+                    console.log(`[end combat] walls round the stand at ${f0}: ${walls} blocks laid on three sides, ${blocksCarried(bot)} left`);
+                  }
                 }
               } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
               aim = target.position.offset(0, 1.2, 0);
