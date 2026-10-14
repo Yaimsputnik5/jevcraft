@@ -744,7 +744,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (!ref) {
       const under = bot.blockAt(f.offset(0, -1, 0));
       if (under?.boundingBox !== 'block') return false;
-      const side = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dz]) => [-1, 0, 1, 2].every(dy => bot.blockAt(f.offset(dx, dy, dz))?.boundingBox !== 'block'));
+      // Not on the pool's side (note 1556): the post stood where the drop goes, and 25588 (dragon-105, 2026-10-14 01:23Z, two crystals broken) read 'east: end_stone/end_stone beside' over its pool east of the column at (-10, -38), dropped south with no pool, 26 blocks, dead.
+      const poolSide = state.pool && Date.now() - state.pool.at < 15 * 60000 ? [state.pool.dx, state.pool.dz] : null;
+      const side = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => !poolSide || dx !== poolSide[0] || dz !== poolSide[1]).find(([dx, dz]) => [-1, 0, 1, 2].every(dy => bot.blockAt(f.offset(dx, dy, dz))?.boundingBox !== 'block'));
       if (!side) return false;
       try {
         await bot.equip(item, 'hand'); check();
@@ -915,10 +917,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // 16:38Z) at (-11, 79, 39) beside its column at (-10, 39): 'no side with
     // ground under it', and it dug instead.
     const f = new Vec3(u.x, Math.floor(bot.entity.position.y), u.z);
-    let best = null; const verdicts = [];
+    let best = null; const verdicts = []; let clearFirst = null;
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const name = dx === 1 ? 'east' : dx === -1 ? 'west' : dz === 1 ? 'south' : 'north';
-      if (bot.blockAt(f.offset(dx, 0, dz))?.boundingBox === 'block' || bot.blockAt(f.offset(dx, 1, dz))?.boundingBox === 'block') { verdicts.push(`${name}: ${bot.blockAt(f.offset(dx, 0, dz))?.name}/${bot.blockAt(f.offset(dx, 1, dz))?.name} beside`); continue; }
+      if (bot.blockAt(f.offset(dx, 0, dz))?.boundingBox === 'block' || bot.blockAt(f.offset(dx, 1, dz))?.boundingBox === 'block') {
+        // The pool's side walled by the bot's own blocks (a roof's post, note 1556): those are dug before the drop, not another side taken.
+        const own = [0, 1].map(dy => f.offset(dx, dy, dz)).filter(c => { const b = bot.blockAt(c); return b?.boundingBox === 'block' && SCAFFOLD_UNDER.test(b.name) && b.name !== 'obsidian'; });
+        const poolHere = state.pool && Date.now() - state.pool.at < 15 * 60000 && state.pool.dx === dx && state.pool.dz === dz;
+        if (poolHere && own.length && [0, 1].every(dy => { const b = bot.blockAt(f.offset(dx, dy, dz)); return b?.boundingBox !== 'block' || own.some(c => c.equals(f.offset(dx, dy, dz))); })) clearFirst = { cells: own, name };
+        verdicts.push(`${name}: ${bot.blockAt(f.offset(dx, 0, dz))?.name}/${bot.blockAt(f.offset(dx, 1, dz))?.name} beside${poolHere ? ' (the pool\'s side)' : ''}`); continue;
+      }
       let fall = null;
       for (let dy = 1; dy <= 48; dy++) { const bl = bot.blockAt(f.offset(dx, -dy, dz)); if (bl?.boundingBox === 'block') { fall = dy - 1; break; } if (bl?.name === 'lava') break; }
       if (fall === null || fall < 3) { verdicts.push(`${name}: ${fall === null ? 'no floor within 48' : `a floor ${fall} down`}`); continue; }
@@ -955,11 +963,17 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       if (!best || score < best.score) best = { dx, dz, fall, obsidian, pool: pool && !inTheWay, inTheWay, score, edge: f.offset(dx, 0, dz), name };
     }
     // Said (note 1522): 25588 (dragon-83, 2026-10-13 21:17Z, six crystals broken) poured its pool south of the column at (-30, -22), dropped from 79 and landed three blocks east of it, dead, and no line said which side was stepped off or why.
+    if (clearFirst) { console.log(`[end combat] the drop's sides from ${f}: ${verdicts.join('; ')}; the ${clearFirst.name} side, the pool's, walled by the bot's own blocks: dug first`); return { clearFirst: clearFirst.cells }; }
     console.log(`[end combat] the drop's sides from ${f}: ${verdicts.join('; ')}${best ? `; ${best.name} taken` : '; none'}${state.pool ? ` (the pool recorded at (${state.pool.x}, ${state.pool.y}, ${state.pool.z}), ${state.pool.dx === 1 ? 'east' : state.pool.dx === -1 ? 'west' : state.pool.dz === 1 ? 'south' : 'north'} of the column)` : ''}`);
     return best;
   };
   const waterDrop = async ({ inCloud = false } = {}) => {
-    const side = waterDropSide();
+    let side = waterDropSide();
+    if (side?.clearFirst && actions.dig) {
+      for (const c of side.clearFirst) { try { await actions.dig(bot, task, c, { requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the pool's side not cleared at ${c}: ${String(err.message || err).slice(0, 80)}`); } }
+      side = waterDropSide();
+    }
+    if (side?.clearFirst) side = null;
     const water = bot.inventory.items().find(i => i.name === 'water_bucket');
     // Into the pool with no bucket in hand (note 1514): the pool at the foot is the landing, the bucket in the air only the second chance. 25588 (dragon-78, 2026-10-13 20:16Z) poured its last bucket into the pool at crystal 94's foot, struck the crystal, and was refused the drop at 85, 'no water bucket carried', the pool under it.
     if (!side || (!water && !side.pool)) { console.log(`[end combat] no water drop from ${bot.entity.position.floored()}: ${!side ? 'no side with ground under it' : 'no water bucket carried and no pool under the way down'}`); return false; }
