@@ -3026,14 +3026,17 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // (the landing is its own matter), and not in a hole two deep, under it.
     let cutRun = null, raced = false; const cut = new Promise((_, reject) => { cutRun = reject; }); cut.catch(() => {});
     // Not on the bot's own column, an obsidian top or in a hole: the hold, the dig down and the stand in the hole answer the breath themselves (notes 1478, 1576, 1618); the ground's runs do not.
-    breathWatch = () => { try { if (!raced && !bot._dropping && !bot._fallRecovery && !onOwnPillar() && !onObsidianTop() && !holeHere() && breathThreat(bot)?.name === 'area_effect_cloud') { raced = true; stepCut = 'dragon_breath_cloud'; cutRun(Object.assign(new Error('dragon_breath_cloud'), { name: 'EndEmergency' })); } } catch (_) { /* nothing */ } };
+    // In the recorded hole as well as a walled one (note 1621): a hole beside an older hole has a side open and holeHere says no, and 25588 (dragon-158, 2026-10-14 10:46Z) had hole_under_head and stay_in_hole cut in its hole at (2, 60, -7). The cloud is named on the cut, to learn where the breath's cloud forms against a body in a hole.
+    const inRecordedHole = () => { const h = state.hole; if (!h || Date.now() - h.at > 120000) return false; const f = bot.entity.position.floored(); return f.x === h.x && f.z === h.z && f.y <= h.y + 0.5; };
+    let cutCloud = null;
+    breathWatch = () => { try { if (!raced && !bot._dropping && !bot._fallRecovery && !onOwnPillar() && !onObsidianTop() && !holeHere() && !inRecordedHole()) { const c = breathThreat(bot); if (c?.name === 'area_effect_cloud') { raced = true; cutCloud = c; stepCut = 'dragon_breath_cloud'; cutRun(Object.assign(new Error('dragon_breath_cloud'), { name: 'EndEmergency' })); } } } catch (_) { /* nothing */ } };
     bot.on('physicsTick', breathWatch);
     try {
       const running = Promise.resolve().then(() => decision.action.run()); running.catch(() => {});
       await Promise.race([running, cut]);
     }
     catch (err) {
-      if (err.name === 'EndEmergency') { bot.pathfinder.setGoal(null); bot.clearControlStates(); console.log(`[end combat] ${[].concat(decision.path).join('/')} cut by the breath's cloud at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`); }
+      if (err.name === 'EndEmergency') { bot.pathfinder.setGoal(null); bot.clearControlStates(); const c = cutCloud; console.log(`[end combat] ${[].concat(decision.path).join('/')} cut by the breath's cloud at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health${c ? ` (the cloud at ${c.position.floored()}, ${Math.round(cloudRadius(bot, c) * 10) / 10} wide, ${Math.round(hazardDistance(bot.entity.position, c) * 10) / 10} off)` : ''}`); }
       if (['Cancelled', 'Blocked', 'EndEmergency'].includes(err.name)) throw err;
       // Moving targets, a newly visible cloud or an obstructed route require
       // a fresh bounded choice. They do not invalidate the retained goal.
