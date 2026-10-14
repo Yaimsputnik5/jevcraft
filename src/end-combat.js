@@ -2602,7 +2602,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       if (thick && wallsHold && voidEdge(bot, bot.entity.position, 4) === null) tree.wait_in_hole = {
         description: { action: `Dig two blocks down under the feet here, ${Math.round(byFountain)} blocks from the fountain, and wait in the hole for the dragon to perch: two deep in the ground the body is below the wings' push (4 over the squared distance a tick, 5 of hurt, the throw off the island) and below the breath's cloud; the dragon keeps its perch while a player stands within 20 of it, in a hole or not; the way out is two blocks laid, about a second, and the run to the fountain from here ${Math.round(byFountain / 5.6 * 10) / 10} s more. The wait is a second a question, as observe is.`,
           blocksFromFountain: Math.round(byFountain), health: bot.health, blocksCarried: blocksCarried(bot), dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null,
-          record: 'the take-off\'s throw ended dragon-121, 130 and 136 on 2026-10-14 at six or seven crystals, each standing in the open by the fountain or on its way to it' },
+          record: 'the take-off\'s throw ended dragon-121, 130 and 136 on 2026-10-14 at six or seven crystals, each standing in the open by the fountain or on its way to it; the landing and the throw did for dragon-149 and 151 at one crystal',
+          drill: 'the arena\'s drill of 2026-10-14 (09:30 to 09:36Z, the dragon set landing on the fountain and then taking off, the bot eleven blocks from it): in a hole two deep the body was moved 0 and lost 0 of health in three of three; standing in the open it was thrown 9 and 6 blocks and lost 15 and 10 in two of three (0 in the third); crouched in the open it lost 5 in three of three and moved under 2' },
         run: async () => {
           // The cell taken where the body stands when the run begins (note 1598), not where it stood when the option was built a question earlier: 25588 (dragon-141, 2026-10-14 08:01Z) was 0.81 off the cell it tried to centre on, a cell away, 'the body still on the rim'. The ground read again for it.
           const feet = bot.entity.position.floored();
@@ -2612,7 +2613,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           // Centred on the cell first (note 1595): a body 0.6 wide at a cell's edge stands on the rim when the cell under it is dug, and 25588 (dragon-139, 2026-10-14 07:35Z) dug its hole at (10, 60, 16) and stayed at 60, 'a side open'.
           const centre = feet.offset(.5, 0, .5), off = () => Math.hypot(centre.x - bot.entity.position.x, centre.z - bot.entity.position.z);
           await centreOn(feet.x, feet.z, 0.12);
-          for (const dy of [1, 2]) { check(); await actions.dig(bot, task, feet.offset(0, -dy, 0), { requireDrops: false }); }
+          // Dug from on the block, dropping into the cell (note 1616): the dig helper steps the body off any block under its own feet unless told to drop in, and the hole's first block was dug from the cell beside it, the body left on the rim 0.8 off the middle every time (25588, dragon-139, 141, 144, 153 and 154, 2026-10-14; the arena's centring test of 09:38Z brought the body to 0.1 in 0.6 s, so the nudge was never the fault).
+          for (const dy of [1, 2]) { check(); await actions.dig(bot, task, feet.offset(0, -dy, 0), { requireDrops: false, dropInto: true }); }
           for (let i = 0; i < 30 && Math.floor(bot.entity.position.y) > feet.y - 2; i++) await sleep(50);
           const inIt = Math.floor(bot.entity.position.y) <= feet.y - 2;
           if (inIt) { state.hole = { x: feet.x, y: feet.y - 2, z: feet.z, at: Date.now() }; save(); }
