@@ -2782,7 +2782,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         const feetAt = top === null ? null : new Vec3(cell.x, top + 1, cell.z);
         const walk0 = feetAt ? Math.round(feetAt.offset(.5, 0, .5).distanceTo(bot.entity.position)) : 99;
         // No walk into the landing (note 1623): the body comes down within seconds, and 25588 (dragon-159, 2026-10-14 11:07Z) took the hole under the head at 0.67 with the dragon landing 18 blocks off and a walk of 7, met the body on the way, four blows 20 to 6.4 and a throw of 25 blocks. Landing, the hole is dug where the body stands (wait_in_hole) unless the cell is within four.
-        if (thickAt(feetAt) && !solid(feetAt) && !solid(feetAt.offset(0, 1, 0)) && !([2, 3].includes(phase) && walk0 > 4)) {
+        // And no walk in from the dragon's side (note 1635): the wings' boxes reach ten aside of the body and six fore and aft, and 25588 (dragon-164, 2026-10-14 12:47Z, one crystal broken) walked to its hole's cell from beside the perched dragon, was lifted at (3, 66, -9) nine blocks from the fountain and thrown, dead on the fall at 13.6. A walk is offered only from in front of the dragon (within 3 of its head's line, ahead of its middle); from anywhere else the hole is dug where the body stands or not at all.
+        const axisH = dragon && live(bot, dragon) ? { x: Math.sin(dragon.yaw || 0), z: Math.cos(dragon.yaw || 0) } : null;
+        const relH = axisH ? { x: bot.entity.position.x - dragon.position.x, z: bot.entity.position.z - dragon.position.z } : null;
+        const frontOfIt = !axisH || (relH.x * axisH.x + relH.z * axisH.z > 0 && Math.abs(relH.x * axisH.z - relH.z * axisH.x) <= 3);
+        if (thickAt(feetAt) && !solid(feetAt) && !solid(feetAt.offset(0, 1, 0)) && !([2, 3].includes(phase) && walk0 > 4) && (walk0 === 0 || frontOfIt)) {
           const walk = walk0;
           const t = state.holeHead || { tries: 0, dugIn: 0, swings: 0 };
           tree.hole_under_head = {
