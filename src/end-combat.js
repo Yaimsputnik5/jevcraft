@@ -2028,7 +2028,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           const gapTo = head => { const e = bot.entity.position.offset(0, 1.62, 0); return Math.round((Math.hypot(Math.max(0, Math.abs(head.position.x - e.x) - .5), Math.max(0, Math.abs(head.position.z - e.z) - .5))) * 10) / 10; };
           if (!canStrike(bot, h) && gapTo(h) > 1.2) {
             try {
-              await require('./motion').move(bot, task, { label: 'under_head_close', keys: ['forward', 'sprint'], sneak: false, why: 'the last blocks to the ground under the perched head (note 1558)', look: h.position.offset(0, -2, 0), maxMs: 3000, tick: 25,
+              // With the jump when the head's ground is a step up from the feet (note 1615): the fountain's rim stands a block over its floor, and 25588 (dragon-153, 2026-10-14 09:25Z) on the floor at (1, 62, 1) walked three seconds into the step with the head at (5, 64, 4), '4 aside, out of reach', and was thrown into the void by the take-off; dragon-151 the same at eight aside.
+              await require('./motion').move(bot, task, { label: 'under_head_close', keys: ground.y > Math.floor(bot.entity.position.y) + 0.5 ? ['forward', 'sprint', 'jump'] : ['forward', 'sprint'], sneak: false, why: 'the last blocks to the ground under the perched head (note 1558)', look: h.position.offset(0, -2, 0), maxMs: 3000, tick: 25,
                 until: () => { const hh = live(bot, dragon) && perchedHead(bot, dragon); return !hh || canStrike(bot, hh) || gapTo(hh) <= 1.0; } });
             } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
             h = live(bot, dragon) && perchedHead(bot, dragon);
