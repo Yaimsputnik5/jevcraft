@@ -1028,6 +1028,20 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // landed its 26-block drop in the pool at (-15, 62, -36), was 42 blocks
     // off at its next question ten seconds later, and poured its next pool
     // with '0 full buckets left'.
+    // Out of the trench first (note 1559): a body in the pool's water wades at
+    // half a walk and climbs its wall at a swim, and 25588 (dragon-109,
+    // 2026-10-14 02:16Z, crystal 114 broken) landed in its trench at (-17, 59,
+    // -37), took a fireball's cloud there, 'evade breath straight' twice, moved
+    // 1.4 blocks in four seconds, 20 to none. The rim is a block up and a block
+    // or two off: forward and the jump, toward the column's foot.
+    if (down && inWater()) {
+      const u = bot._pillarUp || (state.pool && { x: state.pool.x - (state.pool.dx || 0), z: state.pool.z - (state.pool.dz || 0) });
+      const toward = u ? new Vec3(u.x + .5, bot.entity.position.y + 1, u.z + .5) : bot.entity.position.offset(2, 1, 0);
+      try {
+        await require('./motion').move(bot, task, { label: 'out_of_the_trench', keys: ['forward', 'jump'], sneak: false, why: 'up out of the pool\'s trench onto the rim before anything else (note 1559)', look: toward, maxMs: 2500, tick: 25, until: () => !inWater() && bot.entity.onGround });
+      } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+      console.log(`[end combat] out of the trench: ${inWater() ? 'still in the water' : 'on the rim'} at ${bot.entity.position.floored()}`);
+    }
     if (down && countOf(bot, 'bucket') > 0 && !breathThreat(bot) && !dragonThreat(bot)) { try { await takeBackWaterNear(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
     return down;
   };
