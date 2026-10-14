@@ -1762,6 +1762,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     { const h = bot.health, was = state.lastHealthSeen; state.lastHealthSeen = h;
       if (Number.isFinite(was) && h < was - 0.05 && (onOwnPillar() || onObsidianTop())) { const c = state.columnDamage ||= { hits: 0, total: 0, max: 0 }; const d = Math.round((was - h) * 10) / 10; c.hits++; c.total = Math.round((c.total + d) * 10) / 10; c.max = Math.max(c.max, d); save(); } }
     if (endEmergency(bot) && !holeAnswers()) { await respond(); return; }
+    // The water poured against an enderman taken back once it is gone (note 1646): the pick-up reached five blocks and the walk back was left to the question, and 25588 (dragon-178 and 179, 2026-10-14 15:40 to 15:58Z) each walked off from their last bucket's water and were offered the walk back for minutes without taking it. With no full bucket, an empty one, no enderman within twelve and the water within sixteen, the body goes back for it first.
+    if (countOf(bot, 'water_bucket') === 0 && countOf(bot, 'bucket') > 0 && (state.poolsLeft || []).length && !onOwnPillar() && !onObsidianTop() && !hostileEntities(bot, 12).some(e => live(bot, e) && e.name === 'enderman') && !(dragon && dragonThreat(bot))) {
+      if (await reclaimWaterLeft({ within: 16 })) return;
+    }
     task.interruptCheck = () => {
       oldInterrupt?.();
       if (dimension(bot) !== 'end' || bot.health <= 0) throw blocked('End combat interrupted by dimension change or death');
@@ -2605,6 +2609,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         : focus?.name === 'end_crystal' ? (throwing ? 'Go closer under an observed healing crystal, within a throw of it' : 'Change firing position for an observed healing crystal')
         : 'Reposition along this surveyed route to gain a future attack opportunity',
         position: { ...route.p }, visits: state.visits[route.key] || 0, target: focus?.name,
+        // What the moves from here have come to (note 1645): 25588 (dragon-179, 2026-10-14 15:50 to 15:58Z) on the eastern shelf at y 38 to 40 took a four-block move toward the fountain's stand sixty-three times, each ending where it began against the cliff, climb_to_the_top offered beside them at 0.1; the moves said nothing of it.
+        movesLately: (() => { const log = (state.moveLog || []).filter(m => Date.now() - m.at < 90000); const last = log.at(-1); if (last && !last.to) last.to = { x: bot.entity.position.x, z: bot.entity.position.z }; const done = log.filter(m => m.to); if (!done.length) return undefined; const circled = done.filter(m => Math.hypot(m.to.x - m.from.x, m.to.z - m.from.z) < 3).length; return `${done.length} move${done.length === 1 ? '' : 's'} taken in the last ninety seconds, ${circled} of them ending within three blocks of where they began${circled >= 3 ? ': the walks from here go nowhere' : ''}${focus?.name === 'fountain' && bot.entity.position.y < 55 ? `; the fountain's stand is on the island's top, ${Math.round(62 - bot.entity.position.y)} blocks up from this shelf, and no walk reaches it from here: the climb to the top does` : ''}`; })(),
         clearCrystalShot: focus?.name === 'end_crystal' ? route.clearCrystalShot : undefined,
         targetDistance: route.targetDistance, currentTargetDistance: focus?.position?.distanceTo(bot.entity.position),
         desiredHorizontalRange: route.desiredHorizontalRange,
@@ -2614,6 +2620,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         ...(dragon && (perched(bot, dragon) || [2, 3].includes(metadata(bot, dragon, 'phase'))) ? { perchBody: `ends ${Math.round(Math.hypot(route.p.x + .5 - centre.x, route.p.z + .5 - centre.z))} blocks from the fountain's middle, where the dragon ${perched(bot, dragon) ? 'sits' : 'is coming down to sit'}: its body and wings strike what stands within about 8 of it, 4.9 a blow; 25588 (dragon-95, 2026-10-14 00:12Z) walked to 7.6 from it at 14.3 health and took three blows in 1.3 seconds, dead` } : {}),
         ...breathSays(bot, dragon, vector(route.p)) }, run: async () => {
         state.visits[route.key] = (state.visits[route.key] || 0) + 1; save();
+        state.moveLog = [...(state.moveLog || []).filter(m => Date.now() - m.at < 90000), { at: Date.now(), from: { x: bot.entity.position.x, z: bot.entity.position.z } }];
         const initiallySafe = safeEndPoint(bot, bot.entity.position);
         // A walk stops for a mob at arm's length: the recorded rehearsal
         // walked twenty blocks under an enderman's blows, 16.2 health to 1.1
