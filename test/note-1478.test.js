@@ -423,3 +423,40 @@ test('up onto the top, the run walks in off the cliff\'s lip toward the island\'
   assert.ok(inward, `no walk inward: ${JSON.stringify(walks)}`);
   assert.match(lines.find(l => l.includes("in off the cliff's lip")) || '', /\d+ blocks in at/);
 });
+
+test('on the column with the pool at its foot, the drop is offered beside the dig (note 1572)', async () => {
+  const { bot, goal, task } = fixture();
+  // The pool a block east of the column's foot at 64; no water carried, the pool is the landing.
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 20 }, { name: 'bucket', count: 2 }];
+  const blockAt = bot.blockAt;
+  bot.blockAt = p => { const f = p.floored(); if (f.x === 1 && f.y === 64 && f.z === 0) return { name: 'water', boundingBox: 'empty', position: f }; return blockAt(p); };
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'water_drop', at: Date.now() }, pool: { x: 1, y: 64, z: 0, dx: 1, dz: 0, at: Date.now() } };
+  bot.entities[20].position = new Vec3(60, 90, 60);
+  let seen = null;
+  const client = { systemOne: async ({ questions }) => { seen = questions.branch_0.criteria; return { answers: { branch_0: { choice: 'observe' } } }; } };
+  await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig: async () => {}, place: async () => {} }, client);
+  assert.ok(seen, 'a question was asked');
+  const text = JSON.stringify(seen);
+  assert.ok(text.includes('pillar_down'), text.slice(0, 600));
+  assert.ok(text.includes('water_drop'), text.slice(0, 600));
+  assert.match(text, /12 blocks down onto the island at \(1, 0\), into the pool/);
+});
+
+test('on the ground with both buckets empty and water left standing, the walk back for it is offered and told at the pillar (note 1572)', async () => {
+  const { bot, goal, task } = fixture();
+  delete bot._pillarUp;
+  bot.entity.position = new Vec3(0.5, 64, 0.5);
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 40 }, { name: 'bucket', count: 2 }];
+  const blockAt = bot.blockAt;
+  bot.blockAt = p => { const f = p.floored(); if (f.x === 30 && f.y === 63 && f.z === 20) return { name: 'water', boundingBox: 'empty', position: f }; if (f.x === 0 && f.z === 0 && f.y >= 64) return { name: 'air', boundingBox: 'empty', position: f }; if (f.x === 20 && f.z === 0 && f.y === 84) return { name: 'bedrock', boundingBox: 'block', position: f }; return blockAt(p); };
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, poolsLeft: [{ x: 30, y: 63, z: 20, at: Date.now() }] };
+  bot.entities[20].position = new Vec3(-60, 90, -60);
+  let seen = null;
+  const client = { systemOne: async ({ questions }) => { seen = questions.branch_0.criteria; return { answers: { branch_0: { choice: 'observe' } } }; } };
+  await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig: async () => {}, place: async () => {} }, client);
+  const text = JSON.stringify(seen);
+  assert.ok(text.includes('take_back_water'), text.slice(0, 800));
+  assert.match(text, /Walk 36 blocks to the water left standing at \(30, 63, 20\)/);
+  assert.match(text, /no water is carried to pour the pool at this pillar/);
+  assert.match(text, /the water left at \(30, 63, 20\), 36 blocks off/);
+});

@@ -909,6 +909,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       return !!poolCellFor(new Vec3(fx, gy + 1, fz), lift);
     } catch (_) { return false; }
   };
+  // The water left standing from the fight's pours and clutches, for the facts.
+  const waterLeftSays = () => {
+    const here = bot.entity.position, left = (state.poolsLeft || []).filter(w => bot.blockAt(new Vec3(w.x, w.y, w.z))?.name === 'water').map(w => ({ w, d: Math.round(here.distanceTo(new Vec3(w.x + .5, w.y, w.z + .5))) })).sort((a, b) => a.d - b.d);
+    return left.length ? `the water left at (${left[0].w.x}, ${left[0].w.y}, ${left[0].w.z}), ${left[0].d} blocks off, goes back into the bucket when the bot stands within reach of it (take_back_water); ` : 'no water of this fight\'s is left standing anywhere; ';
+  };
   const waterDropSide = () => {
     const u = bot._pillarUp; if (!u) return null;
     // From the column's own cell (note 1489): after the blow the body stands
@@ -1921,7 +1926,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             position: { ...target.position }, blocksOff: out, blocks: lift, blocksForTheClimb: lift + roofs, blocksCarried: carried, pillarRadius: radius, stance: under ? 'under the bedrock top, beside the pillar' : 'on the top, crouched',
             dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null,
             // Whether the drop's pool can be poured at this pillar's foot (note 1539): at the island's eastern rim (pillars 9, 11 and 20 of this world) no level cell beside the foot is clear of the void, the way down is the bucket in the air alone, and 25588 died on it three times on 2026-10-13 (dragon-84, 90, 93) and landed twice (dragon-92, 94).
-            wayDown: poolAtTheFoot(c, radius, lift) ? 'a pool of water can be poured on level ground beside this pillar\'s foot before the climb, and the drop after the blow lands in it' : 'no pool can be poured at this pillar\'s foot: the void lies within eight blocks of every level cell beside it. The way down from here is the column dug down to a height the health can take and the bucket clicked under the body in the last blocks of the fall, a click the server refuses about one time in three; of the five such drops of 2026-10-13 at this rim, three ended in death (dragon-84, 90, 93) and two landed',
+            // With no water carried the pool is not poured (note 1572): 25588 (dragon-120, 2026-10-14 04:05Z) climbed crystal 88's pillar told 'a pool of water can be poured', both buckets empty, the water left at (-36, 61, 19), 26 blocks off, and dug down 18 after the blow.
+            wayDown: poolAtTheFoot(c, radius, lift) ? (countOf(bot, 'water_bucket') ? 'a pool of water can be poured on level ground beside this pillar\'s foot before the climb, and the drop after the blow lands in it' : `no water is carried to pour the pool at this pillar\'s foot: ${waterLeftSays()}the way down from its top is the column dug a block at a time`) : 'no pool can be poured at this pillar\'s foot: the void lies within eight blocks of every level cell beside it. The way down from here is the column dug down to a height the health can take and the bucket clicked under the body in the last blocks of the fall, a click the server refuses about one time in three; of the five such drops of 2026-10-13 at this rim, three ended in death (dragon-84, 90, 93) and two landed',
             onTheColumn: `the climb and the way down are a minute or two each on a column one block wide, where the dragon's fireballs and breath find the bot and there is no step aside; the dragon's charge is its body, and it carried 25588 off its column at 71, 30 blocks to y 87 and onto the rim, dead (dragon-112, 2026-10-14 02:39Z): with the pool below, a charge is met by the drop into it: a fireball's cloud on the column took 6 a second from 25588 (2026-10-13 06:05Z, 20 to 8 in six seconds, and 10 to none a minute later on its next climb); in the arena's drills (05:08 to 05:35Z) the bot broke six crystals so and died twice on its column after a blow; the breath or a fireball on the column is answered by digging down three`, ...(isCaged ? { caged: `iron bars round it, dug out between the stand and the crystal with the ${pickForBars.name.replaceAll('_', ' ')} first` } : {}), dragonPhase: metadata(bot, dragon, 'phase'), health: bot.health,
             fallFromTheTop: `a knock off the top is a fall of ${lift} blocks, about ${Math.max(0, lift - 3)} damage before armour${countOf(bot, 'water_bucket') ? ', a water bucket carried for the landing' : ', no water bucket carried'}`,
             crystalBlast: punchRecordSays(state, under),
@@ -2396,6 +2402,33 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // (note 1414): back to the bot's own column and down it. The drill of
     // 2026-10-13 (04:14Z) stood on the top after its blow, 36 up, offered
     // only moves about the top.
+    // The water left standing, walked back to for the bucket (note 1572): the
+    // step's own walk-back reaches sixteen blocks, and 25588 (dragon-120,
+    // 2026-10-14 04:05Z) left its pool at (-36, 61, 19), fought an enderman,
+    // walked off to crystal 88 and climbed it with both buckets empty, 'no
+    // water bucket carried' at the top. Offered on the ground whenever the
+    // water is carried in no bucket and lies somewhere within sixty.
+    if (!onOwnPillar() && !onObsidianTop() && countOf(bot, 'water_bucket') === 0 && countOf(bot, 'bucket') > 0 && Array.isArray(state.poolsLeft) && state.poolsLeft.length) {
+      state.poolsLeft = state.poolsLeft.filter(w => Date.now() - w.at < 20 * 60000 && bot.blockAt(new Vec3(w.x, w.y, w.z))?.name === 'water');
+      const here = bot.entity.position, w = state.poolsLeft.map(w => ({ w, d: here.distanceTo(new Vec3(w.x + .5, w.y, w.z + .5)) })).filter(x => x.d <= 60).sort((a, b) => a.d - b.d)[0];
+      if (w) tree.take_back_water = {
+        description: { action: `Walk ${Math.round(w.d)} blocks to the water left standing at (${w.w.x}, ${w.w.y}, ${w.w.z}) and take it back into the empty bucket: no water is carried now, so no pool can be poured at the next pillar's foot and the way down from its top is the dig, a minute or more on the column; the walk is out in the open with the dragon's passes and breath about it (${Math.round(w.d / 4.3)} seconds or so)`,
+          blocksOff: Math.round(w.d), emptyBuckets: countOf(bot, 'bucket'), health: bot.health, dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null },
+        run: async () => {
+          const p = new Vec3(w.w.x, w.w.y, w.w.z);
+          goal.step = { action: 'take_back_water', to: { x: p.x, y: p.y, z: p.z }, blocks: Math.round(w.d) }; save();
+          try { await actions.navigate(bot, task, new goals.GoalNear(p.x, p.y, p.z, 2), { timeoutMs: 25000, stallMs: 5000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+          const eye = bot.entity.position.offset(0, 1.62, 0);
+          if (eye.distanceTo(p.offset(.5, .5, .5)) > 4.3) throw new Error(`The water at ${p} was not reached: ${Math.round(bot.entity.position.distanceTo(p.offset(.5, 0, .5)))} blocks off`);
+          const { fillWaterBucket } = require('./water');
+          await fillWaterBucket(bot, task, p, { timeoutMs: 1500 });
+          const full = countOf(bot, 'water_bucket');
+          console.log(`[end combat] the water left at ${p} taken back into the bucket (${full} full carried)`);
+          state.poolsLeft = state.poolsLeft.filter(x => x !== w.w); if (state.pool && state.pool.x === p.x && state.pool.z === p.z) delete state.pool; save();
+          if (!full) throw new Error(`The water at ${p} did not go into the bucket`);
+          progress = true;
+        } };
+    }
     if (onObsidianTop() && bot._pillarUp) tree.pillar_top_down = {
       description: { action: `Walk back to the bot's own pillar at the top's edge, ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z))} blocks off, and dig down it a block at a time from under the feet to the island: no fall on the way`, health: bot.health, dragonHealth: beforeDragon },
       run: async () => { if (!await backToColumn()) throw new Error('The bot\'s own column was not reached from the pillar\'s top'); await digDownColumn(); } };
@@ -2439,6 +2472,26 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       const underName = bot.blockAt(feet.offset(0, -1, 0))?.name || '';
       // Dropped only on the island's own ground (note 1527): on air at the top's rim, the body's middle over the edge, the record is still the way back. 25588 (dragon-87, 2026-10-13 21:51Z, two crystals broken) stood 'on air' at (-17, 88, -37) after the blow, 'column undefined', 'only observe' nine times.
       if (depth < 1 && underName === 'end_stone' && feet.y < 70) delete bot._pillarUp;
+      // The drop beside the dig (note 1572): on the column after the blow the
+      // way down was asked as 'observe or pillar_down' when the blow's run was
+      // cut short before its own way down, and 25588 (dragon-120, 2026-10-14
+      // 04:03Z, crystal 104 broken) dug 22 blocks down at (-36, 85, 21) with
+      // its pool poured two blocks from the foot, a minute on the column for a
+      // second's step. Offered wherever the dig is, with the side, the fall
+      // and what lies under it.
+      if (depth >= 2 && onOwnPillar()) {
+        const side = waterDropSide(), water = countOf(bot, 'water_bucket');
+        if (side && !side.clearFirst && (water || side.pool)) {
+          const dir = side.dx === 1 ? 'east' : side.dx === -1 ? 'west' : side.dz === 1 ? 'south' : 'north';
+          tree.water_drop = {
+            description: { action: `Step off the column's ${dir} edge, ${side.fall} blocks down onto the island at (${side.edge.x}, ${side.edge.z})${side.pool ? ', into the pool poured at the foot: the landing in water takes nothing' : `, no pool under it: the bucket is clicked under the body in the last blocks of the fall, a click the server refuses about one time in three, and a dry landing takes about ${Math.max(0, side.fall - 3)}`}; a second or two, against the dig's ${Math.round(depth * 1.5)} seconds on the column where the breath and the passes land`,
+              fall: side.fall, pool: !!side.pool, waterBuckets: water, health: bot.health, dragonHealth: beforeDragon },
+            run: async () => {
+              goal.step = { action: 'water_drop_chosen', from: { ...bot.entity.position }, fall: side.fall }; save();
+              if (!await waterDrop({ inCloud: breathThreat(bot)?.name === 'area_effect_cloud' })) throw new Error('The water drop was not taken: no side with ground under it, or the fall too long for the health with no pool');
+            } };
+        }
+      }
       if (depth >= 2) tree.pillar_down = {
         description: { action: `Dig down the bot's own pillar a block at a time from under the feet, ${depth} blocks to its foot: no fall on the way`, blocks: depth, health: bot.health, dragonHealth: beforeDragon },
         run: async () => {
