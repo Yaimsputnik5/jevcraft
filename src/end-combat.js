@@ -1322,12 +1322,19 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // 06:35Z, two crystals broken) stood one up its column at (-13, 63, 42)
   // with no pool under the way and no bucket, dug its one block down into
   // the cloud, 20 to 14 to 8.6 to 2.8 to none in three seconds, 24 blocks carried.
+  // Not under a roof, and a climb that gains nothing is no answer (note 1613, as 1608 on the ground): the way down went on to its other steps only when this returned false, and 25588 (dragon-152, 2026-10-14 09:20Z) at (-13, 79, 37) under its own roof beside crystal 78's top logged 'up out of the breath on the short column: 0 blocks up' twenty times in the cloud, 14.4 to 3.4, before the drop. A try that gained nothing is not made again for three seconds.
   const upOutOfBreathOnShortColumn = async () => {
     if (breathThreat(bot)?.name !== 'area_effect_cloud' || blocksCarried(bot) < 2 || columnDepth() >= 4) return false;
+    if (state.shortColumnUpFailedAt > Date.now() - 3000) return false;
     goal.step = { action: 'up_out_of_breath_on_column', health: bot.health }; save();
+    const f0 = bot.entity.position.floored();
+    // The bot's own roof over the head dug first (a block or two, half a second each), the jump stopped under it otherwise.
+    for (const dy of [2, 3]) { const r = bot.blockAt(f0.offset(0, dy, 0)); if (r?.boundingBox === 'block' && actions.dig && !/bedrock|obsidian|end_portal/.test(r.name)) { try { await actions.dig(bot, task, r.position); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } } }
     const from = Math.floor(bot.entity.position.y);
     try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
-    console.log(`[end combat] up out of the breath on the short column: ${Math.floor(bot.entity.position.y) - from} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
+    const rose = Math.floor(bot.entity.position.y) - from;
+    console.log(`[end combat] up out of the breath on the short column: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
+    if (rose < 1) state.shortColumnUpFailedAt = Date.now();
     return true;
   };
   const wayDown = async (opts) => {
