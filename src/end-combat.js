@@ -2720,6 +2720,23 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           lastSeen = Date.now(); ever = true;
           if (roofed() && actions.dig) { await roofHole(false); continue; }
           if (canStrike(bot, fresh)) { if (typeof bot.lookAt === 'function') await bot.lookAt(fresh.position.offset(0, .5, 0), true); bot.attack(fresh); swings++; for (let n = 0; n < 7; n++) { check(); await sleep(100); } continue; }
+          // Out of reach from the floor (note 1633): the dragon sits with its belly at 65 on the fountain and its head a block under, 3.4 over the eyes of a body two deep (dragon-163, 2026-10-14 12:55Z: 'from the hole under the head: 0 swings' three times while the runs from the ground beside struck it ten times). Up out of the hole onto its cell for the sword while it sits, and two dug again when it rises.
+          const gap = fresh.position.distanceTo(bot.entity.position.offset(0, 1.62, 0));
+          if (gap <= 5 && blocksCarried(bot) >= 2 && actions.dig && bot.health >= 12) {
+            const cell = bot.entity.position.floored();
+            console.log(`[end combat] the head ${Math.round(gap * 10) / 10} from the eyes in the hole, out of the sword's three: up onto the rim for it`);
+            if (await outOfTheHole()) {
+              let up = 0;
+              try { await strikeWhilePerched(12000); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+              up = (state.headSwings || 0);
+              // Back in: the two blocks laid to climb out dug again, dropping in.
+              const f2 = bot.entity.position.floored();
+              if (f2.x === cell.x && f2.z === cell.z) { for (const dy of [1, 2]) { check(); try { await actions.dig(bot, task, f2.offset(0, -dy, 0), { requireDrops: false, dropInto: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; break; } } for (let i = 0; i < 20 && Math.floor(bot.entity.position.y) > f2.y - 2; i++) await sleep(50); if (Math.floor(bot.entity.position.y) <= f2.y - 2) { state.hole = { x: f2.x, y: f2.y - 2, z: f2.z, at: Date.now() }; save(); } }
+              console.log(`[end combat] back ${holeHere() ? 'in the hole' : 'on the ground, the hole not dug again'} at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health, ${up} swings this fight`);
+              if (!holeHere()) break;
+              continue;
+            }
+          }
         } else if (ever && Date.now() - lastSeen > 4000) break;
         else if (!ever && ![2, 3, 5, 6, 7].includes(metadata(bot, dragon, 'phase')) && Date.now() - lastSeen > 15000) break;
         else if (!roofed() && !perched(bot, dragon)) await roofHole(true);
@@ -2750,7 +2767,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           const walk = walk0;
           const t = state.holeHead || { tries: 0, dugIn: 0, swings: 0 };
           tree.hole_under_head = {
-            description: { action: `${walk ? `Walk ${walk} blocks to the cell 7 from the fountain's middle on the bot's own side, dig` : `Dig`} two down ${walk ? '' : 'here, ' + Math.round(byFountain * 10) / 10 + ' from the fountain\'s middle, '}and strike the dragon's head from the hole for as long as it sits: sitting, the dragon turns to the player it sees within twenty, its head a block under its middle and 6.5 before it, so from the hole two deep the eyes are about 1.4 under the head's centre, within the sword's three; the body in the hole is below the wings' boxes and the breath's cloud. The dig is two seconds; the way out two blocks laid. While the dragon flies a block is laid over the hole's mouth (its fireball bursts on it and the cloud lies above; a hole with its mouth open took a fireball's cloud, dragon-159), and taken off when it sits for the sword.`,
+            description: { action: `${walk ? `Walk ${walk} blocks to the cell 7 from the fountain's middle on the bot's own side, dig` : `Dig`} two down ${walk ? '' : 'here, ' + Math.round(byFountain * 10) / 10 + ' from the fountain\'s middle, '}and strike the dragon's head for as long as it sits: sitting on the fountain with its belly at about 65, its head a block under its middle and 6.5 before it is 3.4 over the eyes of a body two deep, out of the sword's three, so the blows are struck from the hole's rim (two blocks laid, the body up on its cell) and the hole dug again when the dragon rises; the body in the hole is below the wings' boxes and the breath's cloud, the body on the rim is in the breath and the push (dragon-163, 2026-10-14: ten blows struck from the ground by the head at 20 to 17 health). The dig is two seconds; the way out two blocks laid. While the dragon flies a block is laid over the hole's mouth (its fireball bursts on it and the cloud lies above; a hole with its mouth open took a fireball's cloud, dragon-159), and taken off when it sits for the sword.`,
               dragonNow: head ? 'perched now' : 'coming down to land now', walkBlocks: walk, holeBlocksFromFountain: 7, blocksFromFountain: Math.round(byFountain), health: bot.health, dragonHealth: beforeDragon, blocksCarried: blocksCarried(bot),
               headHitThroughArmourWorn: headHit(bot), healing: healingSays(crystals.length), perchRule: 'the dragon stays at its perch only while a player stands within 20 blocks of it; alone there five seconds, it takes off',
               record: `runs under the head from the open on 2026-10-14: dragon-151, 153, 154 and 155 reached it none and three were thrown by the take-off, dead; the arena's run drill (10:08Z) lost 10 to 20 of health in two to four seconds in five runs of six, breathed on and lifted. The arena's hole drill (09:30Z): in a hole two deep at 11 from the fountain the landing and the take-off moved the body 0 and took 0, three of three; and (11:50Z) the dragon perched twenty seconds over a body in a hole two deep seven blocks out breathed at it twice each time, the clouds forming at the ground's level a block over the hole's mouth, and the body lost 0 in three of three. From holes this fight: ${t.tries} tr${t.tries === 1 ? 'y' : 'ies'}, ${t.dugIn} dug in, ${t.swings} swing${t.swings === 1 ? '' : 's'} at the head.` },
