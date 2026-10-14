@@ -224,7 +224,8 @@ test('a block standing one up in the pool\'s row is dug down before the pour (no
   };
   let looked = null;
   bot.lookAt = async p => { looked = p; };
-  bot.activateItem = () => { if (looked) water.add(`${Math.floor(looked.x)},${Math.ceil(looked.y)},${Math.floor(looked.z)}`); };
+  // The water poured flows along the dug row, as it does in the game (note 1600 reads the row back).
+  bot.activateItem = () => { if (looked) { water.add(`${Math.floor(looked.x)},${Math.ceil(looked.y)},${Math.floor(looked.z)}`); for (const k of removed) { const [x, y, z] = k.split(',').map(Number); if (y === Math.ceil(looked.y)) water.add(k); } } };
   const dug = [];
   const dig = async (b, t, p) => { dug.push(p.clone()); removed.add(`${p.x},${p.y},${p.z}`); bot.entity.position = new V(p.x + .5, 64, p.z + .5); };
   const place = async () => { throw Object.assign(new Error('stop here'), { name: 'Cancelled' }); };

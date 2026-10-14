@@ -1047,11 +1047,22 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // (dragon-121, 2026-10-14 04:17Z, crystal 109) poured at (34, 57, -22),
     // took back (33, 59, -22) a moment later, and climbed with 'no pool'.
     const { sourceWater: isSource } = require('./water');
+    const rowY = best.cell.y;
     let poured = bot.blockAt(best.cell)?.name === 'water' && isSource(bot.blockAt(best.cell));
     if (!poured) {
-      const src = bot.findBlocks({ matching: bot.registry.blocksByName.water.id, maxDistance: 6, count: 8, useExtraInfo: isSource }).map(p => p.floored()).filter(p => Math.abs(p.x - best.cell.x) <= 2 && Math.abs(p.z - best.cell.z) <= 2 && Math.abs(p.y - best.cell.y) <= 3 && !(state.poolsLeft || []).some(w => w.x === p.x && w.y === p.y && w.z === p.z)).sort((p, q) => p.distanceTo(best.cell) - q.distanceTo(best.cell))[0];
-      if (src) { console.log(`[end combat] the water went in at ${src}, not at ${best.cell}: the pool is there`); best.cell = src; poured = true; }
+      // At the trench's level or above only (note 1600): water runs down, not up, and a source in a pit below the row leaves the row dry. 25588 (dragon-141, 2026-10-14 08:10Z, five crystals broken) had its water go in at (31, 58, -29) under its row at 59, 'the pool is there', and came down from 82 on the dry row at (31, 59, -30), 19.4 to none.
+      const sources = bot.findBlocks({ matching: bot.registry.blocksByName.water.id, maxDistance: 6, count: 8, useExtraInfo: isSource }).map(p => p.floored()).filter(p => Math.abs(p.x - best.cell.x) <= 2 && Math.abs(p.z - best.cell.z) <= 2 && Math.abs(p.y - best.cell.y) <= 3 && !(state.poolsLeft || []).some(w => w.x === p.x && w.y === p.y && w.z === p.z)).sort((p, q) => p.distanceTo(best.cell) - q.distanceTo(best.cell));
+      const src = sources[0];
+      if (src && src.y >= best.cell.y) { console.log(`[end combat] the water went in at ${src}, not at ${best.cell}: the pool is there`); best.cell = src; poured = true; }
+      else if (src) {
+        console.log(`[end combat] the water went in at ${src}, ${best.cell.y - src.y} below the row at ${best.cell.y}: no pool in the row from there; taken back and poured again`);
+        try { await require('./water').fillWaterBucket(bot, task, src, { timeoutMs: 1500 }); } catch (_) { /* left */ }
+        water = bot.inventory.items().find(i => i.name === 'water_bucket');
+        if (water) { try { await pourOnce(); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; } poured = bot.blockAt(best.cell)?.name === 'water' && isSource(bot.blockAt(best.cell)); }
+      }
     }
+    // The row holds water where the body comes down (note 1600): the cells of the trench read back after the pour.
+    if (poured && best.reach) { const dx = best.dx, dz = best.dz, base = new Vec3(column.x, rowY, column.z); const wet = []; for (let k = 1; k <= best.reach; k++) wet.push(bot.blockAt(base.offset(dx * k, 0, dz * k))?.name === 'water'); if (wet.filter(Boolean).length < Math.max(2, best.reach - 1)) { console.log(`[end combat] the pool's row holds water in ${wet.filter(Boolean).length} of ${best.reach} cells (${wet.map(w => w ? '~' : '.').join('')}): no pool recorded`); poured = false; } }
     console.log(`[end combat] the pool for the drop ${poured ? 'poured' : 'not poured'} at ${best.cell} beside the column at (${column.x}, ${column.z})${best.obsidian ? `, ${best.obsidian} obsidian that way` : ''}; ${countOf(bot, 'water_bucket')} full bucket${countOf(bot, 'water_bucket') === 1 ? '' : 's'} left`);
     if (poured) { state.pool = { x: best.cell.x, y: best.cell.y, z: best.cell.z, dx: best.dx, dz: best.dz, at: Date.now(), ...(best.reach ? { reach: best.reach } : {}) }; (state.poolsLeft ||= []).push({ x: best.cell.x, y: best.cell.y, z: best.cell.z, at: Date.now() }); save(); return state.pool; }
     return null;
