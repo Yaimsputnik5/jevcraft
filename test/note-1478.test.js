@@ -518,6 +518,27 @@ test('the hold on the column lays the pocket against the wings: two blocks on ev
   assert.ok(firstWall && firstWall.x === -1, `the far side first: ${order.map(String).join(' ')}`);
 });
 
+test('a cell off the column at its top, the body is centred on the column and the pocket built round the column cell (note 1659)', async () => {
+  const { bot, goal, task } = fixture();
+  // The body on the tower's top beside the column, 1.4 off the column cell's middle (dragon-194 at (-33.5, 85, 21.4) beside (-34, 20)).
+  bot.entity.position = new Vec3(0.5, 76, 1.4);
+  const placed = new Set();
+  const blockAt = bot.blockAt;
+  bot.blockAt = p => { const f = p.floored(); if (placed.has(`${f.x},${f.y},${f.z}`)) return { name: 'cobblestone', boundingBox: 'block', position: f }; if (f.x === 0 && f.z === 1 && f.y === 75) return { name: 'obsidian', boundingBox: 'block', position: f }; return blockAt(p); };
+  bot.placeBlock = async (ref, face) => { const c = ref.position.plus(face); placed.add(`${c.x},${c.y},${c.z}`); };
+  // The walk of centreOn: a step forward goes to the point looked at.
+  let looked = null; bot.lookAt = async p => { looked = p; };
+  bot.setControlState = (key, on) => { if (key === 'forward' && on && looked) bot.entity.position = new Vec3(looked.x, bot.entity.position.y, looked.z); };
+  const lines = [], log = console.log; console.log = (...a) => { lines.push(a.join(' ')); log(...a); };
+  try { await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig: async () => {}, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'observe' } } }) }); }
+  finally { console.log = log; }
+  const pocket = lines.find(l => l.includes('a pocket against the wings'));
+  assert.ok(pocket, lines.filter(l => l.includes('end combat')).join('\n'));
+  assert.match(pocket, /4 of 4 sides closed/);
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const dy of [0, 1]) assert.ok(placed.has(`${dx},${76 + dy},${dz}`), `the wall at ${dx},${76 + dy},${dz}: ${[...placed].join(' ')}`);
+  assert.ok(Math.hypot(bot.entity.position.x - 0.5, bot.entity.position.z - 0.5) <= 0.2, `the body centred on the column: ${bot.entity.position}`);
+});
+
 test('a cloud under the feet is said in pillar_down, and the dig down stops over it (note 1576)', async () => {
   const { bot, dug, dig, goal, task } = fixture();
   // The cloud two below the column's top, where the fireball burst on the way up; the dragon far off.

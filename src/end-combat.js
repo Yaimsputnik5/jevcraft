@@ -911,7 +911,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   const pocketOnColumn = async () => {
     // Built round the column's cell, the body centred on it first (note 1655): built round the body's own cell, with the body a step off the column at the top the cell under it was air, no block had a face to be set against, and 48 of 72 pockets of 2026-10-14's runs 160 to 190 laid nothing ('0 blocks laid, 1 of 4 sides closed, 1 ms'); dragon-169, 178, 184, 187 and 190 were then beaten off their column tops, five of the afternoon's eight carries.
     const u = bot._pillarUp && bot._pillarUp.until > Date.now() ? bot._pillarUp : null;
-    if (u && Math.hypot(u.x + .5 - bot.entity.position.x, u.z + .5 - bot.entity.position.z) <= 1.3 && bot.blockAt(new Vec3(u.x, Math.floor(bot.entity.position.y) - 1, u.z))?.boundingBox === 'block') await centreOnColumn(0.2, { maxMs: 600 });
+    if (u && Math.hypot(u.x + .5 - bot.entity.position.x, u.z + .5 - bot.entity.position.z) <= 1.5 && bot.blockAt(new Vec3(u.x, Math.floor(bot.entity.position.y) - 1, u.z))?.boundingBox === 'block') await centreOnColumn(0.2, { maxMs: 600 });
     const f = u && Math.hypot(u.x + .5 - bot.entity.position.x, u.z + .5 - bot.entity.position.z) <= 0.95 ? new Vec3(u.x, Math.floor(bot.entity.position.y), u.z) : bot.entity.position.floored();
     const under = bot.blockAt(f.offset(0, -1, 0)); if (under?.boundingBox !== 'block') { console.log(`[end combat] no pocket at ${f}: ${under?.name || 'nothing'} under the cell`); return { laid: 0, closed: 0 }; }
     const name = blocksCarriedName(bot); let item = name && bot.inventory.items().find(i => i.name === name);
@@ -1483,16 +1483,25 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   };
   // The pass held through on the column, crouched with the shield up, a
   // second and a half (note 1414).
+  // Beside the column's top (note 1659): a body a cell off its column at the top, on the crystal's tower or the block it stepped to, is within reach of the column cell and the pocket is built round that cell, the body centred on it first (note 1655); onOwnPillar wants the body within 0.95 of the cell's middle. 25588 (dragon-194, 2026-10-14 18:59Z, four crystals broken) stood at (-33.5, 85, 21.4) on the tower's top beside its column at (-34, 20), 1.4 off its middle, as the dragon came: no roof and no pocket were tried, the hold crouched with the shield, two blows of the body took 20 to 14.6 and carried it 14 blocks and 23 down, dead at (-48, 62, 5). The column cell must have two blocks under the feet's level and the body the same height.
+  const nearOwnColumnTop = () => {
+    const u = bot._pillarUp; if (!u || u.until < Date.now()) return false;
+    const p = bot.entity.position, f = p.floored();
+    if (f.y < 70 || Math.hypot(u.x + .5 - p.x, u.z + .5 - p.z) > 1.5) return false;
+    return [1, 2].every(dy => bot.blockAt(new Vec3(u.x, f.y - dy, u.z))?.boundingBox === 'block') && bot.blockAt(new Vec3(u.x, f.y, u.z))?.boundingBox !== 'block';
+  };
   const holdOnColumn = async () => {
     // The roof first, on the bot's own column (note 1445): the dragon that
     // comes at the column breathes at it, and the fireball not seen in
     // flight bursts at the feet. 25588 (dragon-26, 2026-10-13 09:16Z) took
     // the first cloud at its feet, 20 to 14, before any fireball was seen,
     // and the roof laid against the second came too late.
-    if (onOwnPillar() && !onObsidianTop()) { try { await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
+    const atTheTop = nearOwnColumnTop();
+    if (atTheTop && !onOwnPillar()) { try { await centreOnColumn(0.2, { maxMs: 600 }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
+    if ((onOwnPillar() && !onObsidianTop()) || atTheTop) { try { await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
     // And the pocket's walls (note 1575), from 70 up (the island's top is 64 and under; every carry that killed began at 71 to 95).
     // Only against the dragon's body coming, never against a fireball (note 1584): the cloud reaches through the walls, and a body sealed in with it has seconds of digging to get out. 25588 (dragon-127, 2026-10-14 05:13Z) died in its first pocket so; dragon-130 (05:49Z) left one at 0.3 health.
-    if (onOwnPillar() && !onObsidianTop() && bot.entity.position.y >= 70 && dragonThreat(bot) && !breathThreat(bot)) {
+    if (((onOwnPillar() && !onObsidianTop()) || atTheTop) && bot.entity.position.y >= 70 && dragonThreat(bot) && !breathThreat(bot)) {
       try { const t0 = Date.now(), r = await pocketOnColumn(); console.log(`[end combat] a pocket against the wings on the column at ${bot.entity.position.floored()}: ${r.laid} blocks laid, ${r.closed} of 4 sides closed${r.poolSideOpen ? ' (the pool\'s side left open for the drop)' : ''}, ${Date.now() - t0} ms, ${blocksCarried(bot)} blocks left`); }
       catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     }
