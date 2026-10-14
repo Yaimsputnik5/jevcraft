@@ -115,13 +115,14 @@ async function trial(mode, n) {
     return;
   }
   // Perched three seconds, then the take-off.
-  const t1 = Date.now(); while (Date.now() - t1 < 3000 && !dead) { sample(); await sleep(50); }
+  const holdMs = Number(process.env.PERCH_HOLD || 3000); const clouds = [];
+  const t1 = Date.now(); while (Date.now() - t1 < holdMs && !dead) { sample(); for (const e of Object.values(bot.entities)) if (e.name === 'area_effect_cloud' && e.isValid !== false && !clouds.some(c => c.id === e.id)) clouds.push({ id: e.id, at: e.position.floored(), afterMs: Date.now() - t1 }); await sleep(50); }
   const perchedSample = { maxOff: Math.round(maxOff * 10) / 10, lost: Math.round(lost * 10) / 10, hurt: hurt.length };
   await setPhase(4);
   const t2 = Date.now(); while (Date.now() - t2 < 8000 && !dead) { sample(); await sleep(50); }
   sample();
   const d = dragon();
-  log({ mode, trial: n, at: AT, feetY, landing, perched: perchedSample, after: { maxOff: Math.round(maxOff * 10) / 10, minY: Math.round(minY * 10) / 10, maxY: Math.round(maxY * 10) / 10, lost: Math.round(lost * 10) / 10, hurt: hurt.length, hurtBy: hurt.slice(0, 6), dead, phases: [...phases], dragonAt: d ? d.position.floored() : null } });
+  log({ mode, trial: n, at: AT, feetY, landing, perched: perchedSample, after: { maxOff: Math.round(maxOff * 10) / 10, minY: Math.round(minY * 10) / 10, maxY: Math.round(maxY * 10) / 10, lost: Math.round(lost * 10) / 10, hurt: hurt.length, hurtBy: hurt.slice(0, 6), dead, phases: [...phases], dragonAt: d ? d.position.floored() : null, clouds: clouds.slice(0, 4), holdMs } });
   await command(end(`tp @e[type=ender_dragon] 0 140 0`));
   if (dead) { await sleep(2000); }
 }
