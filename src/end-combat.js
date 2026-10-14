@@ -2488,10 +2488,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           record: 'the take-off\'s throw ended dragon-121, 130 and 136 on 2026-10-14 at six or seven crystals, each standing in the open by the fountain or on its way to it' },
         run: async () => {
           goal.step = { action: 'wait_in_hole', at: { ...feet } }; save();
+          // Centred on the cell first (note 1595): a body 0.6 wide at a cell's edge stands on the rim when the cell under it is dug, and 25588 (dragon-139, 2026-10-14 07:35Z) dug its hole at (10, 60, 16) and stayed at 60, 'a side open'.
+          const centre = feet.offset(.5, 0, .5), off = () => Math.hypot(centre.x - bot.entity.position.x, centre.z - bot.entity.position.z);
+          for (let i = 0; i < 20 && off() > 0.12; i++) { check(); try { await bot.lookAt(centre.offset(0, 1.6, 0), true); } catch (_) { /* looked */ } bot.setControlState?.('sneak', true); bot.setControlState?.('forward', true); await sleep(off() > 0.4 ? 100 : 50); bot.setControlState?.('forward', false); await sleep(60); }
+          bot.setControlState?.('sneak', false);
           for (const dy of [1, 2]) { check(); await actions.dig(bot, task, feet.offset(0, -dy, 0), { requireDrops: false }); }
-          for (let i = 0; i < 20 && Math.floor(bot.entity.position.y) > feet.y - 2; i++) await sleep(50);
-          state.hole = { x: feet.x, y: feet.y - 2, z: feet.z, at: Date.now() }; save();
-          console.log(`[end combat] in the hole at ${bot.entity.position.floored()}, ${Math.round(byFountain)} from the fountain: ${holeHere() ? 'walled on four sides' : 'a side open'}`);
+          for (let i = 0; i < 30 && Math.floor(bot.entity.position.y) > feet.y - 2; i++) await sleep(50);
+          const inIt = Math.floor(bot.entity.position.y) <= feet.y - 2;
+          if (inIt) { state.hole = { x: feet.x, y: feet.y - 2, z: feet.z, at: Date.now() }; save(); }
+          console.log(`[end combat] ${inIt ? 'in the hole' : 'not down into the hole'} at ${bot.entity.position.floored()} (${Math.round(off() * 100) / 100} off the cell's middle), ${Math.round(byFountain)} from the fountain: ${holeHere() ? 'walled on four sides' : inIt ? 'a side open' : 'the body still on the rim'}`);
+          if (!inIt) throw new Error('The body did not go down into the hole');
           progress = true;
         } };
     }
