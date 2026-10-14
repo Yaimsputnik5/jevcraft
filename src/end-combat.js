@@ -1788,7 +1788,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           // tick, 'no blow at crystal 13: lift 33, 28 blocks carried', the
           // island's end stone under its feet the whole while.
           const floorHere = bot.blockAt(here.floored().offset(0, -1, 0))?.name;
-          if (out <= 64 && lift >= 1 && lift <= 64 && lift + 6 > carried && pickForBars && floorHere === 'end_stone' && !onOwnPillar() && !Object.keys(tree).some(k => k.startsWith('quarry_blocks_'))) {
+          // The quarry's gate is the climb's budget (note 1565): the climb wants lift + roofs + 3, and 25588 (dragon-114, 2026-10-14 03:25Z, five crystals broken) stood with 52 blocks, crystal 73's climb wanting 58, the quarry only offered under 47, 'only observe'.
+          if (out <= 64 && lift >= 1 && lift <= 64 && lift + roofs + 3 > carried && pickForBars && floorHere === 'end_stone' && !onOwnPillar() && !Object.keys(tree).some(k => k.startsWith('quarry_blocks_'))) {
             // Ten over the lift (note 1464): the roofs on the way up and down are
             // of the same blocks, and 25588 (dragon-43, 2026-10-13 12:23Z, three
             // crystals broken) climbed 38 for a lift of 37 and stopped a block
