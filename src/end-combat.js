@@ -895,8 +895,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // first (the push is away from its body), each side a post from the block
   // under the feet where nothing stands beside. Said in the log.
   const pocketOnColumn = async () => {
-    const f = bot.entity.position.floored();
-    const under = bot.blockAt(f.offset(0, -1, 0)); if (under?.boundingBox !== 'block') return { laid: 0, closed: 0 };
+    // Built round the column's cell, the body centred on it first (note 1655): built round the body's own cell, with the body a step off the column at the top the cell under it was air, no block had a face to be set against, and 48 of 72 pockets of 2026-10-14's runs 160 to 190 laid nothing ('0 blocks laid, 1 of 4 sides closed, 1 ms'); dragon-169, 178, 184, 187 and 190 were then beaten off their column tops, five of the afternoon's eight carries.
+    const u = bot._pillarUp && bot._pillarUp.until > Date.now() ? bot._pillarUp : null;
+    if (u && Math.hypot(u.x + .5 - bot.entity.position.x, u.z + .5 - bot.entity.position.z) <= 1.3 && bot.blockAt(new Vec3(u.x, Math.floor(bot.entity.position.y) - 1, u.z))?.boundingBox === 'block') await centreOnColumn(0.2, { maxMs: 600 });
+    const f = u && Math.hypot(u.x + .5 - bot.entity.position.x, u.z + .5 - bot.entity.position.z) <= 0.95 ? new Vec3(u.x, Math.floor(bot.entity.position.y), u.z) : bot.entity.position.floored();
+    const under = bot.blockAt(f.offset(0, -1, 0)); if (under?.boundingBox !== 'block') { console.log(`[end combat] no pocket at ${f}: ${under?.name || 'nothing'} under the cell`); return { laid: 0, closed: 0 }; }
     const name = blocksCarriedName(bot); let item = name && bot.inventory.items().find(i => i.name === name);
     if (!item) return { laid: 0, closed: 0 };
     const d = dragonThreat(bot) || Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
