@@ -120,3 +120,23 @@ test('filling rejects stale reach and requires an actual empty-to-water inventor
     assert.equal(used, behavior === 'moved' ? 0 : 1);
   }
 });
+
+test('a fall that ends in standing water with no click of its own is a landing at once, no bucket used (note 1546)', async () => {
+  const { bot, task, goal, stock } = fixture();
+  let clicks = 0;
+  bot.activateItem = () => { clicks++; };
+  // Falling fast from 30, clutch targets refused (no raycast hit), the pool at y 1 reached a moment later; the current then drifts the body along.
+  bot.entity.position.set(.5, 30, .5); bot.entity.velocity.set(0, -1.2, 0);
+  goal.step = { action: 'water_drop', from: { x: .5, y: 30, z: .5 } };
+  bot.world.raycast = () => null;
+  bot.blockAt = p => ({ name: p.y < 1 ? 'stone' : p.floored().y === 1 ? 'water' : 'air', boundingBox: p.y < 1 ? 'block' : 'empty', metadata: 0 });
+  setTimeout(() => { bot.entity.position.set(.5, 1.2, .5); bot.entity.velocity.set(.06, -.01, 0); bot.entity.onGround = false; }, 60);
+  const timer = setInterval(() => { bot.emit('physicsTick'); if (bot.entity.position.y < 2) bot.entity.position.x += .06; }, 5);
+  const t0 = Date.now();
+  try {
+    assert.equal(await recoverFall(bot, task, goal, () => {}, { timeoutMs: 3000 }), true);
+    assert.ok(Date.now() - t0 < 1200, `the landing was called within a moment, not ${Date.now() - t0} ms`);
+    assert.equal(goal.lastFallLanding.outcome, 'landed_in_standing_water');
+    assert.equal(clicks, 0); assert.equal(stock.water_bucket, 1);
+  } finally { clearInterval(timer); }
+});

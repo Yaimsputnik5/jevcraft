@@ -80,7 +80,7 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
   const before = countOf(bot, 'water_bucket'), emptyBefore = countOf(bot, 'bucket');
   bot.pathfinder.setGoal(null); bot.clearControlStates(); bot.stopDigging?.();
   const previousInterrupt = task.interruptCheck; task.interruptCheck = undefined;
-  let previous = bot.entity.position.clone(), used, failure, wetSince = 0, dryLanding;
+  let previous = bot.entity.position.clone(), used, failure, wetSince = 0, poolSince = 0, dryLanding;
   const check = () => {
     if (bot.game.dimension !== dimension || bot.health <= 0 || bot.isAlive === false) throw new Error('Fall recovery interrupted by dimension change or death');
   };
@@ -146,6 +146,23 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
           ended = true; return true;
         }
       } else wetSince = 0;
+      // Down in standing water with no click of its own (note 1546): the pool
+      // at the column's foot is the landing, and the body is done falling the
+      // moment it floats there. Waited for a dry stand instead, the watcher
+      // let the trench's current carry the body a block a second, and 25588
+      // (dragon-97, 2026-10-14 00:24Z) landed its 27-block drop in the pool at
+      // (-8, 61, -38), drifted to (3, 60, -41) in six seconds, 'landed dry'
+      // there, and the pool thirteen blocks back was never taken up.
+      if (!used && bot.blockAt(bot.entity.position.floored())?.name === 'water' && Math.abs(bot.entity.velocity.y) < .3 && bot.entity.position.y <= (goal.step?.from?.y ?? Infinity) - 3) {
+        poolSince ||= Date.now();
+        if (Date.now() - poolSince >= 250) {
+          const evidence = { at: Date.now(), landing: { ...bot.entity.position }, initialHealth, health: bot.health, outcome: 'landed_in_standing_water', waterConsumed: 0 };
+          goal.lastFallLanding = evidence; save(); bot.emit('fall_recovery', evidence);
+          console.log(`[fall] landed in the water at ${bot.entity.position.floored()}, ${initialHealth.toFixed(1)} to ${bot.health.toFixed(1)}, no bucket used`);
+          bot.clearControlStates();
+          ended = true; return true;
+        }
+      } else poolSince = 0;
       if (bot.entity.onGround && Math.abs(bot.entity.velocity.y) < .1 && dryStanding(bot, bot.entity.position)) {
         if (!dryLanding || dryLanding.position.distanceTo(bot.entity.position) > .3) dryLanding = { at: Date.now(), position: bot.entity.position.clone() };
         if (Date.now() - dryLanding.at >= 150) {
