@@ -980,6 +980,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the pool's trench side not dug at ${c}: ${String(err.message || err).slice(0, 80)}`); }
       }
       if (sides) console.log(`[end combat] the pool's trench widened: ${sides} side cells dug`);
+      // Every cell of the row read back (note 1594): a dig that came to nothing
+      // left (30, 58, -28) solid in a row of four, 'the pool's trench dug: 4
+      // cells', and 25588 (dragon-138, 2026-10-14 07:27Z, four crystals
+      // broken) came down from 82 on exactly that cell, 20 to none. A cell
+      // still solid is dug once more; one still solid after that ends the row there.
+      for (let i = 0; i < dug; i++) {
+        const t = trench[i];
+        if (bot.blockAt(t)?.boundingBox !== 'block') continue;
+        try { check(); await actions.dig(bot, task, t, { requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+        if (bot.blockAt(t)?.boundingBox === 'block') { console.log(`[end combat] the pool's trench cell ${t} stayed solid after two digs: the row ends before it`); dug = i; break; }
+        console.log(`[end combat] the pool's trench cell ${t} was still solid and is dug now`);
+      }
       if (dug >= 2) { best.cell = trench[Math.floor((dug - 1) / 2)].clone(); best.reach = dug; console.log(`[end combat] the pool's trench dug: ${dug} cells from ${trench[0]} out from the column at (${column.x}, ${column.z}); the water goes in at ${best.cell}${dug < len ? ` (${len} wanted: the row ends there)` : ''}`); }
     }
     const eye = bot.entity.position.offset(0, 1.62, 0), target = best.cell.offset(.5, -.01, .5);
