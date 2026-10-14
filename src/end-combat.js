@@ -1567,14 +1567,17 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // Up two first in the cloud (note 1636): the walking escapes are tried for 0.7 and 1.6 seconds before the two blocks up (note 1583), and the cloud takes six a second. 25588 (dragon-165, 2026-10-14 12:57Z, no crystal broken) stood in its pool's pit at (-13, 59, 35) as a fireball's cloud filled it, 20 to 15 to 9.6 to 3.8 to none in three seconds, 'hurt without a survival response', 34 blocks carried; dragon-160 (11:34Z) the same in its pit. Two blocks laid are half a second and the body is out of a cloud half a block deep.
       {
         const f0 = bot.entity.position.floored();
-        const roofedHere = [2, 3].some(dy => bot.blockAt(f0.offset(0, dy, 0))?.boundingBox === 'block');
-        if (inBreath() && blocksCarried(bot) >= 2 && !roofedHere && !onObsidianTop()) {
+        // Under the bot's own roof (note 1641): a block two over the feet stops the jump and is dug first; a block three over leaves room for one up, and one up is out of a cloud half a block deep. 25588 (dragon-175, 2026-10-14 15:03Z, five crystals broken) stood on a two-block stub at (-11, 64, 6) with its fireball roof at 67, the cloud came to its feet, no climb was tried under the roof, and it went 20 to 2 in three seconds.
+        const roofAt2 = bot.blockAt(f0.offset(0, 2, 0))?.boundingBox === 'block', roofAt3 = bot.blockAt(f0.offset(0, 3, 0))?.boundingBox === 'block';
+        if (inBreath() && blocksCarried(bot) >= 1 && !onObsidianTop()) {
           goal.step = { action: 'up_out_of_breath_first', health: bot.health }; save();
           // The feet on the ground first (note 1640): the body arrives in the cloud at a run or off a step, and the climb refused 'air under the feet' while it was in the air (dragon-171 and 174, 2026-10-14, each dead in the cloud a second later). The keys let go and up to half a second waited for the ground.
           bot.clearControlStates(); bot.pathfinder?.setGoal?.(null);
           for (let i = 0; i < 10 && !bot.entity.onGround; i++) { check(); await sleep(50); }
+          if (roofAt2 && actions.dig) { const r = bot.blockAt(f0.offset(0, 2, 0)); if (!/bedrock|obsidian|end_portal/.test(r.name)) { try { await actions.dig(bot, task, r.position, { requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } } }
+          const up = roofAt3 && !roofAt2 ? 1 : 2;
           const from = Math.floor(bot.entity.position.y);
-          try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+          try { await require('./pillar-recovery').pillarUp(bot, task, from + up, { dig: actions.dig, maxBlocks: up, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
           const rose = Math.floor(bot.entity.position.y) - from;
           console.log(`[end combat] up out of the breath first: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
           if (rose >= 1) return;
