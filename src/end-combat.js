@@ -1660,6 +1660,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // Water standing within reach of the eye goes back into an empty bucket (notes 1495, 1535); the cell taken, or null.
   const takeBackWaterNear = async ({ sparePool = false } = {}) => {
     if (countOf(bot, 'bucket') < 1) return null;
+    // Not with an enderman within twelve (note 1638): the water at the feet is the stand against it (note 1136), and the take-back undid the pour the moment after it, pour and take-back six times over while the enderman struck; 25588 (dragon-170, 2026-10-14 13:57Z, one crystal broken) 20 to 1.7 in seventeen seconds, dead.
+    if (hostileEntities(bot, 12).some(e => live(bot, e) && e.name === 'enderman')) return null;
     const { sourceWater, fillWaterBucket } = require('./water');
     const eye = bot.entity.position.offset(0, 1.62, 0);
     // Not the pool poured for the coming drop (note 1574), nor water within two of it.
