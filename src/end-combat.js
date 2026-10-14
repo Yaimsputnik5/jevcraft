@@ -1218,7 +1218,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // and the roof laid against the second came too late.
     if (onOwnPillar() && !onObsidianTop()) { try { await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
     // And the pocket's walls (note 1575), from 70 up (the island's top is 64 and under; every carry that killed began at 71 to 95).
-    if (onOwnPillar() && !onObsidianTop() && bot.entity.position.y >= 70) {
+    // Only against the dragon's body coming, never against a fireball (note 1584): the cloud reaches through the walls, and a body sealed in with it has seconds of digging to get out. 25588 (dragon-127, 2026-10-14 05:13Z) died in its first pocket so; dragon-130 (05:49Z) left one at 0.3 health.
+    if (onOwnPillar() && !onObsidianTop() && bot.entity.position.y >= 70 && dragonThreat(bot) && !breathThreat(bot)) {
       try { const t0 = Date.now(), r = await pocketOnColumn(); console.log(`[end combat] a pocket against the wings on the column at ${bot.entity.position.floored()}: ${r.laid} blocks laid, ${r.closed} of 4 sides closed, ${Date.now() - t0} ms, ${blocksCarried(bot)} blocks left`); }
       catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     }
@@ -1356,11 +1357,19 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           // (88, 45, 2), the void beside every cell, 'No surveyed walking
           // escape' three times, 28 blocks carried, and died in the cloud,
           // 20 to none in three seconds.
-          if (inBreath() && !(thick && voidEdge(bot, bot.entity.position, 4) === null) && blocksCarried(bot) >= 2) {
+          // Up two first wherever two blocks are carried (note 1583), the dig
+          // only without them: two blocks laid are under a second, two dug
+          // are three with a stone pickaxe, and the cloud is six a second.
+          // 25588 (dragon-129, 2026-10-14 05:41Z, three crystals broken)
+          // stood in the cloud at (-32, 59, -31) on thick ground by crystal
+          // 90's foot with 17 blocks carried, no run found, 13 to 7.5 to 1.7
+          // to none in two seconds, nothing pressed; dragon-124 and 110 the
+          // same on the island's ground.
+          if (inBreath() && blocksCarried(bot) >= 2) {
             goal.step = { action: 'up_out_of_breath_on_ground', health: bot.health }; save();
             const from = Math.floor(bot.entity.position.y);
             try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
-            console.log(`[end combat] up out of the breath on thin ground: ${Math.floor(bot.entity.position.y) - from} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
+            console.log(`[end combat] up out of the breath on ${thick ? 'the ground' : 'thin ground'}: ${Math.floor(bot.entity.position.y) - from} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
             return;
           }
           if (inBreath() && thick && voidEdge(bot, bot.entity.position, 4) === null) {

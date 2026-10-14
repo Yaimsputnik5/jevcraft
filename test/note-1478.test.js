@@ -579,3 +579,29 @@ test('the pillars offered are the three cheapest by lift and walk, not the two n
   assert.ok(/pillar_punch_31|crystal_31|quarry_blocks_31/.test(seen), `the far short pillar offered: ${seen.slice(0, 300)}`);
   assert.ok(/pillar_punch_30|crystal_30|quarry_blocks_30/.test(seen), `the near pillar offered: ${seen.slice(0, 300)}`);
 });
+
+test('in the cloud on thick ground with no run, the body goes two up before any dig (note 1583)', async () => {
+  const { bot, goal, task } = fixture();
+  delete bot._pillarUp;
+  // The island's thick ground at 64 everywhere, the body in a hollow a block deep with walls two high round it: no run out, and the cloud on it.
+  bot.entity.position = new Vec3(0.5, 64, 0.5);
+  const placed = new Set();
+  bot.blockAt = p => { const f = p.floored(), k = `${f.x},${f.y},${f.z}`; if (placed.has(k)) return { name: 'cobblestone', boundingBox: 'block', position: f }; if (f.x === 0 && f.z === 0) return { name: f.y < 64 ? 'end_stone' : 'air', boundingBox: f.y < 64 ? 'block' : 'empty', position: f }; return { name: f.y < 69 ? 'end_stone' : 'air', boundingBox: f.y < 69 ? 'block' : 'empty', position: f }; };
+  bot.placeBlock = async (ref, face) => { const c = ref.position.plus(face); placed.add(`${c.x},${c.y},${c.z}`); if (c.x === 0 && c.z === 0) { bot.entity.position = new Vec3(0.5, c.y + 1, 0.5); } };
+  bot.setControlState = () => {};
+  bot.entities[20].position = new Vec3(8, 70, 0);
+  const cloud = { id: 40, name: 'area_effect_cloud', position: new Vec3(0.5, 64, 0.5), isValid: true, metadata: {} };
+  cloud.metadata[registry.entitiesByName.area_effect_cloud.metadataKeys.indexOf('radius')] = 3;
+  bot.entities[40] = cloud;
+  const dug = [];
+  const dig = async (b, t, p) => { dug.push(p.clone()); };
+  const lines = [], log = console.log; console.log = (...a) => { lines.push(a.join(' ')); log(...a); };
+  try { await fightEndStep(bot, task, goal, () => {}, { navigate: async () => { throw Object.assign(new Error('no route'), { name: 'NoEscape' }); }, dig, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'observe' } } }) }); }
+  catch (err) { if (!['NoEscape', 'Cancelled', 'Blocked'].includes(err.name)) throw err; }
+  finally { console.log = log; }
+  const up = lines.find(l => l.includes('up out of the breath on'));
+  assert.ok(up, `${JSON.stringify(goal.step)} ${JSON.stringify(goal.endCombat?.emptyChoice || null)} ${lines.join(' | ').slice(0, 600)}`);
+  // The fixture cannot climb (no physics); the branch taken is the test, not the height.
+  assert.match(up, /up out of the breath on the ground: \d blocks up/);
+  assert.equal(dug.filter(p => p.x === 0 && p.z === 0 && p.y < 64).length, 0, `dug down into the ground: ${dug.map(String).join(' ')}`);
+});
