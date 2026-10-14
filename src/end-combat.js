@@ -1423,6 +1423,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const crystals = observeArena(bot, state);
     state.observedCrystals = crystals.map(e => ({ id: e.id, position: { ...e.position } }));
     state.dragon = dragon && { id: dragon.id, position: { ...dragon.position }, health: beforeDragon, phase: metadata(bot, dragon, 'phase') };
+    // Back onto the column's cell before the ways are weighed (note 1563): a
+    // body on its own column with its middle over the edge stands 'on air',
+    // and no way down is offered from a cell with nothing under it. 25588
+    // (dragon-113, 2026-10-14 02:48Z, two crystals broken) stood so at (8,
+    // 103, -35) beside its column at (8, -36), 'only observe' four times over,
+    // 38 blocks carried and the dragon coming; dragon-92 (23:08Z) the same at
+    // (36, 67, -28).
+    if (onOwnPillar() && bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.boundingBox !== 'block') {
+      try { if (await centreOnColumn(0.3)) console.log(`[end combat] back onto the column's cell at ${bot.entity.position.floored()} from over its edge`); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    }
     const tree = {}, safe = safeHere(), wet = safe && !safeEndPoint(bot, bot.entity.position);
     const guardShot = () => { check(); if (!safeHere()) throw new Error('End firing position became unsafe'); };
     // A turned enderman within sixteen is Jev's question (note 1551), not the
