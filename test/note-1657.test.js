@@ -65,3 +65,15 @@ test('a far fireball is no emergency on the ground unless it is coming; on the c
   assert.equal(fireballNear(bot, wide, { ground: true }), false, 'passing wide');
   assert.equal(fireballNear(bot, { name: 'dragon_fireball', position: new Vec3(15, 66, 0) }, { ground: true }), true, 'within 20 is near');
 });
+
+test('in the End the fastest tool digs; elsewhere the cheapest tier that harvests (note 1673)', () => {
+  const { cheapestTool } = require('../src/skills');
+  const registry = require('prismarine-registry')('26.1');
+  const Block = require('prismarine-block')(registry);
+  const block = Block.fromStateId(registry.blocksByName.end_stone.defaultState, 0);
+  const stone = { name: 'stone_pickaxe', type: registry.itemsByName.stone_pickaxe.id, durabilityUsed: 0 };
+  const iron = { name: 'iron_pickaxe', type: registry.itemsByName.iron_pickaxe.id, durabilityUsed: 0 };
+  const bot = dim => ({ game: { dimension: dim }, registry, inventory: { items: () => [stone, iron] }, _goal: null });
+  assert.equal(cheapestTool(bot('the_end'), block), iron, 'the iron pickaxe in the End');
+  assert.equal(cheapestTool(bot('overworld'), block), stone, 'the stone pickaxe elsewhere');
+});

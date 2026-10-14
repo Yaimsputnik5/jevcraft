@@ -967,8 +967,10 @@ function cheapestTool(bot, block) {
   try { spare = require('./pickaxe-roles').spareOf(bot, bot._goal); } catch (_) { spare = null; }
   return pickTool(bot, block, spare) || (spare ? pickTool(bot, block, null) : null);
 }
+// In the End the fastest tool digs (note 1673), not the cheapest tier that harvests: time there is health. The dig down the column in end stone is 1.15 s a block with a stone pickaxe and 0.75 with the iron one carried, and 25588 (dragon-207, 2026-10-14 22:10Z) dug down its column at 79 with a stone pickaxe, three blows of the body and a cloud in two seconds, 17 to none; dragon-201 and 198 died the same way at 72. The spare of note 779 is still kept whole.
 function pickTool(bot, block, without) {
   let best = null;
+  const fastest = bot.game?.dimension === 'the_end';
   const handTime = block.digTime(null, false, false, false, [], {});
   let bestTime = handTime;
   const remaining = item => (bot.registry?.itemsByName?.[item.name]?.maxDurability || Infinity) - (item.durabilityUsed || 0);
@@ -983,6 +985,7 @@ function pickTool(bot, block, without) {
     // the ladder made another each time the one in hand wore down, and trial
     // 43 carried five iron pickaxes, fifteen ingots its armour went without.
     const better = !best ? true
+      : fastest ? (time < bestTime || (time === bestTime && remaining(item) > remaining(best)))
       : needsTool ? (TOOL_TIER(item) < TOOL_TIER(best) || (TOOL_TIER(item) === TOOL_TIER(best) && remaining(item) < remaining(best)))
         : (time < bestTime || (time === bestTime && (TOOL_TIER(item) < TOOL_TIER(best) || (TOOL_TIER(item) === TOOL_TIER(best) && remaining(item) < remaining(best)))));
     if (better) { bestTime = time; best = item; }
