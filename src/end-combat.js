@@ -619,7 +619,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // a second, and 25588 (dragon-33, 2026-10-13 10:41Z, full iron, three
       // crystals broken) held crouched in it for the dragon's pass, 17 to 11
       // to 5 to none. In the cloud the dig is the way; the pass is taken.
-      if (passes < 20 && dragonThreat(bot) && !breathThreat(bot)) { passes++; const held = await holdOnColumn(); if (held === 'cloud' && state.descent?.pick === 'water_drop' && await waterDrop()) return; n--; continue; }
+      if (passes < 20 && dragonThreat(bot) && !breathThreat(bot)) { passes++; if (await chargeDrop()) return; const held = await holdOnColumn(); if (held === 'cloud' && state.descent?.pick === 'water_drop' && await waterDrop()) return; n--; continue; }
       // The column's own cell, and the body centred on it again each block
       // (note 1452): a body a cell off the column after a drop or a knock
       // read air under its middle, and 25588 (dragon-33, 2026-10-13 10:31Z)
@@ -1122,7 +1122,21 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     } finally { try { bot.deactivateItem?.(); } catch (_) { /* nothing held */ } bot.setControlState?.('sneak', false); }
   };
   // A hold ended by the breath at the feet: three down the column, out of it.
+  // The dragon charging the column (phase 8) with the pool below (note 1562):
+  // off into it at once, not a hold. The hold, crouched with the shield, stands
+  // the breath's knock; the charge is the dragon's body, and it carries what it
+  // strikes. 25588 (dragon-112, 2026-10-14 02:39Z, two crystals broken) held
+  // on its column at 71, 'hold on pillar', took the body twice (20 to 17.3 to
+  // 15.5) and was carried 30 blocks to y 87 and dropped on the western rim.
+  const chargeDrop = async () => {
+    const d = dragonThreat(bot);
+    if (!d || metadata(bot, d, 'phase') !== 8 || state.descent?.pick !== 'water_drop' || !state.pool || Date.now() - state.pool.at > 15 * 60000 || !(onOwnPillar() || onObsidianTop())) return false;
+    console.log(`[end combat] the dragon charges the column at ${bot.entity.position.floored()}, ${Math.round(d.position.distanceTo(bot.entity.position))} off, the pool below: off into it`);
+    goal.step = { action: 'charge_drop', health: bot.health }; save();
+    return waterDrop();
+  };
   const holdOrDown = async () => {
+    if (await chargeDrop()) return;
     if (await holdOnColumn() !== 'cloud') return;
     console.log(`[end combat] the breath at the feet during the hold at ${bot.entity.position.floored()}, health ${bot.health.toFixed(1)}: down the column`);
     goal.step = { action: 'down_out_of_breath', health: bot.health }; save();
@@ -1866,7 +1880,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null,
             // Whether the drop's pool can be poured at this pillar's foot (note 1539): at the island's eastern rim (pillars 9, 11 and 20 of this world) no level cell beside the foot is clear of the void, the way down is the bucket in the air alone, and 25588 died on it three times on 2026-10-13 (dragon-84, 90, 93) and landed twice (dragon-92, 94).
             wayDown: poolAtTheFoot(c, radius, lift) ? 'a pool of water can be poured on level ground beside this pillar\'s foot before the climb, and the drop after the blow lands in it' : 'no pool can be poured at this pillar\'s foot: the void lies within eight blocks of every level cell beside it. The way down from here is the column dug down to a height the health can take and the bucket clicked under the body in the last blocks of the fall, a click the server refuses about one time in three; of the five such drops of 2026-10-13 at this rim, three ended in death (dragon-84, 90, 93) and two landed',
-            onTheColumn: `the climb and the way down are a minute or two each on a column one block wide, where the dragon's fireballs and breath find the bot and there is no step aside: a fireball's cloud on the column took 6 a second from 25588 (2026-10-13 06:05Z, 20 to 8 in six seconds, and 10 to none a minute later on its next climb); in the arena's drills (05:08 to 05:35Z) the bot broke six crystals so and died twice on its column after a blow; the breath or a fireball on the column is answered by digging down three`, ...(isCaged ? { caged: `iron bars round it, dug out between the stand and the crystal with the ${pickForBars.name.replaceAll('_', ' ')} first` } : {}), dragonPhase: metadata(bot, dragon, 'phase'), health: bot.health,
+            onTheColumn: `the climb and the way down are a minute or two each on a column one block wide, where the dragon's fireballs and breath find the bot and there is no step aside; the dragon's charge is its body, and it carried 25588 off its column at 71, 30 blocks to y 87 and onto the rim, dead (dragon-112, 2026-10-14 02:39Z): with the pool below, a charge is met by the drop into it: a fireball's cloud on the column took 6 a second from 25588 (2026-10-13 06:05Z, 20 to 8 in six seconds, and 10 to none a minute later on its next climb); in the arena's drills (05:08 to 05:35Z) the bot broke six crystals so and died twice on its column after a blow; the breath or a fireball on the column is answered by digging down three`, ...(isCaged ? { caged: `iron bars round it, dug out between the stand and the crystal with the ${pickForBars.name.replaceAll('_', ' ')} first` } : {}), dragonPhase: metadata(bot, dragon, 'phase'), health: bot.health,
             fallFromTheTop: `a knock off the top is a fall of ${lift} blocks, about ${Math.max(0, lift - 3)} damage before armour${countOf(bot, 'water_bucket') ? ', a water bucket carried for the landing' : ', no water bucket carried'}`,
             crystalBlast: punchRecordSays(state, under),
             // The health against the breath, in numbers (note 1511): 25588 (dragon-77, 2026-10-13 20:01Z, nine crystals broken, the record) chose this climb at 9.2 health and again at 4.8, and the breath on the column took the rest.
