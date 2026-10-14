@@ -11,9 +11,15 @@ function cloudRadius(bot, entity) {
   const index = bot.registry.entitiesByName.area_effect_cloud.metadataKeys.indexOf('radius');
   return Math.max(1, Number(entity.metadata?.[index]) || 3) + 2;
 }
+// The cloud lies half a block deep on its ground (note 1568): a body whose feet
+// are more than a block over it is out of it, two blocks under it as well.
+// Read as within three either way, the two-block pillar laid out of the
+// breath (note 1557) read as 'the breath at the feet' on the bot's own column,
+// and 25588 (dragon-116, 2026-10-14 03:39Z) dug its escape down into the
+// cloud it had just climbed out of, 14.6 to none in four seconds.
 function hazardDistance(point, entity) {
   if (entity.name !== 'area_effect_cloud') return point.distanceTo(entity.position);
-  if (Math.abs(point.y - entity.position.y) > 3) return Infinity;
+  if (point.y - entity.position.y > 1.2 || entity.position.y - point.y > 2) return Infinity;
   return Math.hypot(point.x - entity.position.x, point.z - entity.position.z);
 }
 function breathThreat(bot) {

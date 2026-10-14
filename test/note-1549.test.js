@@ -17,3 +17,13 @@ test('a cell a block up stops the smooth run; the rough run of three takes it wi
   const rough = straightAway(b, start, bearing, () => true, 3, { rough: true });
   assert.ok(rough, 'the rough run of three');
 });
+
+test('a body two blocks over the breath\'s cloud is out of it, and one two under it (note 1568)', () => {
+  const { hazardDistance } = require('../src/end-safety');
+  const cloud = { name: 'area_effect_cloud', position: new Vec3(0.5, 52, 0.5) };
+  assert.ok(hazardDistance(new Vec3(0.5, 52, 0.5), cloud) < 1, 'on its ground: in');
+  assert.ok(hazardDistance(new Vec3(0.5, 53, 0.5), cloud) < 1, 'one up: still read as in');
+  assert.equal(hazardDistance(new Vec3(0.5, 54, 0.5), cloud), Infinity, 'two up: out');
+  assert.ok(hazardDistance(new Vec3(0.5, 51, 0.5), cloud) < 1, 'one down: in');
+  assert.equal(hazardDistance(new Vec3(0.5, 49.5, 0.5), cloud), Infinity, 'two and a half down: out');
+});
