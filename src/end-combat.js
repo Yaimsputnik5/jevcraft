@@ -1899,8 +1899,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // A caged crystal too, where a pickaxe is carried: its iron bars between
       // the stand and the crystal are dug out on the top before the blow.
       const pickForBars = bot.inventory.items().find(i => /_pickaxe$/.test(i.name) && !/wooden|golden/.test(i.name));
+      // The three cheapest pillars, not the two nearest (note 1582): the climb's
+      // cost is its lift and the walk, and the nearest pillar is often the
+      // tallest. Of the 410 none_good tops on dragon_fight between 03 and 05Z
+      // on 2026-10-14, 93 were on a tree of moves, observe and the quarry for
+      // the nearest crystal alone, its climb gated by the blocks wanted, while
+      // a pillar twenty blocks shorter stood forty blocks off, never offered.
+      const climbCost = c => Math.max(0, c.position.y - 2 - Math.floor(here.y)) + Math.hypot(c.position.x - here.x, c.position.z - here.z) / 4;
       const byDistance = crystals.filter(c => (!caged(bot, c) || pickForBars) && bot.blockAt(c.position.floored().offset(0, -1, 0))?.name === 'bedrock')
-        .sort((a, b) => a.position.distanceTo(here) - b.position.distanceTo(here)).slice(0, 2);
+        .sort((a, b) => climbCost(a) - climbCost(b)).slice(0, 3);
       for (const target of byDistance) {
         const c = target.position.floored(), topY = c.y - 1;
         // The pillar's radius, read along its side a few blocks under the top.

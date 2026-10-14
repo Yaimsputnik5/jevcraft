@@ -556,3 +556,26 @@ test('inside the pocket the column still reads as the bot\'s own, the dig goes d
   for (const y of [75, 76, 77]) assert.ok(dug.some(p => p.x === 0 && p.z === 1 && p.y === y), `the south wall and post dug: ${dug.map(String).join(' ')}`);
   assert.ok(lines.some(l => /the water drop from \(0, 76, 0\)/.test(l)), lines.filter(l => l.includes('water drop')).join('\n'));
 });
+
+test('the pillars offered are the three cheapest by lift and walk, not the two nearest (note 1582)', async () => {
+  const { bot, goal, task } = fixture();
+  delete bot._pillarUp;
+  bot.entity.position = new Vec3(0.5, 64, 0.5);
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 40 }, { name: 'water_bucket', count: 2 }];
+  bot.entities[20].position = new Vec3(-60, 90, -60);
+  // Three pillars: 30 near and middling (20 off, top 84), 32 near and tall (20 off, top 109), 31 far and short (50 off, top 71).
+  const pillars = [{ x: 20, z: 0, top: 84 }, { x: 0, z: 20, top: 109 }, { x: 50, z: 0, top: 71 }];
+  bot.blockAt = p => {
+    const f = p.floored();
+    for (const q of pillars) { if (f.x === q.x && f.z === q.z && f.y === q.top) return { name: 'bedrock', boundingBox: 'block', position: f }; if (f.x === q.x && f.z === q.z && f.y >= 64 && f.y < q.top) return { name: 'obsidian', boundingBox: 'block', position: f }; }
+    return { name: f.y < 64 ? 'end_stone' : 'air', boundingBox: f.y < 64 ? 'block' : 'empty', position: f };
+  };
+  bot.entities[30].position = new Vec3(20.5, 85, 0.5);
+  bot.entities[32] = { id: 32, name: 'end_crystal', position: new Vec3(0.5, 110, 20.5), isValid: true, metadata: {}, width: 2, height: 2 };
+  bot.entities[31] = { id: 31, name: 'end_crystal', position: new Vec3(50.5, 72, 0.5), isValid: true, metadata: {}, width: 2, height: 2 };
+  let seen = null;
+  await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig: async () => {}, place: async () => {} }, { systemOne: async ({ questions }) => { seen = JSON.stringify(questions); return { answers: { branch_0: { choice: 'observe' } } }; } });
+  assert.ok(seen, 'a question was asked');
+  assert.ok(/pillar_punch_31|crystal_31|quarry_blocks_31/.test(seen), `the far short pillar offered: ${seen.slice(0, 300)}`);
+  assert.ok(/pillar_punch_30|crystal_30|quarry_blocks_30/.test(seen), `the near pillar offered: ${seen.slice(0, 300)}`);
+});
