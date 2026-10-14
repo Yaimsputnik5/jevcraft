@@ -1583,11 +1583,24 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     goal.step = { action: 'charge_drop', health: bot.health }; save();
     return waterDrop();
   };
+  // Up two out of the breath on the column (note 1666): two blocks laid are half a second, two dug in the column's end stone are two and a half with a stone pickaxe, and the cloud takes six a second. 25588 (dragon-201, 2026-10-14 20:37Z, one crystal broken) stood at (31, 72, -27) on its end-stone column with 10.8 health and three blocks carried as the cloud came to its feet, 'the breath at the feet during the hold: down the column', and the dig took 10.8 to 5.8 to none; dragon-198 (19:51Z) the same at 72 with 10.2. The bot's own roof over the head is dug first (half a second, its own cobblestone). Returns the blocks risen.
+  const upOutOfBreathOnColumn = async () => {
+    if (blocksCarried(bot) < 2 || !actions.dig) return 0;
+    const f0 = bot.entity.position.floored();
+    for (const dy of [2, 3]) { const r = bot.blockAt(f0.offset(0, dy, 0)); if (r?.boundingBox === 'block') { if (/bedrock|obsidian|end_portal/.test(r.name)) return 0; try { await actions.dig(bot, task, r.position, { requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; return 0; } } }
+    goal.step = { action: 'up_out_of_breath_on_column', health: bot.health }; save();
+    const from = Math.floor(bot.entity.position.y);
+    try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    const rose = Math.floor(bot.entity.position.y) - from;
+    console.log(`[end combat] up out of the breath on the column: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health, ${blocksCarried(bot)} blocks left`);
+    return rose;
+  };
   const holdOrDown = async () => {
     if (await chargeDrop()) return;
     if (await holdOnColumn() !== 'cloud') return;
     // The cloud below the feet, the body out of it (note 1576): the way down would end in it; the hold stays.
     if (breathThreat(bot)?.name !== 'area_effect_cloud') { const c = cloudUnderfoot(3); if (c) { console.log(`[end combat] the hold stays up at ${bot.entity.position.floored()}: ${cloudUnderfootSays(c)}`); return; } }
+    if (await upOutOfBreathOnColumn() >= 1) return;
     console.log(`[end combat] the breath at the feet during the hold at ${bot.entity.position.floored()}, health ${bot.health.toFixed(1)}: down the column`);
     goal.step = { action: 'down_out_of_breath', health: bot.health }; save();
     await wayDown({ limit: 3 });
@@ -1635,6 +1648,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         goal.step = { action: 'roof_against_fireball', health: bot.health }; save();
         await holdOrDown();
       } else {
+        if (breathThreat(bot)?.name === 'area_effect_cloud' && await upOutOfBreathOnColumn() >= 1) return;
         goal.step = { action: 'down_out_of_breath', health: bot.health }; save();
         await wayDown({ limit: 3 });
       }
@@ -2332,7 +2346,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         // The three over the lift only before the climb (note 1470): on the column already, the climb finishes with what is carried. 25588 (dragon-52, 2026-10-13 13:53Z) at crystal 98's top, lift 28 and 30 blocks, was offered no blow, held 30 seconds 'unsafe: end_crystal 4<=12', and the breath took it 20 to none.
         // The roofs counted in (note 1541): one block every third block of the climb against the obsidian, and 25588 (dragon-95, 2026-10-13 23:53Z) began crystal 94's climb of 31 with 27 blocks and stood at 72 with 18 and 22 to go, no blow offered, and dug down.
         const roofs = Math.ceil(Math.max(0, lift) / 3);
-        const margin = (onOwnPillar() || onObsidianTop()) ? 0 : 3 + roofs;
+        const margin = (onOwnPillar() || onObsidianTop()) ? 0 : 3 + roofs + (under ? 0 : 8); // The stand's walls (note 1664) counted in (note 1666): eight blocks on the top for the stand case; dragon-201 climbed 23 with 26 and had three at the top, no walls, and the body struck it twice there.
         // A lift of none is a stand reached (note 1472): 25588 (dragon-54, 2026-10-13 14:13Z) stood at crystal 66's stand, 'no blow at crystal 66: 3 off, lift 0', held 'unsafe' twenty seconds and died in the breath; dragon-52 the same at 98.
         if (out > 64 || lift < 0 || lift + margin > Math.min(carried, 64 + margin)) {
           if (!(state.punchSkipSaid > Date.now() - 20000)) { state.punchSkipSaid = Date.now(); console.log(`[end combat] no blow at crystal ${target.id}: ${out} off, lift ${lift}, ${carried} blocks carried, radius ${radius}`); }
@@ -2349,7 +2363,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // of the same blocks, and 25588 (dragon-43, 2026-10-13 12:23Z, three
             // crystals broken) climbed 38 for a lift of 37 and stopped a block
             // short with none left, 'no block of the kinds the climb lays carried'.
-            const want = Math.min(24, lift + roofs + 7 - carried);
+            const want = Math.min(24, lift + roofs + 7 + (under ? 0 : 8) - carried);
             const { deepBeside } = require('./end-safety');
             const feet = here.floored();
             const cells = [];
