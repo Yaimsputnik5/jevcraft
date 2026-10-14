@@ -1176,6 +1176,20 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           // into the void.
           const feet0 = bot.entity.position.floored();
           const thick = [1, 2, 3, 4, 5, 6].every(dy => bot.blockAt(feet0.offset(0, -dy, 0))?.boundingBox === 'block');
+          // Up two on the blocks carried (note 1557) where the ground is too thin
+          // to dig and no run is to be had: the cloud lies half a block deep on
+          // the ground, and a body two blocks up is out of it. 25588 (dragon-106,
+          // 2026-10-14 01:26Z) stood on the ledge under the entry platform at
+          // (88, 45, 2), the void beside every cell, 'No surveyed walking
+          // escape' three times, 28 blocks carried, and died in the cloud,
+          // 20 to none in three seconds.
+          if (endEmergency(bot) === 'dragon_breath_cloud' && !(thick && voidEdge(bot, bot.entity.position, 4) === null) && blocksCarried(bot) >= 2) {
+            goal.step = { action: 'up_out_of_breath_on_ground', health: bot.health }; save();
+            const from = Math.floor(bot.entity.position.y);
+            try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+            console.log(`[end combat] up out of the breath on thin ground: ${Math.floor(bot.entity.position.y) - from} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
+            return;
+          }
           if (endEmergency(bot) === 'dragon_breath_cloud' && thick && voidEdge(bot, bot.entity.position, 4) === null) {
             goal.step = { action: 'down_out_of_breath_on_ground', health: bot.health }; save();
             for (let n = 0; n < 2; n++) { const under = bot.entity.position.floored().offset(0, -1, 0); if (bot.blockAt(under)?.boundingBox !== 'block' || bot.blockAt(under.offset(0, -1, 0))?.boundingBox !== 'block') break; try { await actions.dig(bot, task, under, { dropInto: true, openPit: true, requireDrops: false }); } catch (e3) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(e3.name)) throw e3; break; } for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50); }
@@ -2336,6 +2350,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const decision = await decide('dragon_fight', { client, bot, goal, tree, context: { safe }, interrupt: check, watchMs: 50,
       state: endDecisionState({ request: goal.request, health: bot.health, food: bot.food, arrows: countOf(bot, 'arrow'),
         position: { ...bot.entity.position }, safe, dragon: state.dragon,
+        // The footing here (note 1557): how many cells of ground within six are open to step to, and whether the void lies beside the feet. The ledge under the entry platform had none, and 25588 (dragon-106, 2026-10-14 01:26Z) chose to shoot from it with two arrows and died in the breath there with no step to take.
+        footing: state.routeLook && Date.now() - (state.routeLook.at || 0) < 10000 ? `${state.routeLook.allowed} cell${state.routeLook.allowed === 1 ? '' : 's'} of ground within six to step to${voidEdge(bot, bot.entity.position, 3) !== null ? ', the void within three of the feet' : ''}` : (voidEdge(bot, bot.entity.position, 3) !== null ? 'the void within three of the feet' : undefined),
         head: head && { position: { ...head.position }, reachable: canStrike(bot, head) }, crystals: state.observedCrystals, combat: state }),
       isFresh: () => dimension(bot) === 'end' && bot.health >= healthBefore && bot.entity.position.distanceTo(start) < 1 });
     if (decision.stale) return;
