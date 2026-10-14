@@ -733,6 +733,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const columnEnded = () => !openDropBeside(bot.entity.position.floored());
     let n = 0;
     // In the cloud, a body within 0.45 of the middle stands wholly on the block and is dug down at once (note 1481).
+    // No dig down under water at the feet (note 1643): the water follows the body into the shaft, the roof laid against the fireball seals it, and 25588 (dragon-177, 2026-10-14 15:19Z, no crystal broken) drowned in its own column at (31, 45, -23), oxygen 0 for six seconds at the bottom, 'swim_up' with nowhere to rise to. The water goes back into the bucket first, enderman or no enderman; left, the dig is not made.
+    if (inWater()) { await takeBackWaterNear({ force: true }); if (inWater()) { console.log(`[end combat] no dig down at ${bot.entity.position.floored()}: water at the feet that the bucket did not take back`); return; } }
     if (!await centreOnColumn(breathThreat(bot)?.name === 'area_effect_cloud' ? 0.45 : 0.1)) console.log(`[end combat] not centred on the column before the dig: ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off`);
     console.log(`[end combat] down the column from ${bot.entity.position.floored()}, ${bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || 'nothing'} under the feet, column ${JSON.stringify(bot._pillarUp)}`);
     for (; n < limit; n++) {
@@ -1668,10 +1670,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // half a second with no blow recorded and fell 18 and 10 blocks, dragon-59
   // to its death. The climb's jumps (a move of their own) are left upright.
   // Water standing within reach of the eye goes back into an empty bucket (notes 1495, 1535); the cell taken, or null.
-  const takeBackWaterNear = async ({ sparePool = false } = {}) => {
+  const takeBackWaterNear = async ({ sparePool = false, force = false } = {}) => {
     if (countOf(bot, 'bucket') < 1) return null;
-    // Not with an enderman within twelve (note 1638): the water at the feet is the stand against it (note 1136), and the take-back undid the pour the moment after it, pour and take-back six times over while the enderman struck; 25588 (dragon-170, 2026-10-14 13:57Z, one crystal broken) 20 to 1.7 in seventeen seconds, dead.
-    if (hostileEntities(bot, 12).some(e => live(bot, e) && e.name === 'enderman')) return null;
+    // Not with an enderman within twelve (note 1638): the water at the feet is the stand against it (note 1136), and the take-back undid the pour the moment after it, pour and take-back six times over while the enderman struck; 25588 (dragon-170, 2026-10-14 13:57Z, one crystal broken) 20 to 1.7 in seventeen seconds, dead. Forced before a dig down (note 1643).
+    if (!force && hostileEntities(bot, 12).some(e => live(bot, e) && e.name === 'enderman')) return null;
     const { sourceWater, fillWaterBucket } = require('./water');
     const eye = bot.entity.position.offset(0, 1.62, 0);
     // Not the pool poured for the coming drop (note 1574), nor water within two of it.
