@@ -18,7 +18,8 @@ class NeedsAir extends Error {
 // width, not the eye's cell alone: mid-205-l rejoined with its eye at x
 // -368.9, the box reaching into gravel in the next column, and suffocated
 // with its eye's own cell open, nothing dug (2026-09-27).
-const SOLID_FOR_BREATH = b => !!b && b.boundingBox === 'block' && !/_leaves$|glass|slab|stairs|fence|wall|door|trapdoor|scaffolding|chest|bed$/.test(b.name);
+// Bars, chains and the like are thin shapes that do not smother (note 1591).
+const SOLID_FOR_BREATH = b => !!b && b.boundingBox === 'block' && !/_leaves$|glass|slab|stairs|fence|wall|door|trapdoor|scaffolding|chest|bed$|_bars$|^chain$|lantern|candle|torch|button|lever|pressure_plate|sign|banner|rail/.test(b.name);
 function suffocatingBlock(bot) {
   const eye = bot.entity?.position?.offset(0, bot.entity.eyeHeight || 1.62, 0);
   if (!eye || typeof bot.blockAt !== 'function') return null;
@@ -29,8 +30,16 @@ function suffocatingBlock(bot) {
   for (const c of cells) { const b = bot.blockAt(c); if (SOLID_FOR_BREATH(b)) return b; }
   return null;
 }
+// A hurt that something living gave is not the wall's (note 1591): the
+// dragon's breath on a pillar's top beside a caged crystal read as the head
+// in a block, 'Low air' thrown 21 times a second, the fight's step restarted
+// each time and the way down never taken; 25588 (dragon-135, 2026-10-14
+// 06:49Z, five crystals broken) died in the cloud at (-14, 79, 40) with its
+// air at 20. The hurt listener (survival.js) notes who did it.
 function headInBlock(bot) {
   if (!(bot._recentHurtAt > Date.now() - 2000)) return false;
+  const byLiving = Object.values(bot._hurtBy || {}).some(at => at > Date.now() - 2000);
+  if (byLiving) return false;
   return !!suffocatingBlock(bot);
 }
 function needsAir(bot) { return bot.oxygenLevel <= 12 || headInBlock(bot); }
