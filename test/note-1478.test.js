@@ -494,3 +494,23 @@ test('the pool is recorded where the source went in, and the step\'s start does 
   assert.ok(sourceWater(bot.blockAt(new Vec3(pool.x, pool.y, pool.z))), `the pool is the source: ${JSON.stringify(pool)}`);
   assert.ok(lines.some(l => l.includes('the water went in at')), lines.filter(l => l.includes('pool')).join('\n'));
 });
+
+test('the hold on the column lays the pocket against the wings: two blocks on every open side, the far side first (note 1575)', async () => {
+  const { bot, goal, task } = fixture();
+  const placed = new Set();
+  const blockAt = bot.blockAt;
+  bot.blockAt = p => { const f = p.floored(); if (placed.has(`${f.x},${f.y},${f.z}`)) return { name: 'cobblestone', boundingBox: 'block', position: f }; return blockAt(p); };
+  const order = [];
+  bot.placeBlock = async (ref, face) => { const c = ref.position.plus(face); placed.add(`${c.x},${c.y},${c.z}`); order.push(c); };
+  const lines = [], log = console.log; console.log = (...a) => { lines.push(a.join(' ')); log(...a); };
+  try { await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig: async () => {}, place: async () => {} }, { systemOne: async () => ({ answers: { branch_0: { choice: 'observe' } } }) }); }
+  finally { console.log = log; }
+  const pocket = lines.find(l => l.includes('a pocket against the wings'));
+  assert.ok(pocket, lines.filter(l => l.includes('end combat')).join('\n'));
+  assert.match(pocket, /4 of 4 sides closed/);
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const dy of [0, 1]) assert.ok(placed.has(`${dx},${76 + dy},${dz}`), `the wall at ${dx},${76 + dy},${dz}: ${[...placed].join(' ')}`);
+  // The dragon at (8, 80, 0), east: the west side (-1, 0) is laid first, after the roof's post.
+  const roofAt = order.findIndex(c => c.x === 0 && c.z === 0 && c.y === 78);
+  const firstWall = order.slice(roofAt + 1).find(c => c.y === 76 && (Math.abs(c.x) === 1 || Math.abs(c.z) === 1));
+  assert.ok(firstWall && firstWall.x === -1, `the far side first: ${order.map(String).join(' ')}`);
+});

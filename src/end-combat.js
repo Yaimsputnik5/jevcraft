@@ -730,6 +730,48 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // A block over the head on the column, against a solid beside the cell
   // over it (the crystal's obsidian) or, failing that, nothing: true when
   // the cell over the head is solid after.
+  // The pocket against the dragon's wings (note 1575): the death ledger of
+  // 2026-10-14 (44 dragon runs) puts the body carried off its column by the
+  // dragon first, 10 of 43 deaths (dragon-104, 107, 112, 114, 120, 121 among
+  // them): in the game's code the wings' boxes, grown four blocks each way,
+  // push every living thing in them 4 / d² sideways and 0.2 up a tick and
+  // hurt it 5, and a shield does nothing to the push. On the arena (the pass
+  // drill, scripts/pass-drill.js) the body in open air was carried 38 to 52
+  // blocks in four passes of four; walls a block high held two of four (the
+  // lift took it over); two-high walls under the hold's roof held three of
+  // five, the two lost to the dragon's own body passing through the cell.
+  // Two blocks on each open side of the body, the side away from the dragon
+  // first (the push is away from its body), each side a post from the block
+  // under the feet where nothing stands beside. Said in the log.
+  const pocketOnColumn = async () => {
+    const f = bot.entity.position.floored();
+    const under = bot.blockAt(f.offset(0, -1, 0)); if (under?.boundingBox !== 'block') return { laid: 0, closed: 0 };
+    const name = blocksCarriedName(bot); let item = name && bot.inventory.items().find(i => i.name === name);
+    if (!item) return { laid: 0, closed: 0 };
+    const d = dragonThreat(bot) || Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
+    const away = d ? { x: bot.entity.position.x - d.position.x, z: bot.entity.position.z - d.position.z } : null;
+    const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].sort((a, b) => away ? (b[0] * away.x + b[1] * away.z) - (a[0] * away.x + a[1] * away.z) : 0);
+    let laid = 0;
+    for (const [dx, dz] of sides) {
+      // From the lowest open cell up: the post beside the under block, then the two beside the body.
+      for (let dy = -1; dy <= 1; dy++) {
+        const c = f.offset(dx, dy, dz);
+        if (bot.blockAt(c)?.boundingBox === 'block') continue;
+        if (dy === -1 && bot.blockAt(c.offset(0, 1, 0))?.boundingBox === 'block') continue;
+        const below = bot.blockAt(c.offset(0, -1, 0)), beside = bot.blockAt(c.offset(-dx, 0, -dz));
+        let ref = null, face = null;
+        if (below?.boundingBox === 'block') { ref = below; face = new Vec3(0, 1, 0); }
+        else if (beside?.boundingBox === 'block') { ref = beside; face = new Vec3(dx, 0, dz); }
+        else break;
+        item = bot.inventory.items().find(i => i.name === name); if (!item) break;
+        try { check(); await bot.equip(item, 'hand'); await bot.lookAt(ref.position.offset(.5 + face.x * .5, .5 + face.y * .5, .5 + face.z * .5), true); await bot.placeBlock(ref, face); await sleep(40); }
+        catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; break; }
+        if (bot.blockAt(c)?.boundingBox === 'block') laid++; else break;
+      }
+    }
+    const closed = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, 0, dz))?.boundingBox === 'block' && bot.blockAt(f.offset(dx, 1, dz))?.boundingBox === 'block').length;
+    return { laid, closed };
+  };
   const roofOverhead = async () => {
     const f = bot.entity.position.floored(), cell = f.offset(0, 2, 0);
     if (bot.blockAt(cell)?.boundingBox === 'block') return true;
@@ -1130,6 +1172,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // the first cloud at its feet, 20 to 14, before any fireball was seen,
     // and the roof laid against the second came too late.
     if (onOwnPillar() && !onObsidianTop()) { try { await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
+    // And the pocket's walls (note 1575), from 70 up (the island's top is 64 and under; every carry that killed began at 71 to 95).
+    if (onOwnPillar() && !onObsidianTop() && bot.entity.position.y >= 70) {
+      try { const t0 = Date.now(), r = await pocketOnColumn(); console.log(`[end combat] a pocket against the wings on the column at ${bot.entity.position.floored()}: ${r.laid} blocks laid, ${r.closed} of 4 sides closed, ${Date.now() - t0} ms, ${blocksCarried(bot)} blocks left`); }
+      catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    }
     goal.step = { action: 'hold_on_pillar', hazard: endEmergency(bot), health: bot.health }; save();
     const shield = bot.inventory.slots?.[45]?.name === 'shield' || bot.inventory.items().some(i => i.name === 'shield');
     try {
