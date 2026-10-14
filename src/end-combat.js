@@ -2500,6 +2500,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           blocksFromFountain: Math.round(byFountain), health: bot.health, blocksCarried: blocksCarried(bot), dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null,
           record: 'the take-off\'s throw ended dragon-121, 130 and 136 on 2026-10-14 at six or seven crystals, each standing in the open by the fountain or on its way to it' },
         run: async () => {
+          // The cell taken where the body stands when the run begins (note 1598), not where it stood when the option was built a question earlier: 25588 (dragon-141, 2026-10-14 08:01Z) was 0.81 off the cell it tried to centre on, a cell away, 'the body still on the rim'. The ground read again for it.
+          const feet = bot.entity.position.floored();
+          const thickHere = [1, 2, 3, 4, 5, 6].every(dy => bot.blockAt(feet.offset(0, -dy, 0))?.boundingBox === 'block') && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => bot.blockAt(feet.offset(dx, -1, dz))?.boundingBox === 'block' && bot.blockAt(feet.offset(dx, -2, dz))?.boundingBox === 'block') && voidEdge(bot, bot.entity.position, 4) === null;
+          if (!thickHere) throw new Error(`The ground at ${feet} is not the hole's: thin, open beside, or the void within four`);
           goal.step = { action: 'wait_in_hole', at: { ...feet } }; save();
           // Centred on the cell first (note 1595): a body 0.6 wide at a cell's edge stands on the rim when the cell under it is dug, and 25588 (dragon-139, 2026-10-14 07:35Z) dug its hole at (10, 60, 16) and stayed at 60, 'a side open'.
           const centre = feet.offset(.5, 0, .5), off = () => Math.hypot(centre.x - bot.entity.position.x, centre.z - bot.entity.position.z);
