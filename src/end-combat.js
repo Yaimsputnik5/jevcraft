@@ -527,6 +527,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const drop = ([dx, dz]) => { for (let dy = 1; dy <= 6; dy++) if (bot.blockAt(f.offset(dx, -dy, dz))?.boundingBox === 'block') return dy - 1; return 6; };
     return Math.max(...sides.map(drop)) >= 3;
   };
+  // On the recorded column's own cell, the record alive, a block under the feet.
+  const onColumnCell = () => { const u = bot._pillarUp; if (!u || u.until < Date.now()) return false; const f = bot.entity.position.floored(); return f.x === u.x && f.z === u.z && bot.blockAt(f.offset(0, -1, 0))?.boundingBox === 'block'; };
   // On an obsidian pillar's top (not the bot's own column): the top is a
   // small flat place high over the island, with the bot's column at its edge.
   const onObsidianTop = () => { const f = bot.entity.position.floored(); return bot.blockAt(f.offset(0, -1, 0))?.name === 'obsidian' && !!bot._pillarUp && Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) <= 12; };
@@ -894,7 +896,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       bot.activateItem();
       for (let n = 0; n < 20; n++) { check(); if (bot.blockAt(best.cell)?.name === 'water') break; await sleep(50); }
     } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
-    const poured = bot.blockAt(best.cell)?.name === 'water';
+    // The pool is where the source went in, not where the flow reached (note
+    // 1574): the click put the water at the feet, it ran down into the trench,
+    // 'poured' was read off the flow at the trench's cell, and the step's
+    // start took the source back from the feet as water left over. 25588
+    // (dragon-121, 2026-10-14 04:17Z, crystal 109) poured at (34, 57, -22),
+    // took back (33, 59, -22) a moment later, and climbed with 'no pool'.
+    const { sourceWater: isSource } = require('./water');
+    let poured = bot.blockAt(best.cell)?.name === 'water' && isSource(bot.blockAt(best.cell));
+    if (!poured) {
+      const src = bot.findBlocks({ matching: bot.registry.blocksByName.water.id, maxDistance: 6, count: 8, useExtraInfo: isSource }).map(p => p.floored()).filter(p => Math.abs(p.x - best.cell.x) <= 2 && Math.abs(p.z - best.cell.z) <= 2 && Math.abs(p.y - best.cell.y) <= 3 && !(state.poolsLeft || []).some(w => w.x === p.x && w.y === p.y && w.z === p.z)).sort((p, q) => p.distanceTo(best.cell) - q.distanceTo(best.cell))[0];
+      if (src) { console.log(`[end combat] the water went in at ${src}, not at ${best.cell}: the pool is there`); best.cell = src; poured = true; }
+    }
     console.log(`[end combat] the pool for the drop ${poured ? 'poured' : 'not poured'} at ${best.cell} beside the column at (${column.x}, ${column.z})${best.obsidian ? `, ${best.obsidian} obsidian that way` : ''}; ${countOf(bot, 'water_bucket')} full bucket${countOf(bot, 'water_bucket') === 1 ? '' : 's'} left`);
     if (poured) { state.pool = { x: best.cell.x, y: best.cell.y, z: best.cell.z, dx: best.dx, dz: best.dz, at: Date.now(), ...(best.reach ? { reach: best.reach } : {}) }; (state.poolsLeft ||= []).push({ x: best.cell.x, y: best.cell.y, z: best.cell.z, at: Date.now() }); save(); return state.pool; }
     return null;
@@ -1071,7 +1084,13 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // The way down the column as Jev chose it for this fight (column_descent): the drop where chosen and possible, the dig otherwise.
   const wayDown = async (opts) => {
     const dropChosen = state.descent?.pick === 'water_drop' && Date.now() - state.descent.at < 30 * 60000;
-    if (dropChosen && onOwnPillar()) {
+    // From the column's own cell whatever onOwnPillar says of it (note 1573):
+    // at the top against a thick pillar, the roof's post and the obsidian
+    // can close every side it counts, and 25588 (dragon-121, 2026-10-14
+    // 04:15Z, crystal 108 broken) at (16, 103, -36) with its pool at (19, 59,
+    // -36) was dug down 44 blocks without a look at the drop.
+    if (dropChosen && (onOwnPillar() || onColumnCell())) {
+      if (!onOwnPillar()) { const f = bot.entity.position.floored(); console.log(`[end combat] on the column's cell at ${f} but not 'on own pillar': under ${bot.blockAt(f.offset(0, -1, 0))?.name}, ${[[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, -1, dz))?.boundingBox !== 'block').length} open sides at the feet`); }
       if (await waterDrop({ inCloud: breathThreat(bot)?.name === 'area_effect_cloud' })) return;
       // Too high for the drop: dug down to where a dry fall is borne, then the
       // drop (note 1507). 25588 (dragon-76, 2026-10-13 19:33Z) at 82 was
@@ -1289,12 +1308,14 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // half a second with no blow recorded and fell 18 and 10 blocks, dragon-59
   // to its death. The climb's jumps (a move of their own) are left upright.
   // Water standing within reach of the eye goes back into an empty bucket (notes 1495, 1535); the cell taken, or null.
-  const takeBackWaterNear = async () => {
+  const takeBackWaterNear = async ({ sparePool = false } = {}) => {
     if (countOf(bot, 'bucket') < 1) return null;
     const { sourceWater, fillWaterBucket } = require('./water');
     const eye = bot.entity.position.offset(0, 1.62, 0);
+    // Not the pool poured for the coming drop (note 1574), nor water within two of it.
+    const pool = sparePool && state.pool && Date.now() - state.pool.at < 15 * 60000 ? state.pool : null;
     const near = bot.findBlocks({ matching: bot.registry.blocksByName.water.id, maxDistance: 5, count: 8, useExtraInfo: sourceWater })
-      .filter(p => eye.distanceTo(p.offset(.5, .5, .5)) <= 4.3).sort((p, q) => eye.distanceTo(p) - eye.distanceTo(q))[0];
+      .filter(p => eye.distanceTo(p.offset(.5, .5, .5)) <= 4.3 && !(pool && Math.abs(p.x - pool.x) <= 2 && Math.abs(p.z - pool.z) <= 2)).sort((p, q) => eye.distanceTo(p) - eye.distanceTo(q))[0];
     if (!near) return null;
     await fillWaterBucket(bot, task, near, { timeoutMs: 1500 });
     console.log(`[end combat] water left at ${near} taken back into the bucket (${countOf(bot, 'water_bucket')} full carried)`);
@@ -1323,7 +1344,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       try {
         const { fillWaterBucket } = require('./water');
         const eye = bot.entity.position.offset(0, 1.62, 0);
-        const near = await takeBackWaterNear();
+        const near = await takeBackWaterNear({ sparePool: true });
         // The pool poured for a drop, walked back to within ten (note 1519):
         // left where it was poured it is a bucket gone, and 25588 (dragon-82,
         // 2026-10-13 20:49Z) poured its third pool with '0 full buckets left',
@@ -2102,11 +2123,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // (dragon-39, 2026-10-13 11:41Z, full iron, crystal 9 broken) came
             // down three at a time, 79, 75, 72, a question between each, and died
             // on the column at 72 with 7 blocks left.
-            if (!live(bot, target) && onOwnPillar()) { goal.step = { action: 'down_after_the_blow', crystal: target.id, health: bot.health }; save(); await wayDown({ limit: 64 }); }
+            if (!live(bot, target) && (onOwnPillar() || onColumnCell())) { goal.step = { action: 'down_after_the_blow', crystal: target.id, health: bot.health }; save(); await wayDown({ limit: 64 }); }
             // And straight down the column (as pillar_down digs): left on the top at
             // 5.4 health, the drill of 2026-10-13 (04:02Z) took the dragon's breath
             // twice there, 6 and 6, and went over the edge at 1.5.
-            if (bot._pillarUp && Math.floor(bot.entity.position.x) === bot._pillarUp.x && Math.floor(bot.entity.position.z) === bot._pillarUp.z) await digDownColumn();
+            // By the way down chosen, the drop first where it was (note 1573), not the dig alone.
+            if (onColumnCell() && Math.floor(bot.entity.position.y) > 66) await wayDown({ limit: 64 });
             save();
           } };
       }

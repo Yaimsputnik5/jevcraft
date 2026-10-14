@@ -460,3 +460,37 @@ test('on the ground with both buckets empty and water left standing, the walk ba
   assert.match(text, /no water is carried to pour the pool at this pillar/);
   assert.match(text, /the water left at \(30, 63, 20\), 36 blocks off/);
 });
+
+test('the pool is recorded where the source went in, and the step\'s start does not take it back (note 1574)', async () => {
+  const { bot, goal, task } = fixture();
+  const { sourceWater } = require('../src/water');
+  // On the ground at (18, 64), the pillar at (20, 0); the click puts the source at the feet, the flow reaches the trench cell.
+  delete bot._pillarUp;
+  bot.entity.position = new Vec3(18.5, 64, 0.5);
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 40 }, { name: 'water_bucket', count: 1 }, { name: 'bucket', count: 1 }];
+  const water = new Map(), removed = new Set();
+  bot.blockAt = p => {
+    const f = p.floored(), k = `${f.x},${f.y},${f.z}`;
+    if (water.has(k)) return { name: 'water', boundingBox: 'empty', position: f, getProperties: () => ({ level: water.get(k) }), _properties: { level: water.get(k) } };
+    if (removed.has(k)) return { name: 'air', boundingBox: 'empty', position: f };
+    if (f.x === 20 && f.z === 0 && f.y === 84) return { name: 'bedrock', boundingBox: 'block', position: f };
+    if (f.x === 20 && f.z === 0 && f.y >= 64 && f.y <= 83) return { name: 'obsidian', boundingBox: 'block', position: f };
+    return { name: f.y < 64 ? 'end_stone' : 'air', boundingBox: f.y < 64 ? 'block' : 'empty', position: f };
+  };
+  bot.findBlocks = ({ matching, useExtraInfo }) => matching === registry.blocksByName.water.id ? [...water.keys()].map(k => new Vec3(...k.split(',').map(Number))).filter(p => !useExtraInfo || useExtraInfo(bot.blockAt(p))) : [];
+  let looked = null;
+  bot.lookAt = async p => { looked = p; };
+  // The source lands under the feet; every trench cell below gets the flow.
+  bot.activateItem = () => { const feet = bot.entity.position.floored(); water.set(`${feet.x},${feet.y},${feet.z}`, 0); for (const k of removed) { const [x, y, z] = k.split(',').map(Number); if (y === 63) water.set(`${x},${y},${z}`, 8); } };
+  const dig = async (b, t, p) => { removed.add(`${p.x},${p.y},${p.z}`); };
+  const place = async () => { throw Object.assign(new Error('stop here'), { name: 'Cancelled' }); };
+  const navigate = async (b, t, g) => { if (g.constructor.name === 'GoalBlock') bot.entity.position = new Vec3(g.x + .5, g.y, g.z + .5); };
+  const lines = [], log = console.log; console.log = (...a) => { lines.push(a.join(' ')); log(...a); };
+  try {
+    await fightEndStep(bot, task, goal, () => {}, { navigate, dig, place }, { systemOne: async ({ questions }) => ({ answers: { branch_0: { choice: JSON.stringify(questions).includes('pillar_punch_30') ? 'pillar_punch_30' : 'water_drop' } } }) });
+  } catch (err) { if (err.name !== 'Cancelled') throw err; } finally { console.log = log; }
+  const pool = goal.endCombat?.pool;
+  assert.ok(pool, 'the pool recorded');
+  assert.ok(sourceWater(bot.blockAt(new Vec3(pool.x, pool.y, pool.z))), `the pool is the source: ${JSON.stringify(pool)}`);
+  assert.ok(lines.some(l => l.includes('the water went in at')), lines.filter(l => l.includes('pool')).join('\n'));
+});
