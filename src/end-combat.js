@@ -694,7 +694,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // A cloud within three below the feet and within its reach plus two aside (note 1648): wider than cloudUnderfoot, which asks the cloud's own radius; the stub built out of the breath stands at a cloud's edge, and the body dug down to its foot is in the breath's margin again.
   const cloudNearBelow = (blocks = 3) => { const p = bot.entity.position; return Object.values(bot.entities).find(e => e.name === 'area_effect_cloud' && e.isValid !== false && p.y - e.position.y >= 0.5 && p.y - e.position.y <= blocks + 0.5 && Math.hypot(p.x - e.position.x, p.z - e.position.z) <= cloudRadius(bot, e) + 2) || null; };
   // How far up clears the breath (note 1717): two from the ground's cloud, but a fireball's cloud bursts where the body is, at the feet or over them, and two up from a body dug a block under it ends in it. 25588 (dragon-259, 2026-10-15 09:48Z) had a fireball's cloud land at its feet on a short column at (35.6, 59, -21.5), dug down to 58, went '2 blocks up at (34, 59, -22)', the cloud's own height, and died there, 8.7 to 3 to none. Up to the block over the cloud's height, two at least, four at most.
-  const upClear = from => { const p = bot.entity.position; const ys = Object.values(bot.entities).filter(e => e.name === 'area_effect_cloud' && e.isValid !== false && e.position.y >= from - 0.6 && e.position.y <= from + 3 && Math.hypot(p.x - e.position.x, p.z - e.position.z) <= cloudRadius(bot, e) + 0.5).map(e => Math.floor(e.position.y) + 1 - from); return Math.min(4, Math.max(2, ...ys)); };
+  // One up where one clears it (note 1724): the cloud hurts only where its half-block slab meets the body, the feet within half a block over its y (the arena, 2026-10-15 10:15Z: a cloud a block under the feet, none in three seconds; at the feet, nine), and the ground's cloud lies at the feet's own height; one block is half the second in the cloud and half the blocks.
+  const upClear = from => { const p = bot.entity.position; const ys = Object.values(bot.entities).filter(e => e.name === 'area_effect_cloud' && e.isValid !== false && e.position.y >= from - 0.6 && e.position.y <= from + 3 && Math.hypot(p.x - e.position.x, p.z - e.position.z) <= cloudRadius(bot, e) + 0.5).map(e => Math.floor(e.position.y + 0.5 - from) + 1); return ys.length ? Math.min(4, Math.max(1, ...ys)) : 2; };
   const cloudUnderfootSays = c => c ? `the breath's cloud lies ${Math.round((bot.entity.position.y - c.position.y) * 10) / 10} blocks below the feet, ${Math.round(cloudRadius(bot, c) * 10) / 10} wide: a dig down ends in it, and a cloud lasts about thirty seconds and takes six a second` : null;
   // On an obsidian pillar's top (not the bot's own column): the top is a
   // small flat place high over the island, with the bot's column at its edge.
@@ -796,7 +797,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const centred = await centreOnColumn(inCloudNow ? 0.2 : 0.1, { maxMs: inCloudNow ? 800 : 5000 });
     if (!centred && inCloudNow && blocksCarried(bot) >= 2) {
       const from = Math.floor(bot.entity.position.y);
-      try { await require('./pillar-recovery').pillarUp(bot, task, from + upClear(from), { dig: actions.dig, maxBlocks: upClear(from), threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+      const want = upClear(from);
+    try { await require('./pillar-recovery').pillarUp(bot, task, from + want, { dig: actions.dig, maxBlocks: want, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
       console.log(`[end combat] not centred in the cloud: ${Math.floor(bot.entity.position.y) - from} blocks up out of it instead at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
       return;
     }
@@ -1481,7 +1483,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // The lee wall here too (note 1711): 1706 laid it before the column's climb and the ground's, not this one or the thin ground's. 25588 (dragon-253, 2026-10-15 09:18Z, five crystals broken, the day's best) climbed from a stub at (-35, 65, -11) in the breath with 16 blocks and no wall, 'the jump carried the body from (-35, -11) to (-34, -11)', then to (-36) and (-38), no block laid in six jumps, 20 to 4.5.
     await leeForClimb();
     const from = Math.floor(bot.entity.position.y);
-    try { await require('./pillar-recovery').pillarUp(bot, task, from + upClear(from), { dig: actions.dig, maxBlocks: upClear(from), threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    const want = upClear(from);
+    try { await require('./pillar-recovery').pillarUp(bot, task, from + want, { dig: actions.dig, maxBlocks: want, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     const rose = Math.floor(bot.entity.position.y) - from;
     console.log(`[end combat] up out of the breath on the short column: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
     if (rose < 1) state.shortColumnUpFailedAt = Date.now();
@@ -1651,11 +1654,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // Centred on the column before the jump (note 1676, as note 1651 before the dig): a body off the middle of a one-wide column jumps off it. 25588 (dragon-211, 2026-10-14 23:22Z, six crystals broken) at (12, 81, 33) beside its column at (12, 34), 14 health, jumped for the two blocks, '-3 blocks up', and fell 23 to its death; dragon-209 (22:42Z) fell the same way from 87.
     if (bot._pillarUp && !(await centreOnColumn(0.2, { maxMs: 500 }))) { console.log(`[end combat] up out of the breath on the column not tried at ${bot.entity.position.floored()}: not centred on the column in half a second`); return 0; }
     const from = Math.floor(bot.entity.position.y);
-    try { await require('./pillar-recovery').pillarUp(bot, task, from + upClear(from), { dig: actions.dig, maxBlocks: upClear(from), threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    const want = upClear(from);
+    try { await require('./pillar-recovery').pillarUp(bot, task, from + want, { dig: actions.dig, maxBlocks: want, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     const rose = Math.floor(bot.entity.position.y) - from;
     console.log(`[end combat] up out of the breath on the column: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health, ${blocksCarried(bot)} blocks left`);
     // The roof after this climb too (note 1716, as note 1672 after the ground's): the dragon's fireball is aimed at the body, and its cloud spawns where it bursts; on the roof it lies two over the feet, on the body it lies at the feet. 25588 (dragon-258, 2026-10-15 09:46Z) climbed two out of the breath at the foot of its column at (33, 62, -22) with seven blocks and no roof, the dragon 15 over and 7 aside, and the next fireball's cloud lay at (33.6, 62, -21.6), the feet's own height: 16 to 10 to 4 to none. Dragon-256 and 257 had their roofs and their clouds lay at the feet all the same (a fireball from the side); the roof answers only the one from above.
-    if (rose >= 2) await roofTheStub();
+    if (rose >= want) await roofTheStub();
     return rose;
   };
   const holdOrDown = async () => {
@@ -1852,8 +1856,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           try { await require('./pillar-recovery').pillarUp(bot, task, from + up, { dig: actions.dig, maxBlocks: up, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
           const rose = Math.floor(bot.entity.position.y) - from;
           console.log(`[end combat] up out of the breath first: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
-          // Two up or the other ways (note 1679): one block up leaves the body a block over the cloud's base, inside it; 25588 (dragon-214, 2026-10-15 00:00Z) went '1 blocks up' at (40, 62, -5) and stood, 20 to 14.7 to 9.1 to 3.3 to none.
-          if (rose >= 2) { await roofTheStub(); return; }
+          // As high as upClear asks (note 1724: one where the cloud lies at the feet; note 1679's one-up death of dragon-214 was read before the arena measured the slab, and two where no cloud is seen). Two up or the other ways (note 1679): one block up leaves the body a block over the cloud's base, inside it; 25588 (dragon-214, 2026-10-15 00:00Z) went '1 blocks up' at (40, 62, -5) and stood, 20 to 14.7 to 9.1 to 3.3 to none.
+          if (rose >= up) { await roofTheStub(); return; }
         }
       }
       // No blocks for the climb: the dig first, before the run's survey (note 1692). The run out of a cloud is surveyed for 0.7 s and found nothing on the fountain's pitted ground, and the dig two down came last and silent; 25588 (dragon-229, 2026-10-15 03:29Z, two crystals broken) stood at (11, 61, 2.6) with no block carried, 1.5 to 3 from the cloud's middle, five seconds at three a second, 'hurt without a survival response', 14 to none; the dig began at the last second. Two blocks down with the iron pickaxe are a second and a half and the body is under the cloud.
@@ -1909,10 +1913,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             goal.step = { action: 'up_out_of_breath_on_ground', health: bot.health }; save();
             await leeForClimb();
             const from = Math.floor(bot.entity.position.y);
-            try { await require('./pillar-recovery').pillarUp(bot, task, from + upClear(from), { dig: actions.dig, maxBlocks: upClear(from), threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+            const want = upClear(from);
+    try { await require('./pillar-recovery').pillarUp(bot, task, from + want, { dig: actions.dig, maxBlocks: want, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
             const rose = Math.floor(bot.entity.position.y) - from;
             console.log(`[end combat] up out of the breath on ${thick ? 'the ground' : 'thin ground'}: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
-            if (rose >= 2) { await roofTheStub(); return; }
+            if (rose >= want) { await roofTheStub(); return; }
           }
           if (inBreath() && thick && voidEdge(bot, bot.entity.position, 4) === null) {
             goal.step = { action: 'down_out_of_breath_on_ground', health: bot.health }; save();
