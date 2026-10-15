@@ -2640,10 +2640,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               await pr.pillarUp(bot, task, y, { dig: actions.dig, maxBlocks: Math.max(1, y - Math.floor(bot.entity.position.y)), threats: false, canDig });
             } };
             const belowTop = feetY - 6;
-            if (belowTop > Math.floor(bot.entity.position.y) + 2) {
-              await climbTo(belowTop);
+            if (belowTop > Math.floor(bot.entity.position.y) + 2) await climbTo(belowTop);
+            // The wait before every climb above 70 (note 1683), not only when the climb began under the six-below mark: a climb cut by an emergency resumes from where it stands, and 25588 (dragon-218, 2026-10-15 00:50Z) resumed crystal 86's climb at 84, was struck twice by the body at 84 and twice at 87, and was carried 130 blocks into the void; dragon-204, 207 and 210 were struck at their tops the same evening after cut climbs.
+            if (Math.floor(bot.entity.position.y) >= 70) {
               const wait = await waitForThePass(25000);
-              if (wait.waited) console.log(`[end combat] the climb to crystal ${target.id} waited ${(wait.ms / 1000).toFixed(1)} s six under the top at ${bot.entity.position.floored()} for the dragon's pass: ${wait.why}`);
+              if (wait.waited) console.log(`[end combat] the climb to crystal ${target.id} waited ${(wait.ms / 1000).toFixed(1)} s at ${bot.entity.position.floored()} for the dragon's pass: ${wait.why}`);
             }
             await climbTo(feetY);
             // And once more at the top (note 1664): the stand, the walls and the blow are four seconds more in the open.
