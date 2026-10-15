@@ -1616,11 +1616,21 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     return waterDrop();
   };
   // Up two out of the breath on the column (note 1666): two blocks laid are half a second, two dug in the column's end stone are two and a half with a stone pickaxe, and the cloud takes six a second. 25588 (dragon-201, 2026-10-14 20:37Z, one crystal broken) stood at (31, 72, -27) on its end-stone column with 10.8 health and three blocks carried as the cloud came to its feet, 'the breath at the feet during the hold: down the column', and the dig took 10.8 to 5.8 to none; dragon-198 (19:51Z) the same at 72 with 10.2. The bot's own roof over the head is dug first (half a second, its own cobblestone). Returns the blocks risen.
+  // The lee wall before a climb out of the breath on a narrow top (note 1706, the wiring of note 1705's leeWall): each hit knocks the body away from the dragon, off a top one block wide; the arena's drill took the climb from 0 of 8 on the column to 8 of 8 with five blocks laid on the side away from the dragon, about two seconds with the climb. Only where fewer than two cells beside the feet have ground under the feet's level, seven or more blocks carried, and the dragon seen.
+  const leeForClimb = async () => {
+    const f = bot.entity.position.floored(), solid = c => bot.blockAt(c)?.boundingBox === 'block';
+    if ([[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(f.offset(dx, -1, dz))).length >= 2 || blocksCarried(bot) < 7) return 0;
+    const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e)); if (!d) return 0;
+    let laid = 0; try { laid = await require('./pillar-recovery').leeWall(bot, task, d.position); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    console.log(`[end combat] the lee wall before the climb out of the breath at ${f}: ${laid} laid on the side away from the dragon, ${blocksCarried(bot)} blocks left`);
+    return laid;
+  };
   const upOutOfBreathOnColumn = async () => {
     if (blocksCarried(bot) < 2 || !actions.dig) return 0;
     const f0 = bot.entity.position.floored();
     for (const dy of [2, 3]) { const r = bot.blockAt(f0.offset(0, dy, 0)); if (r?.boundingBox === 'block') { if (/bedrock|obsidian|end_portal/.test(r.name)) return 0; try { await actions.dig(bot, task, r.position, { requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; return 0; } } }
     goal.step = { action: 'up_out_of_breath_on_column', health: bot.health }; save();
+    await leeForClimb();
     // The feet on the ground first (note 1669, as note 1640 on the ground): knocked or dropping, the climb refused 'air under the feet'. 25588 (dragon-204, 2026-10-14 21:33Z) at (-4, 67, 12), 12.9 health, 10 blocks carried: '0 blocks up' twice in the cloud, then the hold and a fall to 8.3.
     bot.clearControlStates?.(); bot.pathfinder?.setGoal?.(null);
     for (let i = 0; i < 12 && !bot.entity.onGround; i++) { check(); await sleep(50); }
@@ -1815,6 +1825,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           for (let i = 0; i < 10 && !bot.entity.onGround; i++) { check(); await sleep(50); }
           if (roofAt2 && actions.dig) { const r = bot.blockAt(f0.offset(0, 2, 0)); if (!/bedrock|obsidian|end_portal/.test(r.name)) { try { await actions.dig(bot, task, r.position, { requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } } }
           const up = roofAt3 && !roofAt2 ? 1 : 2;
+          await leeForClimb();
           // Centred on the bot's own column first when one is near (note 1695, as note 1676 on the column's own path): this way is taken on a stub or a column whose record says the body is a cell off, and a jump from 0.9 to 1.3 off a one-wide top goes off its edge. 25588 (dragon-233, 2026-10-15 04:2xZ, two crystals broken) fell three times climbing out of the breath, 'falling from (-12, 72, 35) ... 0.92 off the column (-13, 36)'s middle; step up_out_of_breath_first; keys jump+sneak', then 1.29 and 1.0 off, 15 to 6.1.
           { const u = bot._pillarUp; if (u && u.until > Date.now()) { const p0 = bot.entity.position, off = Math.hypot(u.x + .5 - p0.x, u.z + .5 - p0.z); if (off > 0.3 && off <= 1.6 && bot.blockAt(new Vec3(u.x, Math.floor(p0.y) - 1, u.z))?.boundingBox === 'block') { await centreOn(u.x, u.z, 0.2, { maxMs: 500 }); const off2 = Math.hypot(u.x + .5 - bot.entity.position.x, u.z + .5 - bot.entity.position.z); console.log(`[end combat] centred on the column before the climb out of the breath: ${Math.round(off * 100) / 100} to ${Math.round(off2 * 100) / 100} off`); } } }
           const from = Math.floor(bot.entity.position.y);
