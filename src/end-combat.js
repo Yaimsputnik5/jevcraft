@@ -1628,6 +1628,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // Away from the dragon after all (note 1708): the arena's drill with a real harming cloud found an ownerless cloud's push random in direction (east with the cloud 1.5 west and 1.5 east, west with it 0.8 east, whatever the dragon's place); the breath's clouds are the dragon's own, and the /damage drill with the dragon as the source pushed away from it every time.
     const from = d?.position || cloud?.position;
     if (!from) return 0;
+    // Not at twelve health or under (note 1715): the wall takes about a second, the cloud's tick a second apart takes six, and the climb another second; at twelve the wall leaves no tick to spare. 25588 (dragon-257, 2026-10-15 09:42Z) had a fireball's cloud land on its roofed stub at (7, 63, 10) with the body on it, 20 to 9 by then, laid five in the wall, took six more and died at 3 before the climb; dragon-256 (09:37Z) the same on its stub at (20, 64, -4) at 14.9.
+    if (bot.health <= 12) { console.log(`[end combat] no lee wall at ${f}: ${bot.health.toFixed(1)} health, a second for the wall is a tick of the cloud's six, and the climb goes first`); return 0; }
     let laid = 0; try { laid = await require('./pillar-recovery').leeWall(bot, task, from); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     console.log(`[end combat] the lee wall before the climb out of the breath at ${f}: ${laid} laid on the side away from the ${from === d?.position ? 'dragon' : `cloud's centre at ${cloud.position.floored()}`}, ${blocksCarried(bot)} blocks left`);
     return laid;
