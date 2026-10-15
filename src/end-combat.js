@@ -3137,9 +3137,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             await require('./motion').move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'into_the_tunnel', keys: ['forward'], sneak: false, why: 'into the tunnel cell just dug', look: c.offset(.5, 1.6, .5), maxMs: 1500, tick: 25, until: () => Math.floor(bot.entity.position.x) === c.x && Math.floor(bot.entity.position.z) === c.z });
             cells++;
           }
-          try { await require('./drop-collection').collectNearbyDrops(bot, task, 'end_stone', { radius: 4, timeoutMs: 2000, waitForSpawnMs: 0, move: actions.navigate }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+          // Every stone along the tunnel picked up, round after round (note 1738, as the quarry's note 1502): dragon-291 (2026-10-15 16:19Z) dug twelve cells east from (22, 59, -1) and gained none, the stone left where the body did not step.
+          { const t1 = Date.now(); let rounds = 0; while (Date.now() - t1 < 15000 && rounds < 20) { rounds++; let got = false; try { got = await require('./drop-collection').collectNearbyDrops(bot, task, 'end_stone', { radius: best.n + 3, timeoutMs: 3000, waitForSpawnMs: rounds === 1 ? 300 : 0, move: actions.navigate }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; } if (!got) break; } }
+          const lying = Object.values(bot.entities).filter(e => e.name === 'item' && e.isValid !== false && e.position.distanceTo(bot.entity.position) <= best.n + 3).length;
           const got = blocksCarried(bot) - before;
-          console.log(`[end combat] the tunnel quarry from ${f0}: ${cells} cells dug ${best.dx === 1 ? 'east' : best.dx === -1 ? 'west' : best.dz === 1 ? 'south' : 'north'}, ${got} end stone gained, ${blocksCarried(bot)} carried, ${Math.round((Date.now() - t0) / 100) / 10} s, ${bot.health.toFixed(1)} health`);
+          console.log(`[end combat] the tunnel quarry from ${f0}: ${cells} cells dug ${best.dx === 1 ? 'east' : best.dx === -1 ? 'west' : best.dz === 1 ? 'south' : 'north'}, ${got} end stone gained, ${blocksCarried(bot)} carried, ${Math.round((Date.now() - t0) / 100) / 10} s, ${bot.health.toFixed(1)} health; the body at ${bot.entity.position.floored()}, ${lying} items lying along it`);
           state.hole = { x: bot.entity.position.floored().x, y: bot.entity.position.floored().y, z: bot.entity.position.floored().z, at: Date.now() }; save();
           if (got > 0) progress = true;
         } };
