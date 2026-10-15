@@ -3457,8 +3457,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           const s0 = walled || side;
           const dir = s0.dx === 1 ? 'east' : s0.dx === -1 ? 'west' : s0.dz === 1 ? 'south' : 'north';
           tree.water_drop = {
-            description: { action: `${walled ? `Dig the ${walled.cells} blocks of the bot's own pocket on the column's ${dir} side (a second or two), then step` : 'Step'} off the column's ${dir} edge, ${s0.fall} blocks down onto the island at (${s0.edge.x}, ${s0.edge.z})${s0.pool ? ', into the pool poured at the foot: the landing in water takes nothing' : `, no pool under it: the bucket is clicked under the body in the last blocks of the fall, a click the server refuses about one time in three, and a dry landing takes about ${Math.max(0, s0.fall - 3)}`}; a second or two, against the dig's ${Math.round(depth * 1.5)} seconds on the column where the breath and the passes land`,
-              fall: s0.fall, pool: !!s0.pool, walled: !!walled, waterBuckets: water, health: bot.health, dragonHealth: beforeDragon },
+            description: { action: `${walled ? `Dig the ${walled.cells} blocks of the bot's own pocket on the column's ${dir} side (a second or two), then step` : 'Step'} off the column's ${dir} edge, ${s0.fall} blocks down onto the island at (${s0.edge.x}, ${s0.edge.z})${s0.pool ? ', into the pool poured at the foot: the landing in water takes nothing' : `, no pool under it: the bucket is clicked under the body in the last blocks of the fall, a click the server refuses about one time in three, and a dry landing takes about ${Math.max(0, s0.fall - 3)}`}; a second or two, against the dig's ${Math.round(depth * 1.5)} seconds on the column where the breath and the passes land; the column's ${depth} blocks stay standing, ${blocksCarried(bot)} carried at the foot against about ${blocksCarried(bot) + depth} dug down (the climb out of a cloud is two, a pillar to a crystal ${depth} or more, and quarrying is cut short by each pass)`,
+              fall: s0.fall, blocksCarried: blocksCarried(bot), blocksIfDugDown: blocksCarried(bot) + depth, pool: !!s0.pool, walled: !!walled, waterBuckets: water, health: bot.health, dragonHealth: beforeDragon },
             run: async () => {
               goal.step = { action: 'water_drop_chosen', from: { ...bot.entity.position }, fall: (walled || side).fall }; save();
               if (!await waterDrop({ inCloud: breathThreat(bot)?.name === 'area_effect_cloud' })) throw new Error('The water drop was not taken: no side with ground under it, or the fall too long for the health with no pool');
@@ -3466,7 +3466,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         }
       }
       if (depth >= 2) tree.pillar_down = {
-        description: { action: `Dig down the bot's own pillar a block at a time from under the feet, ${depth} blocks to its foot: no fall on the way${cloudUnderfoot(depth) ? `; ${cloudUnderfootSays(cloudUnderfoot(depth))}` : ''}`, blocks: depth, health: bot.health, dragonHealth: beforeDragon, ...(cloudUnderfoot(depth) ? { breathAtTheFoot: true } : {}) },
+        description: { action: `Dig down the bot's own pillar a block at a time from under the feet, ${depth} blocks to its foot: no fall on the way, and the pillar's blocks come back into the pack (${blocksCarried(bot)} carried now, about ${blocksCarried(bot) + depth} at the foot)${cloudUnderfoot(depth) ? `; ${cloudUnderfootSays(cloudUnderfoot(depth))}` : ''}`, blocks: depth, blocksCarried: blocksCarried(bot), blocksAtTheFoot: blocksCarried(bot) + depth, health: bot.health, dragonHealth: beforeDragon, ...(cloudUnderfoot(depth) ? { breathAtTheFoot: true } : {}) },
         run: async () => {
           // The column's own way down (digDownColumn): a gap under the block filled, end stone counted, the dragon's pass held through (notes 1434, 1438, 1440).
           await digDownColumn({ limit: depth });
