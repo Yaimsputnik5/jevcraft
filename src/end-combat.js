@@ -522,6 +522,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     } catch (_) { /* nothing to catch */ }
   };
   bot.on('physicsTick', falling);
+  // The dragon's phase changes said (note 1730), for the fireball's warning: the strafe at the player (phase 1) is the one that throws the fireball, and it begins seconds before the throw (Fable, 2026-10-15: it fires with a clear line from its eyes to the bot's for a quarter second and its body turned within ten degrees). 25588's deaths 256 to 276 (2026-10-15 09:37 to 12:34Z) were most of them a fireball's cloud on the body; this says how long before each one the strafe began. Kept to the bot's state for the step's own reading.
+  const phaseWatch = () => { try { const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e)); if (!d) return; const ph = metadata(bot, d, 'phase'); if (ph == null || ph === state.dragonPhase?.phase) return; const p = bot.entity.position; const was = state.dragonPhase; state.dragonPhase = { phase: ph, at: Date.now() }; if (ph === 1 || was?.phase === 1) console.log(`[dragon] phase ${was?.phase ?? '?'} to ${ph} at ${Math.round(d.position.distanceTo(p))} blocks${was ? ` after ${((Date.now() - was.at) / 1000).toFixed(1)} s` : ''}; the bot at ${p.floored()}, ${bot.health.toFixed(1)} health`); } catch (_) { /* no dragon */ } };
+  const fireballWatch = e => { try { if (e?.name !== 'dragon_fireball') return; const p = bot.entity.position, ph = state.dragonPhase; console.log(`[dragon] fireball thrown at ${Math.round(e.position.distanceTo(p))} blocks from the bot at ${p.floored()}${ph ? `, phase ${ph.phase} for ${((Date.now() - ph.at) / 1000).toFixed(1)} s` : ''}`); } catch (_) { /* nothing */ } };
+  bot.on('entitySpawn', fireballWatch);
+  bot.on('physicsTick', phaseWatch);
   // The bot's own pillar under it, air on three sides at least: no walk off it.
   // By the block under the feet, not the column's recorded cell (note 1416):
   // the jumps of the climb drift, and 25588 (05:41Z) stood a cell off the
@@ -3636,7 +3641,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     state.noProgress = progress ? 0 : (state.noProgress || 0) + (chose ? 1 : 0);
     state.lastActionAt = started; save();
     clearInterval(crouchKeeper);
-    bot.removeListener('entityMoved', moved); bot.removeListener('physicsTick', falling); if (breathWatch) bot.removeListener('physicsTick', breathWatch); task.interruptCheck = oldInterrupt;
+    bot.removeListener('entityMoved', moved); bot.removeListener('physicsTick', falling); bot.removeListener('physicsTick', phaseWatch); bot.removeListener('entitySpawn', fireballWatch); if (breathWatch) bot.removeListener('physicsTick', breathWatch); task.interruptCheck = oldInterrupt;
     bot.pathfinder.setGoal(null); bot.clearControlStates(); policy.restore();
   }
 }
