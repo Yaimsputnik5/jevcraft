@@ -641,7 +641,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   const waterNear = (cell, r = 3) => bot.findBlocks({ matching: bot.registry.blocksByName.water.id, maxDistance: r + 2, count: 16 }).some(p => Math.abs(p.x - cell.x) <= r && Math.abs(p.z - cell.z) <= r && p.y >= cell.y - 1 && p.y <= cell.y + 2);
   const dryTheHoleCell = async cell => { if (!waterNear(cell)) return true; await takeBackWaterNear({ force: true }); if (!waterNear(cell)) return true; console.log(`[end combat] no hole at ${cell}: water stands within three of it that the bucket did not take back`); return false; };
   // And while the hole is being dug (note 1647): the dig is a second, it is the answer to the dragon's coming, and the charge read at eighteen cut it; 25588 (dragon-181, 2026-10-14 16:20Z) had wait_in_hole cut so twice in a minute with the body on the rim and the hole half dug.
-  const holeAnswers = () => ((holeHere() || inRecordedHole()) && ['dragon_charge_or_contact', 'incoming_dragon_fireball'].includes(endEmergency(bot))) || (state.diggingHole > Date.now() - 4000 && endEmergency(bot) === 'dragon_charge_or_contact');
+  // In the tunnel under the island's stone (note 1740): the dragon's charge and fireball are answered by the stone over the head, as in the hole; 25588 (dragon-292, 2026-10-15 16:35Z) had tunnel_quarry cut by 'incoming_dragon_fireball' at (-28, 59, 16) and climbed out into the open, the cloud on it, 20 to none.
+  const inTunnel = () => { if (!(state.tunnelAt > Date.now() - 60000)) return false; const g = bot.entity.position.floored(); return bot.blockAt(g.offset(0, 2, 0))?.boundingBox === 'block' && bot.blockAt(g.offset(0, -1, 0))?.boundingBox === 'block'; };
+  const holeAnswers = () => ((holeHere() || inRecordedHole() || inTunnel()) && ['dragon_charge_or_contact', 'incoming_dragon_fireball'].includes(endEmergency(bot))) || (state.diggingHole > Date.now() - 4000 && endEmergency(bot) === 'dragon_charge_or_contact');
   // The roof over the hole's mouth (note 1623): a fireball comes to the body and its cloud fills the hole it bursts in; 25588 (dragon-159, 2026-10-14 11:07Z) lost 16 in a hole 40 blocks from the fountain with the dragon flying, and had its stand in the hole by the fountain cut by a cloud at the feet (11:09Z, 13.6 to 11.6). With a block two over the feet the ball bursts on it and the cloud lies above; the sword wants it off, so it is laid while the dragon flies and taken off when it sits.
   const roofCell = () => bot.entity.position.floored().offset(0, 2, 0);
   const roofed = () => bot.blockAt(roofCell())?.boundingBox === 'block';
@@ -3130,12 +3132,14 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           const t0 = Date.now(), before = blocksCarried(bot); let cells = 0;
           if (bot.blockAt(f0)?.boundingBox === 'block') { await actions.dig(bot, task, f0, { requireDrops: false, dropInto: true }); for (let i = 0; i < 20 && Math.floor(bot.entity.position.y) > f0.y; i++) await sleep(50); }
           if (Math.floor(bot.entity.position.y) > f0.y) throw new Error(`The body did not go down to the tunnel's floor at ${f0}`);
+          // The hole's mouth roofed first (note 1740): the shaft over the tunnel's first cell is open to the sky, and a fireball sees down it.
+          state.tunnelAt = Date.now(); try { if (!roofed()) await roofHole(true); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
           for (let k = 1; k <= best.n && Date.now() - t0 < 45000 && blocksCarried(bot) < 64; k++) {
             check();
             const c = f0.offset(best.dx * k, 0, best.dz * k);
             for (const cell of [c.offset(0, 1, 0), c]) if (bot.blockAt(cell)?.boundingBox === 'block') await actions.dig(bot, task, cell, { requireDrops: false });
             await require('./motion').move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'into_the_tunnel', keys: ['forward'], sneak: false, why: 'into the tunnel cell just dug', look: c.offset(.5, 1.6, .5), maxMs: 1500, tick: 25, until: () => Math.floor(bot.entity.position.x) === c.x && Math.floor(bot.entity.position.z) === c.z });
-            cells++;
+            cells++; state.tunnelAt = Date.now();
           }
           // Every stone along the tunnel picked up, round after round (note 1738, as the quarry's note 1502): dragon-291 (2026-10-15 16:19Z) dug twelve cells east from (22, 59, -1) and gained none, the stone left where the body did not step.
           { const t1 = Date.now(); let rounds = 0; while (Date.now() - t1 < 15000 && rounds < 20) { rounds++; let got = false; try { got = await require('./drop-collection').collectNearbyDrops(bot, task, 'end_stone', { radius: best.n + 3, timeoutMs: 3000, waitForSpawnMs: rounds === 1 ? 300 : 0, move: actions.navigate }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; } if (!got) break; } }
