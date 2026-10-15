@@ -227,7 +227,17 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     // own smooth turn took ticks, the bot fell back into the cell before the
     // packet went, and the server refused every block of a pillar from two
     // hoglins in the arena.
-    const place = bot._placeBlockWithOptions ? () => bot._placeBlockWithOptions(below, new Vec3(0, 1, 0), { swingArm: 'right', forceLook: true }) : () => bot.placeBlock(below, new Vec3(0, 1, 0));
+    // The block laid under where the body is at the place (note 1687), not under where it stood before the jump: the jump carries the body a cell over at times ('the jump carried the body from (-14, 34) to (-14, 35)', 25588's dragon-222, 2026-10-15 01:4xZ), and a block laid under the old cell lifts nothing; 'the block was not placed in three jumps' was the climb out of the breath laying one of two in dragon-214, 215, 216, 220 and 221, each dead in its cloud. With air under the new cell the place is not tried.
+    const place = () => {
+      let ref = below;
+      const now = bot.entity.position.floored();
+      if (now.x !== feet.x || now.z !== feet.z) {
+        const under = bot.blockAt(now.offset(0, -1, 0));
+        if (!under || under.boundingBox !== 'block') throw new Error(`the body over (${now.x}, ${now.z}) with ${under ? under.name : 'nothing'} under it, not over its cell`);
+        ref = under;
+      }
+      return bot._placeBlockWithOptions ? bot._placeBlockWithOptions(ref, new Vec3(0, 1, 0), { swingArm: 'right', forceLook: true }) : bot.placeBlock(ref, new Vec3(0, 1, 0));
+    };
     // A block the server refused is tried again, three jumps at most (note
     // 1415): on the live servers, fourteen trials to a machine, the
     // position runs further behind than the arena's, and a climb that gave up
