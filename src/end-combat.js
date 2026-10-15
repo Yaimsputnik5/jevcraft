@@ -3458,6 +3458,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         const walled = side?.clearFirst && state.pool && Date.now() - state.pool.at < 15 * 60000 ? { dx: state.pool.dx, dz: state.pool.dz, fall: Math.max(0, Math.floor(bot.entity.position.y) - state.pool.y), edge: { x: bot._pillarUp.x + state.pool.dx, z: bot._pillarUp.z + state.pool.dz }, pool: true, cells: side.clearFirst.length } : null;
         if (side && (walled || (!side.clearFirst && (water || side.pool)))) {
           const s0 = walled || side;
+          // Not offered where the drop itself refuses (note 1714): a fall whose dry landing would take the health, no pool under it. 25588 (dragon-255, 2026-10-15 09:30Z, two crystals broken) took water_drop on crystal 90's column at 90, 'a fall of 29 blocks takes about 26 health and the body has 17.3 ... 11 dug first', refused, and chose it again, 21 passes in a second, until the dragon's body threw it off the top.
+          if (!s0.pool && s0.fall - 3 >= bot.health - 1) { /* refused by waterDrop; the dig down is the way */ } else {
           const dir = s0.dx === 1 ? 'east' : s0.dx === -1 ? 'west' : s0.dz === 1 ? 'south' : 'north';
           tree.water_drop = {
             description: { action: `${walled ? `Dig the ${walled.cells} blocks of the bot's own pocket on the column's ${dir} side (a second or two), then step` : 'Step'} off the column's ${dir} edge, ${s0.fall} blocks down onto the island at (${s0.edge.x}, ${s0.edge.z})${s0.pool ? ', into the pool poured at the foot: the landing in water takes nothing' : `, no pool under it: the bucket is clicked under the body in the last blocks of the fall, a click the server refuses about one time in three, and a dry landing takes about ${Math.max(0, s0.fall - 3)}`}; a second or two, against the dig's ${Math.round(depth * 1.5)} seconds on the column where the breath and the passes land; the column's ${depth} blocks stay standing, ${blocksCarried(bot)} carried at the foot against about ${blocksCarried(bot) + depth} dug down (the climb out of a cloud is two, a pillar to a crystal ${depth} or more, and quarrying is cut short by each pass)`,
@@ -3466,6 +3468,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               goal.step = { action: 'water_drop_chosen', from: { ...bot.entity.position }, fall: (walled || side).fall }; save();
               if (!await waterDrop({ inCloud: breathThreat(bot)?.name === 'area_effect_cloud' })) throw new Error('The water drop was not taken: no side with ground under it, or the fall too long for the health with no pool');
             } };
+          }
         }
       }
       if (depth >= 2) tree.pillar_down = {
