@@ -701,6 +701,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // How far up clears the breath (note 1717): two from the ground's cloud, but a fireball's cloud bursts where the body is, at the feet or over them, and two up from a body dug a block under it ends in it. 25588 (dragon-259, 2026-10-15 09:48Z) had a fireball's cloud land at its feet on a short column at (35.6, 59, -21.5), dug down to 58, went '2 blocks up at (34, 59, -22)', the cloud's own height, and died there, 8.7 to 3 to none. Up to the block over the cloud's height, two at least, four at most.
   // One up where one clears it (note 1724): the cloud hurts only where its half-block slab meets the body, the feet within half a block over its y (the arena, 2026-10-15 10:15Z: a cloud a block under the feet, none in three seconds; at the feet, nine), and the ground's cloud lies at the feet's own height; one block is half the second in the cloud and half the blocks.
   const upClear = from => { const p = bot.entity.position; const ys = Object.values(bot.entities).filter(e => e.name === 'area_effect_cloud' && e.isValid !== false && e.position.y >= from - 0.6 && e.position.y <= from + 3 && Math.hypot(p.x - e.position.x, p.z - e.position.z) <= cloudRadius(bot, e) + 0.5).map(e => Math.floor(e.position.y + 0.5 - from) + 1); return ys.length ? Math.min(4, Math.max(1, ...ys)) : 2; };
+  // The cloud on the body by its slab (notes 1724, 1732, 1733): half a block high from its y, and the body's 1.8 meeting it, within its radius.
+  const cloudOnBody = () => { const p = bot.entity.position; return Object.values(bot.entities).some(e => e.name === 'area_effect_cloud' && e.isValid !== false && e.position.y > p.y - 1.8 && e.position.y <= p.y + 0.5 && Math.hypot(p.x - e.position.x, p.z - e.position.z) <= cloudRadius(bot, e) + 0.3); };
   const cloudUnderfootSays = c => c ? `the breath's cloud lies ${Math.round((bot.entity.position.y - c.position.y) * 10) / 10} blocks below the feet, ${Math.round(cloudRadius(bot, c) * 10) / 10} wide: a dig down ends in it, and a cloud lasts about thirty seconds and takes six a second` : null;
   // On an obsidian pillar's top (not the bot's own column): the top is a
   // small flat place high over the island, with the bot's column at its edge.
@@ -1796,7 +1798,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // with the shield up, a second and a half; the step then goes on, to the
     // climb or the way down.
     // The stub out of the breath is held, not dug (note 1648): the two laid out of the cloud (note 1636) made a column of two, the fireball's or the cloud's emergency on it was answered with the dig down three, and the body went back into the cloud at the foot, up two, down two, until dead; 25588 (dragon-182, 2026-10-14 16:26Z, no crystal broken) at (62, 48 to 50, -27), and dragon-171 and 174 before it. With the column short and a cloud within three below, the body holds on the stub, crouched, until the cloud is gone.
-    else if (onOwnPillar() && ['dragon_breath_cloud', 'incoming_dragon_fireball'].includes(endEmergency(bot)) && columnDepth() <= 3 && cloudNearBelow(3) && breathThreat(bot)?.name !== 'area_effect_cloud') {
+    else if (onOwnPillar() && ['dragon_breath_cloud', 'incoming_dragon_fireball'].includes(endEmergency(bot)) && columnDepth() <= 3 && cloudNearBelow(3) && !cloudOnBody()) {
       goal.step = { action: 'hold_on_stub_over_cloud', health: bot.health }; save();
       console.log(`[end combat] held on the stub at ${bot.entity.position.floored()}: ${cloudUnderfootSays(cloudNearBelow(3))}`);
       if (endEmergency(bot) === 'incoming_dragon_fireball') await roofOverhead();
@@ -1826,6 +1828,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         goal.step = { action: 'roof_against_fireball', health: bot.health }; save();
         await holdOrDown();
       } else {
+        // Held where the cloud is only near, not on the body (note 1733): one up out of it (note 1724) is a block over it, within breathThreat's margin, and this way dug back down into it. 25588 (dragon-285, 2026-10-15 14:45Z) went '1 blocks up at (-1, 63, 23)', then 'down the column ... 1 dug' at once, 20 to 10 to none.
+        if (!cloudOnBody() && endEmergency(bot) === 'dragon_breath_cloud') { goal.step = { action: 'hold_over_cloud', health: bot.health }; save(); await holdOnColumn(); return; }
         if (breathThreat(bot)?.name === 'area_effect_cloud' && await upOutOfBreathOnColumn() >= 1) return;
         goal.step = { action: 'down_out_of_breath', health: bot.health }; save();
         await wayDown({ limit: 3 });
