@@ -233,7 +233,12 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     // 2026-10-13 05:50Z, 'The pillar stopped 36 blocks short, 0 up').
     for (let attempt = 0; attempt < 3 && bot.entity.position.floored().y <= start; attempt++) {
       task.check();
+      // The body still before the jump (note 1685): a jump with the run's momentum left in it lands a cell over, and on a stub one block wide that is off it. 25588 (dragon-220, 2026-10-15 01:06Z) laid one block of two in the cloud at (3, 64, -4), jumped three times for the second, 'the block was not placed in three jumps (on ground true)', and was found three blocks lower at (3, 62, -7), off its stub, 9.9 health; dragon-214, 215 and 216 laid one of two the same way. The keys are let go and up to three tenths of a second waited for the body to stand still; a jump that lands in another cell is said.
+      bot.clearControlStates?.();
+      for (let i = 0; i < 15 && bot.entity.velocity && Math.hypot(bot.entity.velocity.x, bot.entity.velocity.z) > 0.03; i++) await new Promise(resolve => setTimeout(resolve, 20));
+      const cellBefore = bot.entity.position.floored();
       await move(bot, task, { label: 'pillar_up', keys: ['jump'], sneak: false, until: () => bot.entity.position.y >= start + 1.1, maxMs: 1200, tick: 20 });
+      { const c = bot.entity.position.floored(); if (c.x !== cellBefore.x || c.z !== cellBefore.z) console.log(`[pillar up] the jump carried the body from (${cellBefore.x}, ${cellBefore.z}) to (${c.x}, ${c.z})`); }
       // The server has the position a tick behind: placed the moment the feet
       // cleared the cell here, it still saw the body in it and refused.
       await new Promise(resolve => setTimeout(resolve, 60 + attempt * 60));
