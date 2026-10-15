@@ -3190,6 +3190,20 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           if (steps) progress = true;
         } };
     }
+    // Off a stub of the bot's own blocks onto the ground beside (note 1749): with no block carried the stub's top offered only observe, no hole (its sides open) and no climb. 25588 (dragon-11 of the new save, 2026-10-15 21:4xZ, two crystals broken) stood on cobblestone at (12, 63, 11) with none carried until a fireball's cloud took it.
+    { const g = bot.entity.position.floored(), sd = c => bot.blockAt(c)?.boundingBox === 'block', under = bot.blockAt(g.offset(0, -1, 0))?.name || '';
+      if (!onObsidianTop() && /^(cobblestone|cobbled_deepslate|end_stone|netherrack|dirt|stone)$/.test(under) && !sd(g.offset(0, 2, 0))) {
+        const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dz]) => { const c = g.offset(dx, 0, dz); if (sd(c) || sd(c.offset(0, 1, 0))) return null; for (let fall = 1; fall <= 3; fall++) { if (sd(c.offset(0, -fall, 0))) return null; if (sd(c.offset(0, -fall - 1, 0))) return { dx, dz, fall, land: c.offset(0, -fall, 0) }; } return null; }).filter(Boolean).filter(x => voidEdge(bot, x.land.offset(.5, 0, .5), 3) === null).sort((a, b) => a.fall - b.fall);
+        const down = sides[0];
+        if (down && down.fall >= 1 && blocksCarried(bot) < 2 && !Object.keys(tree).some(k => k !== 'observe')) tree.step_down = {
+          description: { action: `Step off this ${under.replace('_', ' ')} ${down.dx === 1 ? 'east' : down.dx === -1 ? 'west' : down.dz === 1 ? 'south' : 'north'}, ${down.fall} down onto the island at ${down.land}: no harm in a fall of three or under; on the ground the hole, the tunnel and the quarry are to be had`, fall: down.fall, blocksCarried: blocksCarried(bot), health: bot.health },
+          run: async () => {
+            const from = bot.entity.position.y;
+            await require('./motion').move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'step_down', keys: ['forward'], sneak: false, why: 'off the stub onto the ground beside', look: down.land.offset(.5, 1.6, .5), maxMs: 2000, tick: 25, intoFall: true, until: () => bot.entity.position.y < from - 0.5 && bot.entity.onGround });
+            console.log(`[end combat] stepped down from ${g} to ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
+            if (bot.entity.position.y < from - 0.5) progress = true;
+          } };
+      } }
     // The meal in the fight (note 1634): health comes back a point every four seconds only at hunger eighteen or more, and 25588 (dragon-163, 2026-10-14 12:29 to 12:33Z, all ten crystals broken, the dragon at 140) had its hunger fall to 17 and then 15 by the fountain, regenerated nothing more, took the dragon's blows 18 to 15 to 10 to 7 to 4.6 over four minutes with four cooked rabbit in its pockets, was never offered a meal (none_good 0.46 to 0.73), and died. Offered whenever hunger is under eighteen or health under ten with food carried; eaten where the body stands, in the hole without climbing out.
     {
       // The reserve quarry (note 1688; offered under sixteen, note 1701: the climb out of a cloud is two, a stub's roof five, a pocket eight, and dragon-236 and 239 of 2026-10-15 died with none or one): blocks are the fight's escapes, two a climb out of a cloud, five a stub's roof, eight a pocket, and 25588 ended 199, 201, 214, 215, 219, 220 and 222 of 2026-10-14/15 with two or fewer, the climb out of the breath laying one of two and the body dead in its cloud. Under ten carried, with a pickaxe and the island's end stone within seven, Jev is offered the dig, whatever crystal is next.
