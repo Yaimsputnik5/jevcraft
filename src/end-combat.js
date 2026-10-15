@@ -1618,7 +1618,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       const was = bot.health;
       for (let n = 0; n < 15; n++) {
         task.check();
-        if (breathThreat(bot)?.name === 'area_effect_cloud' || bot.health < was - 0.5) return 'cloud';
+        // The cloud on the body, by its slab (note 1732), not breathThreat's margin: one block up out of a cloud (note 1724) leaves the body a block over it, inside the margin, and the hold called it 'cloud' and dug back down into it. 25588 (dragon-283, 2026-10-15 14:24Z) went '1 blocks up at (31, 65, 4)', then 'down the column from (31, 65, 4)' at once, 20 to 14 to 9 to none in a minute.
+        const p = bot.entity.position, onBody = Object.values(bot.entities).some(e => e.name === 'area_effect_cloud' && e.isValid !== false && e.position.y > p.y - 1.8 && e.position.y <= p.y + 0.5 && Math.hypot(p.x - e.position.x, p.z - e.position.z) <= cloudRadius(bot, e) + 0.3);
+        if (onBody || bot.health < was - 0.5) return 'cloud';
         const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
         if (d && typeof bot.lookAt === 'function') { try { await bot.lookAt(d.position.offset(0, 2, 0), true); } catch (_) { /* looked already */ } }
         await sleep(100);
