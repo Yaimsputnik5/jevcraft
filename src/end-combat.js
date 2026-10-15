@@ -3479,7 +3479,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           }
         }
       }
-      if (depth >= 2) tree.pillar_down = {
+      // Not offered while the dig would stop at once (note 1720, as note 1714 for the drop): with a cloud within two under the feet and the body out of it, digDownColumn stops before the first block ('the dig down stops ... the breath's cloud lies 1.4 blocks below'). 25588 (dragon-262, 2026-10-15 09:58 to 10:02Z, one crystal broken) on a column's top at (-13, 81, 36) took pillar_down and dug nothing again and again, 21 passes a second, 17 spins, until the dragon's body struck it there, 7 to none.
+      const digStopsNow = breathThreat(bot)?.name !== 'area_effect_cloud' && !!cloudUnderfoot(2);
+      if (depth >= 2 && !digStopsNow) tree.pillar_down = {
         description: { action: `Dig down the bot's own pillar a block at a time from under the feet, ${depth} blocks to its foot: no fall on the way, and the pillar's blocks come back into the pack (${blocksCarried(bot)} carried now, about ${blocksCarried(bot) + depth} at the foot)${cloudUnderfoot(depth) ? `; ${cloudUnderfootSays(cloudUnderfoot(depth))}` : ''}`, blocks: depth, blocksCarried: blocksCarried(bot), blocksAtTheFoot: blocksCarried(bot) + depth, health: bot.health, dragonHealth: beforeDragon, ...(cloudUnderfoot(depth) ? { breathAtTheFoot: true } : {}) },
         run: async () => {
           // The column's own way down (digDownColumn): a gap under the block filled, end stone counted, the dragon's pass held through (notes 1434, 1438, 1440).
