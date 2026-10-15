@@ -1647,7 +1647,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (![1, 2, 3, 4, 5, 6].every(dy => solid(f.offset(0, -dy, 0))) || voidEdge(bot, bot.entity.position, 4) !== null) return false;
     goal.step = { action: 'hole_through_the_stub', health: bot.health }; save();
     const t0 = Date.now(); let dug = 0;
-    for (let n = 0; n < 4; n++) {
+    for (let n = 0; n < 4 && Date.now() - t0 < 4000; n++) {
       const g = bot.entity.position.floored();
       const closed = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(g.offset(dx, 0, dz)) && solid(g.offset(dx, 1, dz))).length;
       if (closed >= 4) break;
@@ -1665,8 +1665,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   };
   const roofTheStub = async () => {
     const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
-    if (d && perched(bot, d) && Math.hypot(bot.entity.position.x, bot.entity.position.z) <= 20 && blocksCarried(bot) >= 0) return holeThroughTheStub();
-    if (!d || perched(bot, d) || blocksCarried(bot) < 6) return false;
+    // The hole through the stub fell short three times in four (note 1694: dragon-229 and 230, 2026-10-15, '2 dug, 0 of 4 sides closed' twice and '4 dug, 1 of 4 sides closed, 9186 ms' once, against one '4 dug, 4 of 4, roof laid, 5970 ms'); when it fails the stub is roofed as before, and the dig is given four seconds.
+    if (d && perched(bot, d) && Math.hypot(bot.entity.position.x, bot.entity.position.z) <= 20) { if (await holeThroughTheStub()) return true; if (blocksCarried(bot) < 6) return false; }
+    else if (!d || perched(bot, d) || blocksCarried(bot) < 6) return false;
     const t0 = Date.now();
     let roofed = false;
     try { roofed = await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
