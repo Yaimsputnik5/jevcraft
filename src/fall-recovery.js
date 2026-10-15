@@ -84,7 +84,7 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
   const check = () => {
     if (bot.game.dimension !== dimension || bot.health <= 0 || bot.isAlive === false) throw new Error('Fall recovery interrupted by dimension change or death');
   };
-  let ended = false;
+  let ended = false, reequipping = false;
   const tick = () => {
     try {
       check();
@@ -106,6 +106,21 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
       // the bucket that is then short at the column. 25588 (dragon-81,
       // 2026-10-13 20:38Z) poured both buckets on falls of three into the
       // quarry's pits and climbed with none.
+      // The bucket put back in the hand mid-fall (note 1709): the fight's own
+      // routines go on during the fall and take the weapon or a block into the
+      // hand, and the click below waits for the bucket that is no longer
+      // there. 25588 (dragon-251, 2026-10-15 08:30Z) walked off a rim at 57 out
+      // of a trench with an enderman beside, one full bucket carried, and
+      // landed dry at 46, 20 to 12, 'the clutch was never asked'; two
+      // endermen killed it there.
+      if (!used && !reequipping && bot.heldItem?.name !== 'water_bucket' && bot.entity.velocity.y <= -0.5) {
+        const w = bot.inventory.items().find(i => i.name === 'water_bucket');
+        if (w) {
+          reequipping = true;
+          console.log(`[fall] the bucket put back in the hand at ${bot.entity.position.floored()} (${bot.heldItem?.name || 'nothing'} held), falling ${bot.entity.velocity.y.toFixed(2)} a tick`);
+          bot.equip(w, 'hand').catch(() => {}).finally(() => { reequipping = false; });
+        }
+      }
       if ((!used || retry) && bot.heldItem?.name === 'water_bucket' && bot.entity.velocity.y <= -0.85) {
         const target = clutchTarget(bot, previous);
         if (target) {
