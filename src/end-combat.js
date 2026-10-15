@@ -846,6 +846,17 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       const inCloud = breathThreat(bot)?.name === 'area_effect_cloud';
       // Not down into the cloud (note 1576): out of it, the dig waits over it.
       const cloudBelow = !inCloud && cloudUnderfoot(2);
+      // A cloud at the feet's own height: one block up, not the dig (note 1729). The cloud's slab is half a block, and one block laid is half a second where two dug down are two and more with a stone pickaxe; 25588 (dragon-274, 2026-10-15 12:18Z) had a fireball's cloud land at its feet at (41.5, 63, -17.4) as it began 'two dug down into it' with 14 blocks carried, 'not centred ... 0.8 off', and stood there four seconds, 20 to none.
+      if (inCloud && blocksCarried(bot) >= 1) {
+        const p0 = bot.entity.position, atFeet = Object.values(bot.entities).find(e => e.name === 'area_effect_cloud' && e.isValid !== false && Math.abs(e.position.y - p0.y) <= 0.6 && Math.hypot(p0.x - e.position.x, p0.z - e.position.z) <= cloudRadius(bot, e) + 0.3);
+        if (atFeet) {
+          const from = Math.floor(p0.y), want = upClear(from);
+          try { await require('./pillar-recovery').pillarUp(bot, task, from + want, { dig: actions.dig, maxBlocks: want, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+          const rose = Math.floor(bot.entity.position.y) - from;
+          console.log(`[end combat] the cloud at the feet during the dig down at ${p0.floored()}: ${rose} up out of it instead, ${bot.health.toFixed(1)} health, ${blocksCarried(bot)} blocks left`);
+          if (rose >= 1) break;
+        }
+      }
       if (cloudBelow) { console.log(`[end combat] the dig down stops at ${bot.entity.position.floored()}: ${cloudUnderfootSays(cloudBelow)}`); break; }
       if (n % 3 === 0 && !inCloud) { const fh = bot.entity.position.floored(); if (![2, 3, 4].some(dy => bot.blockAt(fh.offset(0, dy, 0))?.boundingBox === 'block')) { try { await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } } }
       const yBefore = Math.floor(bot.entity.position.y);
