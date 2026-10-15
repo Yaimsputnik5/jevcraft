@@ -3120,13 +3120,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     }
     // The tunnel quarry (note 1735, the fight plan's first step): from the hole two deep, a tunnel one wide and two high dug sideways through the island's end stone, the stone picked up as the body steps into each cell. Underground the body is out of the dragon's sight (its fireballs need it), under the breath's slab on the ground above, and end stone is proof against the dragon's body (Fable, 2026-10-15). On the open ground 25588's quarries were cut by the dragon or the breath in most of today's runs (dragon-240 to 288), and four deaths in five came with none or one block carried.
     if (actions.dig && holeHere() && blocksCarried(bot) < 64) {
-      const f0 = bot.entity.position.floored(), es = c => bot.blockAt(c)?.name === 'end_stone', sd = c => bot.blockAt(c)?.boundingBox === 'block';
+      // A block under the hole's floor (note 1737): the hole is two deep, so a tunnel at its floor has the open ground for a ceiling, and none was ever offered (dragon-290, 2026-10-15 16:00 to 16:04Z, five holes, 0 tunnel_quarry). The tunnel runs a block lower, under a ceiling of the island's own stone.
+      const f0 = bot.entity.position.floored().offset(0, -1, 0), es = c => bot.blockAt(c)?.name === 'end_stone', sd = c => bot.blockAt(c)?.boundingBox === 'block';
       const runs = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dz]) => { let n = 0; for (let k = 1; k <= 12; k++) { const c = f0.offset(dx * k, 0, dz * k); if (!es(c) || !es(c.offset(0, 1, 0)) || !sd(c.offset(0, -1, 0)) || !sd(c.offset(0, 2, 0)) || voidEdge(bot, c.offset(.5, 0, .5), 4) !== null) break; n = k; } return { dx, dz, n }; }).sort((a, b) => b.n - a.n);
       const best = runs[0];
       if (best.n >= 3) tree.tunnel_quarry = {
         description: { action: `Dig a tunnel one wide and two high sideways from this hole, ${best.n} cells of end stone ${best.dx === 1 ? 'east' : best.dx === -1 ? 'west' : best.dz === 1 ? 'south' : 'north'}, two stone a cell picked up as the body steps in, about a second a block with the ${(bot.inventory.items().find(i => /_pickaxe$/.test(i.name)) || {}).name || 'pickaxe'}; the body stays underground the while, out of the dragon's sight and under the breath's slab on the ground, and end stone stands against the dragon's body`, blocksCarried: blocksCarried(bot), cells: best.n, health: bot.health },
         run: async () => {
           const t0 = Date.now(), before = blocksCarried(bot); let cells = 0;
+          if (bot.blockAt(f0)?.boundingBox === 'block') { await actions.dig(bot, task, f0, { requireDrops: false, dropInto: true }); for (let i = 0; i < 20 && Math.floor(bot.entity.position.y) > f0.y; i++) await sleep(50); }
+          if (Math.floor(bot.entity.position.y) > f0.y) throw new Error(`The body did not go down to the tunnel's floor at ${f0}`);
           for (let k = 1; k <= best.n && Date.now() - t0 < 45000 && blocksCarried(bot) < 64; k++) {
             check();
             const c = f0.offset(best.dx * k, 0, best.dz * k);
