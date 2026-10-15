@@ -1714,6 +1714,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // Emergency handlers must not trip the guard that interrupted ordinary
     // planning. They still retain cancellation and the caller's guard.
     task.interruptCheck = oldInterrupt; stepCut = null;
+    // The cut step's walk let go first (note 1691): a run cut by an emergency leaves its pathfinder goal and keys behind, and the body walks on while the response digs. 25588 (dragon-225, 2026-10-15 02:26Z, three crystals broken) had dig_to_sky cut on its two-block stub at (-11, 64, -37), the response dug down into the stub, and the body walked north-east at eight tenths a second off the stub into the cloud, (-10.5, -36.5) to (-9.2, -34.2) in three seconds, 20 to none; dragon-193 (18:39Z) saw 'the dig under the feet was stopped by something else (pathing true, goal set)'. The falls off columns on the dig down (209, 211, 212, 219) may be the same walk.
+    bot.pathfinder?.setGoal?.(null); bot.pathfinder?.stop?.(); bot.clearControlStates?.();
     if (fallDanger(bot)) await recoverFall(bot, task, goal, save);
     // On its own pillar, nothing but air round the feet (note 1414): there
     // is no walking escape from the dragon's pass, and looking for one threw
