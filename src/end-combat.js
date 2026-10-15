@@ -1474,6 +1474,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const f0 = bot.entity.position.floored();
     // The bot's own roof over the head dug first (a block or two, half a second each), the jump stopped under it otherwise.
     for (const dy of [2, 3]) { const r = bot.blockAt(f0.offset(0, dy, 0)); if (r?.boundingBox === 'block' && actions.dig && !/bedrock|obsidian|end_portal/.test(r.name)) { try { await actions.dig(bot, task, r.position); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } } }
+    // The lee wall here too (note 1711): 1706 laid it before the column's climb and the ground's, not this one or the thin ground's. 25588 (dragon-253, 2026-10-15 09:18Z, five crystals broken, the day's best) climbed from a stub at (-35, 65, -11) in the breath with 16 blocks and no wall, 'the jump carried the body from (-35, -11) to (-34, -11)', then to (-36) and (-38), no block laid in six jumps, 20 to 4.5.
+    await leeForClimb();
     const from = Math.floor(bot.entity.position.y);
     try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     const rose = Math.floor(bot.entity.position.y) - from;
@@ -1892,6 +1894,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           const roofed = [2, 3].some(dy => bot.blockAt(bot.entity.position.floored().offset(0, dy, 0))?.boundingBox === 'block');
           if (inBreath() && blocksCarried(bot) >= 2 && !roofed && !onObsidianTop()) {
             goal.step = { action: 'up_out_of_breath_on_ground', health: bot.health }; save();
+            await leeForClimb();
             const from = Math.floor(bot.entity.position.y);
             try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
             const rose = Math.floor(bot.entity.position.y) - from;
