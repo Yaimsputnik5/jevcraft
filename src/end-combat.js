@@ -1623,7 +1623,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if ([[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(f.offset(dx, -1, dz))).length >= 2 || blocksCarried(bot) < 12) return 0;
     const cloud = Object.values(bot.entities).filter(e => e.name === 'area_effect_cloud' && e.isValid !== false).sort((a, b) => a.position.distanceTo(bot.entity.position) - b.position.distanceTo(bot.entity.position))[0];
     const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
-    const from = cloud && Math.hypot(cloud.position.x - bot.entity.position.x, cloud.position.z - bot.entity.position.z) > 0.6 ? cloud.position : d?.position;
+    // Away from the dragon after all (note 1708): the arena's drill with a real harming cloud found an ownerless cloud's push random in direction (east with the cloud 1.5 west and 1.5 east, west with it 0.8 east, whatever the dragon's place); the breath's clouds are the dragon's own, and the /damage drill with the dragon as the source pushed away from it every time.
+    const from = d?.position || cloud?.position;
     if (!from) return 0;
     let laid = 0; try { laid = await require('./pillar-recovery').leeWall(bot, task, from); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     console.log(`[end combat] the lee wall before the climb out of the breath at ${f}: ${laid} laid on the side away from the ${from === d?.position ? 'dragon' : `cloud's centre at ${cloud.position.floored()}`}, ${blocksCarried(bot)} blocks left`);

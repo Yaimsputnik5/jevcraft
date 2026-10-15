@@ -77,6 +77,9 @@ bot.once('spawn', async () => {
     }
     let lee = null;
     if (process.env.CLIMB_LEE === '1') lee = await pr.leeWall(bot, task, new Vec3(AT - 40, top + 30, AT + .5));
+    // CLIMB_CLOUD=1: a real harming cloud, its centre 1.5 west of the column at the feet's level, as the breath's.
+    if (process.env.CLIMB_DRAGON_DX) await command(end(`tp @e[type=ender_dragon] ${AT + Number(process.env.CLIMB_DRAGON_DX)} ${top + 20} ${AT + .5}`));
+    if (process.env.CLIMB_CLOUD === '1') await command(end(`summon area_effect_cloud ${AT + .5 + Number(process.env.CLIMB_CLOUD_DX || -1.5)} ${top} ${AT + .5} {Radius:2.5f,Duration:200,RadiusPerTick:0f,potion_contents:{custom_effects:[{id:"minecraft:instant_damage",amplifier:0b,duration:1}]}}`));
     try { laid = await pr.pillarUp(bot, task, Math.floor(start.y) + 2, { maxBlocks: 2, threats: false, wet: true, dig: async () => {} }); } catch (e) { err = String(e.message || e).slice(0, 80); }
     if (hurting) { clearInterval(hurting); await command(end(`tp @e[type=ender_dragon] 0 160 0`)); }
     await sleep(600);
