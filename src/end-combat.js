@@ -2380,7 +2380,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const atHand = safe || strikeSafe();
     if (atHand && head && canStrike(bot, head) && bot.inventory.items().some(i => /_sword$/.test(i.name) && durable(bot.registry, i))) {
       const edge = voidEdge(bot, bot.entity.position);
-      tree.strike_head = { description: `Strike the reachable head of the perched dragon with the carried sword, and keep striking for as long as it sits and the place stays safe, up to ten seconds${edge ? `: the void is ${edge} block${edge === 1 ? '' : 's'} from where the bot stands, and the dragon's wing throws a player` : ''}. ${healingSays(crystals.length)}.`, run: () => strikeWhilePerched(10000) };
+      tree.strike_head = { description: `Strike the reachable head of the perched dragon with the carried sword, and keep striking for as long as it sits and the place stays safe, up to ten seconds${edge ? `: the void is ${edge} block${edge === 1 ? '' : 's'} from where the bot stands, and the dragon's wing throws a player` : ''}. The perched dragon breathes its cloud at the one before its head, six a second, and its body strikes those beside it: 25588 (dragon-261, 2026-10-15 09:56Z) came up out of its hole to strike the head 3 off with all ten crystals standing, was struck and breathed on at once, 20 to none in two seconds, the dragon's health unmoved. ${healingSays(crystals.length)}.`, run: () => strikeWhilePerched(10000) };
     }
     // The perched head out of reach: straight to the ground under it and the
     // sword there for as long as it sits (note 1155). Three routes surveyed
