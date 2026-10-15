@@ -203,6 +203,13 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
       await dig(bot, task, head, { requireDrops: false });
       continue;
     }
+    // A thin block in the feet's own cell dug first (note 1712): iron bars, a
+    // pane or a fence stand in the cell the body jumps out of, and the block
+    // laid there is refused. 25588 (dragon-254, 2026-10-15 09:24Z) stood in
+    // a caged crystal's bars at (35, 82, -26) in the breath, 'Server refused to
+    // place end_stone at (35, 82, -26): the block is still iron_bars' three
+    // jumps, and the dragon's body threw it off the cage's top.
+    { const own = bot.blockAt(feet); if (own && own.name !== 'air' && own.boundingBox !== 'empty' && !/water|lava|bedrock|obsidian|end_portal/.test(own.name)) { console.log(`[pillar up] the ${own.name} in the feet's cell at ${feet} dug before the climb`); try { await dig(bot, task, feet, { requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } } }
     // In the order the kinds are listed, not the pack's: rock before wood
     // before the gravel that falls.
     const block = blocks.map(n => bot.inventory.items().find(i => i.name === n)).find(Boolean);
