@@ -3063,6 +3063,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
                 if (bot.blockAt(p)?.name !== 'end_stone') continue;
                 try { await actions.dig(bot, task, p, { requireDrops: false }); dug++; } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; break; }
               }
+              // The drops walked over (note 1693): the reserve quarry dug 12 of 12 and carried 7, then 5, the end stone lying in the cells it did not step in (dragon-229 and 230, 2026-10-15 03:2x and 03:5xZ). Each dug cell is stepped to for a second while the dragon is not within 20.
+              if (blocksCarried(bot) - before < dug) {
+                const dNow = () => { const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e)); return d ? Math.hypot(d.position.x - bot.entity.position.x, d.position.z - bot.entity.position.z) : 99; };
+                for (const p of cells) {
+                  if (blocksCarried(bot) - before >= dug || dNow() < 20) break;
+                  check();
+                  try { await actions.navigate(bot, task, new goals.GoalNear(p.x + .5, p.y, p.z + .5, 0.8), { timeoutMs: 1500, stallMs: 800 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+                }
+              }
               console.log(`[end combat] the reserve quarry dug ${dug} of ${cells.length} cells: ${blocksCarried(bot)} blocks carried (${before} before)`);
               progress = blocksCarried(bot) > before;
             } };
