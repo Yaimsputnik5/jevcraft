@@ -3473,7 +3473,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         run: async () => {
           // The column's own way down (digDownColumn): a gap under the block filled, end stone counted, the dragon's pass held through (notes 1434, 1438, 1440).
           await digDownColumn({ limit: depth });
-          delete bot._pillarUp;
+          // The record kept when the dig did not come down (note 1712): 25588 (dragon-254, 2026-10-15 09:23Z) was 'down the column: 0 dug, now at (35, 83, -27)' on its own column beside crystal 92's cage, the record dropped, 'column undefined', and 'only observe' seven times on the top at 82 until the breath and the body came.
+          { const u = bot._pillarUp; if (!u || u.base == null || Math.floor(bot.entity.position.y) <= u.base + 2) delete bot._pillarUp; }
         } };
     }
     if (!Object.keys(tree).length && !safe) {
