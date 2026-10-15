@@ -3169,7 +3169,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // The way up out from under the island (note 1747): a staircase dug up through the stone, a step a block, the stone picked up on the way. 25588 (dragon-6 of the new save, 2026-10-15 19:18 to 19:52Z, four crystals broken) stood at (-3, 18, 13) under the island with no block carried and was offered only observe for half an hour.
     if (actions.dig && !openSky && !onOwnPillar() && !onObsidianTop() && bot.entity.position.y < 58) {
       const g0 = bot.entity.position.floored(), sd = c => bot.blockAt(c)?.boundingBox === 'block', diggable = c => !/bedrock|obsidian|end_portal/.test(bot.blockAt(c)?.name || '');
-      const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => diggable(g0.offset(dx, 1, dz)) && diggable(g0.offset(dx, 2, dz)) && voidEdge(bot, g0.offset(dx + .5, 0, dz + .5), 4) === null);
+      const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => diggable(g0.offset(dx, 1, dz)) && diggable(g0.offset(dx, 2, dz)) && sd(g0.offset(dx, 0, dz)));
+      // No void test for the way up (note 1748): near the island's underside the void lies under every side, and 25588's dragon-6 (2026-10-15 19:5x to 20:25Z, seven crystals broken) was offered no stair at (-4, 18, 13) for it; the step's floor is the stone itself, the cell ahead at the feet' level.
       if (dirs.length) tree.dig_up_to_the_surface = {
         description: { action: `Dig a staircase up through the island's stone from ${g0}, a step a block (the cell ahead a block up and the two over it), the stone picked up as it goes, until the sky is open overhead: about ${Math.max(1, 62 - g0.y)} steps, two or three seconds each`, depth: Math.max(0, 62 - g0.y), blocksCarried: blocksCarried(bot), health: bot.health },
         run: async () => {
