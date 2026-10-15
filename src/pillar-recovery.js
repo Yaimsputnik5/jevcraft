@@ -184,7 +184,7 @@ function climbStop(bot, feet, { canDig = diggableAbove, wet: throughWater = fals
 }
 async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = true, canDig = diggableAbove, blocks = SCAFFOLD, wet = false } = {}) {
   const { move } = require('./motion');
-  let placed = 0, lastPlaceError = null;
+  let placed = 0, lastPlaceError = null, lastJump = '';
   let rested = false;
   while (bot.entity.position.y < targetY - 0.5 && placed < maxBlocks) {
     // A climb away from the threat itself does not stop for it.
@@ -237,12 +237,14 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
       bot.clearControlStates?.();
       for (let i = 0; i < 15 && bot.entity.velocity && Math.hypot(bot.entity.velocity.x, bot.entity.velocity.z) > 0.03; i++) await new Promise(resolve => setTimeout(resolve, 20));
       const cellBefore = bot.entity.position.floored();
-      await move(bot, task, { label: 'pillar_up', keys: ['jump'], sneak: false, until: () => bot.entity.position.y >= start + 1.1, maxMs: 1200, tick: 20 });
+      let peak = bot.entity.position.y;
+      await move(bot, task, { label: 'pillar_up', keys: ['jump'], sneak: false, until: () => { peak = Math.max(peak, bot.entity.position.y); return bot.entity.position.y >= start + 1.1; }, maxMs: 1200, tick: 20 });
       { const c = bot.entity.position.floored(); if (c.x !== cellBefore.x || c.z !== cellBefore.z) console.log(`[pillar up] the jump carried the body from (${cellBefore.x}, ${cellBefore.z}) to (${c.x}, ${c.z})`); }
       // The server has the position a tick behind: placed the moment the feet
       // cleared the cell here, it still saw the body in it and refused.
       await new Promise(resolve => setTimeout(resolve, 60 + attempt * 60));
       // The column's base kept with the record (note 1610): the lowest block laid, so that its own end stone above it is told from the island's without reading the sides.
+      lastJump = `the jump reached ${Math.round((peak - start) * 100) / 100} over the start, the body at ${Math.round((bot.entity.position.y - start) * 100) / 100} at the place`;
       try { lastPlaceError = null; await place(); placed++; const prev = bot._pillarUp; bot._pillarUp = { x: feet.x, z: feet.z, until: Date.now() + 600000, base: prev && prev.x === feet.x && prev.z === feet.z && prev.base != null && prev.until > Date.now() ? Math.min(prev.base, feet.y) : feet.y }; }
       catch (err) { task.check(); lastPlaceError = String(err.message || err).slice(0, 80); }
       for (let i = 0; i < 20 && !bot.entity.onGround; i++) { task.check(); await new Promise(resolve => setTimeout(resolve, 25)); }
@@ -250,7 +252,7 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
       if (bot.blockAt(feet)?.boundingBox === 'block') break;
     }
     // Said after the first block too, with the place's own error (note 1680): the climb out of the breath laid one of two and said nothing of the second; 25588 (dragon-216, 2026-10-15 00:2xZ, 1679 live) '1 blocks up' at (-6, 60, 35) at 9 health and '0 blocks up' at (-9, 61, 42), each three jumps of 1.2 s in a cloud of six a second.
-    if (bot.entity.position.floored().y <= start) { console.log(`[pillar up] stopped ${placed ? `after ${placed}` : 'before the first block'}: the block was not placed in three jumps from ${feet} (on ground ${bot.entity.onGround}, ${block.name} in hand${lastPlaceError ? `, the place said: ${lastPlaceError}` : ''})`); break; }
+    if (bot.entity.position.floored().y <= start) { console.log(`[pillar up] stopped ${placed ? `after ${placed}` : 'before the first block'}: the block was not placed in three jumps from ${feet} (on ground ${bot.entity.onGround}, ${block.name} in hand${lastPlaceError ? `, the place said: ${lastPlaceError}` : ''}${lastJump ? `; ${lastJump}; the cell at the feet is ${bot.blockAt(feet)?.name || 'unloaded'}` : ''})`); break; }
   }
   return placed;
 }
