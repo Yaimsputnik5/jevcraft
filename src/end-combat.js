@@ -1619,10 +1619,14 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // The lee wall before a climb out of the breath on a narrow top (note 1706, the wiring of note 1705's leeWall): each hit knocks the body away from the dragon, off a top one block wide; the arena's drill took the climb from 0 of 8 on the column to 8 of 8 with five blocks laid on the side away from the dragon, about two seconds with the climb. Only where fewer than two cells beside the feet have ground under the feet's level, seven or more blocks carried, and the dragon seen.
   const leeForClimb = async () => {
     const f = bot.entity.position.floored(), solid = c => bot.blockAt(c)?.boundingBox === 'block';
-    if ([[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(f.offset(dx, -1, dz))).length >= 2 || blocksCarried(bot) < 7) return 0;
-    const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e)); if (!d) return 0;
-    let laid = 0; try { laid = await require('./pillar-recovery').leeWall(bot, task, d.position); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
-    console.log(`[end combat] the lee wall before the climb out of the breath at ${f}: ${laid} laid on the side away from the dragon, ${blocksCarried(bot)} blocks left`);
+    // Twelve carried, not seven, and the cloud's centre the source (note 1707): the breath's damage comes from the cloud, whose centre is where the push comes from, not the dragon's; 25588 (dragon-249, 2026-10-15 08:16Z) laid two walls away from the dragon with eight blocks, three left each time, and was pushed off sideways both times (1.51 and 0.72 off its column), then dug down with none and died.
+    if ([[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(f.offset(dx, -1, dz))).length >= 2 || blocksCarried(bot) < 12) return 0;
+    const cloud = Object.values(bot.entities).filter(e => e.name === 'area_effect_cloud' && e.isValid !== false).sort((a, b) => a.position.distanceTo(bot.entity.position) - b.position.distanceTo(bot.entity.position))[0];
+    const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
+    const from = cloud && Math.hypot(cloud.position.x - bot.entity.position.x, cloud.position.z - bot.entity.position.z) > 0.6 ? cloud.position : d?.position;
+    if (!from) return 0;
+    let laid = 0; try { laid = await require('./pillar-recovery').leeWall(bot, task, from); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    console.log(`[end combat] the lee wall before the climb out of the breath at ${f}: ${laid} laid on the side away from the ${from === d?.position ? 'dragon' : `cloud's centre at ${cloud.position.floored()}`}, ${blocksCarried(bot)} blocks left`);
     return laid;
   };
   const upOutOfBreathOnColumn = async () => {
