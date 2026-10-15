@@ -1695,6 +1695,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const thick = [1, 2, 3, 4, 5, 6].every(dy => solid(f.offset(0, -dy, 0)));
     const { voidSides, deepBeside } = require('./end-safety');
     const wet = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => /water/.test(bot.blockAt(f.offset(dx, 0, dz))?.name || '') || /water/.test(bot.blockAt(f.offset(dx, -1, dz))?.name || ''));
+    // Ground, not a stub's top (note 1697): with no column record the stub reads as ground, and a hole dug in a top one block wide drops the body off it. 25588 (dragon-234, 2026-10-15 05:0xZ) dug 'the hole before the pass' at (14, 67, -7), the top of a stub with air round it, 'column undefined', and fell from (13, 68, -6), 14.8 health. Two or more of the four cells beside the feet must have ground at the feet's level less one.
+    const groundBeside = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(f.offset(dx, -1, dz))).length;
+    if (groundBeside < 2) return false;
     if (!thick || wet || voidSides(bot, p) > 0 || deepBeside(bot, p) || !bot.entity.onGround) return false;
     goal.step = { action: 'hole_before_the_pass', dragonBlocksOff: Math.round(flat), closing: Math.round(closing), sidesClosed }; save();
     console.log(`[end combat] the dragon coming at ${Math.round(closing)} a second, ${Math.round(flat)} blocks off: the hole dug under the feet at ${f} before the pass (${sidesClosed} of 4 sides closed now)`);
