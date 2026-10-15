@@ -1686,7 +1686,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const p = bot.entity.position, flat = Math.hypot(d.position.x - p.x, d.position.z - p.z), now = Date.now();
     const last = state.quarryTrack; state.quarryTrack = { t: now, flat };
     const closing = last && now - last.t > 0 && now - last.t < 3000 ? (last.flat - flat) / ((now - last.t) / 1000) : 0;
-    return flat < 32 && closing >= 4 && Math.abs(d.position.y - p.y) < 30;
+    // A pass about to land, not the circle (note 1704): within 32 and closing at four stopped dragon-244's quarries eight times in ten minutes (2026-10-15 07:12 to 07:22Z), no crystal broken, blocks 14 to 8; within 24 and closing at six is two to four seconds out.
+    return flat < 24 && closing >= 6 && Math.abs(d.position.y - p.y) < 30;
   };
   const holeBeforeThePass = async () => {
     if (!actions.dig || !onTheGround() || inWater()) return false;
