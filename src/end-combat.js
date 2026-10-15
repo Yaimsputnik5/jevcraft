@@ -1283,6 +1283,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       let fall = null;
       for (let dy = 1; dy <= 48; dy++) { const bl = bot.blockAt(f.offset(dx, -dy, dz)); if (bl?.boundingBox === 'block') { fall = dy - 1; break; } if (bl?.name === 'lava') break; }
       if (fall === null || fall < 3) { verdicts.push(`${name}: ${fall === null ? 'no floor within 48' : `a floor ${fall} down`}`); continue; }
+      // The fall to the lowest floor within the carry (note 1702): the body comes down about a cell out for every twelve of fall, plus one, and lands on whatever floor is there, not the first cell's. 25588 (dragon-241, 2026-10-15 06:34Z, five crystals broken) read 'west: 21 down' from (-13, 87, -36), no pool, 20 health, and landed at y 61, 26 down, 20 to none. The deepest floor over the cells one to the carry out is the fall the health is weighed against; a cell with no floor is the island's edge, which note 1569 sets aside.
+      { const carry = Math.max(1, Math.round(1 + fall / 12)); let deepest = fall;
+        for (let k = 2; k <= carry + 1; k++) { let fk = null; for (let dy = 1; dy <= 48; dy++) { const bl = bot.blockAt(f.offset(dx * k, -dy, dz * k)); if (!bl) break; if (bl.boundingBox === 'block') { fk = dy - 1; break; } } if (fk === null) break; deepest = Math.max(deepest, fk); }
+        if (deepest > fall) fall = deepest; }
       // Away from the obsidian (note 1501): the water goes where the server's
       // line of sight from the body reaches the floor, and a fall down the
       // pillar's side has the obsidian in that line. Both dry landings of
