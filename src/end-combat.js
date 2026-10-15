@@ -1805,9 +1805,23 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           if (rose >= 2) { await roofTheStub(); return; }
         }
       }
+      // No blocks for the climb: the dig first, before the run's survey (note 1692). The run out of a cloud is surveyed for 0.7 s and found nothing on the fountain's pitted ground, and the dig two down came last and silent; 25588 (dragon-229, 2026-10-15 03:29Z, two crystals broken) stood at (11, 61, 2.6) with no block carried, 1.5 to 3 from the cloud's middle, five seconds at three a second, 'hurt without a survival response', 14 to none; the dig began at the last second. Two blocks down with the iron pickaxe are a second and a half and the body is under the cloud.
+      if (inBreath() && blocksCarried(bot) < 2 && actions.dig) {
+        const f1 = bot.entity.position.floored();
+        const thick1 = [1, 2, 3, 4, 5, 6].every(dy => bot.blockAt(f1.offset(0, -dy, 0))?.boundingBox === 'block');
+        if (thick1 && voidEdge(bot, bot.entity.position, 4) === null && !inWater()) {
+          goal.step = { action: 'down_out_of_breath_first', health: bot.health }; save();
+          console.log(`[end combat] in the cloud with ${blocksCarried(bot)} blocks at ${f1}: two dug down first, ${bot.health.toFixed(1)} health`);
+          let dug = 0;
+          for (let n = 0; n < 2; n++) { const under = bot.entity.position.floored().offset(0, -1, 0); if (bot.blockAt(under)?.boundingBox !== 'block' || bot.blockAt(under.offset(0, -1, 0))?.boundingBox !== 'block') break; try { await actions.dig(bot, task, under, { dropInto: true, openPit: true, requireDrops: false }); dug++; } catch (e3) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(e3.name)) throw e3; break; } for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50); }
+          console.log(`[end combat] down out of the breath: ${dug} dug, now at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
+          if (dug >= 2) return;
+        }
+      }
       try { await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) && safeFromHostiles(bot, p, endMobs(bot)), timeoutMs: inBreath() ? 700 : 1600, dig: actions.dig }); }
       catch (err) {
         if (err.name !== 'NoEscape') throw err;
+        if (inBreath()) console.log(`[end combat] no run out of the cloud from ${bot.entity.position.floored()}: ${String(err.message || err).slice(0, 90)}`);
         try { if (inBreath()) throw Object.assign(new Error('No surveyed walking escape from the dragon on loaded terrain'), { name: 'NoEscape' }); await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) }); }
         catch (err2) {
           if (err2.name !== 'NoEscape' || !actions.dig) throw err2;
