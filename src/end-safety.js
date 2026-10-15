@@ -442,8 +442,14 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600, d
           if (sidesClosed >= 4) { bot.setControlState?.('sneak', true); goal.step = { action: 'in_the_hole_for_the_body', hazard: dragon.name }; save(); await sleep(400); bot.setControlState?.('sneak', false); return true; }
           goal.step = { action: 'hole_for_the_body', hazard: dragon.name, sidesClosed }; save();
           console.log(`[end safety] the dragon's body coming: a block dug under the feet at ${f} toward a hole two deep (${sidesClosed} of 4 sides closed now), not a run under the wings`);
-          try { await dig(bot, task, f.offset(0, -1, 0), { dropInto: true, openPit: true, requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
-          for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50);
+          // Both blocks in the one call (note 1699, as note 1681 for the hole before the pass): a block a call left the body one deep when the blow came. 25588 (dragon-235, 2026-10-15 05:24Z, four crystals broken) dug one at (-33, 63, -4), the next call dug the second, and between them two blows of the body took 10.5 to 5.1 at (-32.5, 62, -3.5).
+          for (let n = 0; n < 2; n++) {
+            const g = bot.entity.position.floored();
+            if ([[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(g.offset(dx, 0, dz)) && solid(g.offset(dx, 1, dz))).length >= 4) break;
+            if (!solid(g.offset(0, -1, 0)) || !solid(g.offset(0, -2, 0))) break;
+            try { await dig(bot, task, g.offset(0, -1, 0), { dropInto: true, openPit: true, requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; break; }
+            for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50);
+          }
           bot.setControlState?.('sneak', true); await sleep(150); bot.setControlState?.('sneak', false);
           return true;
         }
