@@ -1679,6 +1679,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     return roofed;
   };
   // The hole dug before the pass (note 1674): the body's call comes within 12 blocks, under a second before the blow, and the hole of note 1667 gets one block a call; the dragon in flight is seen coming from 32 blocks, two and a half seconds off at 13 a second, time for two blocks with the iron pickaxe. 25588 (dragon-208, 2026-10-14 22:29Z, one crystal broken) took three passes of the body in a minute on open ground, 14.6 to 9.2, 6.5 to 3.8, and 11.8 to 6.4 a second after it left its roofed hole to quarry, and was carried 90 blocks into the void; dragon-200, 202 and 204 died of the body on open ground the same evening. On diggable ground clear of the void and water, with the dragon flying within 32 and closing at four a second or more, a block is dug under the feet toward a hole two deep; in a hole two deep the body holds while the dragon is within 24. Nothing is dug on the bot's own column, its cell or an obsidian top, nor in a hole already.
+  // The dragon coming at the quarry (note 1703): the quarry's loop of cells, a second each, ran on with the dragon closing, and the body was thrown from it before the step ended and the hole before the pass (note 1674) could be dug. 25588 (dragon-240, 2026-10-15 06:22Z, three crystals broken) was thrown 5.7 up from its quarry at (-1, 67, -8) and died of the fall; dragon-242 (06:43Z) the same at (-6, 67, 6), 5.1 up. Before each cell, with the dragon flying within 32 and closing at four a second or more, the quarry ends.
+  const dragonComingAtQuarry = () => {
+    const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
+    if (!d || perched(bot, d)) { state.quarryTrack = null; return false; }
+    const p = bot.entity.position, flat = Math.hypot(d.position.x - p.x, d.position.z - p.z), now = Date.now();
+    const last = state.quarryTrack; state.quarryTrack = { t: now, flat };
+    const closing = last && now - last.t > 0 && now - last.t < 3000 ? (last.flat - flat) / ((now - last.t) / 1000) : 0;
+    return flat < 32 && closing >= 4 && Math.abs(d.position.y - p.y) < 30;
+  };
   const holeBeforeThePass = async () => {
     if (!actions.dig || !onTheGround() || inWater()) return false;
     const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
@@ -2569,6 +2578,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
                 const hostileNear = () => (hostile = hostileEntities(bot, 5).find(e => live(bot, e) && e.name !== 'ender_dragon') || null);
                 for (const p of cells) {
                   check();
+                  if (dragonComingAtQuarry()) { console.log(`[end combat] the quarry stopped: the dragon coming, ${dug} cells dug`); break; }
                   if (hostileNear()) { console.log(`[end combat] the quarry stopped for a ${hostile.name} ${Math.round(hostile.position.distanceTo(bot.entity.position))} blocks off`); break; }
                   if (inWater() || (bot.oxygenLevel ?? 20) < 18) { console.log(`[end combat] the quarry stopped: the body in the water at ${bot.entity.position.floored()}, breath ${bot.oxygenLevel}`); break; }
                   if (bot.blockAt(p)?.name !== 'end_stone') { skipped++; continue; }
@@ -3070,6 +3080,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               let dug = 0;
               for (const p of cells) {
                 check();
+                if (dragonComingAtQuarry()) { console.log(`[end combat] the reserve quarry stopped: the dragon coming, ${dug} cells dug`); break; }
                 if (hostileEntities(bot, 5).some(e => live(bot, e) && e.name !== 'ender_dragon')) break;
                 if (inWater()) break;
                 if (bot.blockAt(p)?.name !== 'end_stone') continue;
