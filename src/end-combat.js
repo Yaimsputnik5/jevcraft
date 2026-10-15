@@ -881,7 +881,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // dragon_charge_or_contact' at 3 health, was asked again at 8 and
       // climbed, and the breath at the top took the rest.
       bot.setControlState?.('sneak', true);
-      { const u = bot._pillarUp, p = bot.entity.position; if (u) { const off = Math.hypot(u.x + .5 - p.x, u.z + .5 - p.z); if (off > 0.3) console.log(`[end combat] the dig down at ${p.floored()} begins ${Math.round(off * 100) / 100} off the column's middle`); } }
+      // Centred again before each block (note 1684): the body drifts between the centring and the dig, and a dig 0.42 off the middle dropped 25588 (dragon-219, 2026-10-15 00:56Z) a cell off its stub at (8, 64, -5) into the cloud two below, 20 to none; dragon-209, 211 and 212 fell from their columns on the dig down the same evening. Over 0.3 off, the body is centred to 0.2 in six tenths of a second, or the dig down ends and says so.
+      { const u = bot._pillarUp; if (u) { const off = () => Math.hypot(u.x + .5 - bot.entity.position.x, u.z + .5 - bot.entity.position.z); if (off() > 0.3) { const o0 = Math.round(off() * 100) / 100; await centreOn(u.x, u.z, 0.2, { maxMs: 600 }); if (off() > 0.3) { console.log(`[end combat] the dig down at ${bot.entity.position.floored()} stops: ${Math.round(off() * 100) / 100} off the column's middle after the centring (${o0} before)`); bot.setControlState?.('sneak', false); break; } console.log(`[end combat] the dig down at ${bot.entity.position.floored()} centred from ${o0} to ${Math.round(off() * 100) / 100} off the column's middle before the block`); } } }
       try { await actions.dig(bot, task, underFoot, { dropInto: true, openPit: true, requireDrops: false }); }
       catch (err) {
         bot.setControlState?.('sneak', false);
