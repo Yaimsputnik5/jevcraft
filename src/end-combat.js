@@ -1667,10 +1667,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const wet = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => /water/.test(bot.blockAt(f.offset(dx, 0, dz))?.name || '') || /water/.test(bot.blockAt(f.offset(dx, -1, dz))?.name || ''));
     if (!thick || wet || voidSides(bot, p) > 0 || deepBeside(bot, p) || !bot.entity.onGround) return false;
     goal.step = { action: 'hole_before_the_pass', dragonBlocksOff: Math.round(flat), closing: Math.round(closing), sidesClosed }; save();
-    console.log(`[end combat] the dragon coming at ${Math.round(closing)} a second, ${Math.round(flat)} blocks off: a block dug under the feet at ${f} toward a hole before the pass (${sidesClosed} of 4 sides closed now)`);
+    console.log(`[end combat] the dragon coming at ${Math.round(closing)} a second, ${Math.round(flat)} blocks off: the hole dug under the feet at ${f} before the pass (${sidesClosed} of 4 sides closed now)`);
     bot.clearControlStates?.(); bot.pathfinder?.setGoal?.(null);
-    try { await actions.dig(bot, task, f.offset(0, -1, 0), { dropInto: true, openPit: true, requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
-    for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50);
+    // Both blocks in the one call (note 1681): a block a call left a pit one deep when the next call came late, and a pit one deep is no hole. 25588 (dragon-216, 2026-10-15 00:31Z, two crystals broken) dug one at (-1, 60, 24) with the dragon 23 off and closing, the step went on, and three blows of the body took 8.6 to 3.2 before the second was dug; dragon-215 and 214 the same. The second block goes while the dragon is still within 40 and the cell is not yet closed on four sides.
+    for (let n = 0; n < 2; n++) {
+      const g = bot.entity.position.floored();
+      const closed = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(g.offset(dx, 0, dz)) && solid(g.offset(dx, 1, dz))).length;
+      if (closed >= 4) break;
+      if (n > 0) { const d2 = theDragon(); if (!d2) break; const q = bot.entity.position; if (Math.hypot(d2.position.x - q.x, d2.position.z - q.z) > 40) break; if (!solid(g.offset(0, -2, 0)) || !solid(g.offset(0, -3, 0))) break; }
+      try { await actions.dig(bot, task, g.offset(0, -1, 0), { dropInto: true, openPit: true, requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; break; }
+      for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50);
+    }
+    { const g = bot.entity.position.floored(); const closed = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(g.offset(dx, 0, dz)) && solid(g.offset(dx, 1, dz))).length; console.log(`[end combat] the hole before the pass at ${g}: ${closed} of 4 sides closed`); }
     return true;
   };
   const respond = async () => {
