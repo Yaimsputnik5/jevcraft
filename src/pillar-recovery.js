@@ -211,6 +211,11 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     await bot.look(bot.entity.yaw, -Math.PI / 2, true);
     const start = feet.y;
     let below = bot.blockAt(feet.offset(0, -1, 0));
+    // In the air, not off the column (note 1705): a hit mid-climb lifts the body, the cell under it reads air, and the climb walked to a 'resting cell' as far as eleven blocks off; the arena's drill (2026-10-15, scripts/climb-drill.js, the dragon's magic dealt four times during a two-block climb on a column one wide) ended 0 of 8 on the column, the body walked 11 to 12 blocks away. The feet are waited for, up to six tenths of a second, before any walk.
+    if ((!below || below.boundingBox !== 'block') && bot.entity.onGround === false) {
+      for (let i = 0; i < 12 && !bot.entity.onGround; i++) { task.check(); await new Promise(resolve => setTimeout(resolve, 50)); }
+      if (bot.entity.onGround) continue;
+    }
     // The body at the edge of the block it stands on, its middle over air
     // (note 1456): onto the block it rests on first, as the span does
     // (restingCell, note 533). 25588 (dragon-36, 2026-10-13 11:16Z, full
@@ -274,6 +279,26 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
 // and every cell up to the target's height air or diggable, with no lava or
 // water in or beside it. Under the portal the lava fall was beside the
 // column the bot stood in, and the pillar stopped before its first block.
+// The lee wall for a climb under the dragon's breath (note 1705): every hit of the breath knocks the body away from the dragon, 1.4 blocks in a fifth of a second, and on a top one block wide that is off it; the arena's drill (2026-10-15, scripts/climb-drill.js, the dragon's magic dealt four times during a two-block climb) ended 0 of 8 on the column bare and 8 of 8 with a wall on the side away from the dragon at the heights the body rises through. The wall is laid on the cardinal side away from 'from', from the level under the feet to three over them, each block against the one below, the first against the column's own side. Returns the blocks laid.
+async function leeWall(bot, task, from, { blocks = SCAFFOLD, maxMs = 2500 } = {}) {
+  const feet = bot.entity.position.floored(), dx0 = feet.x + .5 - from.x, dz0 = feet.z + .5 - from.z;
+  const [dx, dz] = Math.abs(dx0) >= Math.abs(dz0) ? [Math.sign(dx0) || 1, 0] : [0, Math.sign(dz0) || 1];
+  const t0 = Date.now(); let laid = 0;
+  for (let dy = -1; dy <= 3 && Date.now() - t0 < maxMs; dy++) {
+    task.check();
+    const cell = feet.offset(dx, dy, dz);
+    if (bot.blockAt(cell)?.boundingBox === 'block') continue;
+    const below = bot.blockAt(cell.offset(0, -1, 0)), side = bot.blockAt(cell.offset(-dx, 0, -dz));
+    let ref = null, face = null;
+    if (below?.boundingBox === 'block') { ref = below; face = new Vec3(0, 1, 0); }
+    else if (side?.boundingBox === 'block') { ref = side; face = new Vec3(dx, 0, dz); }
+    else break;
+    const item = blocks.map(n => bot.inventory.items().find(i => i.name === n)).find(Boolean); if (!item) break;
+    try { await bot.equip(item, 'hand'); await bot.lookAt(ref.position.offset(.5 + face.x * .5, .5 + face.y * .5, .5 + face.z * .5), true); await bot.placeBlock(ref, face); } catch (_) { break; }
+    if (bot.blockAt(cell)?.boundingBox === 'block') laid++; else break;
+  }
+  return laid;
+}
 function pillarSite(bot, targetY, target, { radius = 5 } = {}) {
   const feet = bot.entity.position.floored();
   const liquid = c => /lava|water/.test(bot.blockAt(c)?.name || '');
@@ -294,4 +319,4 @@ function pillarSite(bot, targetY, target, { radius = 5 } = {}) {
   return sites.sort((a, b) => far(a) - far(b))[0] || null;
 }
 
-module.exports = { pillarHeight, pillarDescent, descendPillar, pillarUp, pillarSite, climbStop, SCAFFOLD, DIGGABLE_ABOVE };
+module.exports = { leeWall, pillarHeight, pillarDescent, descendPillar, pillarUp, pillarSite, climbStop, SCAFFOLD, DIGGABLE_ABOVE };
