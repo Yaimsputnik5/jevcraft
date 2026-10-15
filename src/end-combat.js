@@ -1640,8 +1640,32 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     await wayDown({ limit: 3 });
   };
   // The stub roofed after the climb out of the cloud (note 1672): the dragon in flight aims its fireballs at the body, the next one lands on the stub's top where the body stands, and the climb is asked again, two blocks a time; 25588's runs 193, 197 and 203 of 2026-10-14 climbed out 27, 44 and 14 times, and dragon-206 (22:07Z) went up one and dug one by turns on its stub at (-20, 64, 34) as the clouds came, 20 to none. Standing two blocks over a cloud's base is safe (209 readings of 'the cloud lies 2 blocks below' today with no hit after, one with); the next ball is the danger. With six blocks carried and the dragon not perched, the roof is laid over the head (its post up the stub's side where nothing stands beside), and the next ball bursts on it.
+  // Under the perched dragon within 20 of the fountain (note 1690), the stub is where the next breath lands: 25588 (dragon-223, 2026-10-15 02:06Z, three crystals broken) went two up out of one cloud onto a stub at (9, 65, -7), 11 from the fountain, and the next breath came to the stub's top, 11.7 to 5.7 to none; dragon-203 (21:24Z) and 215 (00:16Z) died the same way at the fountain's edge. The hole 7 to 11 blocks from the fountain is untouched by the breath (note 1616's drill): the body digs down through its own stub and two into the island under it, and roofs the hole. Out of the cloud after the two up, back through its height for under a second on the way down.
+  const holeThroughTheStub = async () => {
+    if (!actions.dig) return false;
+    const f = bot.entity.position.floored(), solid = c => bot.blockAt(c)?.boundingBox === 'block';
+    if (![1, 2, 3, 4, 5, 6].every(dy => solid(f.offset(0, -dy, 0))) || voidEdge(bot, bot.entity.position, 4) !== null) return false;
+    goal.step = { action: 'hole_through_the_stub', health: bot.health }; save();
+    const t0 = Date.now(); let dug = 0;
+    for (let n = 0; n < 4; n++) {
+      const g = bot.entity.position.floored();
+      const closed = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(g.offset(dx, 0, dz)) && solid(g.offset(dx, 1, dz))).length;
+      if (closed >= 4) break;
+      if (!solid(g.offset(0, -1, 0)) || !solid(g.offset(0, -2, 0))) break;
+      const off = bot._pillarUp ? Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) : 0;
+      if (off > 0.3) { await centreOn(bot._pillarUp.x, bot._pillarUp.z, 0.2, { maxMs: 500 }); }
+      try { await actions.dig(bot, task, g.offset(0, -1, 0), { dropInto: true, openPit: true, requireDrops: false }); dug++; } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; break; }
+      for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50);
+    }
+    let roofed = false;
+    try { roofed = await roofHole(true); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    const g = bot.entity.position.floored(), closed = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(g.offset(dx, 0, dz)) && solid(g.offset(dx, 1, dz))).length;
+    console.log(`[end combat] down through the stub into a hole at ${g} under the perched dragon: ${dug} dug, ${closed} of 4 sides closed, roof ${roofed ? 'laid' : 'not laid'}, ${Date.now() - t0} ms, ${bot.health.toFixed(1)} health`);
+    return closed >= 4;
+  };
   const roofTheStub = async () => {
     const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
+    if (d && perched(bot, d) && Math.hypot(bot.entity.position.x, bot.entity.position.z) <= 20 && blocksCarried(bot) >= 0) return holeThroughTheStub();
     if (!d || perched(bot, d) || blocksCarried(bot) < 6) return false;
     const t0 = Date.now();
     let roofed = false;
