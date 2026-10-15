@@ -944,7 +944,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // Two blocks on each open side of the body, the side away from the dragon
   // first (the push is away from its body), each side a post from the block
   // under the feet where nothing stands beside. Said in the log.
-  const pocketOnColumn = async () => {
+  const pocketOnColumn = async ({ allSides = false } = {}) => {
     // Built round the column's cell, the body centred on it first (note 1655): built round the body's own cell, with the body a step off the column at the top the cell under it was air, no block had a face to be set against, and 48 of 72 pockets of 2026-10-14's runs 160 to 190 laid nothing ('0 blocks laid, 1 of 4 sides closed, 1 ms'); dragon-169, 178, 184, 187 and 190 were then beaten off their column tops, five of the afternoon's eight carries.
     const u = bot._pillarUp && bot._pillarUp.until > Date.now() ? bot._pillarUp : null;
     if (u && Math.hypot(u.x + .5 - bot.entity.position.x, u.z + .5 - bot.entity.position.z) <= 1.5 && bot.blockAt(new Vec3(u.x, Math.floor(bot.entity.position.y) - 1, u.z))?.boundingBox === 'block') await centreOnColumn(0.2, { maxMs: 600 });
@@ -963,7 +963,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // 82 with a bucket in hand and the pool below. The push is away from the
     // dragon's body; a body pushed out the pool's side comes down in the pool.
     // The pool's side left open only when it is not the push's way (note 1630): the wings shove the body away from the dragon, and a body shoved out the open side is carried. 25588 (dragon-162, 2026-10-14 11:52Z, two crystals broken) stood in its pocket at (-32, 83, 28), three sides closed and the pool's open, and was pushed out of it and carried 80 blocks to y 105, dead on the fall. The side within 60 degrees of the push's way is closed, pool or not.
-    let poolSide = state.pool && Date.now() - state.pool.at < 15 * 60000 ? [state.pool.dx, state.pool.dz] : null;
+    let poolSide = !allSides && state.pool && Date.now() - state.pool.at < 15 * 60000 ? [state.pool.dx, state.pool.dz] : null;
     if (poolSide && away) { const len = Math.hypot(away.x, away.z) || 1; if ((poolSide[0] * away.x + poolSide[1] * away.z) / len > 0.5) poolSide = null; }
     const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => !poolSide || dx !== poolSide[0] || dz !== poolSide[1]).sort((a, b) => away ? (b[0] * away.x + b[1] * away.z) - (a[0] * away.x + a[1] * away.z) : 0);
     let laid = 0;
@@ -1701,6 +1701,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     let roofed = false;
     try { roofed = await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     console.log(`[end combat] the stub at ${bot.entity.position.floored()} roofed against the next fireball: ${roofed ? 'laid' : 'not laid'}, ${Date.now() - t0} ms, ${blocksCarried(bot)} blocks left`);
+    // Walled on all four sides too, out of the dragon's sight (note 1721): the dragon fires only with a clear line from its eyes to the bot's for a quarter second, and a fireball bursting within four blocks of the feet moves its cloud onto the body (the arena, 2026-10-15 10:2xZ: a burst two blocks off put the cloud at the feet, 20 to 8; three and a half off and more, none). The roof alone leaves the sides open; 25588's dragon-256, 257, 258, 259 and 263 (2026-10-15 09:37 to 10:10Z) took a fireball's cloud at the feet on their stubs, roofed or not, five of eight deaths. With the roof laid and twelve blocks carried, the four sides at the feet and the head close the line of sight.
+    if (roofed && blocksCarried(bot) >= 12 && !perched(bot, d)) {
+      try { const t1 = Date.now(), r = await pocketOnColumn({ allSides: true }); console.log(`[end combat] the stub at ${bot.entity.position.floored()} walled out of the dragon's sight: ${r.laid} laid, ${r.closed} of 4 sides closed, ${Date.now() - t1} ms, ${blocksCarried(bot)} blocks left`); }
+      catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    }
     return roofed;
   };
   // The hole dug before the pass (note 1674): the body's call comes within 12 blocks, under a second before the blow, and the hole of note 1667 gets one block a call; the dragon in flight is seen coming from 32 blocks, two and a half seconds off at 13 a second, time for two blocks with the iron pickaxe. 25588 (dragon-208, 2026-10-14 22:29Z, one crystal broken) took three passes of the body in a minute on open ground, 14.6 to 9.2, 6.5 to 3.8, and 11.8 to 6.4 a second after it left its roofed hole to quarry, and was carried 90 blocks into the void; dragon-200, 202 and 204 died of the body on open ground the same evening. On diggable ground clear of the void and water, with the dragon flying within 32 and closing at four a second or more, a block is dug under the feet toward a hole two deep; in a hole two deep the body holds while the dragon is within 24. Nothing is dug on the bot's own column, its cell or an obsidian top, nor in a hole already.
