@@ -195,7 +195,8 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     // (dragon-7, 2026-10-13 05:55Z) was 'stopped 35 blocks short, 0 up' with
     // 80 cobblestone carried and no word of why.
     const why = climbStop(bot, feet, { canDig, wet });
-    if (why) { if (!placed) console.log(`[pillar up] stopped before the first block: ${why}`); break; }
+    // Said after the first block too (note 1679): 25588 (dragon-214, 2026-10-15 00:00Z) laid one of two in the cloud at (40, 62, -5) and nothing said why the second did not go; 20 to none in three seconds.
+    if (why) { console.log(`[pillar up] stopped ${placed ? `after ${placed} block${placed === 1 ? '' : 's'}` : 'before the first block'}: ${why}`); break; }
     if (!dryPassable(above)) {
       await dig(bot, task, head, { requireDrops: false });
       continue;
@@ -203,7 +204,7 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     // In the order the kinds are listed, not the pack's: rock before wood
     // before the gravel that falls.
     const block = blocks.map(n => bot.inventory.items().find(i => i.name === n)).find(Boolean);
-    if (!block) { if (!placed) console.log('[pillar up] stopped before the first block: no block of the kinds the climb lays carried'); break; }
+    if (!block) { console.log(`[pillar up] stopped ${placed ? `after ${placed}` : 'before the first block'}: no block of the kinds the climb lays carried`); break; }
     await bot.equip(block, 'hand');
     await bot.look(bot.entity.yaw, -Math.PI / 2, true);
     const start = feet.y;
@@ -219,7 +220,7 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
       if (rest && !rest.equals(feet)) { rested = true; await require('./bridging').creepTo(bot, task, rest, 1500); continue; }
     }
     rested = false;
-    if (!below || below.boundingBox !== 'block') { if (!placed) console.log(`[pillar up] stopped before the first block: ${below ? below.name : 'nothing'} under the feet at ${feet}`); break; }
+    if (!below || below.boundingBox !== 'block') { console.log(`[pillar up] stopped ${placed ? `after ${placed}` : 'before the first block'}: ${below ? below.name : 'nothing'} under the feet at ${feet}`); break; }
     // Placed with the look already down (set before the jump): placeBlock's
     // own smooth turn took ticks, the bot fell back into the cell before the
     // packet went, and the server refused every block of a pillar from two

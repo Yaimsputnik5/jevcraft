@@ -1762,7 +1762,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           try { await require('./pillar-recovery').pillarUp(bot, task, from + up, { dig: actions.dig, maxBlocks: up, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
           const rose = Math.floor(bot.entity.position.y) - from;
           console.log(`[end combat] up out of the breath first: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
-          if (rose >= 1) { await roofTheStub(); return; }
+          // Two up or the other ways (note 1679): one block up leaves the body a block over the cloud's base, inside it; 25588 (dragon-214, 2026-10-15 00:00Z) went '1 blocks up' at (40, 62, -5) and stood, 20 to 14.7 to 9.1 to 3.3 to none.
+          if (rose >= 2) { await roofTheStub(); return; }
         }
       }
       try { await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) && safeFromHostiles(bot, p, endMobs(bot)), timeoutMs: inBreath() ? 700 : 1600, dig: actions.dig }); }
@@ -1806,7 +1807,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
             const rose = Math.floor(bot.entity.position.y) - from;
             console.log(`[end combat] up out of the breath on ${thick ? 'the ground' : 'thin ground'}: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
-            if (rose >= 1) { await roofTheStub(); return; }
+            if (rose >= 2) { await roofTheStub(); return; }
           }
           if (inBreath() && thick && voidEdge(bot, bot.entity.position, 4) === null) {
             goal.step = { action: 'down_out_of_breath_on_ground', health: bot.health }; save();
