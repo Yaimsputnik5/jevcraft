@@ -1650,6 +1650,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     try { await require('./pillar-recovery').pillarUp(bot, task, from + 2, { dig: actions.dig, maxBlocks: 2, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     const rose = Math.floor(bot.entity.position.y) - from;
     console.log(`[end combat] up out of the breath on the column: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health, ${blocksCarried(bot)} blocks left`);
+    // The roof after this climb too (note 1716, as note 1672 after the ground's): the dragon's fireball is aimed at the body, and its cloud spawns where it bursts; on the roof it lies two over the feet, on the body it lies at the feet. 25588 (dragon-258, 2026-10-15 09:46Z) climbed two out of the breath at the foot of its column at (33, 62, -22) with seven blocks and no roof, the dragon 15 over and 7 aside, and the next fireball's cloud lay at (33.6, 62, -21.6), the feet's own height: 16 to 10 to 4 to none. Dragon-256 and 257 had their roofs and their clouds lay at the feet all the same (a fireball from the side); the roof answers only the one from above.
+    if (rose >= 2) await roofTheStub();
     return rose;
   };
   const holdOrDown = async () => {
