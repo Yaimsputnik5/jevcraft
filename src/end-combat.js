@@ -2014,7 +2014,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       if (holeAnswers()) return;
       checkEndEmergency(bot, { ground: onTheGround() });
     };
-    if (safeHere()) {
+    // No meal with a fireball in the air or a cloud near or the dragon's body coming (note 1700): the survival layer's eat is a second and a half and takes no End emergency, and 25588 (dragon-237, 2026-10-15 05:35Z, five crystals broken) landed wet in its pool, stepped to the rim, and began to eat at 05:35:05.5 with a fireball shot a tenth before; the cloud took 20 to 14 to 8 to 2 to none in four seconds while it ate, 'hurt without a survival response'. dragon-229 (03:29Z) stood the same five seconds.
+    const mealSafe = () => !breathThreat(bot) && !dragonThreat(bot) && !Object.values(bot.entities).some(e => e.name === 'area_effect_cloud' && e.isValid !== false && hazardDistance(bot.entity.position, e) <= cloudRadius(bot, e) + 4);
+    if (safeHere() && mealSafe()) {
       if (await maintainVitals(bot, task, action => { goal.survivalAction = { ...action, at: new Date().toISOString() }; save(); }, { client, goal, save })) return;
     }
     // Hungry with nothing to eat, the fight goes on (note 1381): under
