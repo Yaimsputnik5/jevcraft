@@ -436,7 +436,9 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600, d
         const sidesClosed = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(f.offset(dx, 0, dz)) && solid(f.offset(dx, 1, dz))).length;
         const thick = [1, 2, 3, 4, 5, 6].every(dy => solid(f.offset(0, -dy, 0)));
         const wet = /water/.test(bot.blockAt(f)?.name || '') || [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => /water/.test(bot.blockAt(f.offset(dx, 0, dz))?.name || '') || /water/.test(bot.blockAt(f.offset(dx, -1, dz))?.name || ''));
-        if (dig && thick && !wet && voidSides(bot, bot.entity.position) === 0 && !deepBeside(bot, bot.entity.position) && bot.entity.onGround) {
+        // Ground, not a stub's top (note 1698, as note 1697 in end combat): 25588 (dragon-235, 2026-10-15 05:1xZ) dug 'hole_for_the_body' on a stub top at (10, 65, 10), 'no column', and fell at 13.6 health. Two of the four cells beside the feet must have ground one under the feet.
+        const groundBeside = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(f.offset(dx, -1, dz))).length;
+        if (dig && thick && !wet && groundBeside >= 2 && voidSides(bot, bot.entity.position) === 0 && !deepBeside(bot, bot.entity.position) && bot.entity.onGround) {
           if (sidesClosed >= 4) { bot.setControlState?.('sneak', true); goal.step = { action: 'in_the_hole_for_the_body', hazard: dragon.name }; save(); await sleep(400); bot.setControlState?.('sneak', false); return true; }
           goal.step = { action: 'hole_for_the_body', hazard: dragon.name, sidesClosed }; save();
           console.log(`[end safety] the dragon's body coming: a block dug under the feet at ${f} toward a hole two deep (${sidesClosed} of 4 sides closed now), not a run under the wings`);
