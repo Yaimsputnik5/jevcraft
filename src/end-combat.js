@@ -3039,10 +3039,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     }
     // The meal in the fight (note 1634): health comes back a point every four seconds only at hunger eighteen or more, and 25588 (dragon-163, 2026-10-14 12:29 to 12:33Z, all ten crystals broken, the dragon at 140) had its hunger fall to 17 and then 15 by the fountain, regenerated nothing more, took the dragon's blows 18 to 15 to 10 to 7 to 4.6 over four minutes with four cooked rabbit in its pockets, was never offered a meal (none_good 0.46 to 0.73), and died. Offered whenever hunger is under eighteen or health under ten with food carried; eaten where the body stands, in the hole without climbing out.
     {
-      // The reserve quarry (note 1688): blocks are the fight's escapes, two a climb out of a cloud, five a stub's roof, eight a pocket, and 25588 ended 199, 201, 214, 215, 219, 220 and 222 of 2026-10-14/15 with two or fewer, the climb out of the breath laying one of two and the body dead in its cloud. Under ten carried, with a pickaxe and the island's end stone within seven, Jev is offered the dig, whatever crystal is next.
+      // The reserve quarry (note 1688; offered under sixteen, note 1701: the climb out of a cloud is two, a stub's roof five, a pocket eight, and dragon-236 and 239 of 2026-10-15 died with none or one): blocks are the fight's escapes, two a climb out of a cloud, five a stub's roof, eight a pocket, and 25588 ended 199, 201, 214, 215, 219, 220 and 222 of 2026-10-14/15 with two or fewer, the climb out of the breath laying one of two and the body dead in its cloud. Under ten carried, with a pickaxe and the island's end stone within seven, Jev is offered the dig, whatever crystal is next.
       {
         const pick = bot.inventory.items().find(i => /_pickaxe$/.test(i.name)), carriedNow = blocksCarried(bot);
-        if (pick && actions.dig && carriedNow < 10 && !inWater() && onTheGround()) {
+        if (pick && actions.dig && carriedNow < 16 && !inWater() && onTheGround()) {
           const feet = bot.entity.position.floored(), cells = [];
           const { deepBeside } = require('./end-safety');
           const skyOver = p => { for (let dy = 1; dy <= 12; dy++) if (bot.blockAt(p.offset(0, dy, 0))?.boundingBox === 'block') return false; return true; };
@@ -3059,7 +3059,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           if (cells.length >= 4) tree.quarry_reserve = {
             description: { action: `Dig ${cells.length} end stone from the island's ground within seven blocks of where the bot stands, with the ${pick.name.replace('_', ' ')}, as the fight's reserve: ${carriedNow} blocks carried, and the ways out of the breath and the body are laid of blocks (two a climb out of a cloud, five a roof over a stub, eight a pocket at a column's top). The floor cells dug have rock under them; about a second a block.`,
               blocksCarried: carriedNow, cellsToDig: cells.length, health: bot.health, dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null,
-              record: 'seven of 25588\'s runs of 2026-10-14/15 ended with two blocks or fewer, the climb out of the breath laying one of two and the body dead in its cloud' },
+              record: 'seven of 25588\'s runs of 2026-10-14/15 ended with two blocks or fewer, the climb out of the breath laying one of two and the body dead in its cloud; dragon-236 and 239 (2026-10-15) died with none or one', dropsCollected: 'the dug blocks are walked over and taken only while the dragon is more than 20 blocks off; with it nearer they lie where dug (dragon-235 dug 12 three times and kept almost none)' },
             run: async () => {
               const before = blocksCarried(bot);
               goal.step = { action: 'quarry_reserve', cells: cells.length }; save();
