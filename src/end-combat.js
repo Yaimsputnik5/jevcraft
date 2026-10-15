@@ -1706,7 +1706,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     try { roofed = await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     console.log(`[end combat] the stub at ${bot.entity.position.floored()} roofed against the next fireball: ${roofed ? 'laid' : 'not laid'}, ${Date.now() - t0} ms, ${blocksCarried(bot)} blocks left`);
     // Walled on all four sides too, out of the dragon's sight (note 1721): the dragon fires only with a clear line from its eyes to the bot's for a quarter second, and a fireball bursting within four blocks of the feet moves its cloud onto the body (the arena, 2026-10-15 10:2xZ: a burst two blocks off put the cloud at the feet, 20 to 8; three and a half off and more, none). The roof alone leaves the sides open; 25588's dragon-256, 257, 258, 259 and 263 (2026-10-15 09:37 to 10:10Z) took a fireball's cloud at the feet on their stubs, roofed or not, five of eight deaths. With the roof laid and twelve blocks carried, the four sides at the feet and the head close the line of sight.
-    if (roofed && blocksCarried(bot) >= 12 && !perched(bot, d)) {
+    // Twelve left after the walls, not twelve before them (note 1726): the walls are nine, and a stub's climb and roof out of the next cloud is three; 25588 (dragon-270, 2026-10-15 11:3xZ) walled at 12 and had 4, then 0 at the next cloud, and died in it; dragon-266 the same at 13.
+    if (roofed && blocksCarried(bot) >= 21 && !perched(bot, d)) {
       try { const t1 = Date.now(), r = await pocketOnColumn({ allSides: true }); console.log(`[end combat] the stub at ${bot.entity.position.floored()} walled out of the dragon's sight: ${r.laid} laid, ${r.closed} of 4 sides closed, ${Date.now() - t1} ms, ${blocksCarried(bot)} blocks left`); }
       catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     }
@@ -2631,11 +2632,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
                 // the first item gained, and 25588 (dragon-74, 2026-10-13 18:57Z) dug 18
                 // cells and 'quarried 1', six stones lying two and three blocks off,
                 // then dug 24 more for 2. Picked up until none is gained or twenty seconds.
+                // Within sixteen, not eight (note 1725): the stone rolls down the island's slopes past eight, and 25588 (dragon-270, 2026-10-15 11:35Z) dug 14 cells and 'quarried 0 ... items lying within 16: (14, 59, 4) 12 off, (19, 60, 8) 15 off, (5, 61, -9) 10 off' and five more at ten, then stood in the breath with no block and died.
                 { const t0 = Date.now(); let rounds = 0;
                   while (Date.now() - t0 < 20000 && rounds < 30 && !hostileNear()) {
                     check(); rounds++;
                     let got = false;
-                    try { got = await require('./drop-collection').collectNearbyDrops(bot, task, 'end_stone', { radius: 8, timeoutMs: 5000, waitForSpawnMs: rounds === 1 ? 300 : 0, move: actions.navigate }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; break; }
+                    try { got = await require('./drop-collection').collectNearbyDrops(bot, task, 'end_stone', { radius: 16, timeoutMs: 5000, waitForSpawnMs: rounds === 1 ? 300 : 0, move: actions.navigate }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; break; }
                     if (!got) break;
                   } }
                 const after = blocksCarried(bot);
