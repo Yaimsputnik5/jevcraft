@@ -3090,7 +3090,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // out of the hole is two blocks laid, about a second. Offered on the
     // island's ground within 24 of the fountain while the dragon flies.
     // Anywhere on the island's thick ground, not only within 24 of the fountain (note 1728): the hole with its roof is out of the dragon's sight, which its fireballs need (Fable and the arena, 2026-10-15: a burst within four blocks of the feet puts the cloud on the body), and it is one block laid against two dug, where a stub walled out of sight is twelve. 25588's runs 254 to 272 (2026-10-15 09:20 to 12:05Z) spent four blocks in five on stubs, roofs, walls and pockets, and four of the last five deaths came with none or one carried.
-    if (actions.dig && fountain && !onOwnPillar() && !onObsidianTop() && !holeHere() && !(dragon && perched(bot, dragon)) && byFountain >= 6 && blocksCarried(bot) >= 2) {
+    if (actions.dig && fountain && !onOwnPillar() && !onObsidianTop() && !holeHere() && !(dragon && perched(bot, dragon)) && byFountain >= 6) {
+      // With no block carried too (note 1742): the hole's two dug end stone are its roof's, and the stock taken underground (note 1741) is for the bot with none; dragon-294 (2026-10-15 17:06Z) was never offered it at none carried and died so in the breath at (8, 64, 2).
       const feet = bot.entity.position.floored();
       const thick = [1, 2, 3, 4, 5, 6].every(dy => bot.blockAt(feet.offset(0, -dy, 0))?.boundingBox === 'block');
       const wallsHold = [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => bot.blockAt(feet.offset(dx, -1, dz))?.boundingBox === 'block' && bot.blockAt(feet.offset(dx, -2, dz))?.boundingBox === 'block');
