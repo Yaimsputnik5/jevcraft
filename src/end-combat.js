@@ -801,6 +801,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       return;
     }
     if (!centred) console.log(`[end combat] not centred on the column before the dig: ${Math.round(Math.hypot(bot._pillarUp.x + .5 - bot.entity.position.x, bot._pillarUp.z + .5 - bot.entity.position.z) * 100) / 100} off`);
+    // The feet on the column first (note 1718): the centring's step on a top beside a cage's bars lifts the body, and the dig read 'air under the feet' a block over the top and dug nothing. 25588 (dragon-254 and 260, 2026-10-15 09:23Z and 09:51Z) were 'down the column from (35, 83, -23), air under the feet ... 0 dug' on the column by crystal 92's cage at 82, and the dragon's body came to them there, both dead.
+    for (let i = 0; i < 16 && bot.entity.onGround === false; i++) await sleep(50);
     console.log(`[end combat] down the column from ${bot.entity.position.floored()}, ${bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || 'nothing'} under the feet, column ${JSON.stringify(bot._pillarUp)}`);
     for (; n < limit; n++) {
       check();
