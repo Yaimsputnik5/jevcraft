@@ -3166,6 +3166,29 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (actions.dig && !holeHere() && tree.wait_in_hole && blocksCarried(bot) < 32) tree.stock_up_underground = {
       description: { quarriesThisFight: `open ground: ${state.openQuarry ? `${state.openQuarry.tries} begun, ${state.openQuarry.gained} stone gained in ${Math.round(state.openQuarry.seconds)} s` : 'none yet'}; underground: ${state.tunnelQuarry ? `${state.tunnelQuarry.tries} tunnels, ${state.tunnelQuarry.gained} stone in ${Math.round(state.tunnelQuarry.seconds)} s` : 'none yet'}; 25588's tunnels of 2026-10-15: 25 stone in 35 s at full health (dragon-291)`, action: `Dig the hole two deep here, roof it, and from a block under its floor dig a tunnel sideways through the island's end stone, picking the stone up, to 64 blocks carried or 45 s: the whole while underground, out of the dragon's sight and under the breath's slab, the stone proof against its body`, blocksCarried: blocksCarried(bot), health: bot.health },
       run: async () => { await tree.wait_in_hole.run(); const t = makeTunnel(); if (!t) throw new Error('No tunnel of end stone in a line from this hole'); await t.run(); } };
+    // The way up out from under the island (note 1747): a staircase dug up through the stone, a step a block, the stone picked up on the way. 25588 (dragon-6 of the new save, 2026-10-15 19:18 to 19:52Z, four crystals broken) stood at (-3, 18, 13) under the island with no block carried and was offered only observe for half an hour.
+    if (actions.dig && !openSky && !onOwnPillar() && !onObsidianTop() && bot.entity.position.y < 58) {
+      const g0 = bot.entity.position.floored(), sd = c => bot.blockAt(c)?.boundingBox === 'block', diggable = c => !/bedrock|obsidian|end_portal/.test(bot.blockAt(c)?.name || '');
+      const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => diggable(g0.offset(dx, 1, dz)) && diggable(g0.offset(dx, 2, dz)) && voidEdge(bot, g0.offset(dx + .5, 0, dz + .5), 4) === null);
+      if (dirs.length) tree.dig_up_to_the_surface = {
+        description: { action: `Dig a staircase up through the island's stone from ${g0}, a step a block (the cell ahead a block up and the two over it), the stone picked up as it goes, until the sky is open overhead: about ${Math.max(1, 62 - g0.y)} steps, two or three seconds each`, depth: Math.max(0, 62 - g0.y), blocksCarried: blocksCarried(bot), health: bot.health },
+        run: async () => {
+          const [dx, dz] = dirs[0]; const t0 = Date.now(); let steps = 0;
+          while (Date.now() - t0 < 180000 && steps < 80) {
+            check();
+            const g = bot.entity.position.floored();
+            if ([2, 3, 4, 5, 6, 7, 8].every(dy => !sd(g.offset(0, dy, 0)))) break;
+            const ahead = g.offset(dx, 1, dz);
+            for (const c of [g.offset(0, 2, 0), ahead, ahead.offset(0, 1, 0)]) if (sd(c)) { if (!diggable(c)) throw new Error(`The stair's way is ${bot.blockAt(c).name} at ${c}`); await actions.dig(bot, task, c, { requireDrops: false }); }
+            if (!sd(ahead.offset(0, -1, 0))) break;
+            await require('./motion').move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'stair_up', keys: ['forward', 'jump'], sneak: false, why: 'up the staircase step just dug', look: ahead.offset(.5, 1.6, .5), maxMs: 1500, tick: 25, until: () => Math.floor(bot.entity.position.y) > g.y && Math.floor(bot.entity.position.x) === ahead.x && Math.floor(bot.entity.position.z) === ahead.z });
+            if (Math.floor(bot.entity.position.y) <= g.y) break;
+            steps++;
+          }
+          console.log(`[end combat] up the staircase from ${g0}: ${steps} steps to ${bot.entity.position.floored()}, ${blocksCarried(bot)} blocks carried, ${Math.round((Date.now() - t0) / 1000)} s`);
+          if (steps) progress = true;
+        } };
+    }
     // The meal in the fight (note 1634): health comes back a point every four seconds only at hunger eighteen or more, and 25588 (dragon-163, 2026-10-14 12:29 to 12:33Z, all ten crystals broken, the dragon at 140) had its hunger fall to 17 and then 15 by the fountain, regenerated nothing more, took the dragon's blows 18 to 15 to 10 to 7 to 4.6 over four minutes with four cooked rabbit in its pockets, was never offered a meal (none_good 0.46 to 0.73), and died. Offered whenever hunger is under eighteen or health under ten with food carried; eaten where the body stands, in the hole without climbing out.
     {
       // The reserve quarry (note 1688; offered under sixteen, note 1701: the climb out of a cloud is two, a stub's roof five, a pocket eight, and dragon-236 and 239 of 2026-10-15 died with none or one): blocks are the fight's escapes, two a climb out of a cloud, five a stub's roof, eight a pocket, and 25588 ended 199, 201, 214, 215, 219, 220 and 222 of 2026-10-14/15 with two or fewer, the climb out of the breath laying one of two and the body dead in its cloud. Under ten carried, with a pickaxe and the island's end stone within seven, Jev is offered the dig, whatever crystal is next.
