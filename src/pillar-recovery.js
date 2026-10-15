@@ -174,6 +174,8 @@ function climbStop(bot, feet, { canDig = diggableAbove, wet: throughWater = fals
   const head = feet.offset(0, 2, 0), above = bot.blockAt(head);
   if (!above) return 'the block over the head is not loaded';
   const liquid = c => (throughWater ? /lava/ : /lava|water/).test(bot.blockAt(c)?.name || '');
+  // In water there is no climb, water beside or not (note 1689): a jump from water reaches 0.8, under the block's top, and the block never goes under the body. 25588 (dragon-223, 2026-10-15 02:0xZ) in its pool's pit at (-10, 62, -38): 'the jump reached 0.8 over the start, the body at -0.03 at the place' three times, one block of two laid; the one-block climbs out of the breath of dragon-214, 215, 216, 220, 221 and 222 stood in or beside their pools.
+  if (/water/.test(bot.blockAt(feet)?.name || '')) return `water at the feet at ${feet.x}, ${feet.y}, ${feet.z}: a jump from water reaches 0.8, under the block's top`;
   const passing = [feet.offset(0, 1, 0), head, head.offset(0, 1, 0)];
   const wet = passing.find(liquid) || passing.slice(0, 2).flatMap(c => directions.map(d => c.plus(d))).find(liquid);
   if (wet) return `${bot.blockAt(wet).name.replaceAll('_', ' ')} at ${wet.x}, ${wet.y}, ${wet.z}, in or beside the cells the body rises through`;
