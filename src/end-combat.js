@@ -3130,13 +3130,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const makeTunnel = () => {
       // A block under the hole's floor (note 1737): the hole is two deep, so a tunnel at its floor has the open ground for a ceiling, and none was ever offered (dragon-290, 2026-10-15 16:00 to 16:04Z, five holes, 0 tunnel_quarry). The tunnel runs a block lower, under a ceiling of the island's own stone.
       // In the tunnel already the next one runs at its own floor, not a block lower (note 1746).
-      const f0 = (inTunnel() ? bot.entity.position.floored() : bot.entity.position.floored().offset(0, -1, 0)), es = c => bot.blockAt(c)?.name === 'end_stone', sd = c => bot.blockAt(c)?.boundingBox === 'block';
+      // A block lower only from a hole dug from the open ground within two minutes (note 1750): from any other hole (the tunnel's, its record lapsed) each tunnel went a block deeper; 25588's dragon-20 of the new save (2026-10-15 23:05Z to 00:01Z) went down so to y 30 with no block left.
+      const fh = bot.entity.position.floored(), freshHole = state.hole && Date.now() - state.hole.at < 120000 && state.hole.x === fh.x && state.hole.z === fh.z && state.hole.y === fh.y && !inTunnel();
+      const f0 = (freshHole ? fh.offset(0, -1, 0) : fh), es = c => bot.blockAt(c)?.name === 'end_stone', sd = c => bot.blockAt(c)?.boundingBox === 'block';
       const runs = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dz]) => { let n = 0; for (let k = 1; k <= 20; k++) { const c = f0.offset(dx * k, 0, dz * k); if (!es(c) || !es(c.offset(0, 1, 0)) || !sd(c.offset(0, -1, 0)) || !sd(c.offset(0, 2, 0)) || voidEdge(bot, c.offset(.5, 0, .5), 4) !== null) break; n = k; } return { dx, dz, n }; }).sort((a, b) => b.n - a.n);
       // Toward the nearest standing crystal where that way holds three cells or more (note 1744): the walk to the pillar's foot is then underground, and the climb is the only time in the open. 25588 (dragon-296, 2026-10-15 17:23Z) had dug three tunnels, 81 stone at full health, climbed out for the walk to crystal 94's pillar, and the dragon's body threw it 50 blocks to its death 13 s later.
       const near = crystals.slice().sort((a, b) => a.position.distanceTo(bot.entity.position) - b.position.distanceTo(bot.entity.position))[0];
       const toward = near ? runs.filter(r => r.n >= 3).sort((a, b) => ((b.dx * (near.position.x - f0.x) + b.dz * (near.position.z - f0.z)) - (a.dx * (near.position.x - f0.x) + a.dz * (near.position.z - f0.z))))[0] : null;
       const best = toward && (toward.dx * (near.position.x - f0.x) + toward.dz * (near.position.z - f0.z)) > 0 ? toward : runs[0];
-      if (best.n < 3) return null;
+      if (best.n < 3 || f0.y < 50) return null;
       return {
         description: { action: `Dig a tunnel one wide and two high sideways from this hole, ${best.n} cells of end stone ${best.dx === 1 ? 'east' : best.dx === -1 ? 'west' : best.dz === 1 ? 'south' : 'north'}, two stone a cell picked up as the body steps in, about a second a block with the ${(bot.inventory.items().find(i => /_pickaxe$/.test(i.name)) || {}).name || 'pickaxe'}; the body stays underground the while, out of the dragon's sight and under the breath's slab on the ground, and end stone stands against the dragon's body`, blocksCarried: blocksCarried(bot), cells: best.n, health: bot.health },
         run: async () => {
