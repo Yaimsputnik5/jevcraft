@@ -18,7 +18,7 @@ const { Task, navigate, countOf } = require('../src/skills');
 const { prepareCombatGear } = require('../src/mob-hunt');
 const { fightEndStep } = require('../src/end-combat');
 const { watchGameProgress, gameStep, dimension } = require('../src/game-progress');
-const { waitFor, inventory, dig, place } = require('../src/work');
+const { waitFor, inventory, dig, place, craft } = require('../src/work');
 const { arenaDir } = require('./lib/arena');
 
 const port = Number(process.env.MC_PORT || 25574);
@@ -38,6 +38,7 @@ async function command(line) { fs.writeFileSync(consolePath, line + '\n'); await
 const bot = mineflayer.createBot({ host: '127.0.0.1', port, username, version: '26.1', auth: 'offline' });
 bot.loadPlugin(compatibilityPlugin); bot.loadPlugin(pathfinder);
 const task = new Task('End drill'), client = new TypeSafe();
+task.opportunityClient = client; // the gear's questions answered by Jev, not held for a client (note 1758)
 const timer = setTimeout(() => task.cancel(), minutes * 60000);
 const started = Date.now();
 let goal, detach, deaths = 0, lowest = 20, finishing = false, staged = false;
@@ -70,7 +71,7 @@ bot.once('spawn', async () => {
     for (let step = 0; !goal.gameProgress?.milestones?.dragon_defeated && Date.now() - started < minutes * 60000; step++) {
       const passAt = Date.now();
       // A step's error is the live loop's next pass, not the drill's end.
-      try { await gameStep(bot, task, goal, save, { fight_dragon: (b, t, g, s) => fightEndStep(b, t, g, s, { navigate, dig, place }, client) }); }
+      try { await gameStep(bot, task, goal, save, { fight_dragon: (b, t, g, s) => fightEndStep(b, t, g, s, { navigate, dig, place, craft }, client) }); }
       catch (err) { if (task.cancelled || deaths || err.name === 'Cancelled') throw err; log({ stepError: String(err.message || err).slice(0, 200) }); await sleep(500); }
       if (Date.now() - passAt < 200) await sleep(200);
       if (step % 60 === 0) {

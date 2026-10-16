@@ -3270,6 +3270,28 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             } };
         }
       }
+      // An iron pickaxe crafted in the fight (note 1758): the pickaxe wears out, 250 blocks for iron, and every block of the fight's climbs, roofs and pockets is end stone dug with it. 25588 (dragon-40, 2026-10-16 16:32Z, six crystals broken) wore its iron pickaxe out in the tunnel quarry, dug the staircase up by hand (198 s for three steps) and stood three hours 'only observe' with 3 blocks, 9 iron ingots, 5 sticks and a crafting table carried.
+      {
+        const count = n => bot.inventory.items().filter(i => i.name === n).reduce((k, i) => k + i.count, 0);
+        const anyPick = bot.inventory.items().some(i => /_pickaxe$/.test(i.name));
+        const ingots = count('iron_ingot'), sticks = count('stick'), planks = bot.inventory.items().filter(i => /_planks$/.test(i.name)).reduce((k, i) => k + i.count, 0);
+        const tableCarried = count('crafting_table') > 0;
+        if (!anyPick && actions.craft && ingots >= 3 && (sticks >= 2 || planks >= 2) && tableCarried && !inWater() && onTheGround()) {
+          tree.craft_pickaxe = {
+            description: { action: `Craft an iron pickaxe here: the crafting table carried is set down beside the body, three iron ingots and two sticks${sticks >= 2 ? '' : ' (made from two planks first)'} are made into the pickaxe, and the table is left standing. No pickaxe is carried, and without one end stone is not dug (by hand a block takes about fifteen seconds and drops nothing), so no block for a climb, a roof or a pocket is to be had; an iron pickaxe digs end stone in about a second and lasts 250 blocks. About five seconds, the body on the ground the while.`,
+              pickaxeCarried: false, ironIngots: ingots, sticks, planks, craftingTableCarried: true, blocksCarried: blocksCarried(bot), health: bot.health, dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null,
+              record: '25588\'s dragon-40 (2026-10-16) wore its iron pickaxe out in the tunnel quarry 20 minutes in, six crystals broken, and stood three hours by the fountain with 3 blocks, no blow offered at the last four crystals and the ingots for three pickaxes carried' },
+            run: async () => {
+              goal.step = { action: 'craft_pickaxe_in_the_fight', ingots, sticks }; save();
+              if (sticks < 2) await actions.craft(bot, task, { action: 'craft', item: 'stick', count: 4, consumes: {} }, goal);
+              await actions.craft(bot, task, { action: 'craft', item: 'iron_pickaxe', count: 1, needs_table: true, consumes: { iron_ingot: 3, stick: 2 } }, goal);
+              const made = bot.inventory.items().some(i => /_pickaxe$/.test(i.name));
+              console.log(`[end combat] the pickaxe crafted in the fight: ${made ? 'an iron pickaxe carried' : 'none made'}, ${count('iron_ingot')} iron ingots left, ${bot.health.toFixed(1)} health at ${bot.entity.position.floored()}`);
+              if (!made) throw new Error('No pickaxe was made');
+              progress = true;
+            } };
+        }
+      }
       let meal = null; try { meal = require('./low-health').mealOf(bot); } catch (_) { meal = null; }
       const food = bot.food ?? 20;
       if (meal && (food < 18 || bot.health <= 10) && bot.health < 20) {
