@@ -44,7 +44,7 @@ async function stage() {
   await command(end(`fill ${AT - 4} ${g - 4} ${AT - 4} ${AT + 4} ${g} ${AT + 4} end_stone`));
   await command(end(`fill ${AT - 4} ${g + 1} ${AT - 4} ${AT + 4} ${g + H + 6} ${AT + 4} air`));
   await command(end(`fill ${AT} ${g + 1} ${AT} ${AT} ${g + H} ${AT} cobblestone`));
-  await command(`give ${username} minecraft:cobblestone 16`);
+  await command(`give ${username} minecraft:cobblestone ${Number(process.env.CLIMB_GIVE || 16)}`);
   await command(`give ${username} minecraft:iron_pickaxe 1`);
   const top = g + H + 1;
   // CLIMB_WALLS=1: the pocket's walls, two high on the four sides of the column's top cell.
@@ -80,16 +80,18 @@ bot.once('spawn', async () => {
     // CLIMB_CLOUD=1: a real harming cloud, its centre 1.5 west of the column at the feet's level, as the breath's.
     if (process.env.CLIMB_DRAGON_DX) await command(end(`tp @e[type=ender_dragon] ${AT + Number(process.env.CLIMB_DRAGON_DX)} ${top + 20} ${AT + .5}`));
     if (process.env.CLIMB_CLOUD === '1') await command(end(`summon area_effect_cloud ${AT + .5 + Number(process.env.CLIMB_CLOUD_DX || -1.5)} ${top} ${AT + .5} {Radius:2.5f,Duration:200,RadiusPerTick:0f,potion_contents:{custom_effects:[{id:"minecraft:instant_damage",amplifier:0b,duration:1}]}}`));
-    try { laid = await pr.pillarUp(bot, task, Math.floor(start.y) + 2, { maxBlocks: 2, threats: false, wet: true, dig: async () => {} }); } catch (e) { err = String(e.message || e).slice(0, 80); }
+    // CLIMB_UP=N (default 2): how many to climb. CLIMB_ENCLOSE=1: the ring at the feet and the head on every level (note 1753), the ring blocks counted.
+    const up = Number(process.env.CLIMB_UP || 2); bot._ringLaid = 0;
+    try { laid = await pr.pillarUp(bot, task, Math.floor(start.y) + up, { maxBlocks: up, threats: false, wet: true, dig: async () => {}, enclose: process.env.CLIMB_ENCLOSE === '1' }); } catch (e) { err = String(e.message || e).slice(0, 80); }
     if (hurting) { clearInterval(hurting); await command(end(`tp @e[type=ender_dragon] 0 160 0`)); }
     await sleep(600);
     if (track) clearInterval(track);
     const p = bot.entity.position, off = Math.hypot(AT + .5 - p.x, AT + .5 - p.z);
     const onColumn = Math.floor(p.x) === AT && Math.floor(p.z) === AT && solid(new Vec3(AT, Math.floor(p.y) - 1, AT));
-    const r = { trial: t + 1, laid, rose: Math.round((p.y - start.y) * 100) / 100, endY: Math.round(p.y * 100) / 100, startY: top, offset: Math.round(off * 100) / 100, onColumn, ms: Date.now() - t0, err, lee };
+    const r = { trial: t + 1, laid, ring: bot._ringLaid || 0, rose: Math.round((p.y - start.y) * 100) / 100, endY: Math.round(p.y * 100) / 100, startY: top, offset: Math.round(off * 100) / 100, onColumn, ms: Date.now() - t0, err, lee };
     log(r); results.push(r);
   }
-  const ok = results.filter(r => r.laid >= 2 && r.onColumn && r.rose >= 1.9).length;
+  const UP = Number(process.env.CLIMB_UP || 2); const ok = results.filter(r => r.laid >= UP && r.onColumn && r.rose >= UP - 0.1).length;
   log({ summary: { trials, twoUpOnColumn: ok, oneOrNone: results.filter(r => r.laid < 2).length, offColumn: results.filter(r => !r.onColumn).length, offsetStart: OFF, height: H } });
   bot.quit(); setTimeout(() => process.exit(0), 500);
 });
