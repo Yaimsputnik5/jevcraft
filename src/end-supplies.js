@@ -82,6 +82,7 @@ function kitItems(bot, goal, actions = {}, now = Date.now()) {
   // The nearest snowy ground in what is loaded (note 1368): 25598 (2026-10-06
   // 16:15Z), twelve eyes banked, was offered snowballs with no word of where
   // snow lies and chose arrows, at a skeleton or less a kill.
+  // The grove, not the cherry grove (note 1752): /grove/ matched cherry_grove, and 25588's stronghold-1 trial (2026-10-16) was told 'Snowy ground in what is loaded: the cherry grove about 148 blocks off', where no snow lies.
   const snowNear = (() => {
     try {
       const here = bot.entity.position.floored(), name = require('./exploration').biomeName;
@@ -89,7 +90,7 @@ function kitItems(bot, goal, actions = {}, now = Date.now()) {
       for (let dx = -160; dx <= 160; dx += 16) for (let dz = -160; dz <= 160; dz += 16) {
         const d = Math.hypot(dx, dz); if (d > 160 || (best && d >= best.d)) continue;
         const b = name(bot, bot.blockAt(here.offset(dx, 70 - here.y, dz)));
-        if (b && /snow|frozen|ice_spikes|grove|jagged|frozen_peaks/.test(b)) best = { d: Math.round(d), biome: b.replaceAll('_', ' ') };
+        if (b && /snow|frozen|ice_spikes|^grove$|jagged|frozen_peaks/.test(b)) best = { d: Math.round(d), biome: b.replaceAll('_', ' ') };
       }
       return best;
     } catch (_) { return null; }

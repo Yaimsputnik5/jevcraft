@@ -1749,6 +1749,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   };
   const holeBeforeThePass = async () => {
     if (!actions.dig || !onTheGround() || inWater()) return false;
+    // Under the open sky only (note 1751, as end safety's hole for the body): with stone over the head the body is underground already.
+    { const g = bot.entity.position.floored(); if ([2, 3, 4, 5, 6, 7, 8].some(dy => bot.blockAt(g.offset(0, dy, 0))?.boundingBox === 'block')) return false; }
     const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
     if (!d || perched(bot, d)) { state.dragonTrack = null; return false; }
     const p = bot.entity.position, flat = Math.hypot(d.position.x - p.x, d.position.z - p.z), now = Date.now();
@@ -3176,16 +3178,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       if (dirs.length) tree.dig_up_to_the_surface = {
         description: { action: `Dig a staircase up through the island's stone from ${g0}, a step a block (the cell ahead a block up and the two over it), the stone picked up as it goes, until the sky is open overhead: about ${Math.max(1, 62 - g0.y)} steps, two or three seconds each`, depth: Math.max(0, 62 - g0.y), blocksCarried: blocksCarried(bot), health: bot.health },
         run: async () => {
-          const [dx, dz] = dirs[0]; const t0 = Date.now(); let steps = 0;
+          // Every way in turn (note 1751): one way's step ahead had no floor at the island's underside, 'up the staircase ... 2 steps' 212 times from the same cell (dragon-20 of the new save).
+          let way = 0, [dx, dz] = dirs[0]; const t0 = Date.now(); let steps = 0, stuck = 0;
+          const turn = () => { way++; if (way >= dirs.length) return false; [dx, dz] = dirs[way]; return true; };
           while (Date.now() - t0 < 180000 && steps < 80) {
             check();
             const g = bot.entity.position.floored();
             if ([2, 3, 4, 5, 6, 7, 8].every(dy => !sd(g.offset(0, dy, 0)))) break;
             const ahead = g.offset(dx, 1, dz);
             for (const c of [g.offset(0, 2, 0), ahead, ahead.offset(0, 1, 0)]) if (sd(c)) { if (!diggable(c)) throw new Error(`The stair's way is ${bot.blockAt(c).name} at ${c}`); await actions.dig(bot, task, c, { requireDrops: false }); }
-            if (!sd(ahead.offset(0, -1, 0))) break;
+            if (!sd(ahead.offset(0, -1, 0))) { if (turn()) continue; break; }
             await require('./motion').move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'stair_up', keys: ['forward', 'jump'], sneak: false, why: 'up the staircase step just dug', look: ahead.offset(.5, 1.6, .5), maxMs: 1500, tick: 25, until: () => Math.floor(bot.entity.position.y) > g.y && Math.floor(bot.entity.position.x) === ahead.x && Math.floor(bot.entity.position.z) === ahead.z });
-            if (Math.floor(bot.entity.position.y) <= g.y) break;
+            if (Math.floor(bot.entity.position.y) <= g.y) { if (++stuck <= 2 && turn()) continue; break; }
             steps++;
           }
           console.log(`[end combat] up the staircase from ${g0}: ${steps} steps to ${bot.entity.position.floored()}, ${blocksCarried(bot)} blocks carried, ${Math.round((Date.now() - t0) / 1000)} s`);
