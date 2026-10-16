@@ -2828,7 +2828,7 @@ async function mineAtSource(bot, task, step, goal, save, selected) {
       if (!pool.length) break;
       continue;
     }
-    const before = countOf(bot, step.drops);
+    const before = countOf(bot, step.drops), wasBlock = bot.blockAt(p)?.name;
     let access;
     // Where the step is going, for the record: the day audit saw the mine
     // step walk twelve blocks up its own staircase and could not say toward
@@ -2863,6 +2863,8 @@ async function mineAtSource(bot, task, step, goal, save, selected) {
       }
     }
     if (countOf(bot, step.drops) > before) return;
+    // What a dig that came to nothing left, said (note 1759): 25595's stronghold-1 (2026-10-16 15:51 to 16:00Z) took 47 snow mine steps in a grove at (-170 to -200, 122 to 134, -90 to -127), a wooden shovel crafted for them and room made nine times, and carried no snowball; the arena's full-pocket drills gathered six every time.
+    console.log(`[mine] nothing collected at ${p}: ${wasBlock} there before, ${bot.blockAt(p)?.name} after, the bot at ${bot.entity.position.floored()} on ${bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name}, ${bot.heldItem?.name || 'bare hand'} held, ${bot.inventory.emptySlotCount?.() ?? '?'} free slots, ${Object.values(bot.entities).filter(e => e.name === 'item' && e.position.distanceTo(p) <= 4).length} items lying within 4${goal.lastMiningError ? `; ${String(goal.lastMiningError).slice(0, 120)}` : ''}`);
     setAside(goal, 'reach', p, goal.lastMiningError || 'dug nothing there', 120000);
     missed++;
   }
