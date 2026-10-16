@@ -298,7 +298,8 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     // The ring about the new cell (note 1753): at the feet (the level below's head ring, or the first level's) and at the head, while the blocks carried cover the rest of the climb and four more.
     if (enclose && bot.entity.position.floored().y > start && bot.entity.position.floored().y < encloseUntil) {
       const nf = bot.entity.position.floored(), have = blocks.reduce((n, k) => n + bot.inventory.items().filter(i => i.name === k).reduce((m, i) => m + i.count, 0), 0);
-      if (have >= Math.max(0, targetY - nf.y) + 4) { const a = await ringAround(bot, task, nf, 0, blocks); const b = await ringAround(bot, task, nf, 1, blocks); if (a + b) bot._ringLaid = (bot._ringLaid || 0) + a + b; }
+      // From a level under the feet (note 1756): the cell beside the feet has nothing under it on a column one wide, and the first ring is laid against the column's own block below the feet; the arena's drill (2026-10-16 06:48Z, CLIMB_ENCLOSE=1) laid no ring block at the feet's and the head's levels alone. A level already ringed is skipped, so the first level is twelve blocks and each after it four.
+      if (have >= Math.max(0, targetY - nf.y) + 4) { let n = 0; for (const dy of [-1, 0, 1]) n += await ringAround(bot, task, nf, dy, blocks); if (n) bot._ringLaid = (bot._ringLaid || 0) + n; }
     }
     if (bot.entity.position.floored().y <= start) { console.log(`[pillar up] stopped ${placed ? `after ${placed}` : 'before the first block'}: the block was not placed in three jumps from ${feet} (on ground ${bot.entity.onGround}, ${block.name} in hand${lastPlaceError ? `, the place said: ${lastPlaceError}` : ''}${lastJump ? `; ${lastJump}; the cell at the feet is ${bot.blockAt(feet)?.name || 'unloaded'}` : ''})`); break; }
   }
