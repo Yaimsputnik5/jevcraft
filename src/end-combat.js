@@ -2693,6 +2693,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           description: { action: under
             ? `Walk to the foot of the healing crystal's obsidian pillar (radius ${radius}), pillar up ${lift} blocks beside it on the blocks carried to two under the bedrock the crystal stands on, and strike the crystal from there by hand: any blow breaks one, and the bedrock is between the bot and its blast`
             : `Walk to the foot of the healing crystal's obsidian pillar (radius ${radius}, too thick to reach the crystal from its side), pillar up ${lift} blocks beside it on the blocks carried to its top, step onto the top two blocks from the crystal's bedrock, crouch, and strike the crystal by hand: any blow breaks one; crouched, the bot's body above the bedrock's top face is in the blast's line`,
+            // The walled climb said (note 1753): what it costs and what it buys.
+            walledClimb: isCaged ? `this crystal is caged: with ${lift * 5 + 8} blocks carried (${carried} now) the climb is walled on four sides at the head's height on every level, so the dragon has no line of sight to throw at it on the way up; five blocks a level` : undefined,
             position: { ...target.position }, blocksOff: out, blocks: lift, blocksForTheClimb: lift + roofs, blocksCarried: carried, pillarRadius: radius, stance: under ? 'under the bedrock top, beside the pillar' : 'on the top, crouched',
             dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null,
             // The climb against the dragon's turns (note 1736, the fight plan's second step): a climb is open to the dragon's sight from first block to last, and the dragon turns to strafe and throws one fireball a strafe; while it perches (phases 5 to 7) it does not strafe. 25588 (dragon-278 and 282, 2026-10-15): strafes 4 to 45 s apart, a throw 0.9 to 14 s into each, one in eight on the body; dragon-276 took its cloud at 79 on crystal 91's climb and fell.
@@ -2772,7 +2774,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               // the head, which the climb does not dig', three times.
               const pr = require('./pillar-recovery');
               const canDig = b => !!b && ((pr.DIGGABLE_ABOVE.test(b.name) && b.diggable) || (isCaged && !!pickForBars && b.name === 'iron_bars'));
-              await pr.pillarUp(bot, task, y, { dig: actions.dig, maxBlocks: Math.max(1, y - Math.floor(bot.entity.position.y)), threats: false, canDig });
+              // The caged crystal's climb walled on four sides (note 1753, the user's choice of 2026-10-16: the protected climb for the caged crystals, projectiles for the rest): a ring at the head's height on every level but the top's, end stone first (the dragon's body smashes cobblestone, not end stone). On a bare column 25588 lost most of its bots of 2026-10-15 to the fireball's cloud or the body on the way up.
+              const enclose = isCaged && blocksCarried(bot) >= lift * 5 + 8;
+              if (enclose && !state.encloseSaid) { state.encloseSaid = true; console.log(`[end combat] the climb to caged crystal ${target.id} walled on four sides: ${blocksCarried(bot)} blocks carried for ${lift} up`); }
+              bot._ringLaid = 0;
+              await pr.pillarUp(bot, task, y, { dig: actions.dig, maxBlocks: Math.max(1, y - Math.floor(bot.entity.position.y)), threats: false, canDig, enclose, encloseUntil: feetY - 1, blocks: enclose ? ['end_stone', ...pr.SCAFFOLD] : pr.SCAFFOLD });
+              if (enclose) console.log(`[end combat] the walled climb to crystal ${target.id}: ${bot._ringLaid} ring blocks laid, now at ${bot.entity.position.floored()}, ${blocksCarried(bot)} blocks left, ${bot.health.toFixed(1)} health`);
             } };
             const belowTop = feetY - 6;
             if (belowTop > Math.floor(bot.entity.position.y) + 2) await climbTo(belowTop);

@@ -184,7 +184,26 @@ function climbStop(bot, feet, { canDig = diggableAbove, wet: throughWater = fals
   if (FALLS.test(above.name) || FALLS.test(bot.blockAt(head.offset(0, 1, 0))?.name || '')) return `${above.name.replaceAll('_', ' ')} over the head with a block that falls in it or over it`;
   return null;
 }
-async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = true, canDig = diggableAbove, blocks = SCAFFOLD, wet = false } = {}) {
+// The ring about a climb's cell (note 1753): the four cells beside it at dy, each laid on the block under it (the ring of the level below) or against the climb's own block toward the middle; cells already solid are left. With a ring at the head's height on every level the dragon has no line from its eyes to the bot's, which its fireball needs (Fable, 2026-10-15; the sealed stubs of notes 1721 and 1731 took no fireball while the body stayed in them).
+async function ringAround(bot, task, feet, dy, blocks = SCAFFOLD, { maxMs = 2500 } = {}) {
+  const t0 = Date.now(); let laid = 0;
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    if (Date.now() - t0 > maxMs) break;
+    task.check();
+    const cell = feet.offset(dx, dy, dz);
+    if (bot.blockAt(cell)?.boundingBox === 'block') continue;
+    const below = bot.blockAt(cell.offset(0, -1, 0)), inner = bot.blockAt(cell.offset(-dx, 0, -dz));
+    let ref = null, face = null;
+    if (below?.boundingBox === 'block') { ref = below; face = new Vec3(0, 1, 0); }
+    else if (inner?.boundingBox === 'block') { ref = inner; face = new Vec3(dx, 0, dz); }
+    else continue;
+    const item = blocks.map(n => bot.inventory.items().find(i => i.name === n)).find(Boolean); if (!item) break;
+    try { await bot.equip(item, 'hand'); await bot.lookAt(ref.position.offset(.5 + face.x * .5, .5 + face.y * .5, .5 + face.z * .5), true); await bot.placeBlock(ref, face); } catch (_) { continue; }
+    if (bot.blockAt(cell)?.boundingBox === 'block') laid++;
+  }
+  return laid;
+}
+async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = true, canDig = diggableAbove, blocks = SCAFFOLD, wet = false, enclose = false, encloseUntil = Infinity } = {}) {
   const { move } = require('./motion');
   let placed = 0, lastPlaceError = null, lastJump = '';
   let rested = false;
@@ -276,6 +295,11 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
       if (bot.blockAt(feet)?.boundingBox === 'block') break;
     }
     // Said after the first block too, with the place's own error (note 1680): the climb out of the breath laid one of two and said nothing of the second; 25588 (dragon-216, 2026-10-15 00:2xZ, 1679 live) '1 blocks up' at (-6, 60, 35) at 9 health and '0 blocks up' at (-9, 61, 42), each three jumps of 1.2 s in a cloud of six a second.
+    // The ring about the new cell (note 1753): at the feet (the level below's head ring, or the first level's) and at the head, while the blocks carried cover the rest of the climb and four more.
+    if (enclose && bot.entity.position.floored().y > start && bot.entity.position.floored().y < encloseUntil) {
+      const nf = bot.entity.position.floored(), have = blocks.reduce((n, k) => n + bot.inventory.items().filter(i => i.name === k).reduce((m, i) => m + i.count, 0), 0);
+      if (have >= Math.max(0, targetY - nf.y) + 4) { const a = await ringAround(bot, task, nf, 0, blocks); const b = await ringAround(bot, task, nf, 1, blocks); if (a + b) bot._ringLaid = (bot._ringLaid || 0) + a + b; }
+    }
     if (bot.entity.position.floored().y <= start) { console.log(`[pillar up] stopped ${placed ? `after ${placed}` : 'before the first block'}: the block was not placed in three jumps from ${feet} (on ground ${bot.entity.onGround}, ${block.name} in hand${lastPlaceError ? `, the place said: ${lastPlaceError}` : ''}${lastJump ? `; ${lastJump}; the cell at the feet is ${bot.blockAt(feet)?.name || 'unloaded'}` : ''})`); break; }
   }
   return placed;
@@ -326,4 +350,4 @@ function pillarSite(bot, targetY, target, { radius = 5 } = {}) {
   return sites.sort((a, b) => far(a) - far(b))[0] || null;
 }
 
-module.exports = { leeWall, pillarHeight, pillarDescent, descendPillar, pillarUp, pillarSite, climbStop, SCAFFOLD, DIGGABLE_ABOVE };
+module.exports = { ringAround, leeWall, pillarHeight, pillarDescent, descendPillar, pillarUp, pillarSite, climbStop, SCAFFOLD, DIGGABLE_ABOVE };
