@@ -464,7 +464,7 @@ async function airInTheEnd(bot, task, goal, save) {
     bot.setControlState?.('sneak', true);
     for (let i = 0; i < 16 && alive() && !bot.entity.onGround; i++) await sleep(50);
     bot.setControlState?.('sneak', false);
-    for (let tries = 0; tries < 2 && alive() && roof && wet(headCell()); tries++) {
+    for (let tries = 0; tries < 3 && alive() && roof && wet(headCell()); tries++) {
       const b = bot.blockAt(roof); if (!b || b.boundingBox !== 'block') break;
       try { const td = Date.now(); await bot.dig(b); how.push(`${b.name} over the head dug in ${Math.round((Date.now() - td) / 100) / 10} s${bot.entity.onGround ? '' : ' afloat'}`); } catch (err) { how.push(`no dig: ${String(err.message || err).slice(0, 50)}`); }
       roof = roofOver();
@@ -985,7 +985,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     let holed = false;
     if (n >= 1 && actions.dig && pickCarried() && !bot._pillarUp && !inWater()) {
       const f = bot.entity.position.floored(), u1 = bot.blockAt(f.offset(0, -1, 0)), u2 = bot.blockAt(f.offset(0, -2, 0)), u3 = bot.blockAt(f.offset(0, -3, 0));
-      if (u1?.name === 'end_stone' && u2?.name === 'end_stone' && u3?.boundingBox === 'block' && voidEdge(bot, bot.entity.position, 4) === null && blocksCarried(bot) >= 1) {
+      const wetAbout = [f, f.offset(0, -1, 0), f.offset(0, -2, 0)].some(c => [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0]].some(([dx, dy, dz]) => /water/.test(bot.blockAt(c.offset(dx, dy, dz))?.name || '')));
+      if (u1?.name === 'end_stone' && u2?.name === 'end_stone' && u3?.boundingBox === 'block' && voidEdge(bot, bot.entity.position, 4) === null && blocksCarried(bot) >= 1 && !wetAbout) {
         const t0 = Date.now(); let dug = 0;
         for (let d = 0; d < 2; d++) { const y0 = Math.floor(bot.entity.position.y), under = new Vec3(f.x, y0 - 1, f.z); if (bot.blockAt(under)?.name !== 'end_stone') break; try { await actions.dig(bot, task, under, { requireDrops: false, dropInto: true, openPit: true }); dug++; } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; break; } for (let i = 0; i < 30 && Math.floor(bot.entity.position.y) >= y0; i++) await sleep(50); for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50); }
         let roofed = false; if (dug >= 2) { try { roofed = await roofHole(true); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; } }
@@ -1274,10 +1275,13 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       await pourOnce();
       const feetCell = bot.entity.position.floored();
       if (bot.blockAt(best.cell)?.name !== 'water' && bot.blockAt(feetCell)?.name === 'water' && !feetCell.equals(best.cell)) {
-        console.log(`[end combat] the water went in at the feet ${feetCell}, not at ${best.cell}: taken back and poured again`);
+        // Not poured again from a pit (note 1794): the second pour went in at the feet too, and 25588's dragon-162 (2026-10-17 22:09Z, four crystals, 267 blocks) drowned in its roofed foot hole at (7, 59, -36) with the head cell refilling, 'air in the End ... the head still under, 18.9 s'.
+        const sidesNow = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(feetCell.offset(dx, 0, dz))?.boundingBox === 'block').length;
+        console.log(`[end combat] the water went in at the feet ${feetCell}, not at ${best.cell}: taken back${sidesNow >= 2 ? ` and not poured again (the body in a pit, ${sidesNow} of 4 sides closed)` : ' and poured again'}`);
         try { await require('./water').fillWaterBucket(bot, task, feetCell, { timeoutMs: 1500 }); } catch (_) { /* left */ }
+        if (/water/.test(bot.blockAt(feetCell)?.name || '')) { try { await require('./water').fillWaterBucket(bot, task, feetCell, { timeoutMs: 1500 }); } catch (_) { /* left */ } }
         water = bot.inventory.items().find(i => i.name === 'water_bucket');
-        if (water) await pourOnce();
+        if (water && sidesNow < 2 && !/water/.test(bot.blockAt(feetCell)?.name || '')) await pourOnce();
       }
     } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
     // The pool is where the source went in, not where the flow reached (note
