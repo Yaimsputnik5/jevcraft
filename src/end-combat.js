@@ -2677,6 +2677,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
                   if (Date.now() - t0 > 150000) { why = 'out of time'; break; }
                   if (hostileEntities(bot, 4).some(e => live(bot, e) && e.name !== 'ender_dragon')) { why = 'a mob within four'; break; }
                   if (inWater()) { why = 'water'; break; }
+                  if (!pickCarried()) { why = 'the pickaxe gone'; break; } // note 1779: dragon-149's tunnel to crystal 63 went on bare-handed for 156 s, 6 of 25 cells
                   if (!sd(q.offset(0, -1, 0)) || voidEdge(bot, q.offset(.5, 0, .5), 4) !== null) { why = 'no floor ahead'; break; }
                   if (wetNear(q)) { why = 'water beside the way'; break; }
                   for (const cell of [q.offset(0, 1, 0), q]) if (sd(cell)) { if (hard(cell)) { why = `${bot.blockAt(cell)?.name} in the way`; break; } await actions.dig(bot, task, cell, { requireDrops: false }); }

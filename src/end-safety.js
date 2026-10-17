@@ -487,7 +487,9 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
         const solid = c => bot.blockAt(c)?.boundingBox === 'block';
         const sidesClosed = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(f.offset(dx, 0, dz)) && solid(f.offset(dx, 1, dz))).length;
         const thick = [1, 2, 3, 4, 5, 6].every(dy => solid(f.offset(0, -dy, 0)));
-        if (dig && sidesClosed < 4 && thick && voidSides(bot, bot.entity.position) === 0 && !deepBeside(bot, bot.entity.position) && bot.entity.onGround) {
+        // No hand dig here either (note 1779, as note 1763 for the other branch): 25588's dragon-149 (2026-10-17 18:2xZ) with its pickaxe worn out took 16 and 11 s over this dig.
+        const pickaxe2 = (bot.inventory?.items?.() || []).some(i => /_pickaxe$/.test(i.name));
+        if (dig && pickaxe2 && sidesClosed < 4 && thick && voidSides(bot, bot.entity.position) === 0 && !deepBeside(bot, bot.entity.position) && bot.entity.onGround) {
           goal.step = { action: 'hole_for_the_body', hazard: dragon.name, sidesClosed }; save();
           console.log(`[end safety] the dragon's body coming: no run; a block dug under the feet at ${f} toward a hole two deep (${sidesClosed} of 4 sides closed now)`);
           try { await dig(bot, task, f.offset(0, -1, 0), { dropInto: true, openPit: true, requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
