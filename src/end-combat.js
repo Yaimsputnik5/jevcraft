@@ -3848,6 +3848,24 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         } };
     }
     // Out of the water before the hold (note 1776): in water nothing is offered (no climb, no dig, no tunnel, no quarry), the tree is empty, and the hold stood the body still in its landing pool under the fireballs. 25588's dragon-142 (2026-10-17 17:00 to 17:02Z, one crystal broken) landed its drop in the clutch's water at (-15, 61, 36) at 14 health and held 'end_hold' there 81 s with no question asked and no response, two clouds on it, dead at 17:02:14Z. The water is taken back into the bucket where it can be, or the body steps to the nearest dry cell.
+    // Back into the hole from a stub over it (note 1796): the body that came 'up out of the hole' three blocks for a step that failed stands on its own stub with the hole's cavity under it, no hole, no tunnel (no ground four thick under the feet) and no climb to offer, and 'only observe' for minutes; 25588's dragon-165 (2026-10-17 22:3xZ, one crystal, 160 blocks) stood so at (35, 60, 22) with every walk 'no path'. The stub's blocks are dug from under the feet into the cavity, the pack keeping them, and the hole roofed again.
+    {
+      const f = bot.entity.position.floored(), under = bot.blockAt(f.offset(0, -1, 0));
+      const cavity = [2, 3, 4].find(dy => bot.blockAt(f.offset(0, -dy, 0))?.boundingBox !== 'block');
+      if (actions.dig && pickCarried() && bot.entity.onGround && !inWater() && under && SCAFFOLD_UNDER.test(under.name) && cavity && !tree.pillar_down && !holeHere() && !inTunnel()) {
+        tree.back_into_the_hole = {
+          description: { action: `Dig the stub's ${cavity - 1} block${cavity - 1 === 1 ? '' : 's'} from under the feet back into the hole below (about a second each, the blocks kept) and roof it: from the hole the tunnel to a crystal's foot is to be had, from this stub nothing is (every walk from here found no path).`, stubBlocks: cavity - 1, blocksCarried: blocksCarried(bot), health: bot.health, dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null },
+          run: async () => {
+            goal.step = { action: 'back_into_the_hole', blocks: cavity - 1 }; save();
+            const t0 = Date.now(); let dug = 0;
+            for (let d = 0; d < cavity - 1; d++) { const y0 = Math.floor(bot.entity.position.y), u = new Vec3(f.x, y0 - 1, f.z), b = bot.blockAt(u); if (!b || b.boundingBox !== 'block' || !SCAFFOLD_UNDER.test(b.name)) break; await actions.dig(bot, task, u, { requireDrops: false, dropInto: true, openPit: true }); dug++; for (let i = 0; i < 30 && Math.floor(bot.entity.position.y) >= y0; i++) await sleep(50); for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50); }
+            let roofed = false; try { roofed = await roofHole(true); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
+            const g = bot.entity.position.floored(); if (dug) { state.hole = { x: g.x, y: g.y, z: g.z, at: Date.now() }; save(); }
+            console.log(`[end combat] back into the hole from the stub at (${f.x}, ${f.z}): ${dug} dug, ${roofed ? 'roofed' : 'not roofed'}, now at ${g}, ${blocksCarried(bot)} blocks, ${Math.round((Date.now() - t0) / 100) / 10} s`);
+            if (dug) progress = true;
+          } };
+      }
+    }
     if (!Object.keys(tree).length && !safe && inWater()) {
       const f = bot.entity.position.floored(); let how = 'nothing';
       try { const took = await takeBackWaterNear({ force: true }); if (took) how = `the water at ${took} taken back`; } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
