@@ -1740,7 +1740,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // A second, looser centring before the climb is refused (note 1766): the refusal after half a second sent the body down the column through the cloud instead, and 25588's dragon-37, 76, 104 and 127 (2026-10-16/17) died within seconds of it, four of the nine runs that saw it; a jump from under 0.6 off a one-wide top stays on it (note 1695 measured 0.9 to 1.3 going off).
     if (bot._pillarUp && !(await centreOnColumn(0.2, { maxMs: 500 })) && !(await centreOnColumn(0.4, { maxMs: 800 }))) {
       const u = bot._pillarUp, off = Math.round(Math.hypot(u.x + .5 - bot.entity.position.x, u.z + .5 - bot.entity.position.z) * 100) / 100;
-      if (off > 0.6) { console.log(`[end combat] up out of the breath on the column not tried at ${bot.entity.position.floored()}: not centred on the column in 1.3 s, ${off} off`); return 0; }
+      // Up from where the body stands when the column is out of reach (note 1789): the breath's knockback puts the body one to two blocks off its stub, the centring fails, and the refusal sent it down the column into the cloud; six of 25588's nine deaths from dragon-150 to 158 (2026-10-17 18:3x to 20:1xZ) followed a failed climb out of a cloud on a stub ('not centred', '0 blocks up', 'not tried'). With solid ground under the feet and no water the climb goes up from the cell the body is in; its own stub is left standing.
+      const underNow = bot.blockAt(bot.entity.position.floored().offset(0, -1, 0));
+      if (off > 0.6 && !(underNow?.boundingBox === 'block' && !inWater() && bot.entity.onGround)) { console.log(`[end combat] up out of the breath on the column not tried at ${bot.entity.position.floored()}: not centred on the column in 1.3 s, ${off} off, and ${underNow?.name || 'nothing'} under the feet`); return 0; }
+      if (off > 0.6) { console.log(`[end combat] the climb out of the breath taken from the cell the body stands on at ${bot.entity.position.floored()}, ${off} off its column, ${underNow.name} under the feet`); delete bot._pillarUp; }
       console.log(`[end combat] the climb out of the breath on the column taken ${off} off its middle after 1.3 s of centring`);
     }
     const from = Math.floor(bot.entity.position.y);
