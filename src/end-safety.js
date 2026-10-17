@@ -344,7 +344,16 @@ async function evadeOverTerrain(bot, task, goal, save, dragon, { allowed = () =>
   } finally { bot.pathfinder.setGoal(null); bot.clearControlStates(); Object.assign(movement, previous); }
 }
 
-async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600, dig = null } = {}) {
+// Where the evasion's time went, said when it took over 600 ms or the breath is still on the body (note 1765): 25588's dragon-117 (2026-10-17 13:27Z) set evade_breath_straight in a fireball's cloud and wrote nothing for 6.8 s to its death at (-27, 62, 28), 92 blocks and a pickaxe carried; the arena (14:23Z) answered the same cloud in 12 ms with two blocks up.
+async function evadeDragon(bot, task, goal, save, opts = {}) {
+  const t0 = Date.now(), p0 = bot.entity.position.clone(), h0 = bot.health;
+  try { return await evadeDragonInner(bot, task, goal, save, opts); }
+  finally {
+    const ms = Date.now() - t0, breath = breathThreat(bot);
+    if (ms > 600 || breath) console.log(`[end safety] the evasion took ${ms} ms: step ${goal?.step?.action || '-'}, moved ${Math.round(bot.entity.position.distanceTo(p0) * 10) / 10} blocks to ${bot.entity.position.floored()}, ${Number(h0).toFixed(1)} to ${Number(bot.health).toFixed(1)} health, breath ${breath ? `${breath.name} ${Math.round(hazardDistance(bot.entity.position, breath) * 10) / 10} off` : 'none'}, on ground ${bot.entity.onGround}`);
+  }
+}
+async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 1600, dig = null } = {}) {
   task.check();
   const dimension = bot.game.dimension;
   bot.pathfinder.setGoal(null); bot.clearControlStates(); bot.stopDigging?.();

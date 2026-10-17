@@ -65,6 +65,12 @@ bot.once('spawn', async () => {
     detach = watchGameProgress(bot, goal, save); save();
     staged = true; lowest = bot.health;
     log({ phase: 'staged', inventory: inventory(bot), position: bot.entity.position });
+    // Console commands after the staging, {x} {y} {z} the bot's feet (note 1765): a pit dug under the body, a cloud summoned on it, the ground about it shaped.
+    const runCommands = async (list) => { for (const c of list.split(';').map(x => x.trim()).filter(Boolean)) { const p = bot.entity.position.floored(); await command(c.replaceAll('{x}', p.x).replaceAll('{y}', p.y).replaceAll('{z}', p.z)); } };
+    if (process.env.END_STAGE_CMDS) { await runCommands(process.env.END_STAGE_CMDS); await sleep(1500); log({ phase: 'shaped', position: bot.entity.position }); }
+    if (process.env.END_LATE_CMDS) setTimeout(() => runCommands(process.env.END_LATE_CMDS).then(() => log({ phase: 'late commands run', position: bot.entity.position, health: bot.health })), Number(process.env.END_LATE_AT || 20) * 1000);
+    let lastStep = null; const stepWatch = setInterval(() => { const k = JSON.stringify(goal?.step); if (k !== lastStep) { lastStep = k; log({ step: goal?.step, health: bot.health }); } }, 100);
+    bot.once('end', () => clearInterval(stepWatch));
     await prepareCombatGear(bot, task, goal, save, { acquireStep: async () => { throw new Error('nothing is made in the drill'); } }).catch(err => log({ gear: err.message }));
     await waitFor(task, () => Object.values(bot.entities).some(e => e.name === 'ender_dragon'), 60000);
     // Until the dragon dies or the time is up; a pass that returns at once is paced.
