@@ -2611,7 +2611,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             if (!sd(q.offset(0, 2, 0))) roofsWanted++;
             path.push(q);
           }
-          if (ok && path.length >= 4 && sd(f0.offset(0, -1, 0)) && !hard(f0)) {
+          if (ok && path.length >= 1 && sd(f0.offset(0, -1, 0)) && !hard(f0)) {
             const stone = path.filter(q => es(q) || es(q.offset(0, 1, 0))).reduce((n, q) => n + (es(q) ? 1 : 0) + (es(q.offset(0, 1, 0)) ? 1 : 0), 0);
             tree[`tunnel_to_${target.id}`] = {
               description: { action: `Dig a tunnel one wide and two high from this hole to the foot of crystal ${target.id}'s pillar, ${path.length} cells under the island's surface (${stone} of end stone to pick up as the body steps in, ${roofsWanted} cell${roofsWanted === 1 ? '' : 's'} with open ground over them roofed with a block carried), ending in a hole at the foot; about a second a block with the pickaxe, the body out of the dragon's sight the while. From the foot the climb is ${lift} up, walled with ${lift * 5 + 8} blocks carried (${carried} now).`,
@@ -2837,6 +2837,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             if (flat > radius + 2.2) { (state.punchUnreached ||= {})[target.id] = Date.now(); save(); throw new Error(`The pillar's foot was not reached: ${Math.round(flat)} blocks from its middle, its radius ${radius}`); }
             const from = Math.floor(p.y);
             await descentChoice(feetY - from);
+            // Out of the hole before the pool and the climb (note 1772): at a tunnel's end the foot cell is a pit, the drop's pool poured beside the column went into it, and the climb refused water at the feet; 25588's dragon-139 (2026-10-17 16:2xZ) poured, took back and poured again twenty-four times at (-10, 57, -36) under crystal 65, the climb never begun.
+            { const fh = bot.entity.position.floored(), sdh = q => bot.blockAt(q)?.boundingBox === 'block'; const closed = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => sdh(fh.offset(dx, 0, dz))).length; if (holeHere() || inTunnel() || closed >= 2) { try { await outOfTheHole(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; } } }
             const footCell = bot.entity.position.floored();
             require('./climb-record').begin(bot, { walled: Math.floor((blocksCarried(bot) - 8 - lift) / 4) >= Math.ceil(lift / 2), lift, crystal: target.id });
             if (state.descent?.pick === 'water_drop') { try { await poolForTheDrop(footCell, feetY - from); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; } }
