@@ -2603,7 +2603,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           // A block under the hole's floor (note 1737), so the roof over the head is two thick: the breath's cloud on the ground above is half a block high and hurts what its box meets through the blocks, and the arena's drill (2026-10-17 15:33Z) had its tunnel at the hole's own floor cut by 'dragon_breath_cloud' from the ground a block and a half over its head.
           const f0 = here.floored().offset(0, -1, 0), es = q => bot.blockAt(q)?.name === 'end_stone', sd = q => bot.blockAt(q)?.boundingBox === 'block', hard = q => /bedrock|obsidian|end_portal/.test(bot.blockAt(q)?.name || '');
           const path = []; let q = f0.clone(), roofsWanted = 0, ok = true;
-          for (let k = 0; k < 72 && Math.hypot(c.x + .5 - (q.x + .5), c.z + .5 - (q.z + .5)) > radius + 2.5; k++) {
+          // To the cell against the pillar (note 1771), within radius + 1.6 of its middle, not radius + 2.5: the climb's walk wants the foot within radius + 2.2, and 25588's dragon-139 (2026-10-17 16:2xZ) ended its tunnel 4.7 from crystal 65's middle and looped nineteen times at 'still off it', the pool poured and taken back each time.
+          for (let k = 0; k < 72 && Math.hypot(c.x + .5 - (q.x + .5), c.z + .5 - (q.z + .5)) > radius + 1.6; k++) {
             const ddx = c.x - q.x, ddz = c.z - q.z, step = Math.abs(ddx) >= Math.abs(ddz) ? [Math.sign(ddx), 0] : [0, Math.sign(ddz)];
             q = q.offset(step[0], 0, step[1]);
             if (!sd(q.offset(0, -1, 0)) || hard(q) || hard(q.offset(0, 1, 0)) || voidEdge(bot, q.offset(.5, 0, .5), 4) !== null) { ok = false; break; }
