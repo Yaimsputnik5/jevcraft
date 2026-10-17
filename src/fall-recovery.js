@@ -26,8 +26,9 @@ function fallDanger(bot) {
 function clutchTarget(bot, serverPosition) {
   const why = reason => { (bot._clutchWhy ||= []).push(`${Math.floor(bot.entity.position.y)}:${reason}`); if (bot._clutchWhy.length > 12) bot._clutchWhy.shift(); return null; };
   const feet = bot.entity.position, eye = serverPosition.offset(0, 1.62, 0);
-  const hit = bot.world.raycast(feet.offset(0, 1.62, 0), down, 5);
-  if (!hit?.position) return why('nothing within five below');
+  // Seven down from the eye, not five (note 1797): at two and a third blocks a tick the sample that sees the floor within five is the one 3.4 or less above it, often the last before the ground; 25588's dragon-168 (2026-10-17 23:22Z) fell 29 off its column with samples at 70, 68 and 66 'nothing within five below' and the ground at 60, never a click. Seen from seven, the sample at 4 to 5 above sees it and clicks within the reach of note 1795.
+  const hit = bot.world.raycast(feet.offset(0, 1.62, 0), down, 7);
+  if (!hit?.position) return why('nothing within seven below');
   const support = bot.blockAt(hit.position), p = hit.position.offset(0, 1, 0);
   if (support?.boundingBox !== 'block' || ['magma_block', 'cactus'].includes(support.name)) return why(`${support?.name || 'nothing'} under`);
   if (!['air', 'cave_air', 'void_air'].includes(bot.blockAt(p)?.name)) return why(`${bot.blockAt(p)?.name} where the water would go`);
