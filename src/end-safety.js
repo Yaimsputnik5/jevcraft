@@ -495,6 +495,8 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
           bot.setControlState?.('sneak', true); await sleep(200); bot.setControlState?.('sneak', false);
           return true;
         }
+        // Why no hole, said (note 1768): 43 times on 25588 (2026-10-16/17) the body's call found no run and the crouch was taken, and nine of them were followed by the throw (dragon-131, 15:1xZ: from (-30, 68, 27) 17.8 blocks through the air, dead of the fall); the crouch stops nothing, and nothing said which of the hole's conditions failed.
+        if (!(bot._noHoleSaid > Date.now() - 10000)) { bot._noHoleSaid = Date.now(); const why = [!dig && 'no dig', sidesClosed >= 4 && 'walled already', !thick && `ground ${[1, 2, 3, 4, 5, 6].findIndex(dy => !solid(f.offset(0, -dy, 0))) + 1} thick`, voidSides(bot, bot.entity.position) !== 0 && 'the void beside', deepBeside(bot, bot.entity.position) && 'a drop beside', !bot.entity.onGround && 'in the air'].filter(Boolean).join(', '); console.log(`[end safety] the dragon's body coming: no run and no hole at ${f} (${why || 'no reason found'}): the crouch, which stops nothing`); }
         bot.setControlState?.('sneak', true); goal.step = { action: 'crouch_for_the_body', hazard: dragon.name, islandAlongThePush: here, sidesClosed }; save(); await sleep(400); bot.setControlState?.('sneak', false); return true;
       }
     }
