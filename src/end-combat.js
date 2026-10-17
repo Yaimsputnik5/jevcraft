@@ -2150,6 +2150,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // the bot's own column or an obsidian top, told on the climb's option.
     { const h = bot.health, was = state.lastHealthSeen; state.lastHealthSeen = h;
       if (Number.isFinite(was) && h < was - 0.05 && (onOwnPillar() || onObsidianTop())) { const c = state.columnDamage ||= { hits: 0, total: 0, max: 0 }; const d = Math.round((was - h) * 10) / 10; c.hits++; c.total = Math.round((c.total + d) * 10) / 10; c.max = Math.max(c.max, d); save(); } }
+    // Hurt by the dragon within three seconds and no emergency seen, said at the pass start (note 1776; note 1765 said it only inside the response, which a silent pass never reached).
+    if (bot._lastDragonHurtAt > Date.now() - 3000 && !endEmergency(bot, { ground: onTheGround() }) && !(state.notInBreathSaid > Date.now() - 2000)) { state.notInBreathSaid = Date.now(); const clouds = Object.values(bot.entities).filter(e => e.name === 'area_effect_cloud' && e.isValid !== false).map(e => `${Math.round(Math.hypot(e.position.x - bot.entity.position.x, e.position.z - bot.entity.position.z) * 10) / 10} off, ${Math.round((e.position.y - bot.entity.position.y) * 10) / 10} up, radius ${Math.round(cloudRadius(bot, e) * 10) / 10}`); console.log(`[end combat] hurt by the dragon ${Math.round((Date.now() - bot._lastDragonHurtAt) / 100) / 10} s ago at ${bot.entity.position.floored()} and no emergency by the geometry; in water ${inWater()}; clouds ${clouds.length ? clouds.join('; ') : 'none seen'}`); }
     if (endEmergency(bot, { ground: onTheGround() }) && !holeAnswers()) { await respond(); return; }
     if (await holeBeforeThePass()) return;
     // The stub taken back (note 1767): every fireball's cloud on open ground costs two blocks up and a roof of about four, and the stub was left standing when the body walked off to its next step. 25588's dragon-129 (2026-10-17 15:0xZ, two crystals broken) went 56 blocks to 2 in ten such stubs over four minutes and died in the next cloud with none to climb on; dragon-128 the same from 54, and 13 of the stage's 57 deaths carried two blocks or fewer. On a stub of one to three with the dragon over thirty off and no breath near, the roof's blocks within reach and the column are dug back before the next step.
@@ -3797,6 +3799,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           // The record kept when the dig did not come down (note 1712): 25588 (dragon-254, 2026-10-15 09:23Z) was 'down the column: 0 dug, now at (35, 83, -27)' on its own column beside crystal 92's cage, the record dropped, 'column undefined', and 'only observe' seven times on the top at 82 until the breath and the body came.
           { const u = bot._pillarUp; if (!u || u.base == null || Math.floor(bot.entity.position.y) <= u.base + 2) delete bot._pillarUp; }
         } };
+    }
+    // Out of the water before the hold (note 1776): in water nothing is offered (no climb, no dig, no tunnel, no quarry), the tree is empty, and the hold stood the body still in its landing pool under the fireballs. 25588's dragon-142 (2026-10-17 17:00 to 17:02Z, one crystal broken) landed its drop in the clutch's water at (-15, 61, 36) at 14 health and held 'end_hold' there 81 s with no question asked and no response, two clouds on it, dead at 17:02:14Z. The water is taken back into the bucket where it can be, or the body steps to the nearest dry cell.
+    if (!Object.keys(tree).length && !safe && inWater()) {
+      const f = bot.entity.position.floored(); let how = 'nothing';
+      try { const took = await takeBackWaterNear({ force: true }); if (took) how = `the water at ${took} taken back`; } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
+      if (inWater()) {
+        const dry = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]].map(([dx, dz]) => f.offset(dx, 0, dz)).find(c => !/water/.test(bot.blockAt(c)?.name || '') && bot.blockAt(c)?.boundingBox !== 'block' && bot.blockAt(c.offset(0, -1, 0))?.boundingBox === 'block' && bot.blockAt(c.offset(0, 1, 0))?.boundingBox !== 'block');
+        if (dry) { goal.step = { action: 'out_of_the_pool', to: { x: dry.x, y: dry.y, z: dry.z } }; save(); try { await require('./motion').move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'out_of_the_pool', keys: ['forward'], sneak: false, why: 'out of the water, where no climb and no dig is to be had', look: dry.offset(.5, 1.6, .5), maxMs: 1500, tick: 25, until: () => !inWater() }); how += `; stepped to ${dry}`; } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; } }
+        else how += '; no dry cell beside';
+      }
+      console.log(`[end combat] in the water with nothing offered at ${f}: ${how}; now ${inWater() ? 'still in the water' : 'out'} at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);
+      return;
     }
     if (!Object.keys(tree).length && !safe) {
       state.heldForMobs = { at: Date.now(), unsafe: unsafeBecause(bot, bot.entity.position).slice(0, 6) }; save();
