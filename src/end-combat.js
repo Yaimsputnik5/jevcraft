@@ -980,12 +980,25 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // The record kept on the obsidian (note 1473): the way back to the column from the top can fail, and the record dropped there left 25588 (dragon-55, 2026-10-13 14:22Z, crystal 9 broken) 'only observe' on the top, 'column undefined'.
     { const un = bot.blockAt(bot.entity.position.floored().offset(0, -1, 0))?.name || ''; if (!scaffold.test(un, Math.floor(bot.entity.position.y) - 1) && !/^(obsidian|bedrock|iron_bars)$/.test(un)) delete bot._pillarUp; }
     console.log(`[end combat] down the column: ${n} dug, now at ${bot.entity.position.floored()}`);
+    // Two under the ground at the column's foot, roofed (note 1780): the body at ground level at the end of its descent, in the column's one-wide shaft, is where the next fireball finds it, and its cloud lies in the shaft with the body. 25588's dragon-149 (2026-10-17 18:2xZ) came down 21 to (-11, 58, 37), a fireball thrown as it arrived, the hole roofed a second later, 8.5 to 2.5, dead; dragon-150 (18:4xZ) the same at the next descent's foot. With the pickaxe and end stone two deep under the feet, no void within four and no water, the body goes two down and roofs the cell over its head before anything else; from that hole the tunnel is offered.
+    let holed = false;
+    if (n >= 1 && actions.dig && pickCarried() && !bot._pillarUp && !inWater()) {
+      const f = bot.entity.position.floored(), u1 = bot.blockAt(f.offset(0, -1, 0)), u2 = bot.blockAt(f.offset(0, -2, 0)), u3 = bot.blockAt(f.offset(0, -3, 0));
+      if (u1?.name === 'end_stone' && u2?.name === 'end_stone' && u3?.boundingBox === 'block' && voidEdge(bot, bot.entity.position, 4) === null && blocksCarried(bot) >= 1) {
+        const t0 = Date.now(); let dug = 0;
+        for (let d = 0; d < 2; d++) { const y0 = Math.floor(bot.entity.position.y), under = new Vec3(f.x, y0 - 1, f.z); if (bot.blockAt(under)?.name !== 'end_stone') break; try { await actions.dig(bot, task, under, { requireDrops: false, dropInto: true, openPit: true }); dug++; } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; break; } for (let i = 0; i < 30 && Math.floor(bot.entity.position.y) >= y0; i++) await sleep(50); for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50); }
+        let roofed = false; if (dug >= 2) { try { roofed = await roofHole(true); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; } }
+        holed = dug >= 2 && roofed;
+        if (holed) { const g = bot.entity.position.floored(); state.hole = { x: g.x, y: g.y, z: g.z, at: Date.now() }; save(); }
+        console.log(`[end combat] the column's foot made a hole: ${dug} dug under the ground, ${roofed ? 'roofed' : 'not roofed'}, ${Math.round((Date.now() - t0) / 100) / 10} s, now at ${bot.entity.position.floored()}, ${blocksCarried(bot)} blocks, ${bot.health.toFixed(1)} health`);
+      }
+    }
     // The descent's record for the way-down question (note 1484).
     { const from = digFromY, to = Math.floor(bot.entity.position.y); (state.descents ||= []).push({ at: Date.now(), kind: 'dig', from, to, dug: n, down: from - to >= Math.min(limit, 3), fell: from - to > n + 2, lost: Math.round((digFromHealth - bot.health) * 10) / 10 }); state.descents = state.descents.slice(-20); }
     // The column's blocks lie at its foot: picked up for the next climb. The
     // drill of 2026-10-13 (04:26 to 04:56Z) built four columns and had 16 of
     // its 128 blocks left, none picked up.
-    if (n >= 3) {
+    if (n >= 3 && !holed) {
       const material = blocksCarriedName(bot) || 'cobblestone';
       try { await require('./drop-collection').collectNearbyDrops(bot, task, material, { radius: 6, timeoutMs: 5000, waitForSpawnMs: 500, move: actions.navigate }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
     }
