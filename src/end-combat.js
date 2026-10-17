@@ -2598,6 +2598,54 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         const margin = (onOwnPillar() || onObsidianTop()) ? 0 : 3 + roofs + 8; // The pocket before the blow under the bedrock (note 1675) wants eight too (note 1677): dragon-212 (2026-10-14 23:45Z) climbed 16 for crystal 89 with 15 and struck with none to spare, no pocket. // The stand's walls (note 1664) counted in (note 1666): eight blocks on the top for the stand case; dragon-201 climbed 23 with 26 and had three at the top, no walls, and the body struck it twice there.
         // A lift of none is a stand reached (note 1472): 25588 (dragon-54, 2026-10-13 14:13Z) stood at crystal 66's stand, 'no blow at crystal 66: 3 off, lift 0', held 'unsafe' twenty seconds and died in the breath; dragon-52 the same at 98.
         // The quarry offered for the walled climb's blocks too (note 1760; every crystal's, note 1761): the caged crystal's climb is walled with five blocks a level and eight more, and with fewer the climb is bare. 25588's dragon-41, 42, 53 and 55 (2026-10-16 20:43 to 23:27Z) climbed caged crystals bare with 100 of 193, 44 of 123, 41 of 68 and 73 of 133 carried, no quarry offered (it was offered only under the bare climb's count), were thrown off by the dragon's body and died of the fall.
+        // The tunnel to the crystal's foot (note 1769): one wide and two high under the island's surface from the hole the body is in, each cell's two stone picked up as it steps in, roofed where the ground above is open, ending in a hole at the pillar's foot. Of 25588's 59 deaths on this stage (2026-10-16/17) the step at death was on the open ground between crystals 15 times (the quarry, a walk, a wait, a meal: the dragon's body and the breath find the body there) and a bare climb 19 times; the tunnel keeps the body out of the dragon's sight to the foot, and its stone (two a cell) is the walls' (five a level). In 23 runs after the walls (dragon-111 to 133) ten broke no crystal.
+        if ((holeHere() || inTunnel()) && actions.dig && pickCarried() && out > radius + 3 && out <= 72 && Math.floor(here.y) >= 50 && !onOwnPillar() && !onObsidianTop()) {
+          // A block under the hole's floor (note 1737), so the roof over the head is two thick: the breath's cloud on the ground above is half a block high and hurts what its box meets through the blocks, and the arena's drill (2026-10-17 15:33Z) had its tunnel at the hole's own floor cut by 'dragon_breath_cloud' from the ground a block and a half over its head.
+          const f0 = here.floored().offset(0, -1, 0), es = q => bot.blockAt(q)?.name === 'end_stone', sd = q => bot.blockAt(q)?.boundingBox === 'block', hard = q => /bedrock|obsidian|end_portal/.test(bot.blockAt(q)?.name || '');
+          const path = []; let q = f0.clone(), roofsWanted = 0, ok = true;
+          for (let k = 0; k < 72 && Math.hypot(c.x + .5 - (q.x + .5), c.z + .5 - (q.z + .5)) > radius + 2.5; k++) {
+            const ddx = c.x - q.x, ddz = c.z - q.z, step = Math.abs(ddx) >= Math.abs(ddz) ? [Math.sign(ddx), 0] : [0, Math.sign(ddz)];
+            q = q.offset(step[0], 0, step[1]);
+            if (!sd(q.offset(0, -1, 0)) || hard(q) || hard(q.offset(0, 1, 0)) || voidEdge(bot, q.offset(.5, 0, .5), 4) !== null) { ok = false; break; }
+            if (!sd(q.offset(0, 2, 0))) roofsWanted++;
+            path.push(q);
+          }
+          if (ok && path.length >= 4 && sd(f0.offset(0, -1, 0)) && !hard(f0)) {
+            const stone = path.filter(q => es(q) || es(q.offset(0, 1, 0))).reduce((n, q) => n + (es(q) ? 1 : 0) + (es(q.offset(0, 1, 0)) ? 1 : 0), 0);
+            tree[`tunnel_to_${target.id}`] = {
+              description: { action: `Dig a tunnel one wide and two high from this hole to the foot of crystal ${target.id}'s pillar, ${path.length} cells under the island's surface (${stone} of end stone to pick up as the body steps in, ${roofsWanted} cell${roofsWanted === 1 ? '' : 's'} with open ground over them roofed with a block carried), ending in a hole at the foot; about a second a block with the pickaxe, the body out of the dragon's sight the while. From the foot the climb is ${lift} up, walled with ${lift * 5 + 8} blocks carried (${carried} now).`,
+                cells: path.length, endStoneToGain: stone, roofsToLay: roofsWanted, blocksCarried: carried, liftAtTheFoot: lift, wallsWant: lift * 5 + 8, crystalBlocksOff: out, health: bot.health, dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null,
+                climbRecord: require('./climb-record').says(bot),
+                record: 'of 25588\'s 59 deaths on this stage (2026-10-16/17) the step at death was on the open ground between crystals 15 times (the quarry, a walk, a wait, a meal) and a bare climb 19 times; underground, in the tunnel quarries, none' },
+              run: async () => {
+                const t0 = Date.now(), before = blocksCarried(bot); let cells = 0, roofs = 0, why = 'reached';
+                goal.step = { action: 'tunnel_to_crystal', crystal: target.id, cells: path.length }; save();
+                if (Math.floor(bot.entity.position.y) > f0.y) { if (sd(f0)) await actions.dig(bot, task, f0, { requireDrops: false, dropInto: true }); for (let i = 0; i < 20 && Math.floor(bot.entity.position.y) > f0.y; i++) await sleep(50); }
+                if (Math.floor(bot.entity.position.y) > f0.y) throw new Error(`The body did not go down to the tunnel's floor at ${f0}`);
+                state.tunnelAt = Date.now();
+                try {
+                for (const q of path) {
+                  check();
+                  if (Date.now() - t0 > 150000) { why = 'out of time'; break; }
+                  if (hostileEntities(bot, 4).some(e => live(bot, e) && e.name !== 'ender_dragon')) { why = 'a mob within four'; break; }
+                  if (inWater()) { why = 'water'; break; }
+                  if (!sd(q.offset(0, -1, 0)) || voidEdge(bot, q.offset(.5, 0, .5), 4) !== null) { why = 'no floor ahead'; break; }
+                  for (const cell of [q.offset(0, 1, 0), q]) if (sd(cell)) { if (hard(cell)) { why = `${bot.blockAt(cell)?.name} in the way`; break; } await actions.dig(bot, task, cell, { requireDrops: false }); }
+                  if (why !== 'reached') break;
+                  if (!sd(q.offset(0, 2, 0))) { const block = bot.inventory.items().find(i => i.name === 'end_stone') || bot.inventory.items().find(i => require('./pillar-recovery').SCAFFOLD.includes(i.name)); if (block) { try { await actions.place(bot, task, q.offset(0, 2, 0), block.name); roofs++; } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; } } }
+                  await require('./motion').move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'into_the_tunnel', keys: ['forward'], sneak: false, why: 'into the tunnel cell just dug', look: q.offset(.5, 1.6, .5), maxMs: 1500, tick: 25, until: () => Math.floor(bot.entity.position.x) === q.x && Math.floor(bot.entity.position.z) === q.z });
+                  cells++; state.tunnelAt = Date.now();
+                }
+                } finally {
+                const got = blocksCarried(bot) - before, g = bot.entity.position.floored();
+                state.hole = { x: g.x, y: g.y, z: g.z, at: Date.now() }; (state.tunnelsTo ||= []).push({ crystal: target.id, cells, got, why, at: Date.now() }); save();
+                console.log(`[end combat] the tunnel to crystal ${target.id}'s foot from ${f0}: ${cells} of ${path.length} cells dug (${why}), ${roofs} roofed, ${got} end stone gained, ${blocksCarried(bot)} carried, ${Math.round((Date.now() - t0) / 100) / 10} s, ${bot.health.toFixed(1)} health; the body at ${g}, ${Math.round(Math.hypot(c.x + .5 - g.x, c.z + .5 - g.z))} from the pillar's middle`);
+                if (cells >= 4) progress = true;
+                }
+                if (why !== 'reached' && cells < 4) throw new Error(`The tunnel to crystal ${target.id} ended after ${cells} cells: ${why}`);
+              } };
+          }
+        }
         const noBlow = out > 64 || lift < 0 || lift + margin > Math.min(carried, 64 + margin);
         const wallsShort = !noBlow && lift >= 1 && carried < lift * 5 + 8 && !onOwnPillar() && !onObsidianTop();
         if (noBlow || wallsShort) {
@@ -3782,7 +3830,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     }
     goal.step = { action: 'end_combat', selected: decision.path, dragonHealth: beforeDragon, observedCrystals: crystals.length }; save();
     // Out of the hole first for anything but the stay (note 1592).
-    if (holeHere() && !['stay_in_hole', 'observe', 'eat'].includes([].concat(decision.path).at(-1))) { try { await outOfTheHole(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
+    if (holeHere() && !['stay_in_hole', 'observe', 'eat'].includes([].concat(decision.path).at(-1)) && !/^(tunnel_to_|tunnel_quarry|stock_up_underground)/.test(String([].concat(decision.path).at(-1)))) { try { await outOfTheHole(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
     // The breath's cloud cuts the run within a tick (note 1619): the emergency
     // was read at the step's start and wherever a run happened to call the
     // task's check, and a quarry's dig or a walk in the pathfinder calls it
