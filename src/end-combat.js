@@ -440,6 +440,42 @@ async function arenaRoutes(bot, task, goal, policy, focus, { throwing = false } 
   return routes;
 }
 
+// Air in the End (note 1774): the fight owns every tick there and the arbiter never hands the turn to the survival layer, so a body under water has no rescue but this. 25588's dragon-139 (2026-10-17 16:4xZ, 226 blocks carried) dug its tunnel's floor into a pool's run-off at (-7, 54, 34), went under, and drowned over 21 s of '0 air and no rescue under way'. Under 15 air with the head or the feet in water: an empty bucket scoops a source at the head or the feet (the air comes with it), the jump key is held toward the surface, and a roof over the shaft is dug with the bot's own dig (the work loop's dig checks the air and would throw).
+async function airInTheEnd(bot, task, goal, save) {
+  const air = () => bot.oxygenLevel ?? 20;
+  const wet = p => /water/.test(bot.blockAt(p)?.name || '');
+  const headCell = () => bot.entity.position.offset(0, 1.62, 0).floored(), feetCell = () => bot.entity.position.floored();
+  if (!(air() < 15 && wet(headCell()))) return false;
+  const t0 = Date.now(), a0 = air(), p0 = feetCell(), alive = () => bot.health > 0 && bot.isAlive !== false && /end$/.test(String(bot.game?.dimension || ''));
+  goal.step = { action: 'air_in_the_end', air: a0, at: { x: p0.x, y: p0.y, z: p0.z } }; save();
+  bot._airAbort = false; bot.pathfinder?.setGoal?.(null); bot.clearControlStates?.();
+  const how = [];
+  // An empty bucket on a source at the head or the feet: the cell empties and the air comes with it.
+  try {
+    const { sourceWater } = require('./water');
+    const bucket = bot.inventory.items().find(i => i.name === 'bucket');
+    if (bucket) for (const c of [headCell(), feetCell()]) { const b = bot.blockAt(c); if (b && wet(c) && sourceWater(b)) { await bot.equip(bucket, 'hand'); await bot.lookAt(c.offset(.5, .5, .5), true); await sleep(120); bot.activateItem(); await sleep(250); how.push(`the water at ${c} scooped`); break; } }
+  } catch (err) { how.push(`no scoop: ${String(err.message || err).slice(0, 60)}`); }
+  // A roof over the shaft: the body sinks to the floor first (a dig afloat under water is twenty-five times slower, on the floor five), the pickaxe in hand, and the block over the head is dug; the arena (2026-10-17 16:46Z) dug it afloat and bare-handed in 20 s, 20 to 1.3 health.
+  const roofOver = () => { for (let dy = 1; dy <= 2; dy++) { const c = headCell().offset(0, dy, 0), b = bot.blockAt(c); if (b?.boundingBox === 'block') return /bedrock|obsidian|end_portal/.test(b.name) ? null : c; if (!wet(c)) return null; } return null; };
+  let roof = wet(headCell()) ? roofOver() : null;
+  if (roof) {
+    try { const pick = bot.inventory.items().find(i => /_pickaxe$/.test(i.name) && !/wooden|golden/.test(i.name)) || bot.inventory.items().find(i => /_pickaxe$/.test(i.name)); if (pick) await bot.equip(pick, 'hand'); } catch (_) {}
+    bot.setControlState?.('sneak', true);
+    for (let i = 0; i < 16 && alive() && !bot.entity.onGround; i++) await sleep(50);
+    bot.setControlState?.('sneak', false);
+    for (let tries = 0; tries < 2 && alive() && roof && wet(headCell()); tries++) {
+      const b = bot.blockAt(roof); if (!b || b.boundingBox !== 'block') break;
+      try { const td = Date.now(); await bot.dig(b); how.push(`${b.name} over the head dug in ${Math.round((Date.now() - td) / 100) / 10} s${bot.entity.onGround ? '' : ' afloat'}`); } catch (err) { how.push(`no dig: ${String(err.message || err).slice(0, 50)}`); }
+      roof = roofOver();
+    }
+  }
+  bot.setControlState?.('jump', true);
+  while (Date.now() - t0 < 8000 && alive() && wet(headCell())) await sleep(50);
+  bot.setControlState?.('jump', false);
+  console.log(`[end combat] air in the End at ${p0}: ${a0} air, ${how.join(', ') || 'swam up'}; now ${air()} air at ${feetCell()}, the head ${wet(headCell()) ? 'still under' : 'out'}, ${Math.round((Date.now() - t0) / 100) / 10} s`);
+  return true;
+}
 async function fightEndStep(bot, task, goal, save, actions, client, { shot = shootBow } = {}) {
   // No blow at what cannot be struck (note 1456): the server's answer to one
   // is the door ('multiplayer.disconnect.invalid_entity_attacked'), and 25588
@@ -458,6 +494,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       return raw(entity, ...rest);
     };
   }
+  if (await airInTheEnd(bot, task, goal, save)) return;
   let stepCut = null;
   const check = () => {
     task.check(); checkAir(bot);
