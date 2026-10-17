@@ -1935,7 +1935,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       if (await backToColumn()) await wayDown({ limit: 3 });
     }
     else if (onOwnPillar()) await holdOrDown();
-    else if (onObsidianTop()) { if (await holdOnColumn() === 'cloud' && await backToColumn()) await wayDown({ limit: 3 }); }
+    else if (onObsidianTop()) {
+      // Back into the column's pocket before the hold when the body's call comes on the stand (note 1788): the stand is the pillar's cap, one thick with the void beside, no run and no hole, and the crouch stops nothing. 25588's dragon-155 (2026-10-17 19:5xZ, two crystals from climbs walled on every level) struck crystal 1875 and was charged on the stand at (-9, 88, -36) before it stepped back, fell 26 to (-8, 62, -36), and the clutch found no floor within five until the ground.
+      if (endEmergency(bot) === 'dragon_charge_or_contact' && nearOwnColumnTop() && !onColumnCell()) { const t0 = Date.now(); let back = false; try { back = await backToColumn(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } console.log(`[end combat] the body's call on the stand at ${bot.entity.position.floored()}: back to the column ${back ? 'there' : 'not reached'}, ${Date.now() - t0} ms`); }
+      if (await holdOnColumn() === 'cloud' && await backToColumn()) await wayDown({ limit: 3 });
+    }
     else {
       // Out of the dragon's way by ground no mob stands near, and where
       // there is none, by any ground (note 1174): an enderman's blow is
