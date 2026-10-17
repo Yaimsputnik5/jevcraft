@@ -34,7 +34,7 @@ function breathSays(bot, dragon, to) {
     return d <= 8 ? { intoTheBreath: `ends ${Math.round(d)} blocks from the perched dragon while it breathes: its breath lies on the ground before its head, Instant Damage of 6 a time that armour does not lessen; the drill's bot in full iron at 20 health walked in there and died` } : {};
   } catch (_) { return {}; }
 }
-const blocksCarriedName = bot => { const SCAFF = ['cobblestone', 'end_stone', 'netherrack', 'dirt', 'stone', 'cobbled_deepslate', 'andesite', 'granite', 'diorite', 'oak_planks', 'spruce_planks', 'birch_planks']; return (bot.inventory?.items() || []).map(i => i.name).find(n => SCAFF.includes(n)) || null; };
+const blocksCarriedName = bot => { const SCAFF = ['end_stone', 'cobblestone', 'netherrack', 'dirt', 'stone', 'cobbled_deepslate', 'andesite', 'granite', 'diorite', 'oak_planks', 'spruce_planks', 'birch_planks']; return (bot.inventory?.items() || []).map(i => i.name).find(n => SCAFF.includes(n)) || null; };
 function blocksCarried(bot) {
   return bot.inventory.items().filter(i => /^(cobblestone|cobbled_deepslate|end_stone|netherrack|dirt|stone|blackstone|deepslate|andesite|diorite|granite|tuff|obsidian)$/.test(i.name)).reduce((n, i) => n + i.count, 0);
 }

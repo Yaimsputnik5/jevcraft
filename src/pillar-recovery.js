@@ -145,7 +145,8 @@ async function descendPillar(bot, task, goal, save, expected, { combat = false }
 // next cell up; the pathfinder takes over from wherever it stops.
 // The hand-dug Nether blocks last (block-stock.js HAND_BLOCKS, note 692).
 // End stone too (note 1427): the island's own rock, dug for the climbs there; 25588 (dragon-12, 2026-10-13 06:45Z), its cobblestone laid, stood with 22 end stone and 'no block of the kinds the climb lays carried'.
-const SCAFFOLD = ['netherrack', 'cobblestone', 'cobbled_deepslate', 'dirt', 'nether_bricks', 'blackstone', 'basalt', 'stone', 'andesite', 'diorite', 'granite', 'tuff', 'end_stone', 'soul_soil', 'soul_sand', 'nether_wart_block', 'warped_wart_block', 'shroomlight'];
+// End stone first (note 1785): the dragon's body smashes every block it meets but end stone, obsidian and bedrock, and 25588's dragon-153 (2026-10-17 19:1xZ, 199 blocks carried, most of them end stone from its tunnels) had its pocket at the top of a walled climb roofed and walled in cobblestone, the charge opened it, and the cloud filled the cell, 14.3 to none. Elsewhere no end stone is carried and the order is as before.
+const SCAFFOLD = ['end_stone', 'netherrack', 'cobblestone', 'cobbled_deepslate', 'dirt', 'nether_bricks', 'blackstone', 'basalt', 'stone', 'andesite', 'diorite', 'granite', 'tuff', 'end_stone', 'soul_soil', 'soul_sand', 'nether_wart_block', 'warped_wart_block', 'shroomlight'];
 // The End island's end stone too (note 1420): a climb begun under its lip stopped 'end stone over the head' (25588, dragon-9, 2026-10-13 06:12Z).
 const DIGGABLE_ABOVE = /^(netherrack|stone|deepslate|cobblestone|cobbled_deepslate|dirt|gravel|sand|soul_sand|soul_soil|basalt|blackstone|andesite|diorite|granite|tuff|nether_bricks|glowstone|magma_block|crimson_nylium|warped_nylium|nether_quartz_ore|nether_gold_ore|.*_leaves|end_stone)$/;
 // `canDig` says which blocks overhead may be dug: a climb out of the mine
