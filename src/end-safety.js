@@ -443,6 +443,11 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600, d
         if (dig && thick && !wet && groundBeside >= 2 && voidSides(bot, bot.entity.position) === 0 && !deepBeside(bot, bot.entity.position) && bot.entity.onGround) {
           if (sidesClosed >= 4) { bot.setControlState?.('sneak', true); goal.step = { action: 'in_the_hole_for_the_body', hazard: dragon.name }; save(); await sleep(400); bot.setControlState?.('sneak', false); return true; }
           if (!openSky) { bot.setControlState?.('sneak', true); goal.step = { action: 'under_the_stone_for_the_body', hazard: dragon.name }; save(); await sleep(400); bot.setControlState?.('sneak', false); return true; }
+          // No hole dug by hand (note 1763): end stone by hand is fifteen seconds a block, the body standing still in the open the while, and the cloud that lands on it is not answered until the dig ends. 25588's dragon-113 (2026-10-17 12:59Z, two crystals broken) and dragon-118 (13:46Z, four broken) had worn their pickaxes out, stood 14 and 20 seconds a block over this dig in a pit one deep, and died in the fireball's cloud at the second block, nine iron ingots and a crafting table carried. With no pickaxe the run is taken.
+          const pickaxe = (bot.inventory?.items?.() || []).some(i => /_pickaxe$/.test(i.name));
+          if (!pickaxe) {
+            if (!(bot._noPickHoleSaid > Date.now() - 20000)) { bot._noPickHoleSaid = Date.now(); console.log(`[end safety] the dragon's body coming and no pickaxe carried: no hole dug by hand at ${f} (end stone is fifteen seconds a block bare-handed, the body still in the open the while); the run instead`); }
+          } else {
           goal.step = { action: 'hole_for_the_body', hazard: dragon.name, sidesClosed }; save();
           console.log(`[end safety] the dragon's body coming: a block dug under the feet at ${f} toward a hole two deep (${sidesClosed} of 4 sides closed now), not a run under the wings`);
           // Both blocks in the one call (note 1699, as note 1681 for the hole before the pass): a block a call left the body one deep when the blow came. 25588 (dragon-235, 2026-10-15 05:24Z, four crystals broken) dug one at (-33, 63, -4), the next call dug the second, and between them two blows of the body took 10.5 to 5.1 at (-32.5, 62, -3.5).
@@ -455,6 +460,7 @@ async function evadeDragon(bot, task, goal, save, { allowed, timeoutMs = 1600, d
           }
           bot.setControlState?.('sneak', true); await sleep(150); bot.setControlState?.('sneak', false);
           return true;
+          }
         }
       }
       const routes = dodgeRoutes(bot, dragon, allowed).map(r => ({ ...r, floor: carryFloor(bot, r.destination, dragon) }));
