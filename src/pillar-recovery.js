@@ -203,7 +203,7 @@ async function ringAround(bot, task, feet, dy, blocks = SCAFFOLD, { maxMs = 2500
   }
   return laid;
 }
-async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = true, canDig = diggableAbove, blocks = SCAFFOLD, wet = false, enclose = false, encloseUntil = Infinity } = {}) {
+async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = true, canDig = diggableAbove, blocks = SCAFFOLD, wet = false, enclose = false, encloseUntil = Infinity, encloseFrom = -Infinity } = {}) {
   const { move } = require('./motion');
   let placed = 0, lastPlaceError = null, lastJump = '';
   let rested = false;
@@ -296,7 +296,8 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     }
     // Said after the first block too, with the place's own error (note 1680): the climb out of the breath laid one of two and said nothing of the second; 25588 (dragon-216, 2026-10-15 00:2xZ, 1679 live) '1 blocks up' at (-6, 60, 35) at 9 health and '0 blocks up' at (-9, 61, 42), each three jumps of 1.2 s in a cloud of six a second.
     // The ring about the new cell (note 1753): at the feet (the level below's head ring, or the first level's) and at the head, while the blocks carried cover the rest of the climb and four more.
-    if (enclose && bot.entity.position.floored().y > start && bot.entity.position.floored().y < encloseUntil) {
+    // The walls from a height (note 1770): with too few blocks for every level, the top levels are walled and the lower climbed bare, the top being where the body waits for the perch and falls farthest from.
+    if (enclose && bot.entity.position.floored().y > start && bot.entity.position.floored().y < encloseUntil && bot.entity.position.floored().y >= encloseFrom) {
       const nf = bot.entity.position.floored(), have = blocks.reduce((n, k) => n + bot.inventory.items().filter(i => i.name === k).reduce((m, i) => m + i.count, 0), 0);
       // From a level under the feet (note 1756): the cell beside the feet has nothing under it on a column one wide, and the first ring is laid against the column's own block below the feet; the arena's drill (2026-10-16 06:48Z, CLIMB_ENCLOSE=1) laid no ring block at the feet's and the head's levels alone. A level already ringed is skipped, so the first level is twelve blocks and each after it four.
       if (have >= Math.max(0, targetY - nf.y) + 4) { let n = 0; for (const dy of [-1, 0, 1]) n += await ringAround(bot, task, nf, dy, blocks); if (n) bot._ringLaid = (bot._ringLaid || 0) + n; }
