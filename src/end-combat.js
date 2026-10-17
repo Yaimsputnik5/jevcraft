@@ -2565,8 +2565,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         const roofs = Math.ceil(Math.max(0, lift) / 3);
         const margin = (onOwnPillar() || onObsidianTop()) ? 0 : 3 + roofs + 8; // The pocket before the blow under the bedrock (note 1675) wants eight too (note 1677): dragon-212 (2026-10-14 23:45Z) climbed 16 for crystal 89 with 15 and struck with none to spare, no pocket. // The stand's walls (note 1664) counted in (note 1666): eight blocks on the top for the stand case; dragon-201 climbed 23 with 26 and had three at the top, no walls, and the body struck it twice there.
         // A lift of none is a stand reached (note 1472): 25588 (dragon-54, 2026-10-13 14:13Z) stood at crystal 66's stand, 'no blow at crystal 66: 3 off, lift 0', held 'unsafe' twenty seconds and died in the breath; dragon-52 the same at 98.
-        if (out > 64 || lift < 0 || lift + margin > Math.min(carried, 64 + margin)) {
-          if (!(state.punchSkipSaid > Date.now() - 20000)) { state.punchSkipSaid = Date.now(); console.log(`[end combat] no blow at crystal ${target.id}: ${out} off, lift ${lift}, ${carried} blocks carried, radius ${radius}`); }
+        // The quarry offered for the walled climb's blocks too (note 1760): the caged crystal's climb is walled with five blocks a level and eight more, and with fewer the climb is bare. 25588's dragon-41, 42, 53 and 55 (2026-10-16 20:43 to 23:27Z) climbed caged crystals bare with 100 of 193, 44 of 123, 41 of 68 and 73 of 133 carried, no quarry offered (it was offered only under the bare climb's count), were thrown off by the dragon's body and died of the fall.
+        const noBlow = out > 64 || lift < 0 || lift + margin > Math.min(carried, 64 + margin);
+        const wallsShort = !noBlow && isCaged && lift >= 1 && carried < lift * 5 + 8 && !onOwnPillar() && !onObsidianTop();
+        if (noBlow || wallsShort) {
+          if (noBlow && !(state.punchSkipSaid > Date.now() - 20000)) { state.punchSkipSaid = Date.now(); console.log(`[end combat] no blow at crystal ${target.id}: ${out} off, lift ${lift}, ${carried} blocks carried, radius ${radius}`); }
           // Too few blocks for the climb, a pickaxe carried and the island's
           // stone underfoot (note 1435): the blocks are dug here, Jev's to
           // choose. 25588 (dragon-19, 2026-10-13 07:53Z, full iron, an iron
@@ -2575,12 +2578,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           // island's end stone under its feet the whole while.
           const floorHere = bot.blockAt(here.floored().offset(0, -1, 0))?.name;
           // The quarry's gate is the climb's budget (note 1565): the climb wants lift + roofs + 3, and 25588 (dragon-114, 2026-10-14 03:25Z, five crystals broken) stood with 52 blocks, crystal 73's climb wanting 58, the quarry only offered under 47, 'only observe'.
-          if (out <= 64 && lift >= 1 && lift <= 64 && lift + roofs + 3 > carried && pickForBars && floorHere === 'end_stone' && !onOwnPillar() && !Object.keys(tree).some(k => k.startsWith('quarry_blocks_'))) {
+          if (out <= 64 && lift >= 1 && lift <= 64 && (lift + roofs + 3 > carried || wallsShort) && pickForBars && floorHere === 'end_stone' && !onOwnPillar() && !Object.keys(tree).some(k => k.startsWith('quarry_blocks_'))) {
             // Ten over the lift (note 1464): the roofs on the way up and down are
             // of the same blocks, and 25588 (dragon-43, 2026-10-13 12:23Z, three
             // crystals broken) climbed 38 for a lift of 37 and stopped a block
             // short with none left, 'no block of the kinds the climb lays carried'.
-            const want = Math.min(24, lift + roofs + 7 + 8 - carried);
+            const want = wallsShort ? Math.min(64, lift * 5 + 8 - carried) : Math.min(24, lift + roofs + 7 + 8 - carried);
             const { deepBeside } = require('./end-safety');
             const feet = here.floored();
             const cells = [];
@@ -2636,7 +2639,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             }
             state.quarryLook = { crystal: target.id, cells: cells.length, want, inPit, sky: skyOver(feet.offset(0, -1, 0)), at: Date.now() }; state.quarryCells = cells.map(c => ({ x: c.x, y: c.y, z: c.z }));
             if (cells.length >= Math.min(want, 4)) tree[`quarry_blocks_${target.id}`] = {
-              description: { action: `Dig ${cells.length} end stone from the island's ground within seven blocks of where the bot stands, with the ${pickForBars.name.replace('_', ' ')}, for the climb beside crystal ${target.id}'s pillar: ${lift} blocks up to its stand, ${carried} carried. The floor cells dug have rock under them and no void beside; the dragon's passes and breath go on while it digs (about a second a block). The crystal is ${out} blocks off.`,
+              description: { action: `Dig ${cells.length} end stone from the island's ground within seven blocks of where the bot stands, with the ${pickForBars.name.replace('_', ' ')}, for the climb beside crystal ${target.id}'s pillar: ${lift} blocks up to its stand, ${carried} carried.${wallsShort ? ` The crystal is caged: its climb is walled on four sides with ${lift * 5 + 8} blocks carried, and bare with fewer; on 2026-10-16 four of 25588's runs (dragon-41, 42, 53 and 55) climbed caged crystals bare with too few for the walls, were thrown off the column by the dragon's body and died of the fall.` : ''} The floor cells dug have rock under them and no void beside; the dragon's passes and breath go on while it digs (about a second a block). The crystal is ${out} blocks off.`,
                 // The record of this fight's quarries said (note 1743): Jev took the open quarry at 0.29 against the stock taken underground under 0.07 (dragon-295, 2026-10-15 17:10Z) with no word of how either had paid.
                 quarriesThisFight: `open ground: ${state.openQuarry ? `${state.openQuarry.tries} begun, ${state.openQuarry.gained} stone gained in ${Math.round(state.openQuarry.seconds)} s, the rest cut by the dragon, the breath or a mob` : 'none yet'}; underground: ${state.tunnelQuarry ? `${state.tunnelQuarry.tries} tunnels, ${state.tunnelQuarry.gained} stone in ${Math.round(state.tunnelQuarry.seconds)} s` : 'none yet'}`,
                 blocksWanted: lift, blocksCarried: carried, cellsToDig: cells.length, health: bot.health, dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null },
@@ -2680,7 +2683,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
                 save();
               } };
           }
-          continue;
+          if (noBlow) continue;
         }
         // Up its own pillar beside another crystal's, the way to this one's foot
         // is down first (pillar_down): the arena's drill of 2026-10-13 (03:45Z)
