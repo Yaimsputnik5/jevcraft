@@ -1727,6 +1727,26 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     console.log(`[end combat] down through the stub into a hole at ${g} under the perched dragon: ${dug} dug, ${closed} of 4 sides closed, roof ${roofed ? 'laid' : 'not laid'}, ${Date.now() - t0} ms, ${bot.health.toFixed(1)} health`);
     return closed >= 4;
   };
+  const takeTheStubBack = async () => {
+    const u = bot._pillarUp; if (!u || u.until < Date.now() || u.base == null || !onOwnPillar()) return false;
+    const depth = columnDepth(); if (depth < 1 || depth > 3 || !actions.dig || !pickCarried() || inWater()) return false;
+    const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e)); if (!d) return false;
+    const off = Math.round(d.position.distanceTo(bot.entity.position));
+    if (off < 30 || breathThreat(bot) || cloudUnderfoot(3) || hostileEntities(bot, 8).some(e => live(bot, e) && e.name !== 'ender_dragon')) return false;
+    const before = blocksCarried(bot), f = bot.entity.position.floored(), y0 = f.y;
+    goal.step = { action: 'take_the_stub_back', height: depth, blocksCarried: before, dragonBlocksOff: off }; save();
+    const cells = [f.offset(0, 2, 0), ...[[1, 0], [-1, 0], [0, 1], [0, -1]].flatMap(([dx, dz]) => [2, 1, 0].map(dy => f.offset(dx, dy, dz)))].filter(c => c.y > u.base && SCAFFOLD_UNDER.test(bot.blockAt(c)?.name || ''));
+    let roof = 0;
+    for (const c of cells) {
+      check(); if (endEmergency(bot, { ground: onTheGround() })) break;
+      try { await actions.dig(bot, task, c, { requireDrops: false }); roof++; } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; break; }
+    }
+    if (!endEmergency(bot, { ground: onTheGround() })) { try { await digDownColumn({ limit: depth }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; } }
+    for (let i = 0; i < 10 && blocksCarried(bot) < before + roof + (y0 - Math.floor(bot.entity.position.y)); i++) { check(); await sleep(100); }
+    state.stubsTakenBack = (state.stubsTakenBack || 0) + 1;
+    console.log(`[end combat] the stub at (${f.x}, ${f.z}) taken back: ${roof} roof blocks and ${y0 - Math.floor(bot.entity.position.y)} of the column dug, ${before} to ${blocksCarried(bot)} blocks carried, the dragon ${off} off; ${state.stubsTakenBack} this fight`);
+    return true;
+  };
   const roofTheStub = async () => {
     const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
     // The hole through the stub fell short three times in four (note 1694: dragon-229 and 230, 2026-10-15, '2 dug, 0 of 4 sides closed' twice and '4 dug, 1 of 4 sides closed, 9186 ms' once, against one '4 dug, 4 of 4, roof laid, 5970 ms'); when it fails the stub is roofed as before, and the dig is given four seconds.
@@ -2095,6 +2115,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       if (Number.isFinite(was) && h < was - 0.05 && (onOwnPillar() || onObsidianTop())) { const c = state.columnDamage ||= { hits: 0, total: 0, max: 0 }; const d = Math.round((was - h) * 10) / 10; c.hits++; c.total = Math.round((c.total + d) * 10) / 10; c.max = Math.max(c.max, d); save(); } }
     if (endEmergency(bot, { ground: onTheGround() }) && !holeAnswers()) { await respond(); return; }
     if (await holeBeforeThePass()) return;
+    // The stub taken back (note 1767): every fireball's cloud on open ground costs two blocks up and a roof of about four, and the stub was left standing when the body walked off to its next step. 25588's dragon-129 (2026-10-17 15:0xZ, two crystals broken) went 56 blocks to 2 in ten such stubs over four minutes and died in the next cloud with none to climb on; dragon-128 the same from 54, and 13 of the stage's 57 deaths carried two blocks or fewer. On a stub of one to three with the dragon over thirty off and no breath near, the roof's blocks within reach and the column are dug back before the next step.
+    if (await takeTheStubBack()) return;
     // The water poured against an enderman taken back once it is gone (note 1646): the pick-up reached five blocks and the walk back was left to the question, and 25588 (dragon-178 and 179, 2026-10-14 15:40 to 15:58Z) each walked off from their last bucket's water and were offered the walk back for minutes without taking it. With no full bucket, an empty one, no enderman within twelve and the water within sixteen, the body goes back for it first.
     if (countOf(bot, 'water_bucket') === 0 && countOf(bot, 'bucket') > 0 && (state.poolsLeft || []).length && !onOwnPillar() && !onObsidianTop() && !hostileEntities(bot, 12).some(e => live(bot, e) && e.name === 'enderman') && !(dragon && dragonThreat(bot))) {
       if (await reclaimWaterLeft({ within: 16 })) return;
