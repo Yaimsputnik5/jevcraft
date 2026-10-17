@@ -3830,6 +3830,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if (!Object.keys(tree).length && !safe && inWater()) {
       const f = bot.entity.position.floored(); let how = 'nothing';
       try { const took = await takeBackWaterNear({ force: true }); if (took) how = `the water at ${took} taken back`; } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
+      // The source walked to and scooped (note 1786): flowing water at the feet has its source a few cells off, past the bucket's reach from where the body stands, and the pathfinder's walk times out in the water. 25588's dragon-155 (2026-10-17 19:3xZ, 167 blocks, two tunnels) stood in the run-off at (31, 59, -23) at the foot of its column, 'nothing; no dry cell beside', the walk back to the water at (31, 60, -19) timing out, round after round.
+      if (inWater() && countOf(bot, 'bucket') > 0) {
+        const { sourceWater } = require('./water');
+        const src = bot.findBlocks({ matching: bot.registry.blocksByName.water.id, maxDistance: 7, count: 12, useExtraInfo: sourceWater }).sort((a, b) => a.distanceTo(bot.entity.position) - b.distanceTo(bot.entity.position))[0];
+        if (src) {
+          try { await require('./motion').move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'to_the_water_source', keys: ['forward', 'jump'], sneak: false, why: 'to the pool\'s source, to take it back', look: src.offset(.5, .5, .5), maxMs: 2500, tick: 25, until: () => bot.entity.position.offset(0, 1.62, 0).distanceTo(src.offset(.5, .5, .5)) <= 3.5 }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
+          try { const took = await takeBackWaterNear({ force: true }); if (took) how += `; the source at ${took} walked to and taken back`; else how += `; the source at ${src} not reached (${Math.round(bot.entity.position.distanceTo(src) * 10) / 10} off)`; } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
+        } else how += '; no source within seven';
+      }
       if (inWater()) {
         const dry = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]].map(([dx, dz]) => f.offset(dx, 0, dz)).find(c => !/water/.test(bot.blockAt(c)?.name || '') && bot.blockAt(c)?.boundingBox !== 'block' && bot.blockAt(c.offset(0, -1, 0))?.boundingBox === 'block' && bot.blockAt(c.offset(0, 1, 0))?.boundingBox !== 'block');
         if (dry) { goal.step = { action: 'out_of_the_pool', to: { x: dry.x, y: dry.y, z: dry.z } }; save(); try { await require('./motion').move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'out_of_the_pool', keys: ['forward'], sneak: false, why: 'out of the water, where no climb and no dig is to be had', look: dry.offset(.5, 1.6, .5), maxMs: 1500, tick: 25, until: () => !inWater() }); how += `; stepped to ${dry}`; } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; } }
