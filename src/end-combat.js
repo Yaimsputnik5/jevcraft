@@ -2642,7 +2642,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             }
             state.quarryLook = { crystal: target.id, cells: cells.length, want, inPit, sky: skyOver(feet.offset(0, -1, 0)), at: Date.now() }; state.quarryCells = cells.map(c => ({ x: c.x, y: c.y, z: c.z }));
             if (cells.length >= Math.min(want, 4)) tree[`quarry_blocks_${target.id}`] = {
-              description: { action: `Dig ${cells.length} end stone from the island's ground within seven blocks of where the bot stands, with the ${pickForBars.name.replace('_', ' ')}, for the climb beside crystal ${target.id}'s pillar: ${lift} blocks up to its stand, ${carried} carried.${wallsShort ? ` The climb is walled on four sides with ${lift * 5 + 8} blocks carried, and bare with fewer; on 2026-10-16/17 eight of 25588's runs (dragon-41 to 61) died off bare climbs and their tops, thrown off the column by the dragon's body or stepped off it in the breath.` : ''} The floor cells dug have rock under them and no void beside; the dragon's passes and breath go on while it digs (about a second a block). The crystal is ${out} blocks off.`,
+              description: { action: `Dig ${cells.length} end stone from the island's ground within seven blocks of where the bot stands, with the ${pickForBars.name.replace('_', ' ')}, for the climb beside crystal ${target.id}'s pillar: ${lift} blocks up to its stand, ${carried} carried.${wallsShort ? ` The climb is walled on four sides with ${lift * 5 + 8} blocks carried, and bare with fewer (${require('./climb-record').says(bot)}); on 2026-10-16/17 eight of 25588's runs (dragon-41 to 61) died off bare climbs and their tops, thrown off the column by the dragon's body or stepped off it in the breath.` : ''} The floor cells dug have rock under them and no void beside; the dragon's passes and breath go on while it digs (about a second a block). The crystal is ${out} blocks off.`,
                 // The record of this fight's quarries said (note 1743): Jev took the open quarry at 0.29 against the stock taken underground under 0.07 (dragon-295, 2026-10-15 17:10Z) with no word of how either had paid.
                 quarriesThisFight: `open ground: ${state.openQuarry ? `${state.openQuarry.tries} begun, ${state.openQuarry.gained} stone gained in ${Math.round(state.openQuarry.seconds)} s, the rest cut by the dragon, the breath or a mob` : 'none yet'}; underground: ${state.tunnelQuarry ? `${state.tunnelQuarry.tries} tunnels, ${state.tunnelQuarry.gained} stone in ${Math.round(state.tunnelQuarry.seconds)} s` : 'none yet'}`,
                 blocksWanted: lift, blocksCarried: carried, cellsToDig: cells.length, health: bot.health, dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null },
@@ -2721,6 +2721,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // had its shield break on a dragon's blow at 16:52, struck crystal 107
             // from the top without it at 16:56 and took 15.4, 20 to 5.6, and died.
             shield: (() => { const sh = bot.inventory.slots?.[45]?.name === 'shield' ? bot.inventory.slots[45] : bot.inventory.items().find(i => i.name === 'shield'); if (!sh) return `no shield carried: the blast from the top is taken bare, 15.4 health on 25588 (dragon-67, 2026-10-13 16:56Z, full iron)${under ? '; from two under the bedrock the blast is mostly stopped by the bedrock itself' : ''}`; const left = Math.max(0, 336 - (sh.durabilityUsed || 0)); return `a shield carried with ${left} of 336 uses left (a blocked blow costs its damage in uses); it breaks when they are spent, and the next blast from the top is taken bare, about 15 health`; })(),
+            climbRecord: require('./climb-record').says(bot),
             thisFightOnColumns: state.columnDamage?.hits ? `on this fight's columns the bot has taken ${state.columnDamage.total} health in ${state.columnDamage.hits} blow${state.columnDamage.hits === 1 ? '' : 's'} (the largest ${state.columnDamage.max}); it has ${Math.round(bot.health * 10) / 10} now, and a blow on the column cannot be stepped from` : 'no blow has been taken on a column this fight yet' },
           run: async () => {
             // The foot at whatever height the island has there (note 1447): the
@@ -2759,6 +2760,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             const from = Math.floor(p.y);
             await descentChoice(feetY - from);
             const footCell = bot.entity.position.floored();
+            require('./climb-record').begin(bot, { walled: blocksCarried(bot) >= lift * 5 + 8, lift, crystal: target.id });
             if (state.descent?.pick === 'water_drop') { try { await poolForTheDrop(footCell, feetY - from); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; } }
             // Back onto the foot cell before the climb (note 1548): the trench and
             // the pour walk the body up to five cells out along the row, and the
@@ -2898,6 +2900,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             await sleep(300);
             const took = Math.max(0, Math.round((before - bot.health) * 10) / 10);
             (state.punches ||= []).push({ at: Date.now(), id: target.id, took, exploded: explosion, gone: !live(bot, target), under, shielded });
+            if (explosion) require('./climb-record').end(bot, 'struck');
             console.log(`[end combat] crystal ${target.id} struck ${under ? 'from under the bedrock top' : 'from the top, crouched'}${shielded ? ', shield up' : ''}: ${explosion ? 'it blew' : 'no blast seen'}${live(bot, target) ? ', it stands' : ', it is gone'}; the blast took ${took}`);
             // Gone after the blow is destroyed, the blast's packet seen or not
             // (note 1429): 25588 (dragon-13, 2026-10-13 06:55Z) broke crystal 2,
@@ -3181,6 +3184,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           if (got > 0) progress = true;
         } };
     };
+    // The climb's record closed when the body is on the ground again (note 1764).
+    if (bot._climbNow && !onOwnPillar() && !onObsidianTop() && !bot._dropping && !bot._fallRecovery && bot.entity.onGround) require('./climb-record').end(bot, 'down');
     if (actions.dig && pickCarried() && holeHere() && blocksCarried(bot) < 64) { const t = makeTunnel(); if (t) tree.tunnel_quarry = t; }
     // The stock taken underground in one choice (note 1741): the hole and then the tunnel were two choices, and Jev took the hole and left it; 25588 (dragon-293, 2026-10-15 16:36 to 16:56Z, two crystals broken) never took the tunnel, the block budget said on every option, and died with none carried in the breath at (-9, 64, -4).
     if (actions.dig && pickCarried() && !holeHere() && tree.wait_in_hole && blocksCarried(bot) < 32) tree.stock_up_underground = {
