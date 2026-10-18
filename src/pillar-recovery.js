@@ -237,7 +237,11 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     { const own = bot.blockAt(feet); if (own && own.name !== 'air' && own.boundingBox !== 'empty' && !/water|lava|bedrock|obsidian|end_portal/.test(own.name)) { console.log(`[pillar up] the ${own.name} in the feet's cell at ${feet} dug before the climb`); try { await dig(bot, task, feet, { requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } } }
     // In the order the kinds are listed, not the pack's: rock before wood
     // before the gravel that falls.
-    const block = blocks.map(n => bot.inventory.items().find(i => i.name === n)).find(Boolean);
+    // End stone kept for the top (note 1806): the dragon's body smashes every block but end stone, obsidian and bedrock, and it flies at the column's top, where the pocket, the roof and the upper rings stand. End stone first on the low lift and rings left the top cobblestone: 25588's dragon-173 (2026-10-18 00:19Z) walled 36 of 39 levels to crystal 10 with 2 end stone left of 204 blocks, was hit through its cobblestone at 93 and 91 on the way down, 20 to 13 to 3 to none; dragon-170 and 176 the same with none. The lift and the ring here take another kind while the end stone carried is no more than the top's want: five a walled level still above, and eight for the pocket and the roof.
+    const endStone = bot.inventory.items().filter(i => i.name === 'end_stone').reduce((k, i) => k + i.count, 0);
+    const topWant = (enclose ? Math.max(0, Math.min(targetY, encloseUntil) - Math.max(feet.y + 1, encloseFrom)) * 5 : 0) + 8;
+    const order = endStone <= topWant && blocks.some(n => n !== 'end_stone' && bot.inventory.items().some(i => i.name === n)) ? [...blocks.filter(n => n !== 'end_stone'), 'end_stone'] : blocks;
+    const block = order.map(n => bot.inventory.items().find(i => i.name === n)).find(Boolean);
     if (!block) { console.log(`[pillar up] stopped ${placed ? `after ${placed}` : 'before the first block'}: no block of the kinds the climb lays carried`); break; }
     await bot.equip(block, 'hand');
     await bot.look(bot.entity.yaw, -Math.PI / 2, true);
@@ -308,7 +312,7 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     if (enclose && bot.entity.position.floored().y > start && bot.entity.position.floored().y < encloseUntil && bot.entity.position.floored().y >= encloseFrom) {
       const nf = bot.entity.position.floored(), have = blocks.reduce((n, k) => n + bot.inventory.items().filter(i => i.name === k).reduce((m, i) => m + i.count, 0), 0);
       // From a level under the feet (note 1756): the cell beside the feet has nothing under it on a column one wide, and the first ring is laid against the column's own block below the feet; the arena's drill (2026-10-16 06:48Z, CLIMB_ENCLOSE=1) laid no ring block at the feet's and the head's levels alone. A level already ringed is skipped, so the first level is twelve blocks and each after it four.
-      if (have >= Math.max(0, targetY - nf.y) + 4) { let n = 0; for (const dy of [-1, 0, 1]) n += await ringAround(bot, task, nf, dy, blocks); if (n) bot._ringLaid = (bot._ringLaid || 0) + n; }
+      if (have >= Math.max(0, targetY - nf.y) + 4) { let n = 0; for (const dy of [-1, 0, 1]) n += await ringAround(bot, task, nf, dy, order); if (n) bot._ringLaid = (bot._ringLaid || 0) + n; }
     }
     if (bot.entity.position.floored().y <= start) { console.log(`[pillar up] stopped ${placed ? `after ${placed}` : 'before the first block'}: the block was not placed in three jumps from ${feet} (on ground ${bot.entity.onGround}, ${block.name} in hand${lastPlaceError ? `, the place said: ${lastPlaceError}` : ''}${lastJump ? `; ${lastJump}; the cell at the feet is ${bot.blockAt(feet)?.name || 'unloaded'}` : ''})`); break; }
   }
