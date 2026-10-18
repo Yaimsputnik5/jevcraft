@@ -22,7 +22,7 @@ test('a body two blocks over the breath\'s cloud is out of it, and one two under
   const { hazardDistance } = require('../src/end-safety');
   const cloud = { name: 'area_effect_cloud', position: new Vec3(0.5, 52, 0.5) };
   assert.ok(hazardDistance(new Vec3(0.5, 52, 0.5), cloud) < 1, 'on its ground: in');
-  assert.equal(hazardDistance(new Vec3(0.5, 53, 0.5), cloud), Infinity, 'one up: out (note 1809: the slab is half a block; note 1880 after notes 1869, 1870 and 1877 read the fireball\'s burst on the body as the cloud\'s reach)');
+  assert.ok(hazardDistance(new Vec3(0.5, 53, 0.5), cloud) < 1, 'one up: in (note 1884: dragon-231 hurt with the cloud 0.6 under its feet; note 1880 after notes 1869, 1870 and 1877 had read the fireball\'s burst on the body as the cloud\'s reach)');
   assert.ok(hazardDistance(new Vec3(0.5, 52.4, 0.5), cloud) < 1, 'within half a block over it: in');
   assert.equal(hazardDistance(new Vec3(0.5, 54, 0.5), cloud), Infinity, 'two up: out');
   assert.ok(hazardDistance(new Vec3(0.5, 51, 0.5), cloud) < 1, 'one down: in');
