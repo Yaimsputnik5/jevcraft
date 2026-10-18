@@ -4078,7 +4078,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     {
       const f = bot.entity.position.floored(), under = bot.blockAt(f.offset(0, -1, 0));
       const cavity = [2, 3, 4].find(dy => bot.blockAt(f.offset(0, -dy, 0))?.boundingBox !== 'block');
-      if (actions.dig && pickCarried() && bot.entity.onGround && !inWater() && under && SCAFFOLD_UNDER.test(under.name) && cavity && !tree.pillar_down && !holeHere() && !inTunnel()) {
+      // Not into a hole the cloud lies over (note 1883): the stub stands two over the breath, and the hole under it is in the breath. 25588's dragon-231 (2026-10-18 18:51Z) on its stub at (53, 55, 7) over a cloud 7 wide took 'back_into_the_hole' to (53, 53, 7), 20 to 14.4 in it, and climbed the stub again. The hole is offered when no cloud lies within its radius of the stub at the hole's own height.
+      const cloudAtTheHole = cavity ? Object.values(bot.entities).some(e => e.name === 'area_effect_cloud' && e.isValid !== false && e.position.y <= f.y - 0.5 && e.position.y >= f.y - cavity - 0.5 && Math.hypot(f.x + .5 - e.position.x, f.z + .5 - e.position.z) <= cloudRadius(bot, e) + 0.5) : false;
+      if (actions.dig && pickCarried() && bot.entity.onGround && !inWater() && under && SCAFFOLD_UNDER.test(under.name) && cavity && !tree.pillar_down && !holeHere() && !inTunnel() && !cloudAtTheHole) {
         tree.back_into_the_hole = {
           description: { action: `Dig the stub's ${cavity - 1} block${cavity - 1 === 1 ? '' : 's'} from under the feet back into the hole below (about a second each, the blocks kept) and roof it: from the hole the tunnel to a crystal's foot is to be had, from this stub nothing is (every walk from here found no path).`, stubBlocks: cavity - 1, blocksCarried: blocksCarried(bot), health: bot.health, dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null },
           run: async () => {
