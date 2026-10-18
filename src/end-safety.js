@@ -304,7 +304,8 @@ async function evadeOverTerrain(bot, task, goal, save, dragon, { allowed = () =>
       movement.allowSprinting = !route.path.some(n => deepBeside(bot, new Vec3(n.x + .5, n.y, n.z + .5)));
       goal.step = { action: 'evade_dragon_over_terrain', from: { ...start }, destination: { ...p } }; save();
       try {
-        await walk(bot, task, destination, { timeoutMs: 3000, stallMs: 1000, stopWhen: () => fallDanger(bot) });
+        // 1200 ms, not 3000 (note 1800): the walk over terrain under the dragon ran three seconds with no cover, and the body's hits land in it; 25588's dragon-171 (2026-10-18 00:01Z, one crystal) walked 4.5 blocks in 3.05 s, 14 to 6.4, dead a moment later; dragon-133 and 161 the same; five deaths carry it.
+        await walk(bot, task, destination, { timeoutMs: 1200, stallMs: 800, stopWhen: () => fallDanger(bot) });
       } catch (err) {
         check();
         if (!fallDanger(bot)) {

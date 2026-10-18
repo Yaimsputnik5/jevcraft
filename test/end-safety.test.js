@@ -87,7 +87,7 @@ test('uneven-ground evasion surveys bounded routes without digging, placing or l
       return { status: 'success', path: [{ x: dest.x, y: dest.y, z: dest.z, toBreak: ++surveys === 1 ? [new Vec3(1, 64, 1)] : [] }] };
     };
     const run = evadeOverTerrain(bot, task, goal, () => {}, dragon, { walk: async (b, t, dest, options) => {
-      assert.equal(options.timeoutMs, 3000); assert.equal(options.stallMs, 1000);
+      assert.equal(options.timeoutMs, 1200); assert.equal(options.stallMs, 800);
       walked = true; if (cancel) { task.cancel(); task.check(); }
       bot.entity.position = new Vec3(dest.x + .5, dest.y, dest.z + .5);
     } });
