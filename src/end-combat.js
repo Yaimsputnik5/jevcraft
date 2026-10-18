@@ -2940,7 +2940,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // seconds and bounced between cells six blocks apart.
             // The water left standing fetched first when no bucket is full (note 1644).
             if (countOf(bot, 'water_bucket') === 0 && countOf(bot, 'bucket') > 0) await reclaimWaterLeft();
-            const foot = new goals.GoalNearXZ(c.x + .5, c.z + .5, radius + 1);
+            // The foot at the island's ground (note 1823): the goal by x and z alone was met at any height, and 25588's dragon-189 (2026-10-18 04:55Z, four crystals, relaunched beside its own column) walked up that column's walled levels to (-31, 80, 26), 'No path to the goal', and was taken off the top by the dragon's body, 13 to 16 to none. The ground's top beside the pillar on the bot's side, a block either way.
+            const footGround = (() => { try { const here = bot.entity.position, dx = here.x - (c.x + .5), dz = here.z - (c.z + .5), n = Math.hypot(dx, dz) || 1; const fx = Math.floor(c.x + .5 + dx / n * (radius + 1.5)), fz = Math.floor(c.z + .5 + dz / n * (radius + 1.5)); for (let y = 72; y >= 36; y--) { const b = bot.blockAt(new Vec3(fx, y, fz)); if (b?.boundingBox === 'block' && !/obsidian|bedrock/.test(b.name)) return y + 1; } return null; } catch (_) { return null; } })();
+            const footXZ = new goals.GoalNearXZ(c.x + .5, c.z + .5, radius + 1);
+            const foot = footGround == null ? footXZ : new goals.GoalCompositeAll([footXZ, new goals.GoalCompositeAny([footGround - 1, footGround, footGround + 1].map(y => new goals.GoalY(y)))]);
             const walkFrom = bot.entity.position.floored(), walkAt = Date.now();
             try { await actions.navigate(bot, task, foot, { timeoutMs: 40000, stallMs: 6000, sprint: true, stopWhen: () => hostileEntities(bot, 4).some(e => live(bot, e)) }); }
             catch (err) {
