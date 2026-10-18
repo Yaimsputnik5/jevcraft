@@ -1388,11 +1388,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     let best = null; const verdicts = []; let clearFirst = null;
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const name = dx === 1 ? 'east' : dx === -1 ? 'west' : dz === 1 ? 'south' : 'north';
+      // The pool's side by where the pool lies from this column (note 1856): the pour's own dx/dz belonged to the foot cell it was poured beside, and the climb went up from a cell two off; 25588's dragon-216 (2026-10-18 13:57Z) poured at (37, 47, 22) beside (35, 22), climbed (33, 21), and at the top every side read 'end stone beside' and 'none', the pool a block aside of the east side unseen. Within one aside and one to six out.
+      const poolRec = state.pool && Date.now() - state.pool.at < 15 * 60000 ? state.pool : null;
+      const px = poolRec ? poolRec.x - f.x : 0, pz = poolRec ? poolRec.z - f.z : 0;
+      const poolOnThisSide = !!poolRec && ((dx !== 0 && Math.sign(px) === dx && Math.abs(px) >= 1 && Math.abs(px) <= 6 && Math.abs(pz) <= 1) || (dz !== 0 && Math.sign(pz) === dz && Math.abs(pz) >= 1 && Math.abs(pz) <= 6 && Math.abs(px) <= 1));
       if (bot.blockAt(f.offset(dx, 0, dz))?.boundingBox === 'block' || bot.blockAt(f.offset(dx, 1, dz))?.boundingBox === 'block') {
         // The pool's side walled by the bot's own blocks (a roof's post, note 1556): those are dug before the drop, not another side taken.
         // And the post one under them (note 1577): the pocket's wall stands on a post beside the under block, and left standing it is 'a floor 0 down' where the drop goes. 25588 (dragon-127, 2026-10-14 05:13Z) dug its two wall blocks and had no fall.
         const own = [-1, 0, 1].map(dy => f.offset(dx, dy, dz)).filter(c => { const b = bot.blockAt(c); return b?.boundingBox === 'block' && SCAFFOLD_UNDER.test(b.name) && b.name !== 'obsidian' && !(c.y <= f.y - 1 && bot.blockAt(c.offset(0, -1, 0))?.boundingBox === 'block'); });
-        const poolHere = state.pool && Date.now() - state.pool.at < 15 * 60000 && state.pool.dx === dx && state.pool.dz === dz;
+        const poolHere = state.pool && Date.now() - state.pool.at < 15 * 60000 && poolOnThisSide;
         if (poolHere && own.length && [0, 1].every(dy => { const b = bot.blockAt(f.offset(dx, dy, dz)); return b?.boundingBox !== 'block' || own.some(c => c.equals(f.offset(dx, dy, dz))); })) clearFirst = { cells: own, name };
         verdicts.push(`${name}: ${bot.blockAt(f.offset(dx, 0, dz))?.name}/${bot.blockAt(f.offset(dx, 1, dz))?.name} beside${poolHere ? ' (the pool\'s side)' : ''}`); continue;
       }
@@ -1417,8 +1421,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       const along = recorded ? (recorded.x - u.x) * dx + (recorded.z - u.z) * dz : 0, aside = recorded ? Math.abs((recorded.x - u.x) * dz) + Math.abs((recorded.z - u.z) * dx) : 0;
       // And at the landing's height (note 1597): the eastern pillars stand where the shelf at 38 meets the island's top at 59, a pool poured at the shelf is twenty blocks under a drop that lands on the top, and 25588 (dragon-140, 2026-10-14 07:58Z) stepped west off crystal 15's column at 82 'into the pool' recorded at (31, 37, -22), came down on the rim at 59, dead.
       const landingY = f.y - fall, poolBelow = recorded ? landingY - recorded.y : 0;
-      let pool = !!recorded && recorded.dx === dx && recorded.dz === dz && along >= 1 && along <= 6 && aside <= 1 && Math.abs(poolBelow) <= 2;
-      if (recorded && recorded.dx === dx && recorded.dz === dz && along >= 1 && along <= 6 && aside <= 1 && Math.abs(poolBelow) > 2) verdicts.push(`${name}: the pool recorded at (${recorded.x}, ${recorded.y}, ${recorded.z}) lies ${Math.abs(poolBelow)} blocks ${poolBelow > 0 ? 'below' : 'above'} this side's landing at ${landingY}, no pool under it`);
+      let pool = !!recorded && poolOnThisSide && along >= 1 && along <= 6 && aside <= 1 && Math.abs(poolBelow) <= 2;
+      if (recorded && poolOnThisSide && along >= 1 && along <= 6 && aside <= 1 && Math.abs(poolBelow) > 2) verdicts.push(`${name}: the pool recorded at (${recorded.x}, ${recorded.y}, ${recorded.z}) lies ${Math.abs(poolBelow)} blocks ${poolBelow > 0 ? 'below' : 'above'} this side's landing at ${landingY}, no pool under it`);
       // The trench's reach (note 1552): the body comes down about a cell out for every eight of fall, and a trench shorter than that is no pool under it. 25588 (dragon-101, 2026-10-14 00:59Z, two crystals broken) had a trench of two cells west of its column at (-13, -36), fell 27 toward it and came down on the third cell, 18.3 to none.
       let shortTrench = false;
       if (pool && recorded.reach && Math.round(fall / 8) > recorded.reach) { pool = false; shortTrench = true; }
