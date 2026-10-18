@@ -27,12 +27,12 @@ test('charging and close flying dragons trigger reflexes, while distant flight a
 
 test('a newly arrived breath cloud or approaching fireball triggers immediate evasion', () => {
   const { bot, dragon, phase } = fixture(); dragon.metadata[phase] = 6;
-  // The cloud a block and a half over the feet reaches the body; over two it lies clear of it (note 1568).
+  // The cloud a block and a half over the feet reaches the body; over two and a half it lies clear of it (note 1568, the reach widened to two and a half by notes 1869 and 1870 from 25588's hurts of 2026-10-18).
   const cloud = { id: 21, name: 'area_effect_cloud', position: bot.entity.position.offset(4.9, 1.5, 0),
     metadata: { [registry.entitiesByName.area_effect_cloud.metadataKeys.indexOf('radius')]: 3 } };
   bot.entities[21] = cloud;
   assert.equal(breathThreat(bot), cloud); assert.equal(endEmergency(bot), 'dragon_breath_cloud');
-  cloud.position.y += .6; assert.equal(breathThreat(bot), undefined);
+  cloud.position.y += 1.1; assert.equal(breathThreat(bot), undefined);
   const fireball = { id: 22, name: 'dragon_fireball', position: bot.entity.position.offset(10, 10, 0) };
   bot.entities[22] = fireball; assert.equal(breathThreat(bot), fireball); assert.equal(endEmergency(bot), 'incoming_dragon_fireball');
 });
