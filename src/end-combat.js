@@ -3925,7 +3925,24 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       const open = air(hc) && air(hc.offset(0, 1, 0)) && bot.blockAt(hc.offset(0, -1, 0))?.boundingBox === 'block';
       const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(hc.offset(dx, 0, dz))?.boundingBox === 'block' && bot.blockAt(hc.offset(dx, 1, dz))?.boundingBox === 'block').length;
       const rimLevel = Math.abs((h.y + 2) - f.y) <= 1;
-      if (flat >= 1 && flat <= 4.5 && open && sides >= 3 && rimLevel) {
+      // On the hole's own roof (note 1821): the body that climbed out stands over its hole with the roof under its feet, the hole a block aside for nobody, and 25588's dragon-189 (2026-10-18 04:28 to 04:33Z, four crystals, full health) stood so at (-30, 65, 26) over its hole at (-31, 62, 26), asked 288 times in five minutes, none_good 0.66, observe taken. The roof block is dug from under the feet and the body drops in.
+      const roofUnder = bot.blockAt(f.offset(0, -1, 0));
+      const onItsRoof = flat < 1 && f.y === h.y + 3 && open && roofUnder?.boundingBox === 'block' && (pickCarried() || SCAFFOLD_UNDER.test(roofUnder.name)) && actions.dig;
+      if (onItsRoof) {
+        tree.back_into_the_hole = {
+          description: { action: `Dig the roof block (${roofUnder.name.replaceAll('_', ' ')}) from under the feet and drop the two blocks back into the hole at (${h.x}, ${h.y}, ${h.z}) dug ${Math.round((Date.now() - h.at) / 1000)} s ago (${sides} of 4 sides closed), then roof it again from inside: a hole two deep is untouched by the dragon's body, and a fireball's cloud lands on the ground over it, not in it; from the hole the tunnel to a crystal's foot is to be had`, sidesClosed: sides, health: bot.health, blocksCarried: blocksCarried(bot), dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null },
+          run: async () => {
+            goal.step = { action: 'back_into_the_hole', roof: true }; save();
+            const t0 = Date.now(); const y0 = Math.floor(bot.entity.position.y);
+            try { await actions.dig(bot, task, f.offset(0, -1, 0), { dropInto: true, openPit: true, requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
+            for (let i = 0; i < 30 && Math.floor(bot.entity.position.y) >= y0; i++) { check(); await sleep(100); }
+            for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50);
+            const g = bot.entity.position.floored(), inIt = g.x === h.x && g.z === h.z && g.y <= h.y + 1;
+            let roofed = false; if (inIt) { state.hole = { ...h, at: Date.now() }; save(); try { roofed = await roofHole(true); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; } }
+            console.log(`[end combat] back into the hole at (${h.x}, ${h.y}, ${h.z}) through its roof from ${f}: ${inIt ? 'in it' : `not in it, at ${g}`}, ${roofed ? 'roofed' : 'not roofed'}, ${Math.round((Date.now() - t0) / 100) / 10} s`);
+            if (inIt) progress = true; else throw new Error('The hole was not dropped into');
+          } };
+      } else if (flat >= 1 && flat <= 4.5 && open && sides >= 3 && rimLevel) {
         tree.back_into_the_hole = {
           description: { action: `Walk the ${Math.round(flat * 10) / 10} blocks back to the hole at (${h.x}, ${h.y}, ${h.z}) dug ${Math.round((Date.now() - h.at) / 1000)} s ago and drop into it (two deep, ${sides} of 4 sides closed, roofed again from inside): a hole two deep is untouched by the dragon's body, and a fireball's cloud lands on the ground over it, not in it; from the hole the tunnel to a crystal's foot is to be had`, holeBlocksOff: Math.round(flat * 10) / 10, sidesClosed: sides, health: bot.health, blocksCarried: blocksCarried(bot), dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null, record: '25588\'s dragon-180 (2026-10-18 01:49Z) left its four-sided hole at (35, 59, 16) for a cloud at the rim and never went back: a stub, a three-block drop with no pool, a hole begun on open ground a block from it, and the next fireball\'s cloud on the body there, 20 to 14 to 9 to none' },
           run: async () => {
