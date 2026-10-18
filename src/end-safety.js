@@ -72,7 +72,10 @@ function dragonThreat(bot) {
 function endEmergency(bot, opts = {}) {
   if (fallDanger(bot)) return 'dangerous_fall';
   const breath = breathThreat(bot, opts);
-  if (breath) return breath.name === 'area_effect_cloud' ? 'dragon_breath_cloud' : 'incoming_dragon_fireball';
+  // No charge or fireball emergency for a body shut in (note 1822): two deep with the four sides closed at the feet and the head and a roof two over the feet, the dragon's body has no way to it and a fireball bursts on the roof, its cloud two or more over the head. 25588's dragon-189 (2026-10-18 04:38 to 04:43Z, four crystals, full health) sat so in its roofed hole at (-31, 62, 26) and had wait_in_hole cut by 'dragon_charge_or_contact' 82 times in a hundred lines, Jev asked every second, nothing done. A cloud already on the body still counts.
+  const shutIn = (() => { try { if (bot.entity.onGround === false) return false; const f = bot.entity.position.floored(), solid = c => bot.blockAt(c)?.boundingBox === 'block'; return solid(f.offset(0, 2, 0)) && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => solid(f.offset(dx, 0, dz)) && solid(f.offset(dx, 1, dz))); } catch (_) { return false; } })();
+  if (breath) { if (shutIn && breath.name !== 'area_effect_cloud') return null; return breath.name === 'area_effect_cloud' ? 'dragon_breath_cloud' : 'incoming_dragon_fireball'; }
+  if (shutIn) return null;
   if (dragonThreat(bot)) return 'dragon_charge_or_contact';
   return null;
 }
