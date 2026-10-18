@@ -1897,6 +1897,19 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // Said on a stub (note 1818): the stubs built and the fireball clouds taken on them this fight and across the stage's record.
   const stubRecordSays = () => { const st = state.lastStub, f = bot.entity.position.floored(); if (!st || Math.abs(f.x - st.x) > 1 || Math.abs(f.z - st.z) > 1 || f.y < st.y - 1 || Math.floor(bot.entity.position.y) - 62 > 6) return null; const n = state.stubs || { built: 0, hit: 0 }; return `on a stub ${st.roofed ? 'roofed over' : 'with no roof'}, two or more up out of the breath: a fireball bursting on the stub's side lays its cloud at the feet, roof or none (this fight ${n.hit} of ${n.built} stubs took the next fireball's cloud on the body; 25588's dragon-172, 177, 181, 184 and 187 of 2026-10-18 died so); a hole two deep with its roof takes the burst on the roof, the cloud two over the head, and the dig down from here (pillar_down) ends in the cloud below only while it lasts, about thirty seconds from its fall`; };
   bot._roofOverhead = roofOverhead; // note 1847: end safety roofs the hole it sends the body back into
+  // The wall toward the fireball (note 1881): the fireball flies nearly level from a dragon twenty blocks off and bursts on the first thing it meets; a roof two thick over the head (note 1878) is not in its way, and it burst on the body on its roofed stub in 25588's dragon-205, 216, 223, 225 and 228 (2026-10-18), 'the fireball's cloud on the body on its stub', six a second from a cloud at the body's own height. Two blocks on the side toward the ball, or toward the dragon when no ball is in flight, take the burst instead, the cloud a block off and a block over.
+  const wallTowardTheBall = async ({ maxMs = 1200 } = {}) => {
+    if (blocksCarried(bot) < 3) return 0;
+    const feet = bot.entity.position.floored();
+    const ball = Object.values(bot.entities).filter(e => e.name === 'dragon_fireball' && e.isValid !== false).sort((a, b) => a.position.distanceTo(bot.entity.position) - b.position.distanceTo(bot.entity.position))[0];
+    const d = ball || Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
+    if (!d) return 0;
+    const mirror = new Vec3(2 * (feet.x + .5) - d.position.x, feet.y, 2 * (feet.z + .5) - d.position.z);
+    let laid = 0;
+    try { laid = await require('./pillar-recovery').leeWall(bot, task, mirror, { maxMs }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
+    if (!(state.ballWallSaid > Date.now() - 5000)) { state.ballWallSaid = Date.now(); console.log(`[end combat] the wall toward the ${ball ? 'fireball' : 'dragon'} at ${feet}: ${laid} laid on its side, ${blocksCarried(bot)} blocks left`); }
+    return laid;
+  };
   const roofTheStub = async () => {
     const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
     // The hole through the stub fell short three times in four (note 1694: dragon-229 and 230, 2026-10-15, '2 dug, 0 of 4 sides closed' twice and '4 dug, 1 of 4 sides closed, 9186 ms' once, against one '4 dug, 4 of 4, roof laid, 5970 ms'); when it fails the stub is roofed as before, and the dig is given four seconds.
@@ -1907,6 +1920,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     let roofed = false;
     try { roofed = await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     console.log(`[end combat] the stub at ${bot.entity.position.floored()} roofed against the next fireball: ${roofed ? 'laid' : 'not laid'}, ${Date.now() - t0} ms, ${blocksCarried(bot)} blocks left`);
+    if (roofed) await wallTowardTheBall();
     // The stub's record (note 1818): a fireball bursting on the stub's side lays its cloud at the feet, roof or none, and 25588's dragon-172, 177, 181, 184 and 187 (2026-10-18) died so; a hole two deep roofed takes the burst on its roof, the cloud two over the head. Counted here and said on the stub.
     { const f = bot.entity.position.floored(); state.stubs ||= { built: 0, hit: 0 }; state.stubs.built++; state.lastStub = { x: f.x, y: f.y, z: f.z, at: Date.now(), roofed: !!roofed }; save(); }
     // Walled on all four sides too, out of the dragon's sight (note 1721): the dragon fires only with a clear line from its eyes to the bot's for a quarter second, and a fireball bursting within four blocks of the feet moves its cloud onto the body (the arena, 2026-10-15 10:2xZ: a burst two blocks off put the cloud at the feet, 20 to 8; three and a half off and more, none). The roof alone leaves the sides open; 25588's dragon-256, 257, 258, 259 and 263 (2026-10-15 09:37 to 10:10Z) took a fireball's cloud at the feet on their stubs, roofed or not, five of eight deaths. With the roof laid and twelve blocks carried, the four sides at the feet and the head close the line of sight.
@@ -2023,6 +2037,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // three seconds, 18 health. With no roof to lay, the dig as before.
       if (endEmergency(bot) === 'incoming_dragon_fireball' && await roofOverhead()) {
         goal.step = { action: 'roof_against_fireball', health: bot.health }; save();
+        await wallTowardTheBall();
         await holdOrDown();
       } else {
         // Held where the cloud is only near, not on the body (note 1733): one up out of it (note 1724) is a block over it, within breathThreat's margin, and this way dug back down into it. 25588 (dragon-285, 2026-10-15 14:45Z) went '1 blocks up at (-1, 63, 23)', then 'down the column ... 1 dug' at once, 20 to 10 to none.
