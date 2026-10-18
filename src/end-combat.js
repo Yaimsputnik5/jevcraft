@@ -3898,6 +3898,30 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           } };
       }
     }
+    // The hole within reach walked back into (note 1812): a hole dug and left stays the body's cover, and 25588's dragon-180 (2026-10-18 01:49Z) left its four-sided hole at (35, 59, 16) for a cloud at the rim and never went back: a stub, a three-block drop with no pool, a hole begun on open ground a block from it, and the next fireball's cloud on the body there, 20 to 14 to 9 to none. Note 1796 covers the stub over the hole; this the hole a few blocks off.
+    if (!tree.back_into_the_hole && state.hole && Date.now() - state.hole.at < 120000 && !holeHere() && !inTunnel() && bot.entity.onGround && !inWater() && !onOwnPillar() && !onObsidianTop()) {
+      const h = state.hole, f = bot.entity.position.floored(), hc = new Vec3(h.x, h.y, h.z);
+      const flat = Math.hypot(h.x + .5 - bot.entity.position.x, h.z + .5 - bot.entity.position.z);
+      const air = c => { const b = bot.blockAt(c); return !b || /^(air|cave_air)$/.test(b.name); };
+      const open = air(hc) && air(hc.offset(0, 1, 0)) && bot.blockAt(hc.offset(0, -1, 0))?.boundingBox === 'block';
+      const sides = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(hc.offset(dx, 0, dz))?.boundingBox === 'block' && bot.blockAt(hc.offset(dx, 1, dz))?.boundingBox === 'block').length;
+      const rimLevel = Math.abs((h.y + 2) - f.y) <= 1;
+      if (flat >= 1 && flat <= 4.5 && open && sides >= 3 && rimLevel) {
+        tree.back_into_the_hole = {
+          description: { action: `Walk the ${Math.round(flat * 10) / 10} blocks back to the hole at (${h.x}, ${h.y}, ${h.z}) dug ${Math.round((Date.now() - h.at) / 1000)} s ago and drop into it (two deep, ${sides} of 4 sides closed, roofed again from inside): a hole two deep is untouched by the dragon's body, and a fireball's cloud lands on the ground over it, not in it; from the hole the tunnel to a crystal's foot is to be had`, holeBlocksOff: Math.round(flat * 10) / 10, sidesClosed: sides, health: bot.health, blocksCarried: blocksCarried(bot), dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null, record: '25588\'s dragon-180 (2026-10-18 01:49Z) left its four-sided hole at (35, 59, 16) for a cloud at the rim and never went back: a stub, a three-block drop with no pool, a hole begun on open ground a block from it, and the next fireball\'s cloud on the body there, 20 to 14 to 9 to none' },
+          run: async () => {
+            goal.step = { action: 'back_into_the_hole', walk: Math.round(flat * 10) / 10 }; save();
+            const t0 = Date.now();
+            bot.clearControlStates?.(); bot.pathfinder?.setGoal?.(null);
+            try { await require('./motion').move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'back_into_the_hole', keys: ['forward'], sneak: false, why: 'back into the hole dug before', look: hc.offset(.5, 1, .5), maxMs: 3500, tick: 25, until: () => { const g = bot.entity.position.floored(); return g.x === h.x && g.z === h.z && g.y <= h.y + 1; } }); } catch (err) { check(); }
+            for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50);
+            const g = bot.entity.position.floored(), inIt = g.x === h.x && g.z === h.z && g.y <= h.y + 1;
+            let roofed = false; if (inIt) { state.hole = { ...h, at: Date.now() }; save(); try { roofed = await roofHole(true); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; } }
+            console.log(`[end combat] back into the hole at (${h.x}, ${h.y}, ${h.z}) from ${f}: ${inIt ? 'in it' : `not reached, at ${g}`}, ${roofed ? 'roofed' : 'not roofed'}, ${Math.round((Date.now() - t0) / 100) / 10} s`);
+            if (inIt) progress = true; else throw new Error('The hole was not reached');
+          } };
+      }
+    }
     if (!Object.keys(tree).length && !safe && inWater()) {
       const f = bot.entity.position.floored(); let how = 'nothing';
       try { const took = await takeBackWaterNear({ force: true }); if (took) how = `the water at ${took} taken back`; } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
