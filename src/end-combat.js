@@ -2014,8 +2014,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         const roofAt2 = bot.blockAt(f0.offset(0, 2, 0))?.boundingBox === 'block', roofAt3 = bot.blockAt(f0.offset(0, 3, 0))?.boundingBox === 'block';
         // No stub at a cliff's edge (note 1843): the jump that lays the stub's first block carried the body over the edge, and 25588's dragon-204 (2026-10-18 10:50Z) fell 22 from (45, 54, -17) to the lower shelf and the void from there. Two or more sides dropping away: the run, not the stub.
         const stubEdge = runOffSides(bot, bot.entity.position.floored()).length >= 2;
+        // No stub under a fireball in flight (note 1844): the ball is aimed at the body, and a stub laid in the second before it lands puts the body on the block it bursts on, the cloud at the feet. 25588's dragon-205 (2026-10-18 11:09Z, one crystal, 338 blocks, full health) ran 1.9 blocks from a fireball 7.5 off, went 'up out of the breath first: 1 blocks up' at (-29, 58, 21), and took that fireball's cloud on the stub, 20 to 14 to 8 to none, the first stub of its fight.
+        const ballClose = Object.values(bot.entities).some(e => e.name === 'dragon_fireball' && e.isValid !== false && e.position.distanceTo(bot.entity.position) < 14);
+        if (inBreath() && ballClose && !stubEdge && !(state.stubBallSaid > Date.now() - 5000)) { state.stubBallSaid = Date.now(); console.log(`[end combat] no stub out of the breath at ${bot.entity.position.floored()}: a fireball is in flight within fourteen and would burst on it`); }
         if (inBreath() && stubEdge && !(state.stubEdgeSaid > Date.now() - 10000)) { state.stubEdgeSaid = Date.now(); console.log(`[end combat] no stub out of the breath at ${bot.entity.position.floored()}: ${runOffSides(bot, bot.entity.position.floored()).length} sides drop away two or more, and the jump that lays it carries the body over the edge`); }
-        if (inBreath() && blocksCarried(bot) >= 1 && !onObsidianTop() && !stubEdge) {
+        if (inBreath() && blocksCarried(bot) >= 1 && !onObsidianTop() && !stubEdge && !ballClose) {
           goal.step = { action: 'up_out_of_breath_first', health: bot.health }; save();
           // The feet on the ground first (note 1640): the body arrives in the cloud at a run or off a step, and the climb refused 'air under the feet' while it was in the air (dragon-171 and 174, 2026-10-14, each dead in the cloud a second later). The keys let go and up to half a second waited for the ground.
           bot.clearControlStates(); bot.pathfinder?.setGoal?.(null);
