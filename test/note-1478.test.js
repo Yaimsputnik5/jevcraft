@@ -152,7 +152,7 @@ test('the quarry digs no cell beside water nor within two of the pool poured for
   // On the island's flat ground at 64, 6 blocks carried, the crystal's pillar far off (lift 19); the pool poured at (3, 64, 0) east of the feet, its water flowed to (4, 64, 0).
   bot.entity.position = new Vec3(0.5, 64, 0.5);
   bot._pillarUp = null;
-  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'end_stone', count: 6 }, { name: 'water_bucket', count: 1 }, { name: 'bucket', count: 1 }];
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'end_stone', count: 6 }, { name: 'water_bucket', count: 2 }, { name: 'bucket', count: 1 }];
   bot.entities[20].position = new Vec3(60, 90, 60);
   bot.blockAt = p => {
     const f = p.floored();
@@ -178,7 +178,7 @@ test('the pool is taken back into the bucket where the drop lands, before anythi
   const { bot, goal, task } = fixture();
   const V = require('vec3').Vec3;
   goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'water_drop', at: Date.now() }, pool: { x: 1, y: 64, z: 0, dx: 1, dz: 0, at: Date.now() } };
-  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 20 }, { name: 'water_bucket', count: 1 }, { name: 'bucket', count: 1 }];
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 20 }, { name: 'water_bucket', count: 2 }, { name: 'bucket', count: 1 }];
   bot.entity.velocity = new V(0, -0.08, 0);
   bot.entities[20].position = new V(80, 90, 80);
   const cloud = { id: 40, name: 'area_effect_cloud', position: new V(0.5, 76, 0.5), isValid: true, metadata: {} };
@@ -211,7 +211,7 @@ test('a block standing one up in the pool\'s row is dug down before the pour (no
   bot.entity.position = new V(18.5, 64, 0.5);
   bot._pillarUp = null;
   goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'water_drop', at: Date.now() } };
-  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'end_stone', count: 40 }, { name: 'water_bucket', count: 1 }];
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'end_stone', count: 40 }, { name: 'water_bucket', count: 2 }];
   bot.entities[20].position = new V(60, 90, 60);
   const removed = new Set(), water = new Set();
   // The crystal's pillar at (20, 0), bedrock under the crystal; the ground at 63 everywhere, end stone a block up two cells out from the feet on every side.
@@ -255,7 +255,7 @@ test('the climb\'s option says whether the drop\'s pool can be poured at the pil
   bot.entity.position = new V(0.5, 64, 0.5);
   bot._pillarUp = null;
   goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'water_drop', at: Date.now() } };
-  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'end_stone', count: 40 }, { name: 'water_bucket', count: 1 }];
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'end_stone', count: 40 }, { name: 'water_bucket', count: 2 }];
   bot.entities[20].position = new V(60, 90, 60);
   for (const rim of [false, true]) {
     // Flat island to the pillar at (20, 0); at the rim, nothing but the void east of x 16.
@@ -358,7 +358,7 @@ test('the quarry reaches out to seven when the ring two to four out is the pit o
   bot.entity.position = new V(0.5, 64, 0.5);
   bot._pillarUp = null;
   goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'water_drop', at: Date.now() } };
-  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'end_stone', count: 6 }, { name: 'water_bucket', count: 1 }];
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'end_stone', count: 6 }, { name: 'water_bucket', count: 2 }];
   bot.entities[20].position = new V(60, 90, 60);
   // A pit: the ground at 63 within four of the feet (the feet at 64 on its floor), the island's top at 64 from five out.
   bot.blockAt = p => {
@@ -470,7 +470,7 @@ test('the pool is recorded where the source went in, and the step\'s start does 
   // On the ground at (18, 64), the pillar at (20, 0); the click puts the source at the feet, the flow reaches the trench cell.
   delete bot._pillarUp;
   bot.entity.position = new Vec3(18.5, 64, 0.5);
-  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 40 }, { name: 'water_bucket', count: 1 }, { name: 'bucket', count: 1 }];
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 40 }, { name: 'water_bucket', count: 2 }, { name: 'bucket', count: 1 }];
   const water = new Map(), removed = new Set();
   bot.blockAt = p => {
     const f = p.floored(), k = `${f.x},${f.y},${f.z}`;
@@ -586,7 +586,7 @@ test('between two pockets the column is still the bot\'s own by its record: the 
   for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) for (const dy of [71, 72, 73, 75, 76, 77]) walls.add(`${dx},${dy},${dz}`);
   const blockAt = bot.blockAt;
   bot.blockAt = p => { const f = p.floored(), k = `${f.x},${f.y},${f.z}`; if (walls.has(k)) return { name: 'cobblestone', boundingBox: 'block', position: f }; if (f.x === 0 && f.z === 0 && f.y >= 64 && f.y < 76) return { name: 'end_stone', boundingBox: 'block', position: f }; return blockAt(p); };
-  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 1 }, { name: 'water_bucket', count: 1 }];
+  bot.inventory.items = () => [{ name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 1 }, { name: 'water_bucket', count: 2 }];
   bot.entities[20].position = new Vec3(60, 90, 60);
   goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, descent: { pick: 'pillar_down', at: Date.now() } };
   bot._pillarUp = { x: 0, z: 0, until: Date.now() + 600000, base: 64 };
