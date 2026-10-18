@@ -3028,14 +3028,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               try {
                 const f0 = bot.entity.position.floored(), post = f0.offset(dir.x, 0, dir.z);
                 const name = blocksCarriedName(bot), item = name && bot.inventory.items().find(i => i.name === name);
-                if (item && bot.blockAt(post.offset(0, -1, 0))?.boundingBox === 'block') {
-                  for (let dy = 0; dy <= 2; dy++) {
+                // The roof tried with or without the post (note 1807): with the post's base air the whole roof was skipped without a word, and 25588's dragon-177 (2026-10-18 01:03Z, three crystals) struck crystal 89 from a top with no roof, took the next fireball's cloud on the body there, 20 to 14 to 8 to none in three seconds; crystal 70 before it had its roof. roofOverhead finds its own reference.
+                const postStands = item && bot.blockAt(post.offset(0, -1, 0))?.boundingBox === 'block';
+                if (item) {
+                  if (postStands) for (let dy = 0; dy <= 2; dy++) {
                     const cell = post.offset(0, dy, 0); if (bot.blockAt(cell)?.boundingBox === 'block') continue;
                     const ref = bot.blockAt(cell.offset(0, -1, 0)); if (ref?.boundingBox !== 'block') break;
                     check(); await bot.equip(item, 'hand'); await bot.lookAt(ref.position.offset(.5, 1, .5), true); await bot.placeBlock(ref, new Vec3(0, 1, 0)); await sleep(60);
                   }
                   const roofed = await roofOverhead();
-                  console.log(`[end combat] a roof over the stand on the top at ${f0.offset(0, 2, 0)}: ${roofed ? 'laid' : 'not laid'}`);
+                  console.log(`[end combat] a roof over the stand on the top at ${f0.offset(0, 2, 0)}: ${roofed ? 'laid' : 'not laid'}${postStands ? '' : ` (no post beside: ${bot.blockAt(post.offset(0, -1, 0))?.name || 'nothing'} under its cell)`}`);
                   // Walls round the stand before the blow (note 1664): the dragon's body at the top comes under a second after its call and shoves the body off the tower; two blocks on each side but the crystal's, laid on the tower's top, hold it in its cell. 25588 (dragon-198, 2026-10-14 19:50Z) was struck at its stand at (35, 82, -24) twice in a second and knocked two cells, 20 to 10.9; dragon-194 (18:59Z) was carried off its stand to its death. The walls are recorded and the one toward the column is dug for the way back.
                   if (blocksCarried(bot) >= 8) {
                     let walls = 0; state.standWalls = [];
