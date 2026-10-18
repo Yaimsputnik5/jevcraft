@@ -550,7 +550,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   // columns, dragon-59, 62 and 63 to their deaths, no water poured.
   const falling = () => {
     try {
-      if (bot._fallRecovery || bot.entity?.onGround !== false || !fallDanger(bot) || !bot.inventory.items().some(i => i.name === 'water_bucket')) return;
+      if (bot._fallRecovery || bot.entity?.onGround !== false || !fallDanger(bot)) return;
+      // The fall said even with no bucket to clutch with (note 1803): 25588's dragon-175 (2026-10-18 00:30Z) had poured its last bucket into the drop's pool, took a fireball's cloud on its stub at (-31, 78, 22), 17.5 to 11, and died at 62 sixteen blocks below with not one line between: no fall seen, no step named, nothing to fix from. Once a fall.
+      if (!bot.inventory.items().some(i => i.name === 'water_bucket')) {
+        if (!(bot._dryFallSaid > Date.now() - 3000)) { bot._dryFallSaid = Date.now(); const u = bot._pillarUp, p = bot.entity.position; const keys = ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint'].filter(k => bot.controlState?.[k]); console.log(`[end combat] falling from ${p.floored()} at ${bot.health.toFixed(1)} health with no water bucket to clutch with${u ? ` (${Math.round(Math.hypot(u.x + .5 - p.x, u.z + .5 - p.z) * 100) / 100} off the column (${u.x}, ${u.z})'s middle)` : ' (no column)'}; step ${goal.step?.action || 'none'}; keys ${keys.join('+') || 'none'}; velocity ${bot.entity.velocity ? bot.entity.velocity.y.toFixed(2) : '?'}`); }
+        return;
+      }
       { const u = bot._pillarUp, p = bot.entity.position; const off = u ? Math.round(Math.hypot(u.x + .5 - p.x, u.z + .5 - p.z) * 100) / 100 : null; const keys = ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint'].filter(k => bot.controlState?.[k]);
         // The fall's start said with the body's offset from its column's middle, the step under way and the keys held (note 1678): three falls off a column during the dig down in the breath on 2026-10-14 (dragon-209 at 87, 211 at 81, 212 at 73), each from a cell beside the column, and how the body left its cell is unproven.
         console.log(`[end combat] falling from ${p.floored()} at ${bot.health.toFixed(1)} health: the water bucket under the body${u ? ` (${off} off the column (${u.x}, ${u.z})'s middle` : ' (no column'}; step ${goal.step?.action || 'none'}; keys ${keys.join('+') || 'none'}; ${bot.entity.velocity ? `velocity ${[bot.entity.velocity.x, bot.entity.velocity.y, bot.entity.velocity.z].map(v => Math.round(v * 100) / 100).join(', ')}` : ''})`); }
