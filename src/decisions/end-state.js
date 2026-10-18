@@ -13,6 +13,7 @@ const endDecisionInstructions = {
   ],
   priorities: [
     'Preserve survival, remove healing crystals, then damage the dragon. At good health, prefer an available effective attack over waiting or changing position for its own sake.',
+    'At the foot of a pillar with the climb to its crystal offered, the climb comes before a tunnel to another pillar: a tunnel keeps the body out of sight but strikes nothing, and the fight is won only by striking every crystal. The climb\'s dangers are handled by the reflexes on the way; take a tunnel instead only when this climb cannot be finished (too few blocks, no pickaxe for the way down, low health).',
     'Move when it gains a needed attack opportunity, investigates an unresolved crystal, or escapes danger. A route being new is not itself a combat benefit.',
     'Wait when there is a concrete reason: necessary healing at safe footing, or no useful attack or approach yet. Do not wait for a vulnerable phase when an effective attack is already offered.',
   ],
