@@ -666,6 +666,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   };
   // The column's blocks under the feet, up to six.
   const columnDepth = () => { const f = bot.entity.position.floored(); let n = 0; while (n < 6 && SCAFFOLD_UNDER.test(bot.blockAt(f.offset(0, -1 - n, 0))?.name || '') && !(bot.blockAt(f.offset(0, -1 - n, 0))?.name === 'end_stone' && f.y - 1 - n < 66 && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => bot.blockAt(f.offset(dx, -2 - n, dz))?.boundingBox === 'block'))) n++; return n; };
+  // Ground about the feet (note 1865): a column whose top stands level with the island about it is ground, and the breath's cloud there is run out of, not held over. 25588's dragon-220 (2026-10-18 16:03Z), its pickaxe gone, stood at (10, 56, 34) on blocks laid up out of a pit to the island's level, a fireball's cloud came, 'the breath on the column ... incoming_dragon_fireball', the hold was kept and the health went 20 to 12 to none in a few seconds, the open ground a step away on three sides. Solid two cells out at one or two under the feet on three sides is ground; the step two up out of a cloud under the feet (note 1590) is kept wherever the body stands, the holds alone stand aside.
+  const groundAbout = () => { const f = bot.entity.position.floored(); return [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => [1, 2].some(dy => { const b = bot.blockAt(f.offset(2 * dx, -dy, 2 * dz)); return b?.boundingBox === 'block' && !/obsidian|bedrock/.test(b.name); })).length >= 3; };
   // The hole by the fountain (note 1592): two deep, the body in it out of the
   // dragon's wings and under the breath's cloud; out of it is two blocks laid.
   // Not on the bot's own column (note 1610): the pocket's walls round the feet are the hole's shape, and out of it is up onto the wings' reach with the blocks the way down keeps.
@@ -1969,7 +1971,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       console.log(`[end combat] the fireball at the short column (${columnDepth()} high) at ${bot.entity.position.floored()}: ${roofedFirst ? 'roofed, then ' : 'no roof laid; '}two dug down into it, not the drop into the pool's trench`);
       await digDownColumn({ limit: 2 });
     }
-    else if (onOwnPillar() && ['dragon_breath_cloud', 'incoming_dragon_fireball'].includes(endEmergency(bot))) {
+    else if (onOwnPillar() && (!groundAbout() || cloudOnBody()) && ['dragon_breath_cloud', 'incoming_dragon_fireball'].includes(endEmergency(bot))) {
       // The seconds between the cut and the answer said (note 1854): 25588's dragon-214 (2026-10-18 13:44Z) had its descent cut by a cloud on the body at (35, 59, 22) and died 20 to 14 to 8 to none with no line between; where the two seconds went is the question.
       if (state.lastCutAt) console.log(`[end combat] the breath on the column at ${bot.entity.position.floored()}: ${Date.now() - state.lastCutAt} ms since the step was cut (${Number(state.lastCutHealth).toFixed(1)} to ${bot.health.toFixed(1)} health), ${endEmergency(bot)}`);
       // The breath on the column, or a fireball coming (its cloud lands where
@@ -2003,7 +2005,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       goal.step = { action: 'off_the_top_out_of_breath', health: bot.health }; save();
       if (await backToColumn()) await wayDown({ limit: 3 });
     }
-    else if (onOwnPillar()) await holdOrDown();
+    else if (onOwnPillar() && !groundAbout()) await holdOrDown();
     else if (onObsidianTop()) {
       // Back into the column's pocket before the hold when the body's call comes on the stand (note 1788): the stand is the pillar's cap, one thick with the void beside, no run and no hole, and the crouch stops nothing. 25588's dragon-155 (2026-10-17 19:5xZ, two crystals from climbs walled on every level) struck crystal 1875 and was charged on the stand at (-9, 88, -36) before it stepped back, fell 26 to (-8, 62, -36), and the clutch found no floor within five until the ground.
       if (endEmergency(bot) === 'dragon_charge_or_contact' && nearOwnColumnTop() && !onColumnCell()) { const t0 = Date.now(); let back = false; try { back = await backToColumn(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } console.log(`[end combat] the body's call on the stand at ${bot.entity.position.floored()}: back to the column ${back ? 'there' : 'not reached'}, ${Date.now() - t0} ms`); }
