@@ -2184,7 +2184,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     bot._client.on('damage_event', packet => { try { if (packet?.entityId === bot.entity?.id) { const cause = bot.entities?.[(packet.sourceCauseId || 0) - 1]; if (cause?.name === 'ender_dragon') bot._lastDragonHurtAt = Date.now(); } } catch (_) { /* nothing */ } });
   }
   const crouchKeeper = setInterval(() => {
-    try { if (!bot._controller && !bot._dropping && bot.entity?.onGround && (onOwnPillar() || onObsidianTop()) && !bot.controlState?.sneak) bot.setControlState?.('sneak', true); } catch (_) { /* nothing to hold */ }
+    // Only high on the column, and never during a walk (note 1850): the keeper held the crouch on the column's base cell after every descent, re-pressing it fifty milliseconds after note 1845 let it go, and the walks from the foot stalled; 25588's dragon-207 to 210 (2026-10-18) had the sneak 'held at the walk's start' fifteen times in an hour and 'timed out without reaching new ground' after each. Two or more over the base, with no goal set on the pathfinder.
+    try { const u = bot._pillarUp, high = !u || u.base == null || Math.floor(bot.entity.position.y) >= u.base + 2; if (!bot._controller && !bot._dropping && bot.entity?.onGround && (onOwnPillar() || onObsidianTop()) && high && !bot.pathfinder?.goal && !bot.controlState?.sneak) bot.setControlState?.('sneak', true); } catch (_) { /* nothing to hold */ }
   }, 50);
   try {
     // Water left standing within reach goes back into an empty bucket at the
