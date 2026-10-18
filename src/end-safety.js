@@ -437,11 +437,22 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
         // 06:37Z) fell out of the world at full health.
         const dir = away.minus(start); dir.y = 0; const unit = dir.scaled(1 / (dir.norm() || 1));
         const floorAhead = () => { const n = bot.entity.position.plus(unit.scaled(0.9)); const f = n.floored(); return [0, -1, -2].some(dy => bot.blockAt(f.offset(0, dy - 1, 0))?.boundingBox === 'block') && !deepBeside(bot, n); };
+        // The run that stalls is given up in half a second and taken again with a jump (note 1882): against a pit's or a quarry's wall the body ran in place, 'moved 0.4 blocks' in 1.8 s with the fireball's cloud on it, in 25588's dragon-226 (2026-10-18 17:58Z, 14 to 2) and dragon-229 (18:26Z, 16.9 to 10.9), a tick of six for every second against the wall. The jump takes a block's ledge; a wall two high ends the run, and the stub or the hole is next.
+        const t0 = Date.now(); let stalled = false;
         try {
           await move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'evade_breath_straight', keys: ['forward', 'sprint'], sneak: false,
             why: 'straight out of the dragon\'s breath at a run', look: away.offset(0, 1.6, 0), maxMs: 1800, tick: 25,
-            until: () => bot.entity.position.distanceTo(start) >= Math.max(1.5, runBlocks - 1) || fallDanger(bot) || !breathThreat(bot) || !floorAhead() });
+            until: () => bot.entity.position.distanceTo(start) >= Math.max(1.5, runBlocks - 1) || fallDanger(bot) || !breathThreat(bot) || !floorAhead() || (stalled = Date.now() - t0 > 500 && bot.entity.position.distanceTo(start) < 0.5) });
         } catch (err) { check(); }
+        if (stalled && breathThreat(bot) && !fallDanger(bot)) {
+          const s0 = bot.entity.position.clone();
+          try {
+            await move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'evade_breath_straight_jump', keys: ['forward', 'sprint', 'jump'], sneak: false,
+              why: 'the run stalled against a ledge: the same way with a jump', look: away.offset(0, 1.6, 0), maxMs: 900, tick: 25,
+              until: () => bot.entity.position.distanceTo(start) >= Math.max(1.5, runBlocks - 1) || fallDanger(bot) || !breathThreat(bot) || !floorAhead() });
+          } catch (err) { check(); }
+          console.log(`[end safety] the straight run stalled at ${s0.floored()} (${Math.round(s0.distanceTo(start) * 10) / 10} moved in half a second): taken again with a jump, now at ${bot.entity.position.floored()}, ${Math.round(bot.entity.position.distanceTo(start) * 10) / 10} from the start`);
+        }
         if (fallDanger(bot)) await recoverFall(bot, task, goal, save);
         if (bot.entity.position.distanceTo(start) >= 1.2) {
           const evidence = { at: Date.now(), from: { ...start }, to: { ...bot.entity.position }, hazard: { id: dragon.id, name: dragon.name }, straightRun: true, blocks: runBlocks };
