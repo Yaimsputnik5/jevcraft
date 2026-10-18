@@ -1838,7 +1838,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e));
     // The hole through the stub fell short three times in four (note 1694: dragon-229 and 230, 2026-10-15, '2 dug, 0 of 4 sides closed' twice and '4 dug, 1 of 4 sides closed, 9186 ms' once, against one '4 dug, 4 of 4, roof laid, 5970 ms'); when it fails the stub is roofed as before, and the dig is given four seconds.
     // The hole through the stub withdrawn (note 1696): it closed four sides once in six tries on 2026-10-15 (dragon-229, 230, 233), the dig of the stub and the island under it running 1.8 to 9.2 seconds under the perched dragon with nothing over the head, and dragon-233 (04:41Z, seven crystals broken, three standing) died inside it, '3 dug, 0 of 4 sides closed, 6385 ms, 0.0 health'. The stub is roofed in a fifth of a second; the perched dragon gets the roof too.
-    if (!d || blocksCarried(bot) < 6) return false;
+    // Roofed whether or not the dragon is tracked this tick (note 1813): 'not laid, 0 ms' came from a dragon out of the entity list, and the fireball comes all the same; 25588's dragon-182 (2026-10-18 02:19Z) at (49, 57, 7) and dragon-179 at (35, 77, 22) before its death had their stubs refused so.
+    if (blocksCarried(bot) < 6) return false;
     const t0 = Date.now();
     let roofed = false;
     try { roofed = await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
@@ -3494,13 +3495,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         const tableCarried = count('crafting_table') > 0;
         if (!anyPick && actions.craft && ingots >= 3 && (sticks >= 2 || planks >= 2) && tableCarried && !inWater() && onTheGround()) {
           tree.craft_pickaxe = {
-            description: { action: `Craft an iron pickaxe here: the crafting table carried is set down beside the body, three iron ingots and two sticks${sticks >= 2 ? '' : ' (made from two planks first)'} are made into the pickaxe, and the table is left standing. No pickaxe is carried, and without one end stone is not dug (by hand a block takes about fifteen seconds and drops nothing), so no block for a climb, a roof or a pocket is to be had; an iron pickaxe digs end stone in about a second and lasts 250 blocks. About five seconds, the body on the ground the while.`,
+            description: { action: `Craft an iron pickaxe here: the crafting table carried is set down beside the body, three iron ingots and two sticks${sticks >= 2 ? '' : ' (made from two planks first)'} are made into the pickaxe, and the table is taken back (a second pickaxe wants two more sticks: the End grows no wood). No pickaxe is carried, and without one end stone is not dug (by hand a block takes about fifteen seconds and drops nothing), so no block for a climb, a roof or a pocket is to be had; an iron pickaxe digs end stone in about a second and lasts 250 blocks. About five seconds, the body on the ground the while.`,
               pickaxeCarried: false, ironIngots: ingots, sticks, planks, craftingTableCarried: true, blocksCarried: blocksCarried(bot), health: bot.health, dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null,
               record: '25588\'s dragon-40 (2026-10-16) wore its iron pickaxe out in the tunnel quarry 20 minutes in, six crystals broken, and stood three hours by the fountain with 3 blocks, no blow offered at the last four crystals and the ingots for three pickaxes carried' },
             run: async () => {
               goal.step = { action: 'craft_pickaxe_in_the_fight', ingots, sticks }; save();
               if (sticks < 2) await actions.craft(bot, task, { action: 'craft', item: 'stick', count: 4, consumes: {} }, goal);
               await actions.craft(bot, task, { action: 'craft', item: 'iron_pickaxe', count: 1, needs_table: true, consumes: { iron_ingot: 3, stick: 2 } }, goal);
+              // The table taken back (note 1813): left standing, the next pickaxe had no table; 25588's dragon-181 died with 3 ingots, one stick and no crafting table, and dragon-182 wore its pickaxe out at tunnel cell 57 with no craft to offer.
+              if (actions.dig && count('crafting_table') === 0) { const tb = bot.findBlock({ matching: bot.registry.blocksByName.crafting_table.id, maxDistance: 5 }); if (tb) { try { await actions.dig(bot, task, tb.position, { requireDrops: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; } console.log(`[end combat] the crafting table at ${tb.position} ${count('crafting_table') ? 'taken back' : 'dug but not picked up'}`); } }
               const made = bot.inventory.items().some(i => /_pickaxe$/.test(i.name));
               console.log(`[end combat] the pickaxe crafted in the fight: ${made ? 'an iron pickaxe carried' : 'none made'}, ${count('iron_ingot')} iron ingots left, ${bot.health.toFixed(1)} health at ${bot.entity.position.floored()}`);
               if (!made) throw new Error('No pickaxe was made');
