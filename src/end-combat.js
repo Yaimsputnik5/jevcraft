@@ -1291,6 +1291,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // The source where the body comes down (note 1642): a fall carries the body about a cell out for every twelve of fall plus one (note 1605), and the source poured in the trench's middle left the landing cell with the row's thin flow, where 25588 came down 'dry' (dragon-175, 2026-10-14 15:00Z: the source at the second cell, the landing at the third from 20 up, 20 to 20 by luck; dragon-171 and 174, 7 dry landings of 8 and of 9). The source goes in the carry's cell, the flow either side of it.
       if (dug >= 2) { const carry = Math.max(1, Math.round(1 + lift / 12)); best.cell = trench[Math.min(dug - 1, carry - 1)].clone(); best.reach = dug; console.log(`[end combat] the pool's trench dug: ${dug} cells from ${trench[0]} out from the column at (${column.x}, ${column.z}); the water goes in at ${best.cell}${dug < len ? ` (${len} wanted: the row ends there)` : ''}`); }
     }
+    // Up to the row's level before the pour (note 1864): poured from a pit three under the row the water goes in at the feet, and 25588's dragon-220 (2026-10-18 15:50Z) at (9, 52, 36) poured twice for the row at 55, 'the water went in at the feet', 'the second pour went in at (8, 53, 36) too, below the row', then 'stopped before the first block: water at the feet' six times and the climb of 45 was given up with no block laid. The body pillars up to the row's height on the blocks carried first.
+    if (Math.floor(bot.entity.position.y) < best.cell.y && !inWater() && bot.entity.onGround && blocksCarried(bot) >= 3) {
+      const from = Math.floor(bot.entity.position.y);
+      try { await require('./pillar-recovery').pillarUp(bot, task, best.cell.y, { dig: actions.dig, maxBlocks: best.cell.y - from, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
+      console.log(`[end combat] up to the pool's row before the pour: ${Math.floor(bot.entity.position.y) - from} blocks up at ${bot.entity.position.floored()} for the row at ${best.cell.y}`);
+    }
     const eye = bot.entity.position.offset(0, 1.62, 0), target = best.cell.offset(.5, -.01, .5);
     if (eye.distanceTo(target) > 4.3) {
       try { await actions.navigate(bot, task, new goals.GoalNear(best.cell.x, best.cell.y, best.cell.z, 2), { timeoutMs: 8000, stallMs: 3000 }); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
