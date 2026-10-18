@@ -1090,7 +1090,19 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // Not on the pool's side (note 1556): the post stood where the drop goes, and 25588 (dragon-105, 2026-10-14 01:23Z, two crystals broken) read 'east: end_stone/end_stone beside' over its pool east of the column at (-10, -38), dropped south with no pool, 26 blocks, dead.
       const poolSide = state.pool && Date.now() - state.pool.at < 15 * 60000 ? [state.pool.dx, state.pool.dz] : null;
       const side = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => !poolSide || dx !== poolSide[0] || dz !== poolSide[1]).find(([dx, dz]) => [-1, 0, 1, 2].every(dy => bot.blockAt(f.offset(dx, dy, dz))?.boundingBox !== 'block'));
-      if (!side) return false;
+      // The post on the pocket's own wall (note 1811): in a pocket closed at the feet and the head no side is open from the ground up, the post found no place, and the roof was 'not laid, 0 ms', the pocket open at the top. 25588's dragon-179 (2026-10-18 01:37Z, one crystal, 95 end stone) sat in its end stone pocket at (35, 77, 22), '4 of 4 sides closed', was hit through the open top, 20 to 13.9, and flung 34 blocks to (69, 57, 45), dead. One block on a wall's top, then the roof against it.
+      if (!side) {
+        const wall = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dz]) => bot.blockAt(f.offset(dx, 1, dz))?.boundingBox === 'block' && bot.blockAt(f.offset(dx, 2, dz))?.boundingBox !== 'block' && bot.blockAt(f.offset(dx, 3, dz))?.boundingBox !== 'block');
+        if (!wall) return false;
+        try {
+          const top = bot.blockAt(f.offset(wall[0], 1, wall[1]));
+          await bot.equip(item, 'hand'); check();
+          await bot.lookAt(top.position.offset(.5, 1, .5), true); await bot.placeBlock(top, new Vec3(0, 1, 0)); await sleep(60);
+          const post = bot.blockAt(f.offset(wall[0], 2, wall[1]));
+          if (post?.boundingBox === 'block') { check(); await bot.lookAt(post.position.offset(.5 - wall[0] * .5, .5, .5 - wall[1] * .5), true); await bot.placeBlock(post, new Vec3(-wall[0], 0, -wall[1])); await sleep(60); }
+        } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
+        return bot.blockAt(cell)?.boundingBox === 'block';
+      }
       try {
         await bot.equip(item, 'hand'); check();
         // The first against the under block's side, the rest each on the one below.
