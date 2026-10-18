@@ -718,7 +718,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         try { await bot.equip(item, 'hand'); if (typeof bot.lookAt === 'function') await bot.lookAt(c.offset(.5, .5, .5), true); await bot.placeBlock(ref, new Vec3(-dx, 0, -dz)); } catch (_) { continue; }
         if (roofed()) break;
       }
-      if (roofed()) console.log(`[end combat] the hole roofed at ${c}`);
+      if (roofed()) { console.log(`[end combat] the hole roofed at ${c}`); await thickenRoof(c); }
       return roofed();
     }
     if (!roofed()) return true;
@@ -1083,6 +1083,20 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const closed = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, 0, dz))?.boundingBox === 'block' && bot.blockAt(f.offset(dx, 1, dz))?.boundingBox === 'block').length;
     return { laid, closed, poolSideOpen: !!poolSide };
   };
+  // The roof made two thick (note 1878): a cloud reaches three blocks (note 1877), and the fireball bursting on a roof a block thick leaves its cloud three over the feet, on the body. 25588's dragon-226 (2026-10-18 17:58Z) took 20 to 14 to 2 in its roofed hole at (39, 55, -34); the drills of 2026-10-17 found a two-thick roof keeps the cloud out. The second block goes on the first's top face from below, one block more a roof.
+  const thickenRoof = async cell => {
+    try {
+      const first = bot.blockAt(cell), above = cell.offset(0, 1, 0);
+      if (first?.boundingBox !== 'block' || bot.blockAt(above)?.boundingBox === 'block' || /bedrock|obsidian/.test(first.name)) return bot.blockAt(above)?.boundingBox === 'block';
+      const name = blocksCarriedName(bot), item = name && bot.inventory.items().find(i => i.name === name);
+      if (!item || blocksCarried(bot) < 2) return false;
+      await bot.equip(item, 'hand'); check();
+      await bot.lookAt(first.position.offset(.5, 1, .5), true); await bot.placeBlock(first, new Vec3(0, 1, 0)); await sleep(60);
+      const thick = bot.blockAt(above)?.boundingBox === 'block';
+      if (!(state.thickRoofSaid > Date.now() - 10000)) { state.thickRoofSaid = Date.now(); console.log(`[end combat] the roof at ${cell} made two thick: ${thick ? 'the second block laid above it' : 'the second block not laid'}`); }
+      return thick;
+    } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; return false; }
+  };
   const roofOverhead = async () => {
     const f = bot.entity.position.floored(), cell = f.offset(0, 2, 0);
     if (bot.blockAt(cell)?.boundingBox === 'block') return true;
@@ -1137,6 +1151,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     const roofed = bot.blockAt(cell)?.boundingBox === 'block';
     console.log(`[end combat] a roof against the fireball over the head at ${cell}: ${roofed ? 'laid' : 'not laid'}`);
+    if (roofed) await thickenRoof(cell);
     return roofed;
   };
   // The way down the column by the water bucket (note 1484): off the column's
