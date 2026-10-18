@@ -3987,6 +3987,28 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           } };
       }
     }
+    // Out by hand (note 1832): with the pickaxe gone and the body walled in at the feet, nothing was offered but moves that failed; 25588's dragon-194 (2026-10-18 06:45 to 07:00Z, 428 blocks, full health) stood sealed in its own column's low rings at (30, 61, 24), none_good and observe for a quarter hour. Cobblestone yields to bare hands in about ten seconds, netherrack in two, dirt in one; end stone takes fifteen and obsidian never.
+    if (!pickCarried() && actions.dig && bot.entity.onGround && !inWater() && !holeHere() && !inTunnel() && !Object.keys(tree).some(k => /^(tunnel_to_|pillar_punch_|craft_pickaxe)/.test(k))) {
+      const f0 = bot.entity.position.floored(), solid = q => bot.blockAt(q)?.boundingBox === 'block';
+      const soft = n => /^(cobblestone|cobbled_deepslate|netherrack|dirt|gravel|sand|stone|andesite|diorite|granite|tuff|blackstone|basalt)$/.test(n || '');
+      const secs = n => /netherrack/.test(n) ? 2 : /dirt|gravel|sand/.test(n) ? 1 : 10;
+      const sides = [[1, 0, 'east'], [-1, 0, 'west'], [0, 1, 'south'], [0, -1, 'north']];
+      const walls = sides.filter(([dx, dz]) => solid(f0.offset(dx, 0, dz)));
+      const ways = sides.map(([dx, dz, name]) => { const a = bot.blockAt(f0.offset(dx, 0, dz)), b = bot.blockAt(f0.offset(dx, 1, dz)); const beyond = f0.offset(dx * 2, 0, dz * 2); return { dx, dz, name, a, b, open: solid(f0.offset(dx * 2, -1, dz * 2)) && !solid(beyond) && !solid(beyond.offset(0, 1, 0)), cost: (a?.boundingBox === 'block' ? secs(a.name) : 0) + (b?.boundingBox === 'block' ? secs(b.name) : 0), ok: (a?.boundingBox !== 'block' || soft(a.name)) && (b?.boundingBox !== 'block' || soft(b.name)) && (a?.boundingBox === 'block' || b?.boundingBox === 'block') }; }).filter(w => w.ok && w.open).sort((p, q) => p.cost - q.cost);
+      if (walls.length >= 3 && ways.length) {
+        const w = ways[0];
+        tree.dig_out_by_hand = {
+          description: { action: `Dig out of this walled cell by hand to the ${w.name}: ${[w.a, w.b].filter(b => b?.boundingBox === 'block').map(b => b.name.replaceAll('_', ' ')).join(' and ')} (about ${w.cost} s bare-handed, the blocks dropped and picked up), onto the island's ground beyond; no pickaxe is carried, so end stone (fifteen seconds a block) and obsidian are not dug`, seconds: w.cost, wallsClosed: walls.length, health: bot.health, blocksCarried: blocksCarried(bot), dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null, record: '25588\'s dragon-194 (2026-10-18) stood sealed in its own column\'s cobblestone rings a quarter hour with 428 blocks and no pickaxe, none_good and observe, nothing else offered' },
+          run: async () => {
+            goal.step = { action: 'dig_out_by_hand', side: w.name, seconds: w.cost }; save();
+            const t0 = Date.now(); let dug = 0;
+            for (const cell of [f0.offset(w.dx, 1, w.dz), f0.offset(w.dx, 0, w.dz)]) { if (!solid(cell)) continue; try { await actions.dig(bot, task, cell, { requireDrops: false }); dug++; } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; break; } }
+            const out = !solid(f0.offset(w.dx, 0, w.dz)) && !solid(f0.offset(w.dx, 1, w.dz));
+            console.log(`[end combat] dug out by hand to the ${w.name} from ${f0}: ${dug} dug, ${out ? 'the way open' : 'still walled'}, ${Math.round((Date.now() - t0) / 100) / 10} s, ${bot.health.toFixed(1)} health`);
+            if (out) progress = true; else throw new Error('The way out was not dug');
+          } };
+      }
+    }
     if (!Object.keys(tree).length && !safe && inWater()) {
       const f = bot.entity.position.floored(); let how = 'nothing';
       try { const took = await takeBackWaterNear({ force: true }); if (took) how = `the water at ${took} taken back`; } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
