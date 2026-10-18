@@ -2047,6 +2047,24 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         // No stub up through a cloud over the feet (note 1867, as note 1836 for the hole): the stub rises into it. 25588's dragon-222 (2026-10-18 16:34Z) stood in its foot pit at (31, 63, -23) under a cloud on the ground at 65, 'up out of the breath first: 3 blocks up at (31, 66, -23), 2.0 health', 20 to 8 to 2 on the way up through the cloud, and died on the drop that followed. The body stays under it.
         const cloudOver = Object.values(bot.entities).find(e => e.name === 'area_effect_cloud' && e.isValid !== false && e.position.y > f0.y + 0.5 && e.position.y <= f0.y + 3.5 && Math.hypot(bot.entity.position.x - e.position.x, bot.entity.position.z - e.position.z) <= cloudRadius(bot, e) + 0.5) || null;
         if (inBreath() && cloudOver && !(state.cloudOverSaid > Date.now() - 5000)) { state.cloudOverSaid = Date.now(); console.log(`[end combat] no stub out of the breath at ${f0}: the cloud lies ${Math.round((cloudOver.position.y - f0.y) * 10) / 10} over the feet, ${Math.round(cloudRadius(bot, cloudOver) * 10) / 10} wide, and the stub would rise into it`); }
+        // In a tunnel the run goes along it (note 1872): the straight run away from the cloud meets the tunnel's wall, and 25588's dragon-225 (2026-10-18 17:26Z) in its tunnel at (16, 57, 31) 'moved 0.7 blocks' in 1.8 s and '1.3 blocks' in 2.0 s, jumping at the wall, 20 to 14 to 2.2. The open way along the tunnel, three cells or more, away from the cloud where both ways are open, is taken at a sprint.
+        if (inBreath() && inTunnel()) {
+          const f = bot.entity.position.floored(), open = c => bot.blockAt(c)?.boundingBox !== 'block', solid = c => bot.blockAt(c)?.boundingBox === 'block';
+          const clouds = Object.values(bot.entities).filter(e => e.name === 'area_effect_cloud' && e.isValid !== false).sort((a, b) => Math.hypot(a.position.x - bot.entity.position.x, a.position.z - bot.entity.position.z) - Math.hypot(b.position.x - bot.entity.position.x, b.position.z - bot.entity.position.z));
+          const cloud = clouds[0] || null;
+          const ways = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dz]) => { let k = 0; while (k < 8 && open(f.offset(dx * (k + 1), 0, dz * (k + 1))) && open(f.offset(dx * (k + 1), 1, dz * (k + 1))) && solid(f.offset(dx * (k + 1), -1, dz * (k + 1)))) k++; const away = cloud ? dx * (bot.entity.position.x - cloud.position.x) + dz * (bot.entity.position.z - cloud.position.z) : 0; return { dx, dz, k, away }; }).filter(w => w.k >= 3).sort((a, b) => (b.away > 0) - (a.away > 0) || b.k - a.k);
+          const way = ways[0];
+          if (way) {
+            const h0 = bot.health, p0 = bot.entity.position.clone();
+            goal.step = { action: 'run_along_the_tunnel', health: bot.health, way: [way.dx, way.dz], cells: way.k }; save();
+            bot.clearControlStates(); bot.pathfinder?.setGoal?.(null);
+            const look = f.offset(way.dx * 8 + .5, 1.6, way.dz * 8 + .5);
+            try { await require('./motion').move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'run_along_the_tunnel', keys: ['forward', 'sprint'], sneak: false, why: 'along the tunnel, out of the breath', look, maxMs: 1500, tick: 50, until: () => !inBreath() || Math.hypot(bot.entity.position.x - p0.x, bot.entity.position.z - p0.z) >= way.k - 0.5 }); }
+            catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+            console.log(`[end combat] the run along the tunnel from ${f}: ${way.k} cells open ${way.dx > 0 ? 'east' : way.dx < 0 ? 'west' : way.dz > 0 ? 'south' : 'north'}${way.away > 0 ? ', away from the cloud' : cloud ? ', toward the cloud, the one way open' : ''}; now at ${bot.entity.position.floored()}, ${h0.toFixed(1)} to ${bot.health.toFixed(1)} health${inBreath() ? ', still in it' : ''}`);
+            if (!inBreath()) return;
+          } else if (!(state.tunnelRunSaid > Date.now() - 5000)) { state.tunnelRunSaid = Date.now(); console.log(`[end combat] no run along the tunnel from ${f}: no way three cells open`); }
+        }
         // The run before the stub (note 1868): of 25588's fourteen deaths with logs since dragon-190 (2026-10-18), five ended in 'up out of the breath first' or its ground kin, the top of the ledger; the stub itself cost nothing in nine of thirteen, but it leaves the body standing on two blocks with open sides, and the next fireball burst on it there (dragon-205, 216, 223), a fresh cloud at the body's own height that the walls do not keep out. The run cost nothing in sixteen of eighteen and leaves the body moving. So the run first where the ground gives one, the stub where it does not.
         if (inBreath() && actions.navigate) {
           const h0 = bot.health, p0 = bot.entity.position.floored();
