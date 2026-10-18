@@ -1957,6 +1957,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       await digDownColumn({ limit: 2 });
     }
     else if (onOwnPillar() && ['dragon_breath_cloud', 'incoming_dragon_fireball'].includes(endEmergency(bot))) {
+      // The seconds between the cut and the answer said (note 1854): 25588's dragon-214 (2026-10-18 13:44Z) had its descent cut by a cloud on the body at (35, 59, 22) and died 20 to 14 to 8 to none with no line between; where the two seconds went is the question.
+      if (state.lastCutAt) console.log(`[end combat] the breath on the column at ${bot.entity.position.floored()}: ${Date.now() - state.lastCutAt} ms since the step was cut (${Number(state.lastCutHealth).toFixed(1)} to ${bot.health.toFixed(1)} health), ${endEmergency(bot)}`);
       // The breath on the column, or a fireball coming (its cloud lands where
       // the bot stands): a shield does not stop it (Instant Damage, magic),
       // the drill of 2026-10-13 (05:35Z) died holding in it, 4 a time to none,
@@ -4164,7 +4166,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       await Promise.race([running, cut]);
     }
     catch (err) {
-      if (err.name === 'EndEmergency') { bot.pathfinder.setGoal(null); bot.clearControlStates(); const c = cutCloud; console.log(`[end combat] ${[].concat(decision.path).join('/')} cut by ${c ? 'the breath\'s cloud at the feet' : `the emergency '${String(err.message).slice(0, 40)}'`} at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health${c ? ` (the cloud at ${c.position.floored()}, ${Math.round(cloudRadius(bot, c) * 10) / 10} wide, ${Math.round(hazardDistance(bot.entity.position, c) * 10) / 10} off)` : ''}`); }
+      if (err.name === 'EndEmergency') { state.lastCutAt = Date.now(); state.lastCutHealth = bot.health; bot.pathfinder.setGoal(null); bot.clearControlStates(); const c = cutCloud; console.log(`[end combat] ${[].concat(decision.path).join('/')} cut by ${c ? 'the breath\'s cloud at the feet' : `the emergency '${String(err.message).slice(0, 40)}'`} at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health${c ? ` (the cloud at ${c.position.floored()}, ${Math.round(cloudRadius(bot, c) * 10) / 10} wide, ${Math.round(hazardDistance(bot.entity.position, c) * 10) / 10} off)` : ''}`); }
       if (['Cancelled', 'Blocked', 'EndEmergency'].includes(err.name)) throw err;
       // Moving targets, a newly visible cloud or an obstructed route require
       // a fresh bounded choice. They do not invalidate the retained goal.
