@@ -348,7 +348,7 @@ test('the enderman\'s water left seven blocks behind is walked back to and taken
 
 test('a turned enderman within sixteen is Jev\'s question: the fight, the water at the feet and the pocket are offered with the facts (note 1551)', async () => {
   const { bot, goal, task } = fixture();
-  bot.inventory.items = () => [{ name: 'water_bucket', count: 1 }, { name: 'diamond_sword', count: 1, type: registry.itemsByName.diamond_sword.id, durabilityUsed: 0 }, { name: 'iron_pickaxe', count: 1 }, { name: 'cooked_beef', count: 8 }];
+  bot.inventory.items = () => [{ name: 'water_bucket', count: 2 }, { name: 'diamond_sword', count: 1, type: registry.itemsByName.diamond_sword.id, durabilityUsed: 0 }, { name: 'iron_pickaxe', count: 1 }, { name: 'cooked_beef', count: 8 }];
   bot.equip = async item => { bot.heldItem = item; }; bot.lookAt = async () => {}; bot.setControlState = () => {}; bot.controlState = {}; bot.activateItem = () => {};
   entity(bot, 8, 'enderman', new Vec3(10, 64, .5), { creepy: true });
   bot._hurtBy = { enderman: Date.now() };
