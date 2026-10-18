@@ -2012,7 +2012,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         const f0 = bot.entity.position.floored();
         // Under the bot's own roof (note 1641): a block two over the feet stops the jump and is dug first; a block three over leaves room for one up, and one up is out of a cloud half a block deep. 25588 (dragon-175, 2026-10-14 15:03Z, five crystals broken) stood on a two-block stub at (-11, 64, 6) with its fireball roof at 67, the cloud came to its feet, no climb was tried under the roof, and it went 20 to 2 in three seconds.
         const roofAt2 = bot.blockAt(f0.offset(0, 2, 0))?.boundingBox === 'block', roofAt3 = bot.blockAt(f0.offset(0, 3, 0))?.boundingBox === 'block';
-        if (inBreath() && blocksCarried(bot) >= 1 && !onObsidianTop()) {
+        // No stub at a cliff's edge (note 1843): the jump that lays the stub's first block carried the body over the edge, and 25588's dragon-204 (2026-10-18 10:50Z) fell 22 from (45, 54, -17) to the lower shelf and the void from there. Two or more sides dropping away: the run, not the stub.
+        const stubEdge = runOffSides(bot, bot.entity.position.floored()).length >= 2;
+        if (inBreath() && stubEdge && !(state.stubEdgeSaid > Date.now() - 10000)) { state.stubEdgeSaid = Date.now(); console.log(`[end combat] no stub out of the breath at ${bot.entity.position.floored()}: ${runOffSides(bot, bot.entity.position.floored()).length} sides drop away two or more, and the jump that lays it carries the body over the edge`); }
+        if (inBreath() && blocksCarried(bot) >= 1 && !onObsidianTop() && !stubEdge) {
           goal.step = { action: 'up_out_of_breath_first', health: bot.health }; save();
           // The feet on the ground first (note 1640): the body arrives in the cloud at a run or off a step, and the climb refused 'air under the feet' while it was in the air (dragon-171 and 174, 2026-10-14, each dead in the cloud a second later). The keys let go and up to half a second waited for the ground.
           bot.clearControlStates(); bot.pathfinder?.setGoal?.(null);
@@ -2324,7 +2327,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // The last full bucket kept here too (note 1827, as note 1819 for the pool): 25588's dragon-192 (2026-10-18 05:25Z, three crystals, 372 blocks, full health) poured its second bucket against an enderman three blocks off, was flung off its column top at 86 by the dragon's body, 'falling ... with no water bucket to clutch with', and went into the void. The last bucket goes against an enderman only at 8 health or under.
     const lastBucketKept = countOf(bot, 'water_bucket') < 2 && bot.health > 8;
     if (turned && !waterStands && lastBucketKept && !(state.lastBucketEndermanSaid > Date.now() - 20000)) { state.lastBucketEndermanSaid = Date.now(); console.log(`[end combat] no water against the enderman ${Math.round(turned.position.distanceTo(bot.entity.position))} blocks off: the one full bucket carried is kept for the landing after a knock off a column (health ${bot.health.toFixed(1)})`); }
-    if (turned && !waterStands && !lastBucketKept) {
+    // No reflex pour where the water would run off (note 1843, as the option's own check): the flow carries the body with it, and 25588's dragon-204 (2026-10-18 10:50Z) poured against an enderman on the island's lower shelf at (45, 29, -19) and went off its edge into the void at 11 health.
+    const pourRunsOff = runOffSides(bot, bot.entity.position.floored()).length >= 1;
+    if (turned && !waterStands && !lastBucketKept && pourRunsOff && !(state.pourRunOffSaid > Date.now() - 20000)) { state.pourRunOffSaid = Date.now(); console.log(`[end combat] no water against the enderman at ${bot.entity.position.floored()}: it would run off the ${runOffSides(bot, bot.entity.position.floored()).join(' and ')} side${runOffSides(bot, bot.entity.position.floored()).length === 1 ? '' : 's'} and carry the body with it`); }
+    if (turned && !waterStands && !lastBucketKept && !pourRunsOff) {
       let at = await pourAtFeet(bot, check, { urgent: turned.position.distanceTo(bot.entity.position) <= 4 });
       if (at) { state.water = { at: { ...at }, poured: Date.now() }; state.pours = (state.pours || 0) + 1; goal.step = { action: 'end_water', against: 'enderman', at: { ...at } }; save(); console.log(`[end combat] water poured at ${vector(at)} against the enderman ${Math.round(turned.position.distanceTo(bot.entity.position))} blocks off (${countOf(bot, 'water_bucket')} full left)`); }
       else if (runOffSides(bot, bot.entity.position.floored()).length >= 2 && turned.position.distanceTo(bot.entity.position) <= 4.5 && (countOf(bot, 'water_bucket') >= 2 || bot.health < 12)) {
