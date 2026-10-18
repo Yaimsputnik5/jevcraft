@@ -25,8 +25,10 @@ test('a body two blocks over the breath\'s cloud is out of it, and one two under
   assert.ok(hazardDistance(new Vec3(0.5, 53, 0.5), cloud) < 1, 'one up: in (note 1869: 12 of 21 unexplained hurts in dragon-200 to 224 had the cloud one or two below the feet)');
   assert.ok(hazardDistance(new Vec3(0.5, 52.4, 0.5), cloud) < 1, 'within half a block over it: in');
   assert.ok(hazardDistance(new Vec3(0.5, 54, 0.5), cloud) < 1, 'two up: in (note 1869: the two-block stub does not leave the cloud)');
-  assert.equal(hazardDistance(new Vec3(0.5, 55, 0.5), cloud), Infinity, 'three up: out');
+  assert.ok(hazardDistance(new Vec3(0.5, 55, 0.5), cloud) < 1, 'three up: in (note 1877: dragon-226, the cloud on a one-thick roof)');
+  assert.equal(hazardDistance(new Vec3(0.5, 56, 0.5), cloud), Infinity, 'four up: out');
   assert.ok(hazardDistance(new Vec3(0.5, 51, 0.5), cloud) < 1, 'one down: in');
   assert.ok(hazardDistance(new Vec3(0.5, 50, 0.5), cloud) < 1, 'two down: in (note 1870: dragon-224, the cloud on the roof two over the feet)');
-  assert.equal(hazardDistance(new Vec3(0.5, 49, 0.5), cloud), Infinity, 'three down: out');
+  assert.ok(hazardDistance(new Vec3(0.5, 49, 0.5), cloud) < 1, 'three down: in (note 1877)');
+  assert.equal(hazardDistance(new Vec3(0.5, 48, 0.5), cloud), Infinity, 'four down: out');
 });
