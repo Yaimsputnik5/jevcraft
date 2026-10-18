@@ -2670,7 +2670,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // dragon's wing twice and fell.
     const punchPlace = safe || ((onOwnPillar() || onObsidianTop()) && endHazards(bot).filter(({ entity }) => entity.name !== 'end_crystal').every(({ entity, radius }) => hazardDistance(bot.entity.position, entity) > radius));
     // The tunnel offered with the dragon the only thing making the ground unsafe (note 1808): with the dragon within twenty every crystal option fell away and the ask held escape moves alone, each ending within three blocks of where it began. 25588's dragon-178 (2026-10-18 01:06 to 01:2xZ) stood so at (35, 61, 22) at full health under the dragon hovering eight blocks over it for sixteen minutes, 300 answers of none_good, the tunnel under the island (out of its sight) never on the list. The climbs stay for the safe ground; the tunnel goes under it.
-    const dragonOnly = !safe && unsafeBecause(bot, bot.entity.position).every(r => /^ender_dragon /.test(r));
+    // Endermen not hunting the bot count like the dragon here (note 1815): one standing within twenty, calm, made the ground 'unsafe' and took every climb and tunnel off the list; 25588's dragon-185 (2026-10-18 02:41Z) sat in its hole at crystal 9's foot, the tunnel just dug and a pickaxe carried, and was offered moves, the enderman and dig_up_to_the_surface alone. A hunting mob ('hostile path') or a cloud still closes the list. The climbs stay unless the dragon itself is near.
+    const unsafeReasons = safe ? [] : unsafeBecause(bot, bot.entity.position);
+    const dragonOnly = !safe && unsafeReasons.length > 0 && unsafeReasons.every(r => /^(ender_dragon|enderman) /.test(r));
+    const dragonNear = unsafeReasons.some(r => /^ender_dragon /.test(r));
     if ((punchPlace || dragonOnly) && actions.dig && !Object.keys(tree).some(k => /^(throw_|pillar_throw_)/.test(k))) {
       const here = bot.entity.position, carried = blocksCarried(bot);
       // A caged crystal too, where a pickaxe is carried: its iron bars between
@@ -3141,7 +3144,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           } };
       }
     }
-    if (!punchPlace) for (const k of Object.keys(tree)) if (/^(pillar_punch_|quarry_blocks_)/.test(k)) delete tree[k]; // note 1808: the dragon alone unsafe: the tunnel stays, the climbs do not
+    if (!punchPlace && dragonNear) for (const k of Object.keys(tree)) if (/^(pillar_punch_|quarry_blocks_)/.test(k)) delete tree[k]; // notes 1808, 1815: the dragon near: the tunnel stays, the climbs do not; calm endermen alone take nothing off
     // A bed beside the perched head (bed-bomb.js): the heaviest blow, from a
     // trench that keeps the blast off the bot.
     const { bedPlans, bedBomb, bedsCarried } = require('./bed-bomb');
