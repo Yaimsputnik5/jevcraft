@@ -1585,7 +1585,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // 1.4 blocks in four seconds, 20 to none. The rim is a block up and a block
     // or two off: forward and the jump, toward the column's foot.
     if (down && inWater()) await outOfTheWater();
-    if (down && countOf(bot, 'bucket') > 0 && !breathThreat(bot) && !dragonThreat(bot)) { try { await takeBackWaterNear(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
+    if (down && countOf(bot, 'bucket') > 0 && !breathThreat(bot) && !dragonThreat(bot)) { try { await takeBackWaterNear({ sparePool: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
     return down;
   };
   // The way down the column as Jev chose it for this fight (column_descent): the drop where chosen and possible, the dig otherwise.
@@ -2171,7 +2171,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     state.poolsLeft = state.poolsLeft.filter(x => x !== w.w); if (state.pool && state.pool.x === p.x && state.pool.z === p.z) delete state.pool; save();
     return full > 0;
   };
-  const takeBackWaterNear = async ({ sparePool = false, force = false } = {}) => {
+  // The fresh pool spared by default (note 1858): 'out of the trench' took the pool's own water back into the bucket the moment it was poured, and the climb went up with no pool below; 25588's dragon-217 (2026-10-18 14:33Z) poured at (35, 49, 22), 'the water left at (35, 49, 22) taken back into the bucket (2 full carried)', and at the top 'no water drop'. Only the reclaim after the way down asks for the pool itself.
+  const takeBackWaterNear = async ({ sparePool = true, force = false } = {}) => {
     if (countOf(bot, 'bucket') < 1) return null;
     // Not with an enderman within twelve (note 1638): the water at the feet is the stand against it (note 1136), and the take-back undid the pour the moment after it, pour and take-back six times over while the enderman struck; 25588 (dragon-170, 2026-10-14 13:57Z, one crystal broken) 20 to 1.7 in seventeen seconds, dead. Forced before a dig down (note 1643).
     if (!force && hostileEntities(bot, 12).some(e => live(bot, e) && e.name === 'enderman')) return null;
