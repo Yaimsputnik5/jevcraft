@@ -2047,6 +2047,19 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         // No stub up through a cloud over the feet (note 1867, as note 1836 for the hole): the stub rises into it. 25588's dragon-222 (2026-10-18 16:34Z) stood in its foot pit at (31, 63, -23) under a cloud on the ground at 65, 'up out of the breath first: 3 blocks up at (31, 66, -23), 2.0 health', 20 to 8 to 2 on the way up through the cloud, and died on the drop that followed. The body stays under it.
         const cloudOver = Object.values(bot.entities).find(e => e.name === 'area_effect_cloud' && e.isValid !== false && e.position.y > f0.y + 0.5 && e.position.y <= f0.y + 3.5 && Math.hypot(bot.entity.position.x - e.position.x, bot.entity.position.z - e.position.z) <= cloudRadius(bot, e) + 0.5) || null;
         if (inBreath() && cloudOver && !(state.cloudOverSaid > Date.now() - 5000)) { state.cloudOverSaid = Date.now(); console.log(`[end combat] no stub out of the breath at ${f0}: the cloud lies ${Math.round((cloudOver.position.y - f0.y) * 10) / 10} over the feet, ${Math.round(cloudRadius(bot, cloudOver) * 10) / 10} wide, and the stub would rise into it`); }
+        // The run before the stub (note 1868): of 25588's fourteen deaths with logs since dragon-190 (2026-10-18), five ended in 'up out of the breath first' or its ground kin, the top of the ledger; the stub itself cost nothing in nine of thirteen, but it leaves the body standing on two blocks with open sides, and the next fireball burst on it there (dragon-205, 216, 223), a fresh cloud at the body's own height that the walls do not keep out. The run cost nothing in sixteen of eighteen and leaves the body moving. So the run first where the ground gives one, the stub where it does not.
+        if (inBreath() && actions.navigate) {
+          const h0 = bot.health, p0 = bot.entity.position.floored();
+          goal.step = { action: 'run_out_of_breath_first', health: bot.health }; save();
+          try {
+            await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) && safeFromHostiles(bot, p, endMobs(bot)), timeoutMs: 700, dig: actions.dig });
+            console.log(`[end combat] the run out of the cloud first from ${p0}: now at ${bot.entity.position.floored()}, ${h0.toFixed(1)} to ${bot.health.toFixed(1)} health${inBreath() ? ', still in it' : ''}`);
+            if (!inBreath()) return;
+          } catch (err) {
+            if (err.name !== 'NoEscape') throw err;
+            console.log(`[end combat] no run out of the cloud from ${p0}: ${String(err.message || err).slice(0, 90)}; the stub instead`);
+          }
+        }
         if (inBreath() && blocksCarried(bot) >= 1 && !onObsidianTop() && !stubEdge && !ballClose && !cloudOver) {
           goal.step = { action: 'up_out_of_breath_first', health: bot.health }; save();
           // The feet on the ground first (note 1640): the body arrives in the cloud at a run or off a step, and the climb refused 'air under the feet' while it was in the air (dragon-171 and 174, 2026-10-14, each dead in the cloud a second later). The keys let go and up to half a second waited for the ground.
