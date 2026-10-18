@@ -553,6 +553,8 @@ async function navigateOnce(bot, task, goal, { timeoutMs = 90000, stallMs = 1500
   const pace = setInterval(() => { const p = bot.entity?.position; if (!p) return; const d = Math.hypot(p.x - last.x, p.y - last.y, p.z - last.z); if (d < 10) blocks += d; last = p.clone?.() || { x: p.x, y: p.y, z: p.z }; }, 250);
   pace.unref?.();
   const ended = (kind, why = null) => { clearInterval(pace); const p = bot.entity?.position; if (p) blocks += Math.min(10, Math.hypot(p.x - last.x, p.y - last.y, p.z - last.z)); fp.noteWalk(bot, { kind, goal: there, from, startedAt, blocks, why, walk }); };
+  // A held sneak let go before the walk (note 1845): the End's holds, digs and pockets crouch the body and a cut step can leave the key down; crouched, the pathfinder's walk cannot step off any edge, and 25588's dragon-194, 200 and 206 (2026-10-18) stood on stubs and rims with hundreds of walks 'timed out without reaching new ground' and 'No route from here'. Said when it happens, so the leak's source can be found.
+  if (bot.controlState?.sneak) { console.log(`[walks] the sneak key was held at the walk's start at ${bot.entity?.position?.floored?.() || '?'}: let go (step ${bot._goal?.step?.action || '-'})`); try { bot.setControlState('sneak', false); } catch (_) { /* no controls */ } }
   try {
     const result = await walkTo(bot, task, goal, { timeoutMs, stallMs, stopWhen, sprint, besideLava, edgeTaken, onFoot, walk, from });
     ended('arrived');
