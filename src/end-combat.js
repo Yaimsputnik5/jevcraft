@@ -3905,7 +3905,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       const cavity = [2, 3, 4].find(dy => bot.blockAt(f.offset(0, -dy, 0))?.boundingBox !== 'block');
       if (actions.dig && pickCarried() && bot.entity.onGround && !inWater() && under && SCAFFOLD_UNDER.test(under.name) && cavity && !tree.pillar_down && !holeHere() && !inTunnel()) {
         tree.back_into_the_hole = {
-          description: { action: `Dig the stub's ${cavity - 1} block${cavity - 1 === 1 ? '' : 's'} from under the feet back into the hole below (about a second each, the blocks kept) and roof it: from the hole the tunnel to a crystal's foot is to be had, from this stub nothing is (every walk from here found no path).`, stubBlocks: cavity - 1, blocksCarried: blocksCarried(bot), health: bot.health, dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(here)) : null },
+          description: { action: `Dig the stub's ${cavity - 1} block${cavity - 1 === 1 ? '' : 's'} from under the feet back into the hole below (about a second each, the blocks kept) and roof it: from the hole the tunnel to a crystal's foot is to be had, from this stub nothing is (every walk from here found no path).`, stubBlocks: cavity - 1, blocksCarried: blocksCarried(bot), health: bot.health, dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null },
           run: async () => {
             goal.step = { action: 'back_into_the_hole', blocks: cavity - 1 }; save();
             const t0 = Date.now(); let dug = 0;
