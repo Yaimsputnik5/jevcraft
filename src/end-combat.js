@@ -1365,6 +1365,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       else if (src) {
         console.log(`[end combat] the water went in at ${src}, ${best.cell.y - src.y} below the row at ${best.cell.y}: no pool in the row from there; taken back and poured again`);
         try { await require('./water').fillWaterBucket(bot, task, src, { timeoutMs: 1500 }); } catch (_) { /* left */ }
+        // The hole the water fell into is filled before the second pour (note 1879): the water went in a block under the row because the row's floor was open there, and the second pour went in the same hole; 25588's dragon-227 (2026-10-18 18:05 to 18:14Z) lost all three of its pools this way, at (36, 61, 22), (32, 61, 21) and (11, 58, 34), 'the second pour went in at ... too, below the row: taken back, the bucket kept', and came down 39 blocks from crystal 18 under the fireballs, dead at two crystals. Of the pools refused in runs 190 to 213, twenty were this.
+        if (src.y < best.cell.y && Math.abs(src.x - best.cell.x) <= 1 && Math.abs(src.z - best.cell.z) <= 1 && bot.blockAt(src)?.boundingBox !== 'block') {
+          const fname = blocksCarriedName(bot), fitem = fname && bot.inventory.items().find(i => i.name === fname);
+          const fref = fitem ? [[0, -1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]].map(([dx, dy, dz]) => ({ b: bot.blockAt(src.offset(dx, dy, dz)), face: new Vec3(-dx, -dy, -dz) })).find(r => r.b?.boundingBox === 'block') : null;
+          if (fref) {
+            try { check(); await bot.equip(fitem, 'hand'); await bot.lookAt(fref.b.position.offset(.5 + fref.face.x * .5, .5 + fref.face.y * .5, .5 + fref.face.z * .5), true); await bot.placeBlock(fref.b, fref.face); await sleep(60); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
+            console.log(`[end combat] the hole under the row filled at ${src}: ${bot.blockAt(src)?.boundingBox === 'block' ? 'a block laid' : 'no block laid'} before the second pour at ${best.cell}`);
+          }
+        }
         water = bot.inventory.items().find(i => i.name === 'water_bucket');
         if (water) {
           try { await pourOnce(); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; }
