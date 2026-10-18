@@ -186,9 +186,11 @@ function climbStop(bot, feet, { canDig = diggableAbove, wet: throughWater = fals
   return null;
 }
 // The ring about a climb's cell (note 1753): the four cells beside it at dy, each laid on the block under it (the ring of the level below) or against the climb's own block toward the middle; cells already solid are left. With a ring at the head's height on every level the dragon has no line from its eyes to the bot's, which its fireball needs (Fable, 2026-10-15; the sealed stubs of notes 1721 and 1731 took no fireball while the body stayed in them).
-async function ringAround(bot, task, feet, dy, blocks = SCAFFOLD, { maxMs = 2500 } = {}) {
+async function ringAround(bot, task, feet, dy, blocks = SCAFFOLD, { maxMs = 2500, skipSide = null } = {}) {
   const t0 = Date.now(); let laid = 0;
   for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    // The pool's side left open (note 1861): rings at every level on all four neighbours walled the fall line to the pool, and from a walled top every side read 'a floor 0 down'; 25588's water drop fired 0 times in runs 190 to 219 (2026-10-18), every descent 25 to 40 blocks dug under the dragon's body. The side the pool lies on is left un-ringed, as the pocket at the top already leaves it.
+    if (skipSide && skipSide[0] === dx && skipSide[1] === dz) continue;
     if (Date.now() - t0 > maxMs) break;
     task.check();
     const cell = feet.offset(dx, dy, dz);
@@ -204,7 +206,7 @@ async function ringAround(bot, task, feet, dy, blocks = SCAFFOLD, { maxMs = 2500
   }
   return laid;
 }
-async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = true, canDig = diggableAbove, blocks = SCAFFOLD, wet = false, enclose = false, encloseUntil = Infinity, encloseFrom = -Infinity } = {}) {
+async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = true, canDig = diggableAbove, blocks = SCAFFOLD, wet = false, enclose = false, encloseUntil = Infinity, encloseFrom = -Infinity, skipSide = null } = {}) {
   const { move } = require('./motion');
   let placed = 0, lastPlaceError = null, lastJump = '';
   let rested = false;
@@ -312,7 +314,7 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     if (enclose && bot.entity.position.floored().y > start && bot.entity.position.floored().y < encloseUntil && bot.entity.position.floored().y >= encloseFrom) {
       const nf = bot.entity.position.floored(), have = blocks.reduce((n, k) => n + bot.inventory.items().filter(i => i.name === k).reduce((m, i) => m + i.count, 0), 0);
       // From a level under the feet (note 1756): the cell beside the feet has nothing under it on a column one wide, and the first ring is laid against the column's own block below the feet; the arena's drill (2026-10-16 06:48Z, CLIMB_ENCLOSE=1) laid no ring block at the feet's and the head's levels alone. A level already ringed is skipped, so the first level is twelve blocks and each after it four.
-      if (have >= Math.max(0, targetY - nf.y) + 4) { let n = 0; for (const dy of [-1, 0, 1]) n += await ringAround(bot, task, nf, dy, order); if (n) bot._ringLaid = (bot._ringLaid || 0) + n; }
+      if (have >= Math.max(0, targetY - nf.y) + 4) { let n = 0; for (const dy of [-1, 0, 1]) n += await ringAround(bot, task, nf, dy, order, { skipSide }); if (n) bot._ringLaid = (bot._ringLaid || 0) + n; }
     }
     if (bot.entity.position.floored().y <= start) { console.log(`[pillar up] stopped ${placed ? `after ${placed}` : 'before the first block'}: the block was not placed in three jumps from ${feet} (on ground ${bot.entity.onGround}, ${block.name} in hand${lastPlaceError ? `, the place said: ${lastPlaceError}` : ''}${lastJump ? `; ${lastJump}; the cell at the feet is ${bot.blockAt(feet)?.name || 'unloaded'}` : ''})`); break; }
   }
