@@ -896,10 +896,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // and was a block down two seconds later, 20 to 14 to 8 to 2 to none.
       const inCloud = breathThreat(bot)?.name === 'area_effect_cloud';
       // Not down into the cloud (note 1576): out of it, the dig waits over it.
-      const cloudBelow = !inCloud && cloudUnderfoot(2);
+      // The guard kept with a cloud on the body too (note 1801): a fireball's cloud bursting on the stub's side lies a block under the feet, hurting the body and dug into at the first block, and 'in the cloud' switched the guard off. 25588's dragon-172 (2026-10-18 00:13Z, one crystal) on its stub at (-4, 64, 25) with four blocks, the first cloud at the foot three below, took pillar_down (the code's least bad after Jev's none_good) and dug 64 to 61 in eleven silent seconds, 20 to 14 to 9 to none. The cloud a block under the feet counts as at them: up out of it, not down into it.
+      const cloudBelow = cloudUnderfoot(2);
       // A cloud at the feet's own height: one block up, not the dig (note 1729). The cloud's slab is half a block, and one block laid is half a second where two dug down are two and more with a stone pickaxe; 25588 (dragon-274, 2026-10-15 12:18Z) had a fireball's cloud land at its feet at (41.5, 63, -17.4) as it began 'two dug down into it' with 14 blocks carried, 'not centred ... 0.8 off', and stood there four seconds, 20 to none.
       if (inCloud && blocksCarried(bot) >= 1) {
-        const p0 = bot.entity.position, atFeet = Object.values(bot.entities).find(e => e.name === 'area_effect_cloud' && e.isValid !== false && Math.abs(e.position.y - p0.y) <= 0.6 && Math.hypot(p0.x - e.position.x, p0.z - e.position.z) <= cloudRadius(bot, e) + 0.3);
+        const p0 = bot.entity.position, atFeet = Object.values(bot.entities).find(e => e.name === 'area_effect_cloud' && e.isValid !== false && Math.abs(e.position.y - p0.y) <= 0.6 && Math.hypot(p0.x - e.position.x, p0.z - e.position.z) <= cloudRadius(bot, e) + 0.3) || cloudUnderfoot(1);
         if (atFeet) {
           const from = Math.floor(p0.y), want = upClear(from);
           try { await require('./pillar-recovery').pillarUp(bot, task, from + want, { dig: actions.dig, maxBlocks: want, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
