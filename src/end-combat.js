@@ -1100,8 +1100,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           await bot.lookAt(top.position.offset(.5, 1, .5), true); await bot.placeBlock(top, new Vec3(0, 1, 0)); await sleep(60);
           const post = bot.blockAt(f.offset(wall[0], 2, wall[1]));
           if (post?.boundingBox === 'block') { check(); await bot.lookAt(post.position.offset(.5 - wall[0] * .5, .5, .5 - wall[1] * .5), true); await bot.placeBlock(post, new Vec3(-wall[0], 0, -wall[1])); await sleep(60); }
-        } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
-        return bot.blockAt(cell)?.boundingBox === 'block';
+        } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; if (!(state.roofWallSaid > Date.now() - 10000)) { state.roofWallSaid = Date.now(); console.log(`[end combat] the roof's post on the wall at ${f.offset(wall[0], 2, wall[1])} failed: ${String(err.message || err).slice(0, 100)}`); } }
+        const laid = bot.blockAt(cell)?.boundingBox === 'block';
+        if (!laid && !(state.roofWallSaid > Date.now() - 10000)) { state.roofWallSaid = Date.now(); console.log(`[end combat] the roof over the head at ${cell} not laid from the wall's post at ${f.offset(wall[0], 2, wall[1])}: post ${bot.blockAt(f.offset(wall[0], 2, wall[1]))?.name || 'nothing'}, ${item.name} in hand`); }
+        return laid;
       }
       try {
         await bot.equip(item, 'hand'); check();
@@ -1689,7 +1691,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     if ((onOwnPillar() && !onObsidianTop()) || atTheTop) { try { await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
     // And the pocket's walls (note 1575), from 70 up (the island's top is 64 and under; every carry that killed began at 71 to 95).
     // Only against the dragon's body coming, never against a fireball (note 1584): the cloud reaches through the walls, and a body sealed in with it has seconds of digging to get out. 25588 (dragon-127, 2026-10-14 05:13Z) died in its first pocket so; dragon-130 (05:49Z) left one at 0.3 health.
-    if (((onOwnPillar() && !onObsidianTop()) || atTheTop) && bot.entity.position.y >= 70 && dragonThreat(bot) && !breathThreat(bot)) {
+    // The pocket at any height (note 1824): the body was hit on its column below 70 as well; 25588's dragon-190 (2026-10-18 04:58Z) took the dragon's body at 63 and 69 on a walled climb, 20 to 15 to 13 to 10, was flung to 78 and died of the fall, the pocket never built for the gate at 70.
+    if (((onOwnPillar() && !onObsidianTop()) || atTheTop) && dragonThreat(bot) && !breathThreat(bot)) {
       try { const t0 = Date.now(), r = await pocketOnColumn(); console.log(`[end combat] a pocket against the wings on the column at ${bot.entity.position.floored()}: ${r.laid} blocks laid, ${r.closed} of 4 sides closed${r.poolSideOpen ? ' (the pool\'s side left open for the drop)' : ''}, ${Date.now() - t0} ms, ${blocksCarried(bot)} blocks left`); }
       catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
     }
