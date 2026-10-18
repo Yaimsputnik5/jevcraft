@@ -2955,7 +2955,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               const f0 = bot.entity.position.floored(), solid = q => bot.blockAt(q)?.boundingBox === 'block';
               const walls = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(f0.offset(dx, 0, dz)) && solid(f0.offset(dx, 1, dz))).length;
               if (holeHere()) { try { await outOfTheHole(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; } }
-              else if (walls >= 3 && bot.entity.onGround && !inWater() && blocksCarried(bot) >= 3) {
+              // Not from a walled shaft (note 1830): the rings of a walled climb close four sides of the column's base too, and the climb of note 1829 went two up inside the shaft, then two more, the walk failing from each; 25588's dragon-194 (2026-10-18 06:46 to 06:50Z) at (30, 64, 24) then (30, 66, 24) over its column's base at 61. A shaft's walls go on two and three over the feet; a pit's do not.
+              const shaft = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(f0.offset(dx, 2, dz)) && solid(f0.offset(dx, 3, dz))).length >= 3 || (bot._pillarUp && bot._pillarUp.x === f0.x && bot._pillarUp.z === f0.z);
+              if (!holeHere() && walls >= 3 && shaft && !(state.shaftSaid > Date.now() - 20000)) { state.shaftSaid = Date.now(); console.log(`[end combat] in a walled shaft at ${f0} (${walls} walls, going on above): no climb up it before the walk to crystal ${target.id}'s foot`); }
+              else if (walls >= 3 && !shaft && bot.entity.onGround && !inWater() && blocksCarried(bot) >= 3) {
                 const from = Math.floor(bot.entity.position.y), depth = [2, 3].find(d => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => !solid(f0.offset(dx, d, dz)) && solid(f0.offset(dx, d - 1, dz)))) || 2;
                 try { await require('./pillar-recovery').pillarUp(bot, task, from + depth, { dig: actions.dig, maxBlocks: depth, threats: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
                 console.log(`[end combat] up out of the pit before the walk to crystal ${target.id}'s foot: ${Math.floor(bot.entity.position.y) - from} blocks up at ${bot.entity.position.floored()} (${walls} walls beside the feet)`);
