@@ -216,6 +216,11 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     // Why a climb stops, said once when it placed nothing (note 1417): 25588
     // (dragon-7, 2026-10-13 05:55Z) was 'stopped 35 blocks short, 0 up' with
     // 80 cobblestone carried and no word of why.
+    // Out of the water to a dry cell beside first (note 1804): a jump from water reaches 0.8 and the climb stops before its first block, the body standing in the breath. 25588's dragon-123, 136, 137 and 169 (2026-10-14 to 17) each ended 'stopped before the first block: water at the feet ... a jump from water reaches 0.8', 'up out of the breath first: 0 blocks up', dead in the cloud within seconds. Once a climb; the dry cell with a block under it beside the feet, none over the void.
+    if (!rested && /water/.test(bot.blockAt(feet)?.name || '')) {
+      const dry = directions.map(d => feet.plus(d)).find(c => { const b = bot.blockAt(c), u = bot.blockAt(c.offset(0, -1, 0)), o = bot.blockAt(c.offset(0, 1, 0)); return b && /^(air|cave_air)$/.test(b.name) && o && /^(air|cave_air)$/.test(o.name) && u?.boundingBox === 'block' && !/water|lava/.test(u.name); });
+      if (dry) { rested = true; console.log(`[pillar up] water at the feet at ${feet}: the dry cell beside at ${dry} taken before the climb`); try { await require('./bridging').creepTo(bot, task, dry, 1500); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } continue; }
+    }
     const why = climbStop(bot, feet, { canDig, wet });
     // Said after the first block too (note 1679): 25588 (dragon-214, 2026-10-15 00:00Z) laid one of two in the cloud at (40, 62, -5) and nothing said why the second did not go; 20 to none in three seconds.
     if (why) { console.log(`[pillar up] stopped ${placed ? `after ${placed} block${placed === 1 ? '' : 's'}` : 'before the first block'}: ${why}`); break; }
@@ -260,7 +265,9 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     // packet went, and the server refused every block of a pillar from two
     // hoglins in the arena.
     // The block laid under where the body is at the place (note 1687), not under where it stood before the jump: the jump carries the body a cell over at times ('the jump carried the body from (-14, 34) to (-14, 35)', 25588's dragon-222, 2026-10-15 01:4xZ), and a block laid under the old cell lifts nothing; 'the block was not placed in three jumps' was the climb out of the breath laying one of two in dragon-214, 215, 216, 220 and 221, each dead in its cloud. With air under the new cell the place is not tried.
-    const place = () => {
+    const place = async () => {
+      // The block back in the hand at the place (note 1804): the clutch and the dig equip the bucket and the pickaxe between the equip above and the place, and the place said 'Server refused to place iron_pickaxe' or 'water_bucket' on 25588's dragon-111, 147, 152 and 161 (2026-10-14 to 17), the climb out of the breath stopped before its first block and the body dead in the cloud.
+      if (bot.heldItem?.name !== block.name) { const again = bot.inventory.items().find(i => i.name === block.name); if (again) await bot.equip(again, 'hand'); }
       let ref = below;
       const now = bot.entity.position.floored();
       if (now.x !== feet.x || now.z !== feet.z) {
