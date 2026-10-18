@@ -725,6 +725,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   };
   const outOfTheHole = async () => {
     if (!holeHere()) return true;
+    // Not up into a cloud at the rim (note 1836): the body two deep is under the cloud's slab, and the climb out puts its feet in it. 25588's dragon-196 (2026-10-18 07:47Z, one crystal, full health) in its hole at (39, 59, 9) with 'clouds 0 off, 2 up' went 'up out of the hole' and died on the rim at 61 in the cloud, 14 to 9 to none. The hole is kept while a cloud lies over it, about thirty seconds.
+    { const p = bot.entity.position, over = Object.values(bot.entities).find(e => e.name === 'area_effect_cloud' && e.isValid !== false && e.position.y - p.y >= 1 && e.position.y - p.y <= 4.5 && Math.hypot(p.x - e.position.x, p.z - e.position.z) <= cloudRadius(bot, e) + 0.5); if (over) { if (!(state.rimCloudSaid > Date.now() - 10000)) { state.rimCloudSaid = Date.now(); console.log(`[end combat] the hole kept at ${p.floored()}: a cloud lies ${Math.round((over.position.y - p.y) * 10) / 10} over the feet at the rim, ${Math.round(cloudRadius(bot, over) * 10) / 10} wide; up out of it would be into it`); } return false; } }
     if (roofed() && actions.dig) await roofHole(false);
     const from = Math.floor(bot.entity.position.y);
     const depth = [1, 2, 3].filter(dy => bot.blockAt(bot.entity.position.floored().offset(1, dy - 1, 0))?.boundingBox === 'block' || bot.blockAt(bot.entity.position.floored().offset(-1, dy - 1, 0))?.boundingBox === 'block').length;
