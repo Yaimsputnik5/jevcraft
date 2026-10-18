@@ -1890,6 +1890,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const groundBeside = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(f.offset(dx, -1, dz))).length;
     if (groundBeside < 2) return false;
     if (!thick || wet || voidSides(bot, p) > 0 || deepBeside(bot, p) || !bot.entity.onGround) return false;
+    // No hole by hand (note 1816, as notes 1763 and 1779 for the body's hole): end stone bare-handed is fifteen seconds a block, the body in the open the while; 25588's dragon-186 (2026-10-18 03:12Z, one crystal, 233 blocks, no pickaxe) began 'the hole dug under the feet before the pass (0 of 4 sides closed)' at (-39, 62, -13), the fireball's cloud landed on it there, 20 to 14 to 8 to none.
+    if (!pickCarried()) { if (!(state.noPickHoleSaid > Date.now() - 20000)) { state.noPickHoleSaid = Date.now(); console.log(`[end combat] the dragon coming and no pickaxe carried: no hole dug by hand at ${f} before the pass`); } return false; }
     goal.step = { action: 'hole_before_the_pass', dragonBlocksOff: Math.round(flat), closing: Math.round(closing), sidesClosed }; save();
     console.log(`[end combat] the dragon coming at ${Math.round(closing)} a second, ${Math.round(flat)} blocks off: the hole dug under the feet at ${f} before the pass (${sidesClosed} of 4 sides closed now)`);
     bot.clearControlStates?.(); bot.pathfinder?.setGoal?.(null);
@@ -3503,10 +3505,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               record: '25588\'s dragon-40 (2026-10-16) wore its iron pickaxe out in the tunnel quarry 20 minutes in, six crystals broken, and stood three hours by the fountain with 3 blocks, no blow offered at the last four crystals and the ingots for three pickaxes carried' },
             run: async () => {
               goal.step = { action: 'craft_pickaxe_in_the_fight', ingots, sticks }; save();
-              if (sticks < 2) await actions.craft(bot, task, { action: 'craft', item: 'stick', count: 4, consumes: {} }, goal);
-              await actions.craft(bot, task, { action: 'craft', item: 'iron_pickaxe', count: 1, needs_table: true, consumes: { iron_ingot: 3, stick: 2 } }, goal);
-              // The table taken back (note 1813): left standing, the next pickaxe had no table; 25588's dragon-181 died with 3 ingots, one stick and no crafting table, and dragon-182 wore its pickaxe out at tunnel cell 57 with no craft to offer.
-              if (actions.dig && count('crafting_table') === 0) { const tb = bot.findBlock({ matching: bot.registry.blocksByName.crafting_table.id, maxDistance: 5 }); if (tb) { try { await actions.dig(bot, task, tb.position, { requireDrops: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; } console.log(`[end combat] the crafting table at ${tb.position} ${count('crafting_table') ? 'taken back' : 'dug but not picked up'}`); } }
+              // The table taken back whatever cut the craft (note 1816, after 1813): a craft cut by an emergency after the table went down left it standing, and 25588's dragon-186 (2026-10-18 03:07Z) had no craft_pickaxe to choose with 6 ingots and 3 sticks, no table carried, its pickaxe gone at tunnel cell 28; dead on the surface at 03:12Z.
+              const tableBack = async () => { if (!actions.dig || count('crafting_table') > 0) return; const tb = bot.findBlock({ matching: bot.registry.blocksByName.crafting_table.id, maxDistance: 6 }); if (!tb) return; try { await actions.dig(bot, task, tb.position, { requireDrops: true }); } catch (err) { if (['Cancelled', 'NeedsAir'].includes(err.name)) throw err; } console.log(`[end combat] the crafting table at ${tb.position} ${count('crafting_table') ? 'taken back' : 'dug but not picked up'}`); };
+              try {
+                if (sticks < 2) await actions.craft(bot, task, { action: 'craft', item: 'stick', count: 4, consumes: {} }, goal);
+                await actions.craft(bot, task, { action: 'craft', item: 'iron_pickaxe', count: 1, needs_table: true, consumes: { iron_ingot: 3, stick: 2 } }, goal);
+              } finally { try { await tableBack(); } catch (_) { /* the table stays */ } }
               const made = bot.inventory.items().some(i => /_pickaxe$/.test(i.name));
               console.log(`[end combat] the pickaxe crafted in the fight: ${made ? 'an iron pickaxe carried' : 'none made'}, ${count('iron_ingot')} iron ingots left, ${bot.health.toFixed(1)} health at ${bot.entity.position.floored()}`);
               if (!made) throw new Error('No pickaxe was made');
