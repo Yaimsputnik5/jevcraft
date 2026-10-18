@@ -17,6 +17,11 @@ function cloudRadius(bot, entity) {
 // breath (note 1557) read as 'the breath at the feet' on the bot's own column,
 // and 25588 (dragon-116, 2026-10-14 03:39Z) dug its escape down into the
 // cloud it had just climbed out of, 14.6 to none in four seconds.
+// A cloud under the feet within three (note 1825): the hole for the body dug down from a stub or a rim ends in the cloud lying on the ground below. 25588's dragon-191 (2026-10-18 05:03Z, one crystal) on its stub at (15, 61, 9) with 'clouds 0.4 off, -2 up' dug 'toward a hole two deep', moved 2 blocks down to (15, 58, 9), 11.9 to 0.4 health in the cloud, dead.
+function cloudBelow(bot, blocks = 3) {
+  const p = bot.entity.position;
+  return Object.values(bot.entities).find(e => e.name === 'area_effect_cloud' && e.isValid !== false && p.y - e.position.y >= 0.5 && p.y - e.position.y <= blocks + 0.5 && Math.hypot(p.x - e.position.x, p.z - e.position.z) <= cloudRadius(bot, e) + 0.5) || null;
+}
 function hazardDistance(point, entity) {
   if (entity.name !== 'area_effect_cloud') return point.distanceTo(entity.position);
   // Two deep in a hole the body's top (1.8 over the feet) is under the cloud's floor (note 1619): read as in it at exactly two under, the sword from the hole (note 1618) would be cut by its own cloud.
@@ -454,7 +459,7 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
         const groundBeside = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => solid(f.offset(dx, -1, dz))).length;
         // Under the open sky only (note 1751): with stone over the head the body is underground already, out of the dragon's sight and reach, and the dig here took it a block deeper at every pass. 25588's dragon-20 of the new save (2026-10-15 23:05Z to 10-16 03:4xZ, two crystals broken) was dug down so to y 17 under the island and held there four hours, the staircase up (note 1747) undone a block at a time.
         const openSky = [2, 3, 4, 5, 6, 7, 8].every(dy => !solid(f.offset(0, dy, 0)));
-        if (dig && thick && !wet && groundBeside >= 2 && voidSides(bot, bot.entity.position) === 0 && !deepBeside(bot, bot.entity.position) && bot.entity.onGround) {
+        if (dig && thick && !wet && groundBeside >= 2 && voidSides(bot, bot.entity.position) === 0 && !deepBeside(bot, bot.entity.position) && bot.entity.onGround && !cloudBelow(bot)) {
           if (sidesClosed >= 4) { bot.setControlState?.('sneak', true); goal.step = { action: 'in_the_hole_for_the_body', hazard: dragon.name }; save(); await sleep(400); bot.setControlState?.('sneak', false); return true; }
           if (!openSky) { bot.setControlState?.('sneak', true); goal.step = { action: 'under_the_stone_for_the_body', hazard: dragon.name }; save(); await sleep(400); bot.setControlState?.('sneak', false); return true; }
           // No hole dug by hand (note 1763): end stone by hand is fifteen seconds a block, the body standing still in the open the while, and the cloud that lands on it is not answered until the dig ends. 25588's dragon-113 (2026-10-17 12:59Z, two crystals broken) and dragon-118 (13:46Z, four broken) had worn their pickaxes out, stood 14 and 20 seconds a block over this dig in a pit one deep, and died in the fireball's cloud at the second block, nine iron ingots and a crafting table carried. With no pickaxe the run is taken.
@@ -494,7 +499,7 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
         const thick = [1, 2, 3, 4, 5, 6].every(dy => solid(f.offset(0, -dy, 0)));
         // No hand dig here either (note 1779, as note 1763 for the other branch): 25588's dragon-149 (2026-10-17 18:2xZ) with its pickaxe worn out took 16 and 11 s over this dig.
         const pickaxe2 = (bot.inventory?.items?.() || []).some(i => /_pickaxe$/.test(i.name));
-        if (dig && pickaxe2 && sidesClosed < 4 && thick && voidSides(bot, bot.entity.position) === 0 && !deepBeside(bot, bot.entity.position) && bot.entity.onGround) {
+        if (dig && pickaxe2 && sidesClosed < 4 && thick && voidSides(bot, bot.entity.position) === 0 && !deepBeside(bot, bot.entity.position) && bot.entity.onGround && !cloudBelow(bot)) {
           goal.step = { action: 'hole_for_the_body', hazard: dragon.name, sidesClosed }; save();
           console.log(`[end safety] the dragon's body coming: no run; a block dug under the feet at ${f} toward a hole two deep (${sidesClosed} of 4 sides closed now)`);
           try { await dig(bot, task, f.offset(0, -1, 0), { dropInto: true, openPit: true, requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
