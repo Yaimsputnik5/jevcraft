@@ -106,6 +106,10 @@ function kitItems(bot, goal, actions = {}, now = Date.now()) {
   const usesLeft = picks.reduce((n, i) => n + Math.max(0, (bot.registry.itemsByName[i.name]?.maxDurability || 0) - (i.durabilityUsed || 0)), 0);
   out.push({ key: 'pickaxe', item: 'iron_pickaxe', carried: pick ? 1 : 0, wants: 1, short: !pick, usesLeft,
     says: `${pick ? `${picks.length} pickaxe${picks.length === 1 ? '' : 's'} of iron or better carried, ${usesLeft} blocks of digging left in ${picks.length === 1 ? 'it' : 'them'} (an iron pickaxe lasts 250).` : 'Make an iron pickaxe first (none of iron or better is carried):'} end stone and the entry platform's obsidian are dug with it, the way off the platform where it is walled, a trench for a bed and a pocket from endermen, and every block of the fight's climbs, roofs and pockets is end stone dug with it: 25588's dragon-40 (2026-10-16) wore an iron pickaxe out twenty minutes into the fight, six crystals broken, and had no block for the last four. A spare is three iron ingots and two sticks at a crafting table.` });
+  // A second pickaxe (note 1814): the End grows no wood, and a pickaxe worn out there ends the tunnels, the holes and the way down the columns. 25588's dragon-181 (2026-10-18) died with its pickaxe nearly spent, 3 ingots, one stick and no crafting table; dragon-182 wore it out at tunnel cell 57 of 72 with no craft to offer and died on the surface with no crystal struck; dragon-176 struck one and stood six minutes on its column with no way down. Made here, where wood and a table are to be had.
+  const ingots = countOf(bot, 'iron_ingot'), sticks = countOf(bot, 'stick'), tableCarried = countOf(bot, 'crafting_table');
+  out.push({ key: 'spare_pickaxe', item: 'iron_pickaxe', carried: Math.max(0, picks.length - 1), wants: 1, short: pick && picks.length < 2 && usesLeft < 250,
+    says: `Make a second iron pickaxe first (${usesLeft} blocks of digging left in the one carried; a fresh one has 250): in the End a tunnel under the island to a crystal's foot is 70 to 150 digs, the column dug down after a blow 20 to 40, and a hole two deep 2; the End grows no wood for sticks or a table, and the pickaxe spent there ends the tunnels, the holes and the way down the columns. Carried now: ${ingots} iron ingots, ${sticks} sticks, ${tableCarried ? 'a' : 'no'} crafting table; three ingots and two sticks make one at a table.` });
   const water = countOf(bot, 'water_bucket');
   out.push({ key: 'water', item: 'water_bucket', carried: water, wants: WANTS.water_bucket, short: water < WANTS.water_bucket, target: WANTS.water_bucket,
     says: `Fill water buckets up to two first (${water} carried): one for a landing after the dragon's wing throws the bot, one poured at its feet against endermen it has turned, which water hurts. A bucket is three iron ingots at a crafting table (${countOf(bot, 'bucket')} empty bucket${countOf(bot, 'bucket') === 1 ? '' : 's'}, ${countOf(bot, 'iron_ingot')} iron ingots and ${countOf(bot, 'raw_iron')} raw iron carried), filled at any water. ${LIVE_END_SAYS}` });
@@ -124,7 +128,7 @@ function kitItems(bot, goal, actions = {}, now = Date.now()) {
     says: `Wait and heal to ${WANTS.health} first (health ${Math.round((bot.health ?? 20) * 10) / 10}${bot.food >= 18 ? '' : `; at hunger ${bot.food} it does not come back until the bot eats`}).` });
   return out;
 }
-const kitSays = items => items.map(i => i.key === 'bow' ? (i.carried ? 'a bow' : 'no bow') : i.key === 'pickaxe' ? (i.carried ? 'an iron pickaxe or better' : 'no iron pickaxe') : i.key === 'enchant' ? null
+const kitSays = items => items.map(i => i.key === 'bow' ? (i.carried ? 'a bow' : 'no bow') : i.key === 'pickaxe' ? (i.carried ? 'an iron pickaxe or better' : 'no iron pickaxe') : i.key === 'spare_pickaxe' ? (i.carried ? 'a second pickaxe' : i.short ? 'no second pickaxe, the one carried part worn' : null) : i.key === 'enchant' ? null
   : `${i.key} ${i.carried} of ${i.wants}`).filter(Boolean).join(', ');
 
 async function topUp(bot, task, goal, save, actions, item) {
@@ -167,7 +171,7 @@ async function topUp(bot, task, goal, save, actions, item) {
     await actions.acquireStep(bot, task, 'white_bed', countOf(bot, 'white_bed') + 1, goal, save);
     return;
   }
-  const count = item.key === 'bow' || item.key === 'pickaxe' ? 1 + countOf(bot, item.item) : item.target;
+  const count = item.key === 'bow' || item.key === 'pickaxe' || item.key === 'spare_pickaxe' ? 1 + countOf(bot, item.item) : item.target;
   goal.step = { action: 'prepare_end_supplies', item: item.item, count }; save();
   await actions.acquireStep(bot, task, item.item, count, goal, save);
 }
@@ -195,7 +199,8 @@ async function prepareEndSupplies(bot, task, goal, save, actions, client = task.
   // and wood with its twelve eyes in the pack. A top-up holds while its
   // item is short of what it was chosen to reach.
   const counts = Object.fromEntries(items.map(i => [i.key, i.carried]));
-  const worse = held?.pick === 'enter_now' && Object.entries(held.counts || {}).some(([k, n]) => (counts[k] ?? 0) < n);
+  // A kit item short that the held answer never saw asks again (note 1814): the second pickaxe came in after 'enter_now' was held on the old counts.
+  const worse = held?.pick === 'enter_now' && (Object.entries(held.counts || {}).some(([k, n]) => (counts[k] ?? 0) < n) || (held.counts && short.some(i => !(i.key in held.counts))));
   if (held?.pick === 'enter_now' && held.counts && !worse) pick = 'enter_now';
   else if (held?.pick === 'fill_frame_first') pick = 'fill_frame_first';
   else if (held && held.pick !== 'enter_now') {

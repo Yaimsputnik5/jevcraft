@@ -526,7 +526,7 @@ Questions that ride in one call together (the intake batch is one call per chat 
 
 ### `end_kit`
 
-**Go to the End with the kit carried now, or first top up one named item of it (a bow, arrows, snowballs, cobblestone, an iron pickaxe, water buckets, beds, an enchantment, food, health)?**
+**Go to the End with the kit carried now, or first top up one named item of it (a bow, arrows, snowballs, cobblestone, an iron pickaxe, a second pickaxe, water buckets, beds, an enchantment, food, health)?**
 
 - When: On the way to the End portal, the eyes in hand and the portal found, in Survival, with an item of the End's kit short of what the code would take; asked again when the item chosen is topped up (arrows thirty-two at a time) or after a quarter hour on it, and going now holds while the kit is as it was.
 - Decision tree, choice; stakes medium; ledger kind `strategy`
@@ -539,7 +539,7 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | --- | --- | --- | --- |
 | `enter_now` | root | go to the End with what is carried | always; said with each item of the kit, what is short, what the rehearsed fight took in arrows and minutes, and that there is no way back but the dragon's death or the bot's own |
 | `fill_frame_first` | root | take the eyes to the portal and set them in its frame now, the kit after | the portal found and not lit, the eyes it wants held (carried or in the bot's chests); said with how far the ring is and where the eyes are; held until the portal is lit, then this is asked again (note 1380) |
-| `top_up_(bow\|arrows\|snowballs\|blocks\|pickaxe\|water\|beds\|enchant\|food\|health)` (pattern: names the kit item) | root | top up this item of the kit first | the item is short of what the code would take; said with what it is for in the End and how it is got here (arrows only from skeletons, none to two each; beds from sheared wool; water for a landing and against endermen) |
+| `top_up_(bow\|arrows\|snowballs\|blocks\|pickaxe\|spare_pickaxe\|water\|beds\|enchant\|food\|health)` (pattern: names the kit item) | root | top up this item of the kit first | the item is short of what the code would take; said with what it is for in the End and how it is got here (arrows only from skeletons, none to two each; beds from sheared wool; water for a landing and against endermen) |
 
 ### `crossing_kit`
 
