@@ -2654,7 +2654,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // top, was offered nothing there ('unsafe: end crystal 4<=12'), took the
     // dragon's wing twice and fell.
     const punchPlace = safe || ((onOwnPillar() || onObsidianTop()) && endHazards(bot).filter(({ entity }) => entity.name !== 'end_crystal').every(({ entity, radius }) => hazardDistance(bot.entity.position, entity) > radius));
-    if (punchPlace && actions.dig && !Object.keys(tree).some(k => /^(throw_|pillar_throw_)/.test(k))) {
+    // The tunnel offered with the dragon the only thing making the ground unsafe (note 1808): with the dragon within twenty every crystal option fell away and the ask held escape moves alone, each ending within three blocks of where it began. 25588's dragon-178 (2026-10-18 01:06 to 01:2xZ) stood so at (35, 61, 22) at full health under the dragon hovering eight blocks over it for sixteen minutes, 300 answers of none_good, the tunnel under the island (out of its sight) never on the list. The climbs stay for the safe ground; the tunnel goes under it.
+    const dragonOnly = !safe && unsafeBecause(bot, bot.entity.position).every(r => /^ender_dragon /.test(r));
+    if ((punchPlace || dragonOnly) && actions.dig && !Object.keys(tree).some(k => /^(throw_|pillar_throw_)/.test(k))) {
       const here = bot.entity.position, carried = blocksCarried(bot);
       // A caged crystal too, where a pickaxe is carried: its iron bars between
       // the stand and the crystal are dug out on the top before the blow.
@@ -3124,6 +3126,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           } };
       }
     }
+    if (!punchPlace) for (const k of Object.keys(tree)) if (/^(pillar_punch_|quarry_blocks_)/.test(k)) delete tree[k]; // note 1808: the dragon alone unsafe: the tunnel stays, the climbs do not
     // A bed beside the perched head (bed-bomb.js): the heaviest blow, from a
     // trench that keeps the blast off the bot.
     const { bedPlans, bedBomb, bedsCarried } = require('./bed-bomb');
