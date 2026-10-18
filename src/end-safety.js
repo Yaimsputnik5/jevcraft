@@ -478,6 +478,8 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
             try { await dig(bot, task, g.offset(0, -1, 0), { dropInto: true, openPit: true, requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; break; }
             for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50);
           }
+          // The roof on the hole just dug (note 1852, as note 1847 for the hole gone back into): the two blocks take three or four seconds and the hole is a fireball's cup until it is lidded; 25588's dragon-211 (2026-10-18 12:49Z) dug 'toward a hole two deep' at (30, 61, 19), took the fireball's cloud in it, 14 to 9 to none, 'clouds 0.4 off, 1.9 up'.
+          if (bot._roofOverhead) { try { const r = await bot._roofOverhead(); console.log(`[end safety] the hole for the body at ${bot.entity.position.floored()}: the roof ${r ? 'laid' : 'not laid'}`); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
           bot.setControlState?.('sneak', true); await sleep(150); bot.setControlState?.('sneak', false);
           return true;
           }
@@ -505,6 +507,8 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
           console.log(`[end safety] the dragon's body coming: no run; a block dug under the feet at ${f} toward a hole two deep (${sidesClosed} of 4 sides closed now)`);
           try { await dig(bot, task, f.offset(0, -1, 0), { dropInto: true, openPit: true, requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
           for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50);
+          // The roof on the hole just dug (note 1852, as note 1847 for the hole gone back into): the two blocks take three or four seconds and the hole is a fireball's cup until it is lidded; 25588's dragon-211 (2026-10-18 12:49Z) dug 'toward a hole two deep' at (30, 61, 19), took the fireball's cloud in it, 14 to 9 to none, 'clouds 0.4 off, 1.9 up'.
+          if (bot._roofOverhead) { try { const r = await bot._roofOverhead(); console.log(`[end safety] the hole for the body at ${bot.entity.position.floored()}: the roof ${r ? 'laid' : 'not laid'}`); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } }
           bot.setControlState?.('sneak', true); await sleep(200); bot.setControlState?.('sneak', false);
           return true;
         }
