@@ -1982,7 +1982,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         await holdOrDown();
       } else {
         // Held where the cloud is only near, not on the body (note 1733): one up out of it (note 1724) is a block over it, within breathThreat's margin, and this way dug back down into it. 25588 (dragon-285, 2026-10-15 14:45Z) went '1 blocks up at (-1, 63, 23)', then 'down the column ... 1 dug' at once, 20 to 10 to none.
-        if (!cloudOnBody() && endEmergency(bot) === 'dragon_breath_cloud') { goal.step = { action: 'hold_over_cloud', health: bot.health }; save(); await holdOnColumn(); return; }
+        // The climb out in the same tick when the hold ends in the cloud (note 1857): the hold returned at the first hit and the step returned with it, and the next tick's climb came two seconds and ten health later; 25588's dragon-216 (2026-10-18 14:28Z, three crystals) held over a cloud on its roofed stub at (17, 64, 36), took the next fireball's cloud there, 20 to 14 to 10 to none, the handler having answered in 2 ms.
+        if (!cloudOnBody() && endEmergency(bot) === 'dragon_breath_cloud') { goal.step = { action: 'hold_over_cloud', health: bot.health }; save(); const held = await holdOnColumn(); if (held === 'cloud' && blocksCarried(bot) >= 2 && !onObsidianTop()) { const h0 = bot.health; let rose = 0; try { rose = await upOutOfBreathOnColumn(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } console.log(`[end combat] the hold over the cloud ended in it at ${bot.entity.position.floored()}: up ${rose} out of it at once, ${h0.toFixed(1)} to ${bot.health.toFixed(1)} health`); } return; }
         if (breathThreat(bot)?.name === 'area_effect_cloud' && await upOutOfBreathOnColumn() >= 1) return;
         goal.step = { action: 'down_out_of_breath', health: bot.health }; save();
         await wayDown({ limit: 3 });
