@@ -3763,7 +3763,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // Rock, not the roof the column lays over the head (note 1490): three solid blocks or more in the thirty above, and not on the bot's own column or an obsidian top. 25588 (dragon-67, 2026-10-13 16:45Z) was offered the dig to the sky on its column under its own roof, and the least bad took it four times.
       let rock = 0, solidAbove = 0; for (let dy = 1; dy <= 30; dy++) if (bot.blockAt(feet.offset(0, dy, 0))?.boundingBox === 'block') { rock = dy; solidAbove++; }
       const pick = bot.inventory.items().find(i => /_pickaxe$/.test(i.name));
-      if (rock >= 2 && solidAbove >= 3 && !onOwnPillar() && !onObsidianTop() && pick && actions.dig && blocksCarried(bot) >= 1) {
+      // Not under the bot's own column (note 1871): the roofs it laid coming down, one every third block, are the 'rock' over the head, and the dig to the sky climbs the whole column again. 25588's dragon-224 (2026-10-18 17:02 to 17:04Z, two crystals) came down from 88 to its foot hole at (-10, 60, -37), 20 to 9.5, took 'dig_to_sky', went up its own column to 91, came down the column from 91 to 82 under the breath, took 'dig_to_sky' again to 94, and died at 88.
+      const u = bot._pillarUp, ownColumnAbove = (!!u && u.x === feet.x && u.z === feet.z) || (!!state.lastStub && state.lastStub.x === feet.x && state.lastStub.z === feet.z && Date.now() - (state.lastStub.at || 0) < 20 * 60000);
+      if (rock >= 2 && solidAbove >= 3 && !onOwnPillar() && !onObsidianTop() && !ownColumnAbove && pick && actions.dig && blocksCarried(bot) >= 1) {
         const skyY = feet.y + rock + 1;
         tree.dig_to_sky = { description: { action: `The bot stands under the island's rock, ${rock} blocks of it over its head to the open sky at ${skyY}: dig up to the sky, the blocks over the head dug with the ${pick.name.replace('_', ' ')} and the column laid under the feet from the ${blocksCarried(bot)} blocks carried. No pillar's foot is walked to from down here.`,
           rockOverhead: rock, blocksCarried: blocksCarried(bot), health: bot.health },
