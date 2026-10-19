@@ -492,7 +492,11 @@ function withSays(option, c, bot, state, mobs, now) {
   const add = [];
   const stop = stoppedSays(bot, state, c.layer, now);
   if (stop) add.push(stop);
-  if (c.layer === 'work') { const body = workBodySays(bot, mobs); if (body) add.push(body); }
+  if (c.layer === 'work') {
+    const body = workBodySays(bot, mobs); if (body) add.push(body);
+    // A work that digs toward the mobs opens the ground 'no way to the bot' rests on (note 1935): full-2 (2026-10-19 22:48:21Z), full iron and a stone sword, read four wither skeletons and two blazes 6 to 8 blocks off each with 'no way to the bot from where it is (none found through the ground between)' on dig_down_to_them, gave the work the turn at 0.73, dug through, and was dead in five seconds.
+    if (body && /^(dig_toward_them|dig_down_to_them|open_a_door|break_their_line)$/.test(String(c.action || ''))) add.push('This work digs the ground between open: "no way to the bot" holds only until the dig is through, and from then each of them has the way the bot made and comes by it.');
+  }
   // At low health, the work's option says the fall, the hits and what the
   // work given the turn at this health came to, beside the meal and the
   // pocket with their times (low-health.js, note 752c): 25588 gave the work
