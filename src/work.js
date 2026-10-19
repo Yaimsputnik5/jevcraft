@@ -2097,7 +2097,8 @@ async function explore(bot, task, goal, save, resource, { surfaceOnly = isSurfac
     }
     if (surface && (!destination || stalledSurface) && beginSurfaceAscent(bot, goal, land)) {
       save(); surface.restore();
-      await surfaceStep(bot, task, goal, save);
+      // Through the trip's question, not straight up (note 1936): this climb went unasked, so the night up there and the wait for dawn were never put to Jev. full-3 (2026-10-19 21:50:24Z, 'Climbing to open sky' for a log, eight minutes to dawn) and full-2 (23:06:45Z, 'Climbing back up top, into the dark', five to dawn) both came out bare among skeletons and died within two minutes.
+      await surfaceTrip(bot, task, goal, save, LOG.test(resource) ? 'wood (any log)' : String(resource).replaceAll('_', ' '));
       return;
     }
     if (!destination) {
