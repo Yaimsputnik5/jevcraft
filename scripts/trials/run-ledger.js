@@ -9,7 +9,8 @@
 //   node scripts/trials/run-ledger.js [artifacts dir]
 const fs = require('fs'), path = require('path');
 const dir = process.argv[2] || path.join(__dirname, '..', '..', 'artifacts');
-const files = fs.readdirSync(dir).filter(f => /^midgame-mid-\d+-[a-z]+\.log$/.test(f)).sort();
+// A first-days record is a run from the world's birth (first-days.js start): the full run the goal asks for. A midgame record begins three days in.
+const files = fs.readdirSync(dir).filter(f => /^midgame-mid-\d+-[a-z]+\.log$/.test(f) || /^first-days-[a-z0-9-]+\.log$/.test(f)).sort();
 const minutes = (a, b) => a && b ? Math.round((new Date(b) - new Date(a)) / 60000) : null;
 const rows = [];
 for (const f of files) {
@@ -34,7 +35,7 @@ for (const f of files) {
     step = d.step?.action || step;
     const h = /"health":([0-9.]+),"food"/.exec(line); if (h) health = Number(h[1]);
   }
-  rows.push({ run: f.replace(/^midgame-|\.log$/g, ''), start, total: minutes(start, last), nether: minutes(start, nether), rod: minutes(start, rod), pearl: minutes(start, pearl), stronghold: minutes(start, stronghold), end: minutes(start, end), dragon: minutes(start, dragon), deaths, where: dimension, step, health });
+  rows.push({ run: f.replace(/^midgame-|\.log$/g, '').replace(/^first-days-/, 'fresh:'), start, total: minutes(start, last), nether: minutes(start, nether), rod: minutes(start, rod), pearl: minutes(start, pearl), stronghold: minutes(start, stronghold), end: minutes(start, end), dragon: minutes(start, dragon), deaths, where: dimension, step, health });
 }
 const pad = (v, n) => String(v == null ? '-' : v).padStart(n);
 console.log(['run'.padEnd(14), pad('min', 5), pad('nether', 7), pad('rod', 5), pad('pearl', 6), pad('strong', 7), pad('end', 5), pad('dragon', 7), pad('deaths', 7), ' where / last step'].join(''));
