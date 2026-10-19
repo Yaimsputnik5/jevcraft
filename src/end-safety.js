@@ -418,6 +418,21 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
     // while the surveys took their tenth of a second each. 25588 (dragon-10,
     // 2026-10-13 06:17Z, full iron, two water buckets) went 20 to none in
     // three seconds there, as dragon-6, -7 and -9 had before it.
+    // One block up out of a cloud at the feet, before any run (note 1893): the cloud's box is half a block high (note 1889's drill), so a block placed under the feet takes the body clear of it in a jump, about four tenths of a second; the runs from it on rough ground stalled. 25588's dragon-253 (2026-10-19 03:2xZ, two crystals) at (-2, 57, 30) with the cloud 0.7 off at its feet's level ran 0.9 and 0.5 blocks, 19.6 to 13.6 to 7.6, dead; dragon-252, 251 and 247 the same. Not with a fireball in flight within fourteen (it would burst on the new block's top), nor with a block over the head.
+    if (dragon.name === 'area_effect_cloud' && Math.abs(dragon.position.y - bot.entity.position.y) <= 0.5 && bot.entity.onGround) {
+      const f = bot.entity.position.floored(), pr = require('./pillar-recovery');
+      const items = bot.inventory?.items?.() || [], carried = pr.SCAFFOLD.reduce((n, k) => n + items.filter(i => i.name === k).reduce((m, i) => m + i.count, 0), 0);
+      const headClear = [2, 3].every(dy => bot.blockAt(f.offset(0, dy, 0))?.boundingBox !== 'block');
+      const ballNear = Object.values(bot.entities).some(e => e.name === 'dragon_fireball' && e.isValid !== false && e.position.distanceTo(bot.entity.position) < 14);
+      if (carried >= 1 && headClear && !ballNear) {
+        const h0 = bot.health, t0 = Date.now();
+        goal.step = { action: 'one_up_out_of_the_cloud', health: bot.health }; save();
+        try { await pr.pillarUp(bot, task, f.y + 1, { dig, maxBlocks: 1, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+        const up = Math.floor(bot.entity.position.y) - f.y;
+        console.log(`[end safety] one block up out of the cloud at ${f}: ${up >= 1 ? `up at ${bot.entity.position.floored()}` : 'not up'} in ${Date.now() - t0} ms, ${h0.toFixed(1)} to ${bot.health.toFixed(1)} health`);
+        if (up >= 1) return { oneUp: true };
+      }
+    }
     // No straight run from a pit in the cloud (note 1891, the reflex's half of note 1890): the run meets the wall, and 25588's dragon-247 (2026-10-19 02:2xZ) in its pit at (5, 56, 41) ran 0.4 blocks in 1.6 s, 15.8 to 4.0; one block up is clear of the cloud (note 1889's drill), and the stub is the combat's answer to no escape.
     if (dragon.name === 'area_effect_cloud') {
       const f = bot.entity.position.floored(), walls = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, 1, dz))?.boundingBox === 'block').length;
