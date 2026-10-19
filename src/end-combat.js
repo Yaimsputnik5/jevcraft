@@ -2703,9 +2703,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       }
     }
     if (safe && bow && countOf(bot, 'arrow') > 0) {
-      for (const target of crystals) if (!repeatedCrystalMiss(state, target, bot.entity.position) && aimAtEntity(bot, target)) tree[`crystal_${target.id}`] = {
-        description: { action: 'Destroy an observed healing crystal with a clear bow trajectory, removing a source of dragon health regeneration', position: { ...target.position }, arrowsLeft: countOf(bot, 'arrow'), crystalsInView: crystals.length }, run: () => shoot(target),
-      };
+      // The shot's facts beside the climb's (note 1907): with 64 arrows in the kit (the user's call, 2026-10-19) the shot from the ground is the way a player takes most crystals, no climb, no column and no way down; the option had said only 'a clear bow trajectory'. It says how far and how high the crystal is, the arrow's flight, the seconds standing still to draw, the arrows left, and this stage's record of shots at crystals.
+      const shotRecord = (() => { const all = (state.shots || []).filter(s => s.target === 'end_crystal'); const hit = all.filter(s => s.outcome === 'confirmed_crystal_explosion').length, miss = all.filter(s => s.outcome === 'target_remains').length; return all.length ? `${all.length} arrow${all.length === 1 ? '' : 's'} at crystals this fight: ${hit} burst${hit === 1 ? '' : 's'} seen, ${miss} left the crystal standing` : 'no arrow at a crystal yet this fight'; })();
+      for (const target of crystals) { if (repeatedCrystalMiss(state, target, bot.entity.position)) continue; const aim = aimAtEntity(bot, target); if (!aim) continue;
+        const off = Math.round(Math.hypot(target.position.x - bot.entity.position.x, target.position.z - bot.entity.position.z)), up = Math.round(target.position.y - bot.entity.position.y);
+        tree[`crystal_${target.id}`] = {
+          description: { action: `Shoot crystal ${target.id} with the bow from where the bot stands: it is ${off} blocks off and ${up} up on its pillar, the arrow's path to it is clear and flies about ${Math.round(aim.ticks / 20 * 10) / 10} s; the draw is about 1.2 s standing still, and any hit bursts the crystal (the blast ${off} blocks off reaches nothing here). No climb, no column, no way down: the body stays on the ground`,
+            position: { ...target.position }, blocksOff: off, blocksUp: up, flightSeconds: Math.round(aim.ticks / 20 * 10) / 10, arrowsLeft: countOf(bot, 'arrow'), crystalsInView: crystals.length, shotRecord, dragonBlocksOff: dragon ? Math.round(dragon.position.distanceTo(bot.entity.position)) : null, health: bot.health },
+          run: () => shoot(target),
+        }; }
       if (dragon && !perched(bot, dragon)) {
         for (let n = 0; n < 6; n++) { check(); await sleep(50); }
         let motionNow; try { motionNow = velocity(); } catch (err) { noShot = err.message; /* no feasible predicted shot */ }
