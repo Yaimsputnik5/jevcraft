@@ -418,6 +418,11 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
     // while the surveys took their tenth of a second each. 25588 (dragon-10,
     // 2026-10-13 06:17Z, full iron, two water buckets) went 20 to none in
     // three seconds there, as dragon-6, -7 and -9 had before it.
+    // No straight run from a pit in the cloud (note 1891, the reflex's half of note 1890): the run meets the wall, and 25588's dragon-247 (2026-10-19 02:2xZ) in its pit at (5, 56, 41) ran 0.4 blocks in 1.6 s, 15.8 to 4.0; one block up is clear of the cloud (note 1889's drill), and the stub is the combat's answer to no escape.
+    if (dragon.name === 'area_effect_cloud') {
+      const f = bot.entity.position.floored(), walls = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(f.offset(dx, 1, dz))?.boundingBox === 'block').length;
+      if (walls >= 2) throw Object.assign(new Error(`No straight run out of the cloud from a pit at ${f}: ${walls} walls at the head's height`), { name: 'NoEscape' });
+    }
     if (['area_effect_cloud', 'dragon_fireball'].includes(dragon.name)) {
       const start = bot.entity.position.clone(), toward = dragon.position.minus(start); toward.y = 0;
       const bearing = Math.atan2(toward.z, toward.x);
