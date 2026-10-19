@@ -380,6 +380,8 @@ function airWatch(bot, now = Date.now()) {
   bot._airAbortAt = now; bot._airAbort = true;
   try { bot.pathfinder?.setGoal?.(null); } catch (_) { /* nothing to stop */ }
   try { bot.clearControlStates?.(); } catch (_) { /* nothing held */ }
+  // A dig in hand too (note 1921): under water a block takes five times as long, and full-3 (2026-10-19) was 'digging stone' at 0 air with the step's check eleven seconds behind; the dig ends 'Digging aborted' and the next check unwinds.
+  try { if (bot.targetDigBlock) bot.stopDigging?.(); } catch (_) { /* no dig */ }
   try { if (bot.currentWindow) bot.closeWindow(bot.currentWindow); } catch (_) { /* no window */ }
   console.log(`[air] ${bot.oxygenLevel} air and no rescue under way: the step is stopped for the survival layer ${JSON.stringify({ sinceCheckMs: bot._lastCheckAt ? now - bot._lastCheckAt : null, digging: bot.targetDigBlock?.name || null, window: bot.currentWindow?.type ?? null })}`);
 }
