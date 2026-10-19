@@ -451,7 +451,10 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
       const angles = ball ? [Math.PI / 2, -Math.PI / 2, Math.PI * .75, -Math.PI * .75, Math.PI] : undefined;
       let runBlocks = RUN_BLOCKS;
       let away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks, { angles });
+      // A ball's run takes a rough lane of four, a block up a cell with the jump held, before a smooth lane of three (note 1894): by the pillars the ground is the bot's own pits and trenches, and 25588's dragon-254 (2026-10-19 03:3xZ) found only lanes of two and three there, 'toward 2.0 blocks', and took the burst three times of four.
+      let rough = false;
       if (!away) { runBlocks = 4; away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks, { angles }); }
+      if (!away && ball) { away = straightAway(bot, start, bearing, allowed || (() => true), 4, { angles, rough: true }); if (away) { runBlocks = 4; rough = true; } }
       if (!away) { runBlocks = 3; away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks, { angles }); }
       if (!away) { runBlocks = 2; away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks, { angles }) || straightAway(bot, start, bearing, allowed || (() => true), runBlocks, { rough: true, angles }); }
       if (away) {
@@ -465,7 +468,7 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
         // The run that stalls is given up in half a second and taken again with a jump (note 1882): against a pit's or a quarry's wall the body ran in place, 'moved 0.4 blocks' in 1.8 s with the fireball's cloud on it, in 25588's dragon-226 (2026-10-18 17:58Z, 14 to 2) and dragon-229 (18:26Z, 16.9 to 10.9), a tick of six for every second against the wall. The jump takes a block's ledge; a wall two high ends the run, and the stub or the hole is next.
         const t0 = Date.now(); let stalled = false;
         try {
-          await move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'evade_breath_straight', keys: ['forward', 'sprint'], sneak: false,
+          await move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'evade_breath_straight', keys: rough ? ['forward', 'sprint', 'jump'] : ['forward', 'sprint'], sneak: false,
             why: 'straight out of the dragon\'s breath at a run', look: away.offset(0, 1.6, 0), maxMs: 1800, tick: 25,
             until: () => bot.entity.position.distanceTo(start) >= Math.max(1.5, ball ? Math.min(4, runBlocks) : runBlocks - 1) || fallDanger(bot) || (!breathThreat(bot) && (!ball || bot.entity.position.distanceTo(start) >= Math.min(4, runBlocks))) || !floorAhead() || (stalled = Date.now() - t0 > 500 && bot.entity.position.distanceTo(start) < 0.5) });
         } catch (err) { check(); }
