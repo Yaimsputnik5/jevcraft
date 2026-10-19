@@ -4427,7 +4427,9 @@ class Survival {
     if (down && high) {
       const stranded = high > ROUTE_DROP;
       if (stranded) onPillar = high;
-      options.come_down = { description: up
+      // The way down priced like every other stance (note 1920): it had no 'This way: about N damage' line, and beside fights priced at 62 to 120 it read as the cheap choice; 25588's full-2 (2026-10-19 20:59Z, a fresh run 80 minutes old, a pearl just won from the slot) came down two blocks into two endermen at arm's length, 20 to 3.8 in three seconds, 'doomed to fall by Enderman'. A block a second, the mobs that reach the ground hitting the while.
+      const comeDownCost = stanceCost({ mobs, setup: high, fight: { lead: true }, shield: shielded, health: bot.health });
+      options.come_down = { expects: { damage: comeDownCost.damage, seconds: comeDownCost.seconds, oneHit }, description: up
         ? `Come down the pillar the way it went up: the block under the feet is dug out and the bot drops onto the next, about a second each, ${high} block${high === 1 ? '' : 's'} down to the ground it went up from; shot at meanwhile if a shooter is about. Down there the mobs that cannot reach the top can reach the bot again, and the sword reaches them.${hitsLeft}`
         : stranded
         ? `Get down off the pillar to the ground, ${high} blocks: its top block is dug out and the bot drops onto the next, about a second each, the only way off it; shot at meanwhile if a shooter is about. On the ground the retreat, the pocket and the charge work again; up here none of them can.${hitsLeft}`
