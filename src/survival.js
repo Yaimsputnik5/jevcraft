@@ -9784,8 +9784,10 @@ class Survival {
     // run wore an iron pickaxe from twenty-two uses to none in eighteen
     // seconds with seventeen ingots and a crafting table carried, then
     // sealed itself in for the night with nothing to dig with.
-    const best = Math.max(0, ...bot.inventory.items().filter(i => /_pickaxe$/.test(i.name)).map(i => remainingUses(bot, i)));
-    if (best < usesToClimbOut(bot) && this.actions.acquireStep) {
+    // All the pickaxes carried together against the way out, not the best one alone (note 1925): a stone pickaxe is 131 uses and a climb of 74 blocks reads 164, so the best was short at every look and full-1 (2026-10-19 19:57Z) made fifteen stone pickaxes in a minute, 45 cobblestone and 30 sticks, and carried sixteen for an hour.
+    const uses = bot.inventory.items().filter(i => /_pickaxe$/.test(i.name)).map(i => remainingUses(bot, i));
+    const best = Math.max(0, ...uses), total = uses.reduce((a, b) => a + b, 0);
+    if (total < usesToClimbOut(bot) && this.actions.acquireStep) {
       const make = pickaxeCraftable(bot);
       if (make && !isSetAside(this, 'night_pickaxe', make)) {
         this.report(goal, save, { action: 'craft_pickaxe', item: make, remaining: best });
