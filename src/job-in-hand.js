@@ -26,7 +26,7 @@ const distXZ = (a, b) => (a && b) ? Math.hypot(a.x - b.x, a.z - b.z) : Infinity;
 // The step's need in words, with the nearest known source from `here`:
 // a mine step (its count of drops, the block), a craft step (the item). ->
 // string or ''.
-function stepNeedSays(step, { here = null, nearest = null } = {}) {
+function stepNeedSays(step, { here = null, nearest = null, batch = null } = {}) {
   if (!step?.action) return '';
   if (step.action === 'mine' && (step.block || step.sources)) {
     const block = named(step.block || step.sources?.[0]);
@@ -36,14 +36,20 @@ function stepNeedSays(step, { here = null, nearest = null } = {}) {
   }
   if (step.action === 'tunnel' && plain(step.target)) return `the step waiting tunnels to (${step.target.x}, ${step.target.y}, ${step.target.z})${here ? `, ${Math.round(dist(step.target, here))} blocks from here` : ''}`;
   if (step.action === 'craft' && step.item) return `the step waiting crafts ${step.count > 1 ? `${step.count} ` : ''}${named(step.item)}`;
-  if (step.action === 'smelt' && step.item) return `the step waiting smelts ${step.count > 1 ? `${step.count} ` : ''}${named(step.item)}`;
+  if (step.action === 'smelt' && step.item) {
+    // The furnace's clock (note 1926): how many are done and how long the rest take, ten seconds each, and where it stands; a rung set aside leaves them in it.
+    const b = batch?.startedAt && batch.item === step.item ? batch : null;
+    const done = b ? Math.max(0, Math.min(b.count || 0, Math.floor((Date.now() - b.startedAt) / 10000))) : null;
+    const left = b ? Math.max(0, (b.count || 0) - done) : null;
+    return `the step waiting smelts ${step.count > 1 ? `${step.count} ` : ''}${named(step.item)}${b ? ` in the furnace${b.position ? ` at (${b.position.x}, ${b.position.y}, ${b.position.z})${here ? `, ${Math.round(dist(b.position, here))} blocks from here` : ''}` : ''}: ${done} of ${b.count} done, about ${left * 10} seconds for the rest; set aside or walked from, they stay in the furnace, not carried` : ''}`;
+  }
   return '';
 }
 
 // -> { says, short, places: [{ what, at }] } or null. `find(names)` gives
 // the nearest block of those names (a Vec3-like) or null; `frame` is
 // { at, placed, cast } from framePending; `carried` counts buckets.
-function jobInHand({ step = null, here = null, frame = null, find = null, carried = {} } = {}) {
+function jobInHand({ step = null, here = null, frame = null, find = null, carried = {}, batch = null } = {}) {
   const parts = [], places = [];
   if (frame?.at && Number.isFinite(frame.placed) && frame.placed < 10) {
     const left = 10 - frame.placed;
@@ -56,7 +62,7 @@ function jobInHand({ step = null, here = null, frame = null, find = null, carrie
     try { nearest = typeof find === 'function' ? find(step.sources || [step.block]) : null; } catch (_) { nearest = null; }
     nearest = plain(nearest) || plain(step.target);
   }
-  const need = stepNeedSays(step, { here, nearest });
+  const need = stepNeedSays(step, { here, nearest, batch });
   if (need) {
     parts.push(need);
     if (nearest) places.push({ what: named(step.block || step.sources?.[0]), at: nearest });

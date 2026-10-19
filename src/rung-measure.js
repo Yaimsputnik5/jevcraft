@@ -89,9 +89,11 @@ function parts(bot, goal, { rung, items = [], target = null, stepItems = [] } = 
   // What a chest in the Nether holds of them is held (rod-stash.js, note 704):
   // putting rods in it is not a fall in the measure.
   const kept = () => { try { const s = require('./rod-stash').stashed(goal); return items.reduce((n, name) => n + (s[name] || 0), 0); } catch (_) { return 0; } };
-  if (items.length) put('items', carried(items) + kept(), items.map(label).join(' or '));
+  // What the furnace has cooked of them by its clock (note 1926), ten seconds an item from the batch's start: carried alone read the step's iron as nothing gained while it smelted, so a detour beside the furnace 'came to nothing', the stall escalated to rung_progress, and 11 of the 13 rungs set aside for thirty minutes across full-1..4 (2026-10-19) had 2 to 20 ingots cooking (full-2 20:12:23Z, 9 iron ingots; full-1 21:32:07Z, 20).
+  const cooked = names => { const b = goal?.smelting; if (!b?.startedAt || !names.includes(b.item) || b.left?.away) return 0; return Math.max(0, Math.min(b.count || 0, Math.floor((Date.now() - b.startedAt) / 10000))); };
+  if (items.length) put('items', carried(items) + kept() + cooked(items), items.map(label).join(' or '));
   const own = [...new Set(stepItems)].filter(n => !items.includes(n));
-  if (own.length) put(`step_items:${own.slice().sort().join('+')}`, carried(own), own.map(label).join(' or '));
+  if (own.length) put(`step_items:${own.slice().sort().join('+')}`, carried(own) + cooked(own), own.map(label).join(' or '));
   const registry = bot?.registry?.foodsByName;
   if (registry) put('food', (bot.inventory?.items?.() || []).reduce((n, i) => n + i.count * (registry[i.name]?.foodPoints || 0), 0), 'food');
   put('milestones', Object.values(goal?.gameProgress?.milestones || {}).filter(Boolean).length, 'a milestone');

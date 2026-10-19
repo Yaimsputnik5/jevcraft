@@ -8079,7 +8079,7 @@ async function breakStillness(bot, task, goal, save, { client, survival, onStep 
     try {
       const here = bot.entity?.position;
       const pending = goal.kind === 'win' ? framePending(bot, goal) : null;
-      return require('./job-in-hand').jobInHand({ step: goal.step, here,
+      return require('./job-in-hand').jobInHand({ step: goal.step, here, batch: goal.smelting || null,
         frame: pending ? { at: pending.at, placed: pending.placed, cast: !!pending.frame.cast } : null,
         carried: { lava: countOf(bot, 'lava_bucket'), water: countOf(bot, 'water_bucket') },
         find: names => find(bot, names, 32, 1)[0] || null });
