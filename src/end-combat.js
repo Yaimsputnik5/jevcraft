@@ -3374,6 +3374,22 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       }
     }
     if (!punchPlace && dragonNear) for (const k of Object.keys(tree)) if (/^(pillar_punch_|quarry_blocks_)/.test(k)) delete tree[k]; // notes 1808, 1815: the dragon near: the tunnel stays, the climbs do not; calm endermen alone take nothing off
+    // The tunnel and the climb as one choice (note 1906): on even facts (note 1905) Jev weighed the tunnel and the climb as rivals and took the tunnel, the safer of the two, nearly every time, and the tunnels ran back and forth between pillars' feet; 25588's dragon-293 (2026-10-19 14:0xZ) dug 19 tunnels to 4 climbs for two crystals. The way a player goes about it is both: under the island to the foot, then up. Offered beside the two, with both their facts; its run is the tunnel's and then, at the foot, the climb's.
+    for (const k of Object.keys(tree)) {
+      const m = /^tunnel_to_(\d+)$/.exec(k); if (!m) continue;
+      const climb = tree[`pillar_punch_${m[1]}`], tunnel = tree[k];
+      if (!climb || typeof climb.run !== 'function' || typeof tunnel.run !== 'function') continue;
+      tree[`tunnel_and_climb_${m[1]}`] = {
+        description: { action: `Dig the tunnel under the island to the foot of crystal ${m[1]}'s pillar, out of the dragon's sight, and from the hole at its foot climb at once to the crystal and strike it: the tunnel's way there and the climb's way up as one step`, tunnel: tunnel.description, climb: climb.description },
+        run: async () => {
+          const r = await tunnel.run();
+          const c = Object.values(bot.entities).find(e => e.name === 'end_crystal' && e.id === Number(m[1]) && e.isValid !== false);
+          if (!c) { console.log(`[end combat] tunnel_and_climb_${m[1]}: the tunnel done, the crystal gone`); return r; }
+          if (bot.health < 8) { console.log(`[end combat] tunnel_and_climb_${m[1]}: the tunnel done at ${bot.health.toFixed(1)} health; the climb left to the next question`); return r; }
+          console.log(`[end combat] tunnel_and_climb_${m[1]}: the tunnel done at ${bot.entity.position.floored()}, the climb begun`);
+          return climb.run();
+        } };
+    }
     // A bed beside the perched head (bed-bomb.js): the heaviest blow, from a
     // trench that keeps the blast off the bot.
     const { bedPlans, bedBomb, bedsCarried } = require('./bed-bomb');
