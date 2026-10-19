@@ -1694,6 +1694,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         await digDownColumn({ limit: Math.min(waterDrop.tooHighBy, opts?.limit ?? 64) });
         if (onOwnPillar() && await waterDrop()) return;
       }
+      // The drop asked again every three blocks down (note 1898): at the column's top the stand and the pocket built for the blow lie beside the body on every side, 'a floor 0 down', and the drop was refused there once and the column dug to the ground under the dragon. Of the 23 drops refused in 25588's dragon-251 to 262 (2026-10-19), 15 were 'no side with ground under it', and dragon-262 (four crystals) at (-37, 94, -22), 'east: a floor 0 down; west: a floor 0 down; ...', was struck down at 83 in the dig. A few blocks under the stand the column's sides open.
+      { const u = bot._pillarUp; let left = opts?.limit ?? 64;
+        for (let k = 0; k < 12 && left > 0 && onOwnPillar() && u && u.base != null && Math.floor(bot.entity.position.y) - u.base > 6; k++) {
+          const y0 = Math.floor(bot.entity.position.y);
+          await digDownColumn({ limit: Math.min(3, left) });
+          const went = y0 - Math.floor(bot.entity.position.y); left -= Math.max(went, 1);
+          if (went <= 0) break;
+          if (onOwnPillar() && await waterDrop()) { console.log(`[end combat] the drop taken after ${(opts?.limit ?? 64) - left} blocks dug down from the top`); return; }
+        }
+      }
     }
     await digDownColumn(opts);
   };
