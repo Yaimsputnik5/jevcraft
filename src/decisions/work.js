@@ -701,7 +701,7 @@ define({
 define({
   id: 'opportunistic_animal', area: 'resources', kind: 'pickup', primitive: 'choice', stakes: 'low',
   question: 'An animal whose drop the bot is short of is in view: chase it briefly, or carry on?',
-  trigger: 'Every third step with a sheep in view and fewer than three wool carried (chickens and pigs are never hurt).',
+  trigger: 'Every third step with a sheep in view and fewer than three wool carried .',
   source: 'src/opportunistic-pickups.js (animalCandidates)',
   unreachable: 'Jev not reachable (or no answer within five seconds a try): the bot holds and asks again with a backoff (jev-down.js); an answer after an outage is not used, and the step goes on to ask it fresh at its next turn',
   build: ({ options }) => require('../typesafe').choice('Standing instruction: an animal in view whose drop the bot is short of is worth a short chase, even when it is not an ingredient of the current request. These candidates already pass checks for isolation, safe footing, health and a twelve-block radius; the chase is bounded and the main request resumes afterward. Wool is the next bed. Choose continue if the player explicitly said no detours/only the requested item, or if the request is urgent.', {

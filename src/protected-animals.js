@@ -1,11 +1,12 @@
 'use strict';
 // Animals the bot never hurts (the user, 2026-09-25: "Add one rule that's
-// hard enforced - never hurt a chicken", then "Or a pig"). Not a judgment
+// hard enforced - never hurt a chicken", then "Or a pig"; lifted 2026-10-19). Not a judgment
 // Jev weighs: the one place a swing leaves the bot refuses it, a sword's
 // sweep that would reach one is refused too, and a bow is not drawn with
 // one near the line of the shot. Nothing offers them as food or drops.
 const { Vec3 } = require('vec3');
-const PROTECTED = new Set(['chicken', 'pig']);
+// The rule lifted (the user, 2026-10-19: "You can remove the part about not killing chickens and pigs from the readme and rules"): the set is empty, the guard stays for any animal put back in it.
+const PROTECTED = new Set([]);
 
 class ProtectedAnimal extends Error { constructor(message) { super(message); this.name = 'ProtectedAnimal'; } }
 

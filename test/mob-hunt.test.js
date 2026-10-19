@@ -60,10 +60,11 @@ test('the exact supported vanilla mob loot tables extend the Eyes of Ender recip
   assert.throws(() => planCatalog(registry, 'bedrock', 1), /No supported survival acquisition/);
 });
 
-test('string comes from a spider and arrows from skeletons (never a chicken), so a bow and arrows plan without a cobweb or a tripwire', () => {
+test('string comes from a spider, feathers from a chicken and arrows from skeletons or the craft, so a bow and arrows plan without a cobweb or a tripwire', () => {
   const sources = knowledge(registry).mobSources;
   assert.equal(sources.string[0].entity, 'spider'); assert(!sources.string[0].requiresPlayerKill, 'string drops however the spider dies');
-  assert.equal(sources.feather, undefined, 'no chicken is hunted for feathers (the user, 2026-09-25)');
+  // The rule sparing chickens and pigs lifted by the user on 2026-10-19 (note 1910): a chicken is a feather source again.
+  assert.equal(sources.feather[0].entity, 'chicken', 'a chicken is hunted for feathers');
   assert.equal(sources.arrow[0].entity, 'skeleton');
   assert(!knowledge(registry).sources.string.some(s => s.block === 'tripwire'), 'tripwire is placed string, never a deposit');
   const bow = planCatalog(registry, 'bow', 1, { stick: 3, crafting_table: 1 });
@@ -73,29 +74,22 @@ test('string comes from a spider and arrows from skeletons (never a chicken), so
   const seen = planCatalog(registry, 'bow', 1, { stick: 3, crafting_table: 1 }, { nearby: ['cobweb'] });
   assert(seen.some(s => s.action === 'mine' && s.block === 'cobweb') && !seen.some(s => s.action === 'hunt_mob'), 'a cobweb in view beats the hunt');
   const arrows = planCatalog(registry, 'arrow', 16, { stick: 4, crafting_table: 1 });
-  assert.deepEqual(arrows.filter(s => s.action === 'hunt_mob').map(s => s.entity), ['skeleton']);
-  assert(!arrows.some(s => s.entity === 'chicken'));
+  const hunted = arrows.filter(s => s.action === 'hunt_mob').map(s => s.entity);
+  assert(hunted.every(e => ['skeleton', 'chicken'].includes(e)), `arrows come from skeletons or from chickens' feathers: ${hunted.join(', ')}`);
 });
 
-test('a chicken or a pig is never struck: the swing is refused, and a sword swing that would sweep one is refused too', () => {
-  // The user, 2026-09-25: "never hurt a chicken", "or a pig".
-  const { installGuard } = require('../src/protected-animals');
+test('a chicken or a pig may be struck since the user lifted the rule (2026-10-19, note 1910); the guard stays for an empty set', () => {
+  const { installGuard, PROTECTED } = require('../src/protected-animals');
   const { Vec3 } = require('vec3');
+  assert.equal(PROTECTED.size, 0);
   const struck = [];
   const bot = { entity: { position: new Vec3(0, 64, 0), onGround: true }, heldItem: { name: 'iron_sword' }, controlState: {}, entities: {}, attack: t => struck.push(t.name) };
   const chicken = { id: 1, name: 'chicken', position: new Vec3(1.5, 64, 0), isValid: true }, pig = { id: 2, name: 'pig', position: new Vec3(0, 64, 1.5), isValid: true };
   const zombie = { id: 3, name: 'zombie', position: new Vec3(2, 64, 0), isValid: true };
   bot.entities = { 1: chicken, 2: pig, 3: zombie };
   installGuard(bot);
-  assert.throws(() => bot.attack(chicken), { name: 'ProtectedAnimal' });
-  assert.throws(() => bot.attack(pig), { name: 'ProtectedAnimal' });
-  assert.throws(() => bot.attack(zombie), /sweep/, 'the chicken beside the zombie would be swept');
-  bot.heldItem = { name: 'iron_axe' };
-  bot.attack(zombie);
-  assert.deepEqual(struck, ['zombie'], 'an axe does not sweep');
-  bot.heldItem = { name: 'iron_sword' }; bot.entity.onGround = false;
-  bot.attack(zombie);
-  assert.deepEqual(struck, ['zombie', 'zombie'], 'a falling (critical) hit does not sweep');
+  bot.attack(chicken); bot.attack(pig); bot.attack(zombie);
+  assert.deepEqual(struck, ['chicken', 'pig', 'zombie']);
 });
 
 test('two blazes off one spawner are each a fight: the crowd rule counts kin, the sweep rule counts other kinds', () => {

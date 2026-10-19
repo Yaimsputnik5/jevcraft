@@ -383,7 +383,7 @@ async function tidyInventory(bot, task, { force = false, away = null, keep = new
 const nether = bot => /nether/.test(String(bot.game?.dimension || ''));
 const EXPENDABLE = [
   ['dirt', 0], ['gravel', 0], [/_sapling$/, 0], ['nether_brick_fence', 0], ['leaf_litter', 16], ['short_grass', 0],
-  // Eggs kept (note 1754): a thrown egg breaks an end crystal as a snowball does (src/projectiles.js THROWABLE), and the bot never hurts chickens, so the eggs they lay are its one projectile without snow or skeletons.
+  // Eggs kept (note 1754): a thrown egg breaks an end crystal as a snowball does (src/projectiles.js THROWABLE), and the eggs chickens lay are a projectile without snow or skeletons.
   ['nether_wart', 0], ['poisonous_potato', 0], ['spider_eye', 0],
   ['netherrack', bot => nether(bot) ? 96 : 0], ['cobbled_deepslate', 0], ['cobblestone', bot => nether(bot) ? 64 : 128], [/^soul_(sand|soil)$/, bot => nether(bot) ? 32 : 0], ['nether_bricks', 0],
   ['wheat_seeds', 8], ['raw_copper', 0], ['copper_ingot', 0], ['rotten_flesh', 0], ['wheat_seeds', 0],

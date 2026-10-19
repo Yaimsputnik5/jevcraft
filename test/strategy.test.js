@@ -279,7 +279,7 @@ test('when every step left before the Nether may wait, going now is offered, and
   assert(options.nether_first, 'on offer');
   assert.match(options.nether_first.description, /Leave .*for later and go for the Nether now/);
   assert.match(options.nether_first.description, /Without arrows for now: the bow cannot shoot/);
-  assert.match(options.rung_arrows.description, /only from skeletons/);
+  assert.match(options.rung_arrows.description, /from skeletons.*feathers come from chickens/);
   const { decide } = picking('nether_first');
   assert.deepEqual(await strategyStep(bot, task, goal, () => {}, stage, { decide }), { replan: true }, 'setting steps aside is not work: the ladder is read again at once');
   assert(isSetAside(goal, 'rung', 'arrows'), 'the arrows wait');

@@ -65,7 +65,7 @@ const RUNG_WHY = {
   bucket: 'water for lava, falls and the End portal room',
   golden_boots: 'a piglin leaves a player wearing any one gold armour piece alone in the Nether, save one the player struck (and those near it) for about 30 seconds; a brute ignores gold; four gold ingots at a crafting table',
   bow: 'answers skeletons, blazes and the dragon\'s crystals from range',
-  arrows: 'the bow is nothing without them; here they come only from skeletons, none to two a skeleton, and are spent as they are shot (feathers for crafting come from chickens, which the bot never hurts)',
+  arrows: 'the bow is nothing without them; they come from skeletons, none to two a skeleton, and are spent as they are shot (or are crafted, a feather, a flint and a stick each: feathers come from chickens, a hunt that needs no armour)',
   diamond_sword: 'ends a blaze or a piglin in two swings',
   // The crossing's kit (crossing-kit.js kitRungs, note 673).
   nether_pickaxe: 'a spare pickaxe for the Nether',

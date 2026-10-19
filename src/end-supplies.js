@@ -11,7 +11,7 @@ const { decide } = require('./decisions');
 // Before the portal the code fetched, in a fixed order with no question, a
 // bow, 192 arrows, 64 cobblestone, an iron pickaxe, two water buckets, four
 // beds, an enchanting table and 64 food points. Arrows here come only from
-// skeletons, none to two each (the bot never hurts chickens for feathers):
+// skeletons, none to two each, or crafted from chickens' feathers (the rule sparing chickens lifted 2026-10-19):
 // 192 of them is about that many skeletons killed, and nothing said what the
 // arrows were for or what going with fewer costs. The lead trial of
 // 2026-10-04 (25594, seven rods and twelve pearls in its chests at 00:56Z)
@@ -73,7 +73,7 @@ function kitItems(bot, goal, actions = {}, now = Date.now()) {
     says: 'Make or find a bow first: none that will last is carried. Without one the crystals on their pillars and the dragon in flight are out of reach, and the fight is the sword at its perch alone, the crystals healing it. Three sticks and three string at a crafting table; string is a spider\'s drop, and a skeleton drops a bow now and then.' });
   const arrows = countOf(bot, 'arrow'), step = Math.min(WANTS.arrow, arrows + ARROW_STEP);
   out.push({ key: 'arrows', item: 'arrow', carried: arrows, wants: WANTS.arrow, short: arrows < WANTS.arrow, target: step,
-    says: `Get more arrows first: ${arrows} carried, the code would take ${WANTS.arrow}. ${rehearsedSays()} Here arrows come only from skeletons, none to two each, at night or in caves (the bot never hurts chickens for feathers): chosen, it hunts skeletons until ${step} are carried or a quarter hour has gone, and this is asked again.` });
+    says: `Get more arrows first: ${arrows} carried, the code would take ${WANTS.arrow}. ${rehearsedSays()} Here arrows come from skeletons, none to two each, at night or in caves, or are crafted from a feather, a flint and a stick, the feathers from chickens: chosen, it hunts skeletons until ${step} are carried or a quarter hour has gone, and this is asked again.` });
   // Snowballs for the crystals where the arrows are few (note 1342): any
   // projectile breaks one. The arena's drill of 2026-10-06 (01:59 to 02:03Z,
   // a fresh End, no armour, a stone sword, one arrow and 48 snowballs) threw

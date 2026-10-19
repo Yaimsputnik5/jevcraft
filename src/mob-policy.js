@@ -10,8 +10,8 @@ const vanilla = require('../data/vanilla-26.1.json');
 // passive, so the hunt needs no armour, shield or isolation.
 const handlers = {
   blaze: { item: 'blaze_rod', dimension: 'nether', ranged: true }, enderman: { item: 'ender_pearl' },
-  // Never a chicken (protected-animals.js): arrows come off skeletons.
-  spider: { item: 'string', cost: 16 }, skeleton: { item: 'arrow', ranged: true },
+  // A chicken for feathers (the rule against it lifted by the user, 2026-10-19): passive, common on grass, a feather or two each; arrows are crafted from a feather, a flint and a stick, or come off skeletons.
+  spider: { item: 'string', cost: 16 }, skeleton: { item: 'arrow', ranged: true }, chicken: { item: 'feather', passive: true, cost: 14 },
   // Leather for a book, and a book for the enchanting table: the only other
   // way the planner knew was rabbit hide, which no action gathers.
   cow: { item: 'leather', passive: true },

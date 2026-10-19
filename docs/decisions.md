@@ -1277,7 +1277,7 @@ Questions that ride in one call together (the intake batch is one call per chat 
 
 **An animal whose drop the bot is short of is in view: chase it briefly, or carry on?**
 
-- When: Every third step with a sheep in view and fewer than three wool carried (chickens and pigs are never hurt).
+- When: Every third step with a sheep in view and fewer than three wool carried .
 - Batched question, choice; stakes low; ledger kind `pickup`
 - Bar: none
 - Jev unreachable: Jev not reachable (or no answer within five seconds a try): the bot holds and asks again with a backoff (jev-down.js); an answer after an outage is not used, and the step goes on to ask it fresh at its next turn

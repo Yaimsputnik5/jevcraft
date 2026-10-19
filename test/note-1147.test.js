@@ -23,7 +23,7 @@ test('the End\'s kit is Jev\'s: with 40 arrows and two beds, going now is offere
   assert.match(asked[0].enter_now, /by the bow, on a fresh End, 143 arrows loosed in 25 minutes took the ten crystals and the dragon's whole 200 health; by the sword, with every crystal already down and 16 arrows carried, the dragon's last 146 went in 13 minutes, struck at its head each time it perched on the fountain; the bot alive both times\. The crystals are the arrows' work/);
   assert.match(asked[0].enter_now, /no way back out of the End but the dragon's death or the bot's own/);
   assert.match(asked[0].enter_now, /With fewer arrows, on a fresh End: 48 were enough, the ten crystals down and the dragon dead in 10 minutes, most of its health taken by the sword at its perches, 2 arrows left and the bot never under full health for long; 32 took 7 of the ten crystals before they were gone, and 21 took 3, the dragon healed to 187 of 200 and the bot dead by the fountain 8 minutes in\./);
-  assert.match(asked[0].top_up_arrows, /40 carried, the code would take 64\..*arrows come only from skeletons, none to two each.*until 64 are carried or a quarter hour has gone/);
+  assert.match(asked[0].top_up_arrows, /40 carried, the code would take 64\..*arrows come from skeletons, none to two each.*feathers from chickens.*until 64 are carried or a quarter hour has gone/);
   assert.match(asked[0].top_up_beds, /Make beds up to 4 first \(2 carried\)/);
   assert.deepEqual(calls, [], 'nothing fetched: it goes');
   assert.equal(goal.preparingEnd, undefined);

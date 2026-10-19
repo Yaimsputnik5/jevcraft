@@ -94,5 +94,5 @@ test('the crossing kit\'s food line says whether health comes back, the minutes 
   assert.match(food.says, /hunger 15: no health comes back and nothing carried is food/);
   assert.match(food.says, /hunger under 18 and nothing to eat carried, the bot's own row: 92 fights/);
   const goal = goalOf(); goal.portals.push({ dimension: 'overworld', x: 0, y: 70, z: 0 });
-  assert.match(require('../src/healing').overworldFoodSays(b, { ...goal, portals: [{ dimension: 'overworld', x: 0, y: 70, z: 0 }] }), /cows, sheep and rabbits are common on grass \(the bot never hurts pigs or chickens\)/);
+  assert.match(require('../src/healing').overworldFoodSays(b, { ...goal, portals: [{ dimension: 'overworld', x: 0, y: 70, z: 0 }] }), /cows, pigs, sheep, chickens and rabbits are common on grass/);
 });

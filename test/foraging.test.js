@@ -74,13 +74,12 @@ test('carried raw chicken exposes catalog cooking and plans real furnace, tool a
   assert.equal(foodSupply(bot), 0, 'Planning cooking must not count unmade food');
 });
 
-test('a chicken or a pig in view is never offered as food', async () => {
-  // The user, 2026-09-25: "never hurt a chicken", "or a pig".
+test('a chicken or a pig in view is offered as food since the user lifted the rule sparing them (2026-10-19, note 1910)', async () => {
   const items = [], bot = fixture(items), goal = {};
   bot.entities[1] = { id: 1, name: 'chicken', height: 0.7, position: new Vec3(2, 64, 0.5), isValid: true };
   bot.entities[2] = { id: 2, name: 'pig', height: 0.9, position: new Vec3(3, 64, 0.5), isValid: true };
   const choices = await forageChoices(bot, new Task('test', 'choices'), goal, () => {}, {}, {});
-  assert(!Object.keys(choices || {}).some(k => /^hunt_/.test(k)), JSON.stringify(Object.keys(choices || {})));
+  assert(Object.keys(choices || {}).some(k => /^hunt_/.test(k)), JSON.stringify(Object.keys(choices || {})));
 });
 
 test('food surveys continue partial paths and keep only completed surface routes', async () => {

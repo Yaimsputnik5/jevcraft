@@ -17,8 +17,8 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 // These land animals share the surface chase handler. Fish have their own
 // (fishing.js, note 1203: the swim over one and the rod from the bank);
 // hostile mobs need their own mechanics before becoming candidates.
-// No chickens and no pigs: never hurt (protected-animals.js).
-const landPrey = new Set(['cow', 'mooshroom', 'sheep', 'rabbit']);
+// Pigs and chickens too since 2026-10-19 (the user lifted the rule that spared them).
+const landPrey = new Set(['cow', 'mooshroom', 'sheep', 'rabbit', 'pig', 'chicken']);
 function preyFood(bot, entity) {
   if (!landPrey.has(entity.name)) return undefined;
   const keys = bot.registry.entitiesByName[entity.name]?.metadataKeys || [];

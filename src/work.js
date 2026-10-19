@@ -7718,8 +7718,7 @@ function sideTrips(bot, goal, client) {
     says: "I'll breed these cows", run: (b, t, g, sv) => breeding.breedNearby(b, t, g, sv, 'cow', { navigate }) };
   if (breeding.breedReady(bot, goal, 'sheep')) trips.breed_sheep = { description: 'Breed the two sheep in view with two wheat: the lamb is grown in about twenty real minutes, a wool a shearing (three from killing) for the next bed, and one to two mutton, six hunger a piece cooked.',
     says: "I'll breed these sheep", run: (b, t, g, sv) => breeding.breedNearby(b, t, g, sv, 'sheep', { navigate }) };
-  // Never beside a food search: chickens are never hurt, so breeding them
-  // is never for food, and offered while the Nether food kit is short or
+  // Never beside a food search: the breeding is for feathers, not food, and offered while the Nether food kit is short or
   // being worked (goal.stockFood) it reads as a food answer that is not
   // one (mid-242-tf, note 728). Held back there; offered any other time.
   const seekingNetherFood = !!goal.stockFood || (goal.kind === 'win' && /overworld/.test(String(bot.game?.dimension || 'overworld')) &&

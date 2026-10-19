@@ -6,8 +6,6 @@ Meet Jev. It is trying to beat Minecraft, and so far the Nether is winning.
 
 Jev does not write text or code to decide what to do. Code lists the actions the bot can really take (fight, retreat, take cover, eat, keep working), and [TypeSafe's Jev](https://typesafe.ai/), a [System One](https://docs.typesafe.ai/concepts/system-one) model, picks one in about 0.2 seconds, for about 1.7 cents per bot-hour. **Code decides what is possible. Jev decides what to do.** The bot is built on [mineflayer](https://github.com/PrismarineJS/mineflayer).
 
-One hard rule: Jev never hurts a chicken or a pig. They are my daughters' favorite animals.
-
 Starting from a fresh world with an empty inventory, 15 of the 40 worlds we started on 2026-09-28 reached the Nether (the fastest in 7 minutes, the median 28). None has beaten the game. Getting six blaze rods is the current wall. Every run and every fix is logged in [docs/trial-notes.md](docs/trial-notes.md), which this README cites as "note N".
 
 [Clips](#two-clips) | [Status](#status) | [Lessons](#what-we-learned) | [Development process](#improving-the-bot-with-coding-agents) | [How decisions work](#how-decisions-work) | [Setup](#running-it)
@@ -331,6 +329,3 @@ node scripts/replay-suite.js    # recorded decisions, asked live
 
 Gameplay tests, trials and the arena need a separate, disposable server. See [CONTRIBUTING.md](CONTRIBUTING.md). Flight records and logs can contain chat, player names and coordinates, so review them before sharing. The [roadmap](ROADMAP.md) has what's next. MIT License ([LICENSE](LICENSE)).
 
-## Restrictions
-
-Jev never hurts a chicken or a pig. They are my daughters' favorite animals.
