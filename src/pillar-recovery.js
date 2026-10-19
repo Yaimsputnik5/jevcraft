@@ -316,6 +316,15 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
       // From a level under the feet (note 1756): the cell beside the feet has nothing under it on a column one wide, and the first ring is laid against the column's own block below the feet; the arena's drill (2026-10-16 06:48Z, CLIMB_ENCLOSE=1) laid no ring block at the feet's and the head's levels alone. A level already ringed is skipped, so the first level is twelve blocks and each after it four.
       if (have >= Math.max(0, targetY - nf.y) + 4) { let n = 0; for (const dy of [-1, 0, 1]) n += await ringAround(bot, task, nf, dy, order, { skipSide }); if (n) bot._ringLaid = (bot._ringLaid || 0) + n; }
     }
+    // The pool's fall line dug clear on the way up (note 1886): the drop steps off the open side and falls through the two cells beyond it, and a leftover block there, an earlier column's ring, stops the drop. 25588's dragon-237 (2026-10-18 23:5xZ, four crystals) climbed 38 over its pool at (-50, 61, -3), and at the top: 'end_stone in the fall's way at (-48, 69, -3), 7 over the floor', no drop, the way down dug at 4 health, dead at 78. Each level's two cells on the pool's side, at the feet and the head, are dug as the body passes them.
+    if (skipSide && dig && bot.entity.position.floored().y > start) {
+      const nf = bot.entity.position.floored();
+      for (const k of [1, 2]) for (const dy of [0, 1]) {
+        const c = nf.offset(skipSide[0] * k, dy, skipSide[1] * k), b = bot.blockAt(c);
+        if (b?.boundingBox !== 'block' || /obsidian|bedrock|end_portal/.test(b.name)) continue;
+        try { await dig(bot, task, c, { requireDrops: false }); bot._fallLineCleared = (bot._fallLineCleared || 0) + 1; console.log(`[pillar up] the pool's fall line cleared at ${c}: ${b.name} dug`); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir', 'EndEmergency'].includes(err.name)) throw err; }
+      }
+    }
     if (bot.entity.position.floored().y <= start) { console.log(`[pillar up] stopped ${placed ? `after ${placed}` : 'before the first block'}: the block was not placed in three jumps from ${feet} (on ground ${bot.entity.onGround}, ${block.name} in hand${lastPlaceError ? `, the place said: ${lastPlaceError}` : ''}${lastJump ? `; ${lastJump}; the cell at the feet is ${bot.blockAt(feet)?.name || 'unloaded'}` : ''})`); break; }
   }
   return placed;
