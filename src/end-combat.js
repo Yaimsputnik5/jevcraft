@@ -1401,6 +1401,17 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       }
     }
     console.log(`[end combat] the pool for the drop ${poured ? 'poured' : 'not poured'} at ${best.cell} beside the column at (${column.x}, ${column.z})${best.obsidian ? `, ${best.obsidian} obsidian that way` : ''}; ${countOf(bot, 'water_bucket')} full bucket${countOf(bot, 'water_bucket') === 1 ? '' : 's'} left`);
+    // The pool that runs into the climb's own foot is taken back (note 1895): poured beside the column at the feet's level, its water flows into the cell the climb starts from, and the climb is refused there, 'stopped before the first block: water at the feet'. 25588's dragon-258 (2026-10-19 04:1xZ) poured at (35, 52, -22) beside its column at (35, -23), the body raised to the row (note 1864), and was refused the climb 32 times in five minutes. The climb goes on with no pool, the way down dug.
+    if (poured) {
+      await sleep(400);
+      const foot = new Vec3(column.x, Math.floor(bot.entity.position.y), column.z);
+      if (/water/.test(bot.blockAt(foot)?.name || '') && !foot.equals(best.cell)) {
+        try { await require('./water').fillWaterBucket(bot, task, best.cell, { timeoutMs: 1500 }); } catch (_) { /* left */ }
+        for (let i = 0; i < 20 && /water/.test(bot.blockAt(foot)?.name || ''); i++) await sleep(100);
+        console.log(`[end combat] the pool at ${best.cell} ran into the climb's foot at ${foot}: taken back (${/water/.test(bot.blockAt(foot)?.name || '') ? 'the foot still wet' : 'the foot dry'}), no pool for this climb`);
+        poured = false; (state.noPoolAt ||= {})[`${column.x},${column.z}`] = Date.now();
+      }
+    }
     if (poured) { state.pool = { x: best.cell.x, y: best.cell.y, z: best.cell.z, dx: best.dx, dz: best.dz, at: Date.now(), column: { x: column.x, y: Math.floor(bot.entity.position.y), z: column.z }, ...(best.reach ? { reach: best.reach } : {}) }; (state.poolsLeft ||= []).push({ x: best.cell.x, y: best.cell.y, z: best.cell.z, at: Date.now() }); save(); return state.pool; }
     return null;
   };
