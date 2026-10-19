@@ -34,7 +34,7 @@ function show(d) {
   const bar = `${words(dec.id)}: ${words(picked).toUpperCase()}   [${top}]${health != null ? `   hp ${Math.round(health * 10) / 10} food ${food ?? '?'}` : ''}`;
   const key = `${dec.id}|${picked}|${dec.at}`;
   if (key === lastKey) return; lastKey = key;
-  lastBar = bar; actionbar(bar);
+  lastBar = bar;
   const now = Date.now();
   if (now - lastChat < 1500) return; lastChat = now;
   const opt = dec.options?.[picked];
@@ -50,7 +50,12 @@ try { if (file) { const tail = fs.readFileSync(file, 'utf8').slice(-200000).spli
 chat(`overlay on: ${world} (${file ? path.basename(file) : 'no log yet'})`, 'green');
 console.log(`overlay for ${name} on ${port}: ${world} -> ${file}`);
 // The bar fades in about three seconds and the early game decides once a minute or less (the user, 2026-10-19: 'I don't see the actionbar'): the last decision is shown again every two seconds, with the step and the health as they stand.
-setInterval(() => { const status = `${lastStep ? `[${words(lastStep)}] ` : ''}${lastHealth != null ? `hp ${Math.round(lastHealth * 10) / 10} food ${lastFood}  ` : ''}`; if (status || lastBar) actionbar(`${status}${lastBar.replace(/\s+hp [0-9.]+ food [0-9?]+$/, '')}`); }, 2000);
+// The bar told to stay a minute (title times), and sent again only when its text changes or a minute has gone (the user, 2026-10-19: every push is a server log line, 'overwhelmed with loglines').
+// Command feedback off on this server (the user, 2026-10-19: the echo of every push, 'Showing new actionbar title', filled the watcher's chat): the rule touches only those echoes, and Jev runs no commands.
+send('gamerule send_command_feedback false');
+send(`title ${name} times 0 1200 0`);
+let shown = '', shownAt = 0;
+setInterval(() => { const status = `${lastStep ? `[${words(lastStep)}] ` : ''}${lastHealth != null ? `hp ${Math.round(lastHealth * 10) / 10} food ${lastFood}  ` : ''}`; const text = `${status}${lastBar.replace(/\s+hp [0-9.]+ food [0-9?]+$/, '')}`; if (!text) return; if (text !== shown || Date.now() - shownAt > 50000) { shown = text; shownAt = Date.now(); actionbar(text); } }, 1000);
 setInterval(() => {
   try {
     const w = worldOf();
