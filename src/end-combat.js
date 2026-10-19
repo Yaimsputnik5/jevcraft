@@ -3123,7 +3123,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             const footXZ = new goals.GoalNearXZ(c.x + .5, c.z + .5, radius + 1);
             const foot = footGround == null ? footXZ : new goals.GoalCompositeAll([footXZ, new goals.GoalCompositeAny([footGround - 2, footGround - 1, footGround, footGround + 1, footGround + 2].map(y => new goals.GoalY(y)))]);
             const walkFrom = bot.entity.position.floored(), walkAt = Date.now();
-            try { await actions.navigate(bot, task, foot, { timeoutMs: 40000, stallMs: 6000, sprint: true, stopWhen: () => hostileEntities(bot, 4).some(e => live(bot, e)) }); }
+            // No walk down to the foot from high beside the pillar (note 1897): on its own column or a stub by the pillar the climb goes on from where the body stands, and the walk to the ground stepped it off the column's edge. 25588's dragon-260 (2026-10-19 05:2xZ, two crystals) at (-17, 81, -38) by crystal 65's pillar walked toward its foot at the island's level, 'pillar_punch_65 cut ... at (-19, 79, -38)', the body off its column, struck and fallen.
+            const highBeside = footGround != null && Math.floor(bot.entity.position.y) > footGround + 3 && Math.hypot(c.x + .5 - bot.entity.position.x, c.z + .5 - bot.entity.position.z) <= radius + 2.2;
+            if (highBeside) console.log(`[end combat] the climb to crystal ${target.id} goes on from ${walkFrom}, ${Math.floor(bot.entity.position.y) - footGround} over its foot's ground and beside the pillar: no walk down to the foot`);
+            if (!highBeside) try { await actions.navigate(bot, task, foot, { timeoutMs: 40000, stallMs: 6000, sprint: true, stopWhen: () => hostileEntities(bot, 4).some(e => live(bot, e)) }); }
             catch (err) {
               if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err;
               // Said (note 1486): the walk to a foot failed from 18, 19 and 52 blocks (25588, dragon-61, 64 and 66, 2026-10-13) with no word of why.
