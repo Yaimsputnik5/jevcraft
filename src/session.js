@@ -734,6 +734,10 @@ function createSession(config, client, { stateDirectory = path.join(__dirname, '
     // A dead player can rejoin before respawning. No work has started in this
     // connection, so request respawn directly without recording a second death.
     if (!spawned && survival.state.recovery?.status === 'pending') { bot.respawn(); return; }
+    // One death, one record (note 1930): the event came again 1.2 seconds after the first on the rejoin, at the same spot with an empty inventory, and full-3 (2026-10-19 21:58:22 and 21:58:23Z) was written down dead twice; of the dragon runs' two-death ledgers, one in each was this echo. The echo is answered with the respawn alone.
+    const lastDeath = (survival.state.deaths || []).at(-1), p = bot.entity?.position;
+    const echo = !!lastDeath && Date.now() - Date.parse(lastDeath.at) < 10000 && p && lastDeath.position && Math.hypot(lastDeath.position.x - p.x, lastDeath.position.y - p.y, lastDeath.position.z - p.z) < 2;
+    if (echo) { console.log(`[death] the death event came again ${Math.round((Date.now() - Date.parse(lastDeath.at)) / 100) / 10} s after the one recorded, at the same spot: not written down twice`); if (!spawned) { bot.respawn(); return; } stop('recovering').catch(console.error); bot.quit('Respawning after death'); return; }
     const saved = active && !active.idle ? active.goal : store.read();
     recordDeath(bot, survival.state);
     if (saved && ['pending', 'running', 'recovering'].includes(saved.status)) {
