@@ -9,8 +9,10 @@
 //   node scripts/trials/overlay.js <player name> <port>
 //   (beside spectate.sh, which puts the same player in Spectator on Jev)
 const fs = require('fs'), path = require('path');
-const [name, portArg] = process.argv.slice(2);
-if (!name || !portArg) { console.error('usage: node scripts/trials/overlay.js <player name> <port>'); process.exit(1); }
+const [name, portArg, ...flags] = process.argv.slice(2);
+if (!name || !portArg) { console.error('usage: node scripts/trials/overlay.js <player name> <port> [--chase [back] [up]]'); process.exit(1); }
+// --chase: a chase camera (the user, 2026-10-19: "Is there any option to spectate from a little farther back? I hit f5 but it's very zoomed in"). Locked on Jev the camera sits at its eyes and F5 only turns it; so the watcher is let go of Jev and, every half second, set behind and above it, looking at it: `execute at Jev run tp <name> ^ ^up ^-back facing entity Jev eyes`. A spectator passes through blocks, so the ground is no matter. Default 8 back, 4 up.
+const chaseAt = flags.indexOf('--chase'), chase = chaseAt >= 0 ? { back: Number(flags[chaseAt + 1]) || 8, up: Number(flags[chaseAt + 2]) || 4 } : null;
 // The servers live in the main checkout, whatever worktree this runs from.
 const port = Number(portArg), ROOT = (() => { try { return path.resolve(require('child_process').execSync('git rev-parse --path-format=absolute --git-common-dir', { cwd: __dirname, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(), '..'); } catch (_) { return path.join(__dirname, '..', '..'); } })();
 const server = path.join(ROOT, port === 25581 ? '.clean-run' : `.clean-run-${port}`);
@@ -45,6 +47,7 @@ chat(`overlay on: ${world} (${file ? path.basename(file) : 'no log yet'})`, 'gre
 console.log(`overlay for ${name} on ${port}: ${world} -> ${file}`);
 // Command feedback off on this server (the user, 2026-10-19: every console command's echo filled the watcher's chat); the rule touches only those echoes, Jev running no commands.
 send('gamerule send_command_feedback false');
+if (chase) { send(`execute as ${name} run spectate`); setInterval(() => send(`execute at Jev run tp ${name} ^ ^${chase.up} ^-${chase.back} facing entity Jev eyes`), 500); chat(`chase camera on: ${chase.back} back, ${chase.up} up (Shift frees you; rejoin to lock on again)`, 'green'); }
 setInterval(() => {
   try {
     const w = worldOf();
