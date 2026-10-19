@@ -2045,6 +2045,14 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       console.log(`[end combat] the fireball at the short column (${columnDepth()} high) at ${bot.entity.position.floored()}: ${roofedFirst ? 'roofed, then ' : 'no roof laid; '}two dug down into it, not the drop into the pool's trench`);
       await digDownColumn({ limit: 2 });
     }
+    // Off a short column and away from a fireball (note 1899): three blocks or fewer up, the step off costs nothing and the run out of the ball's line answers it (note 1892); the hold under a roof did not, the ball bursting on the column's side at the body's height. 25588's dragon-267 (2026-10-19 06:4xZ) on its column two up at (-38, 59, -28): 'a roof ... laid', 'the wall toward the fireball ... 1 laid', 'the fireball's cloud on the body: 20.0 to 14.0'.
+    else if (onOwnPillar() && endEmergency(bot) === 'incoming_dragon_fireball' && columnDepth() <= 3 && !cloudOnBody() && bot.entity.onGround) {
+      goal.step = { action: 'off_the_short_column_from_fireball', health: bot.health, depth: columnDepth() }; save();
+      const p0 = bot.entity.position.floored(), h0 = bot.health;
+      try { await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) && safeFromHostiles(bot, p, endMobs(bot)), timeoutMs: 1600, dig: actions.dig }); }
+      catch (err) { if (err.name !== 'NoEscape') throw err; console.log(`[end combat] no run from the fireball off the short column at ${p0}: ${String(err.message || err).slice(0, 90)}; the hold instead`); await holdOrDown(); }
+      console.log(`[end combat] off the short column (${p0.y - (bot._pillarUp?.base ?? p0.y)} up) from the fireball at ${p0}: now at ${bot.entity.position.floored()}, ${h0.toFixed(1)} to ${bot.health.toFixed(1)} health`);
+    }
     else if (onOwnPillar() && (!groundAbout() || cloudOnBody()) && ['dragon_breath_cloud', 'incoming_dragon_fireball'].includes(endEmergency(bot))) {
       // The seconds between the cut and the answer said (note 1854): 25588's dragon-214 (2026-10-18 13:44Z) had its descent cut by a cloud on the body at (35, 59, 22) and died 20 to 14 to 8 to none with no line between; where the two seconds went is the question.
       if (state.lastCutAt) console.log(`[end combat] the breath on the column at ${bot.entity.position.floored()}: ${Date.now() - state.lastCutAt} ms since the step was cut (${Number(state.lastCutHealth).toFixed(1)} to ${bot.health.toFixed(1)} health), ${endEmergency(bot)}`);
