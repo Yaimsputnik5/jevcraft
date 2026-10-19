@@ -131,7 +131,9 @@ function unseenNote(bot, shown = [], radius = 16) {
   const ids = new Set(shown.map(t => t.entity?.id));
   const hidden = threats(bot, radius).filter(t => !ids.has(t.entity.id) && !t.visible).slice(0, 4);
   if (!hidden.length) return '';
-  return ` Out of sight but about: ${hidden.map(t => `a ${t.entity.name.replaceAll('_', ' ')} ${Math.round(t.distance)} blocks off`).join(', ')}.`;
+  // Each biter's time to arm's length at its own speed (note 1928): full-4 (2026-10-19 21:41:36Z) read 'about 3.6 damage over about 4 seconds' for the one zombie in view and 'a zombie 14 blocks off, a zombie 16 blocks off' out of sight with no time said; both were at it in five seconds, 20 health to none in eleven.
+  const soon = t => { if (shooter(t.entity)) return ''; try { const secs = require('./combat-estimate').arrives({ name: t.entity.name, distance: t.distance }); return Number.isFinite(secs) ? ` (at arm's length in about ${Math.round(secs * 10) / 10} seconds at its own speed, with a way here)` : ''; } catch (_) { return ''; } };
+  return ` Out of sight but about: ${hidden.map(t => `a ${t.entity.name.replaceAll('_', ' ')} ${Math.round(t.distance)} blocks off${soon(t)}`).join(', ')}. Those that come after the figures' seconds are not in them.`;
 }
 // A straight line from one point to another with no block across it: the
 // game's raycast, a hit within half a block of the target counted as none.
