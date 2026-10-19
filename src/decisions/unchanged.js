@@ -57,7 +57,9 @@ function markOf(bot) {
   const p = bot?.entity?.position;
   const inv = {};
   try { for (const i of bot?.inventory?.items?.() || []) inv[i.name] = (inv[i.name] || 0) + i.count; } catch (_) { /* no inventory */ }
-  return { p: p && Number.isFinite(p.x) ? { x: p.x, y: p.y, z: p.z } : null, inv, blocks: bot?._stalls?.marked || 0, band: band(bot?.health), health: Number.isFinite(bot?.health) ? bot.health : null };
+  // The ladder's rung too (note 1938): an answer that hands the ladder another rung moves nothing and carries nothing new, and was judged to have changed nothing. full-2 (2026-10-19 23:48:03Z) read of take_up_food 'Tried once from here... it came to nothing... its run changed nothing within 1 second', took cross_now at 0.33, and crossed with 0 of 80 food for the third time.
+  let rung = null; try { rung = bot?._goal?.rungTime?.phase || bot?._goal?.gameProgress?.phase || null; } catch (_) { rung = null; }
+  return { p: p && Number.isFinite(p.x) ? { x: p.x, y: p.y, z: p.z } : null, inv, blocks: bot?._stalls?.marked || 0, band: band(bot?.health), health: Number.isFinite(bot?.health) ? bot.health : null, rung };
 }
 // What changed between two marks, in words, or null for nothing.
 function changed(a, b) {
@@ -71,6 +73,7 @@ function changed(a, b) {
   if (diff.length) return `what is carried changed (${diff.slice(0, 4).map(([n, d]) => `${d > 0 ? '+' : ''}${d} ${words(n)}`).join(', ')}${diff.length > 4 ? ', ...' : ''})`;
   if ((a.blocks || 0) !== (b.blocks || 0)) return 'a block was dug or placed';
   if (a.band !== b.band) return `health went from ${Math.round(a.health)} to ${Math.round(b.health)}`;
+  if ((a.rung || b.rung) && a.rung !== b.rung) return `the ladder went from ${words(a.rung || 'nothing')} to ${words(b.rung || 'nothing')}`;
   return null;
 }
 
