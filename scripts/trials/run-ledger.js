@@ -28,8 +28,10 @@ for (const f of files) {
     if (dim === 'the_nether' && !nether) nether = at;
     if (dim === 'the_end' && !end) end = at;
     const s = JSON.stringify(d.step || {});
-    if (/blaze_rod/.test(s) && /"blaze_rod":[1-9]/.test(line) && !rod) rod = at;
-    if (/"ender_pearl":[1-9]/.test(line) && !pearl) pearl = at;
+    // Held, not planned (note 1924): the step's produces carries "blaze_rod":7 at the rung's start, and full-2 read a rod at minute 48 with none in hand.
+    const inv = /"inventory":\{[^}]*\}/.exec(line)?.[0] || '';
+    if (/"blaze_rod":[1-9]/.test(inv) && !rod) rod = at;
+    if (/"ender_pearl":[1-9]/.test(inv) && !pearl) pearl = at;
     if (/stronghold/.test(s) && /portal_room|eyes? (set|placed)|frame/.test(line) && !stronghold) stronghold = at;
     if (/"dragonHealth":(0|[0-9]\.[0-9]+)[,}]/.test(line) && end && !dragon) dragon = at;
     step = d.step?.action || step;
