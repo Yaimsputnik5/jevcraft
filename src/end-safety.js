@@ -183,10 +183,10 @@ const RUN_BLOCKS = 6;
 // and 25588 (dragon-98, 2026-10-14 00:39Z) stood at (58, 53, 9) seventeen
 // seconds, 'No surveyed walking escape' twenty-six times, and died in the
 // breath's cloud there, 19.3 to none in three seconds, never a step.
-function straightAway(bot, start, bearing, allowed = () => true, blocks = RUN_BLOCKS, { rough = false } = {}) {
+function straightAway(bot, start, bearing, allowed = () => true, blocks = RUN_BLOCKS, { rough = false, angles = [Math.PI, Math.PI * .75, -Math.PI * .75, Math.PI / 2, -Math.PI / 2] } = {}) {
   const solid = (x, y, z) => bot.blockAt(new Vec3(x, y, z))?.boundingBox === 'block';
   const feet = Math.floor(start.y);
-  for (const angle of [Math.PI, Math.PI * .75, -Math.PI * .75, Math.PI / 2, -Math.PI / 2]) {
+  for (const angle of angles) {
     const dx = Math.cos(bearing + angle), dz = Math.sin(bearing + angle);
     let ok = true, y = feet;
     for (let d = 1; d <= blocks && ok; d++) {
@@ -431,10 +431,14 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
       // 25588 (dragon-14, 2026-10-13 07:06Z, full iron) stood in the cloud
       // 'no surveyed walking escape' three seconds, 20 to 2. A short step out
       // and the next tick's step again beat standing.
+      // Out of the fireball's line, not along it (note 1892): the ball flies straight at where the body stood and bursts there, its cloud three or more across, and the run straight away from it stays in its line. Of the fireball bursts on the body in 25588's dragon-239 to 249 (2026-10-19), eleven came after a run of 1 to 2.4 blocks, ended early as the ball stopped reading as aimed at the body, and seven of those lives ended there. Sideways first for a ball, and the run goes on to four blocks whatever the ball reads.
+      const ball = dragon.name === 'dragon_fireball';
+      const angles = ball ? [Math.PI / 2, -Math.PI / 2, Math.PI * .75, -Math.PI * .75, Math.PI] : undefined;
       let runBlocks = RUN_BLOCKS;
-      let away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks);
-      if (!away) { runBlocks = 3; away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks); }
-      if (!away) { runBlocks = 2; away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks) || straightAway(bot, start, bearing, allowed || (() => true), runBlocks, { rough: true }); }
+      let away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks, { angles });
+      if (!away) { runBlocks = 4; away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks, { angles }); }
+      if (!away) { runBlocks = 3; away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks, { angles }); }
+      if (!away) { runBlocks = 2; away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks, { angles }) || straightAway(bot, start, bearing, allowed || (() => true), runBlocks, { rough: true, angles }); }
       if (away) {
         goal.step = { action: 'evade_breath_straight', hazard: dragon.name, from: { ...start }, toward: { x: away.x, y: away.y, z: away.z } }; save();
         // No jump, and the floor a step ahead read each tick (note 1428): at a
@@ -448,7 +452,7 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
         try {
           await move(bot, { check, get cancelled() { return task.cancelled; }, label: task.label }, { label: 'evade_breath_straight', keys: ['forward', 'sprint'], sneak: false,
             why: 'straight out of the dragon\'s breath at a run', look: away.offset(0, 1.6, 0), maxMs: 1800, tick: 25,
-            until: () => bot.entity.position.distanceTo(start) >= Math.max(1.5, runBlocks - 1) || fallDanger(bot) || !breathThreat(bot) || !floorAhead() || (stalled = Date.now() - t0 > 500 && bot.entity.position.distanceTo(start) < 0.5) });
+            until: () => bot.entity.position.distanceTo(start) >= Math.max(1.5, ball ? Math.min(4, runBlocks) : runBlocks - 1) || fallDanger(bot) || (!breathThreat(bot) && (!ball || bot.entity.position.distanceTo(start) >= Math.min(4, runBlocks))) || !floorAhead() || (stalled = Date.now() - t0 > 500 && bot.entity.position.distanceTo(start) < 0.5) });
         } catch (err) { check(); }
         if (stalled && breathThreat(bot) && !fallDanger(bot)) {
           const s0 = bot.entity.position.clone();
