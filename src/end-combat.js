@@ -1608,6 +1608,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         look: new Vec3(bot._pillarUp.x + .5 + side.dx * 12, bot.entity.position.y + 1.0, bot._pillarUp.z + .5 + side.dz * 12), maxMs: 2000, tick: 25, intoFall: true, until: () => !bot.entity.onGround && bot.entity.position.y < startY - 0.5 });
     } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the water drop's step off ended: ${err.name || ''} ${String(err.message || err).slice(0, 100)}`); }
     finally { bot._dropping = false; task.interruptCheck = dropInterrupt; }
+    // What stood in the step's way, said when the step did not leave the column (note 1887): 25588's dragon-240 (2026-10-19 00:3xZ, three crystals) drew 'the water drop from (-10, 88, -43), 28 blocks ... into the pool' and then 'the water drop ended still up', two seconds of the forward key and no fall, and nothing said why; the dig down that followed under the fireballs ended it at 0.3. The cells ahead at the feet and the head, the body's place and the keys held go into the line.
+    if (bot.entity.onGround && bot.entity.position.y >= startY - 0.5) {
+      const p = bot.entity.position, f = p.floored(), ahead = [1, 2].map(k => [0, 1].map(dy => `${k}${dy ? 'h' : 'f'}:${bot.blockAt(f.offset(side.dx * k, dy, side.dz * k))?.name || '?'}`).join(' ')).join(' ');
+      console.log(`[end combat] the water drop's step did not leave the column: at (${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}), the column at (${bot._pillarUp?.x}, ${bot._pillarUp?.z}), toward ${side.dx > 0 ? 'east' : side.dx < 0 ? 'west' : side.dz > 0 ? 'south' : 'north'}: ${ahead}; keys ${JSON.stringify(bot.controlState || {})}; refused ${bot._moveRefused && Date.now() - bot._moveRefused.at < 3000 ? bot._moveRefused.name : 'no'}`);
+    }
     let wet = false;
     try { wet = await recoverFall(bot, task, goal, save, { refill: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the water drop's landing: ${String(err.message || err).slice(0, 120)}`); }
     for (let i = 0; i < 60 && !bot.entity.onGround; i++) await sleep(50);
