@@ -424,6 +424,13 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
       const items = bot.inventory?.items?.() || [], carried = pr.SCAFFOLD.reduce((n, k) => n + items.filter(i => i.name === k).reduce((m, i) => m + i.count, 0), 0);
       const headClear = [2, 3].every(dy => bot.blockAt(f.offset(0, dy, 0))?.boundingBox !== 'block');
       const ballNear = Object.values(bot.entities).some(e => e.name === 'dragon_fireball' && e.isValid !== false && e.position.distanceTo(bot.entity.position) < 14);
+      // The water at the feet taken up first (note 1902): a jump from water does not reach a block's top, and the one up, the stub and the climb were all refused in the bot's own pool. 25588's dragon-274 (2026-10-19 09:3xZ) in its pool's pit at (-10, 62, -38) under a cloud: 'one block up ... not up', 'water at the feet', 'no straight run ... from a pit', 10 to none. A source at the feet goes back into an empty bucket.
+      if (carried >= 1 && headClear && !ballNear && /water/.test(bot.blockAt(f)?.name || '') && items.some(i => i.name === 'bucket')) {
+        const t1 = Date.now();
+        try { await require('./water').fillWaterBucket(bot, task, f, { timeoutMs: 1200 }); } catch (_) { /* left */ }
+        for (let i = 0; i < 10 && /water/.test(bot.blockAt(f)?.name || ''); i++) await new Promise(r => setTimeout(r, 50));
+        console.log(`[end safety] the water at the feet at ${f} taken up before the one block up: ${/water/.test(bot.blockAt(f)?.name || '') ? 'still wet' : 'dry'} in ${Date.now() - t1} ms`);
+      }
       if (carried >= 1 && headClear && !ballNear) {
         const h0 = bot.health, t0 = Date.now();
         goal.step = { action: 'one_up_out_of_the_cloud', health: bot.health }; save();
