@@ -5576,6 +5576,8 @@ class Survival {
       if (k === 'take_cover' && coverWindow) o.description += openWhileBuildingSays(bot, over, coverWindow, `the first block in the ${shotWord(over.pusher.name)}'s line`);
       if (CLOSES_THE_DROP.has(k) || k === 'out_of_the_push') continue;
       o.description += over.says + (k === 'keep_working' ? ' The work does not stop in time: the hit that would stop it is the one that throws the bot over.' : '');
+      // The push carried on the price too (note 1922), for the quiet scene that reads the figure alone: full-1 (2026-10-19 21:12:14Z) was told 'a fireball that lands here is priced by that fall: the bot's death' on a ledge one block from lava 19 down, its figure 'about 0 damage'; the scene read quiet, gave the turn to the work, and a fireball put the bot in the lava at 21:12:20.
+      o.expects = { ...(o.expects || {}), pushOver: { deadly: !!over.deadly, by: over.pusher?.name } };
       // Where the push cannot carry it over, said beside it (note 612).
       if (blastOver && k !== 'fight_from_footing') o.description += blastOver.footing ? ` Footing a push from the ${blastOver.pusher.name.replaceAll('_', ' ')} cannot carry the bot over stands ${blastOver.footing.steps} step${blastOver.footing.steps === 1 ? '' : 's'} off at (${blastOver.footing.cell.x}, ${blastOver.footing.cell.y}, ${blastOver.footing.cell.z}).` : ` No footing a push from the ${blastOver.pusher.name.replaceAll('_', ' ')} cannot carry the bot over is within ${FOOTING_STEPS} steps of walking.`;
     }
@@ -5585,6 +5587,7 @@ class Survival {
     if (blastOver && !over && !edgeNow?.walledNow) for (const [k, o] of Object.entries(options)) {
       if (CLOSES_THE_DROP.has(k) || k === 'out_of_the_push') continue;
       o.description += blastOver.says + (k === 'keep_working' ? ' The work does not stop in time: the hit that would stop it is the one that throws the bot over.' : '');
+      o.expects = { ...(o.expects || {}), pushOver: { deadly: !!blastOver.deadly, by: blastOver.pusher?.name } };
     }
     // A spear holder's knock over the drop, on every stance but the fight
     // (which says its jabs to the drop) and those that close the drop.

@@ -187,6 +187,8 @@ function quietOf(bot, danger = [], options = {}, now = Date.now()) {
   if (bot?._recentHurtAt > now - QUIET_HURT_MS) return null;
   const priced = Object.values(options || {}).map(o => o?.expects?.damage).filter(Number.isFinite);
   if (priced.length < 2 || priced.some(d => d >= QUIET_DAMAGE)) return null;
+  // A way open to a push over a drop that kills is priced by that fall in its words, not in its figure (survival.js shotOverEdge, note 1922): no quiet scene while one is on offer. full-1 (2026-10-19 21:12:14Z), a ghast 16 blocks off and lava 19 down a block away, every figure under a point, was given to the work and pushed in six seconds later.
+  if (Object.values(options || {}).some(o => o?.expects?.pushOver?.deadly)) return null;
   return { ids: mobs.map(t => t.entity.id), until: now + QUIET_MS,
     says: `Every way here is priced under ${QUIET_DAMAGE} damage in the next fifteen seconds and no mob is within ${NEAR} blocks: whatever is chosen holds those fifteen seconds, and these mobs do not take the turn from the work again meanwhile unless one comes within ${NEAR}, a hit lands, or another comes.` };
 }
