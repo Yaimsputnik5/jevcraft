@@ -3879,7 +3879,9 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       const pick = bot.inventory.items().find(i => /_pickaxe$/.test(i.name));
       // Not under the bot's own column (note 1871): the roofs it laid coming down, one every third block, are the 'rock' over the head, and the dig to the sky climbs the whole column again. 25588's dragon-224 (2026-10-18 17:02 to 17:04Z, two crystals) came down from 88 to its foot hole at (-10, 60, -37), 20 to 9.5, took 'dig_to_sky', went up its own column to 91, came down the column from 91 to 82 under the breath, took 'dig_to_sky' again to 94, and died at 88.
       const u = bot._pillarUp, ownColumnAbove = (!!u && u.x === feet.x && u.z === feet.z) || (!!state.lastStub && state.lastStub.x === feet.x && state.lastStub.z === feet.z && Date.now() - (state.lastStub.at || 0) < 20 * 60000);
-      if (rock >= 2 && solidAbove >= 3 && !onOwnPillar() && !onObsidianTop() && !ownColumnAbove && pick && actions.dig && blocksCarried(bot) >= 1) {
+      // Not up an old column (note 1900): rock that reaches past 72 is a column the bot built, the island's own stone ending lower, and the dig to the sky climbed it. 25588's dragon-270 (2026-10-19 07:56Z, five crystals) at (-36, 70, -29) under an earlier climb's column took dig_to_sky to 95, stood on its top with only moves and observe offered, and died there; note 1871 had caught only the column of the moment.
+      const columnAbove = feet.y + rock + 1 > 72;
+      if (rock >= 2 && solidAbove >= 3 && !onOwnPillar() && !onObsidianTop() && !ownColumnAbove && !columnAbove && pick && actions.dig && blocksCarried(bot) >= 1) {
         const skyY = feet.y + rock + 1;
         tree.dig_to_sky = { description: { action: `The bot stands under the island's rock, ${rock} blocks of it over its head to the open sky at ${skyY}: dig up to the sky, the blocks over the head dug with the ${pick.name.replace('_', ' ')} and the column laid under the feet from the ${blocksCarried(bot)} blocks carried. No pillar's foot is walked to from down here.`,
           rockOverhead: rock, blocksCarried: blocksCarried(bot), health: bot.health },
