@@ -11693,7 +11693,8 @@ class Survival {
     // health, hunger 16 and no food, was offered only the request and a
     // food search, climbed toward the surface at night, and a zombie and a
     // spider met it on the way (note 466).
-    const woundedBelow = underground && nightFree && shelterNeeded(bot) && (bot.health ?? 20) < 20 && healing;
+    // By day too, with hostile mobs about (note 1937): the night was the condition, and full-3 (2026-10-19 23:28:37Z), at 4 health underground by day with hunger 12 and three skeletons within 24 that had just shot it to that, was offered the request and a four-minute climb for food (0.93) and nothing that stopped the shots; shot dead sixteen seconds later. Sealed in, nothing heals (said on the option), but nothing shoots either, and the food is asked from inside.
+    const woundedBelow = underground && nightFree && (shelterNeeded(bot) || about.count > 0) && (bot.health ?? 20) < 20 && healing;
     // The shelter kept, and whether there is a way to it from here: with none,
     // this is a pocket, a shaft or a room at a new site, asked next.
     const refugeAt = refuge ? Math.round(pos(refuge.origin).distanceTo(bot.entity.position)) : null;
