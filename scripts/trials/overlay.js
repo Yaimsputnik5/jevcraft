@@ -47,7 +47,8 @@ chat(`overlay on: ${world} (${file ? path.basename(file) : 'no log yet'})`, 'gre
 console.log(`overlay for ${name} on ${port}: ${world} -> ${file}`);
 // Command feedback off on this server (the user, 2026-10-19: every console command's echo filled the watcher's chat); the rule touches only those echoes, Jev running no commands.
 send('gamerule send_command_feedback false');
-if (chase) { send(`execute as ${name} run spectate`); setInterval(() => send(`execute at Jev run tp ${name} ^ ^${chase.up} ^-${chase.back} facing entity Jev eyes`), 500); chat(`chase camera on: ${chase.back} back, ${chase.up} up (Shift frees you; rejoin to lock on again)`, 'green'); }
+// Yaw only (rotated ~ 0): with the pitch in it the camera swung over and under Jev whenever it looked up or down, which mining does all day; four moves a second.
+if (chase) { send(`execute as ${name} run spectate`); setInterval(() => send(`execute at Jev rotated ~ 0 run tp ${name} ^ ^${chase.up} ^-${chase.back} facing entity Jev eyes`), 250); chat(`chase camera on: ${chase.back} back, ${chase.up} up (Shift frees you; rejoin to lock on again)`, 'green'); }
 setInterval(() => {
   try {
     const w = worldOf();
