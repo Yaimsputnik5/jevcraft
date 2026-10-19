@@ -778,8 +778,11 @@ async function resourceTunnelStep(bot, task, goal, save, target, resource, actio
   // walked back thirty blocks to one while twelve from its portal. An
   // inspected staircase close by is still resumed; only one more than
   // eight blocks farther from the target than the bot is replaced by here.
+  // Whatever the saved site was dug toward (note 1927): full-3 (2026-10-19 21:24 to 21:36Z) chose dig_to_water four times at a pool 14 blocks off, and each pass tried to rejoin the water site saved 46 blocks away toward another pool, found no route, and ended 'No existing route to the saved mining worksite' before a block was dug; the surface trip went round nine times in two minutes.
+  // An ore shaft is a descent any ore of its kind is reached from, and is rejoined whatever block is the target now (the test of resumed shafts); a dig to water or lava is to that one pool.
   const sameTarget = site.target && Math.hypot(site.target.x - target.x, site.target.y - target.y, site.target.z - target.z) < 4;
-  if (work && sameTarget && work.distanceTo(target) > bot.entity.position.distanceTo(target) + 8) {
+  const placeBound = /^(water|lava)$/.test(String(resource));
+  if (work && (sameTarget || placeBound) && work.distanceTo(target) > bot.entity.position.distanceTo(target) + 8) {
     site.workPosition = { ...bot.entity.position.floored() }; save();
   } else if (work && work.distanceTo(bot.entity.position) > 6 && !(site.rejoinBlockedUntil > Date.now()) && !rejoinFailed(bot, goal, work)) {
     const movement = bot.pathfinder.movements;
