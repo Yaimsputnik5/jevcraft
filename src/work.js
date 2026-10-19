@@ -8739,6 +8739,8 @@ async function crossingKitReady(bot, task, goal, save, client = task.opportunity
   if (pick.startsWith('take_up_')) {
     const key = pick.slice(8), phase = `nether_${key}`;
     require('./progress').attemptsFor(goal).clear('rung', phase);
+    // And the rung's own step's rest (note 1931): a stall sets 'act' step:rung:<phase> aside, apart from the rung; cleared of the rung alone, full-1 (2026-10-19 21:49:09Z) took up the food, the ladder handed it the rung, its step rested, it 'changed nothing within 1 second', the crossing was asked again ten seconds later and crossed at 0 of 80 food, and came back for food at 21:58.
+    require('./progress').attemptsFor(goal).clear('act', `step:rung:${phase}`);
     // Optional before the Nether (note 776): taken up, it is chosen.
     require('./game-progress').optIn(goal, phase);
     if (key === 'food' && goal.kitFood?.choice?.pick === 'go_without') delete goal.kitFood.choice;
