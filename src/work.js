@@ -8721,7 +8721,10 @@ async function crossingKitReady(bot, task, goal, save, client = task.opportunity
   if (valuables?.how === 'stash') tree.stash_valuables = { description: `Walk ${valuables.far} blocks to the stash chest at home first and leave the valuables in it (${valuables.what}), about ${Math.round(valuables.far / 4.3)} seconds each way: a death in the Nether drops everything carried, often into lava.${ironLeftSays('taken up again at home after a death')}` };
   if (valuables?.how === 'cache') tree.cache_valuables = { description: `Put ${valuables.chest} down here first and leave the valuables in it (${valuables.what}): home's chest is out of reach, and a death in the Nether drops everything carried, often into lava. They are taken back passing by.${ironLeftSays('fetched from this chest on the way back to the portal after a death')}${pickaxeLeft(bot, valuables.spends)}` };
   const keys = Object.keys(tree).sort().join(',');
-  const held = kit.choice && kit.choice.keys === keys && kit.workedMs - kit.choice.at < KIT_HOLD_MS && tree[kit.choice.pick];
+  // A choice held is for the crossing it was made at (note 1933): one that turned back for food, or a death, since it was made asks again. full-1 (2026-10-19) chose cross_now at 21:49 with 0 of 80 food, turned back for food at 21:58, and at 22:34 crossed again unasked on the same held choice with no food carried, the kit's worked minutes still under the hold.
+  const since = Number.isFinite(kit.choice?.wall) ? kit.choice.wall : 0;
+  const undone = !!kit.choice && (goal.foodTurnBack?.at > since || (goal.survival?.deaths || []).some(d => Date.parse(d.at) > since));
+  const held = kit.choice && !undone && kit.choice.keys === keys && kit.workedMs - kit.choice.at < KIT_HOLD_MS && tree[kit.choice.pick];
   let pick = held ? kit.choice.pick : null;
   if (!pick) {
     const worn = k => { const i = short.find(s => `top_up_${s.key}` === k); return i && kit.spent[i.key]?.ms >= KIT_FALLBACK_MS && i.carried > 0; };
@@ -8732,7 +8735,7 @@ async function crossingKitReady(bot, task, goal, save, client = task.opportunity
         minutesAtCrossing: Math.round(kit.workedMs / 60000), riskNow: require('./risk').riskNow(bot) } });
     if (decision.stale) return false;
     pick = decision.path.at(-1);
-    kit.choice = { pick, keys, at: kit.workedMs }; save();
+    kit.choice = { pick, keys, at: kit.workedMs, wall: Date.now() }; save();
   }
   delete goal.preparingNether;
   if (pick === 'cross_now') return true;
