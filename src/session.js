@@ -1,4 +1,6 @@
 'use strict';
+// The last death this process recorded, whichever connection it was in (note 1934).
+let lastDeathSeen = null;
 const DEATH_WORDS = /^(was |were |died|drowned|fell|burned|went up in flames|tried to swim|blew up|hit the ground|starved|suffocated|froze|withered|walked into|experienced kinetic|discovered the floor)/;
 
 const path = require('path');
@@ -735,11 +737,13 @@ function createSession(config, client, { stateDirectory = path.join(__dirname, '
     // connection, so request respawn directly without recording a second death.
     if (!spawned && survival.state.recovery?.status === 'pending') { bot.respawn(); return; }
     // One death, one record (note 1930): the event came again 1.2 seconds after the first on the rejoin, at the same spot with an empty inventory, and full-3 (2026-10-19 21:58:22 and 21:58:23Z) was written down dead twice; of the dragon runs' two-death ledgers, one in each was this echo. The echo is answered with the respawn alone.
-    const lastDeath = (survival.state.deaths || []).at(-1), p = bot.entity?.position;
+    // The record kept in the process too (note 1934): the second event comes on the rejoin, a new connection whose state is read from disk, and the store's save is debounced, so the death a second old was not in it yet; full-3 (2026-10-19 22:45:37 and 22:45:38Z) was written down twice with the guard above in the build.
+    const lastDeath = [(survival.state.deaths || []).at(-1), lastDeathSeen].filter(Boolean).sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0], p = bot.entity?.position;
     const echo = !!lastDeath && Date.now() - Date.parse(lastDeath.at) < 10000 && p && lastDeath.position && Math.hypot(lastDeath.position.x - p.x, lastDeath.position.y - p.y, lastDeath.position.z - p.z) < 2;
     if (echo) { console.log(`[death] the death event came again ${Math.round((Date.now() - Date.parse(lastDeath.at)) / 100) / 10} s after the one recorded, at the same spot: not written down twice`); if (!spawned) { bot.respawn(); return; } stop('recovering').catch(console.error); bot.quit('Respawning after death'); return; }
     const saved = active && !active.idle ? active.goal : store.read();
     recordDeath(bot, survival.state);
+    lastDeathSeen = (survival.state.deaths || []).at(-1) || null;
     if (saved && ['pending', 'running', 'recovering'].includes(saved.status)) {
       saved.lastError = 'The bot died; recovering from observed inventory after respawn';
       saved.status = 'recovering';
