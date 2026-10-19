@@ -457,6 +457,11 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
       if (!away && ball) { away = straightAway(bot, start, bearing, allowed || (() => true), 4, { angles, rough: true }); if (away) { runBlocks = 4; rough = true; } }
       if (!away) { runBlocks = 3; away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks, { angles }); }
       if (!away) { runBlocks = 2; away = straightAway(bot, start, bearing, allowed || (() => true), runBlocks, { angles }) || straightAway(bot, start, bearing, allowed || (() => true), runBlocks, { rough: true, angles }); }
+      // No run that ends in the cloud's box (note 1896): a run out of a cloud a block or two down a slope stood the body where its box still met the cloud's, and 25588's dragon-259 (2026-10-19 04:46Z, two crystals) ran 'moved 1.2 blocks to (-10, 60, -35)' from (-10, 61, -35) with the cloud at 61, 12.3 to 0.3. A lane whose end lies within the cloud's radius with the feet from 1.8 under its height to half a block over it is no lane (the box of note 1889's drill); the stub is the answer then.
+      if (away && dragon.name === 'area_effect_cloud' && Math.hypot(away.x - dragon.position.x, away.z - dragon.position.z) <= cloudRadius(bot, dragon) + 0.3 && away.y - dragon.position.y < 0.5 && dragon.position.y - away.y < 1.8) {
+        console.log(`[end safety] no run out of the cloud to (${Math.floor(away.x)}, ${Math.floor(away.y)}, ${Math.floor(away.z)}): its end is still in the cloud's box (the cloud at ${dragon.position.y.toFixed(1)}, ${Math.round(cloudRadius(bot, dragon) * 10) / 10} wide)`);
+        away = null;
+      }
       if (away) {
         goal.step = { action: 'evade_breath_straight', hazard: dragon.name, from: { ...start }, toward: { x: away.x, y: away.y, z: away.z } }; save();
         // No jump, and the floor a step ahead read each tick (note 1428): at a
