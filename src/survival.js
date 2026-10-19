@@ -10814,7 +10814,7 @@ class Survival {
       const walksRound = w => ` A ${w.entity.name.replaceAll('_', ' ')} after a player walks round to it through open ground, not through rock${keptFor ? `; this one has kept the pocket ${keptFor} seconds` : ''}.`;
       const outRun = (keeper, p) => async () => {
         delete this.state.watchedSince; delete this.state.pocketWatch;
-        if (night) this.state.nightPlan = { plan: 'stay_up', until: Date.now() + 120000, from: 'tunnel_out' };
+        if (night) this.state.nightPlan = { plan: 'stay_up', until: Date.now() + 120000, from: 'tunnel_out', at: Date.now(), startHealth: bot.health };
         foodTrip?.renew();
         return this.tunnelOut(task, goal, save, refuge, keeper, p);
       };
@@ -10832,7 +10832,7 @@ class Survival {
       if (passage) options.tunnel_out = { description: `Dig a passage out through the pocket's ${passage.direction} wall, away from the creeper: ${outCells(passage)}, and go back to work${night ? ' in the dark, where mobs spawn' : ''} from its end, ${passage.clearance} blocks from where the creeper is now (it is ${Math.round(creeperNear.distance)} off${creeperNear.visible ? '' : ', behind the rock'}). A creeper walks to a player it sees within sixteen blocks and lights its fuse within three; behind rock it sees nothing, and digging makes no noise it follows. No block is dug with lava or water behind it, and the passage stops, the bot still enclosed, if the creeper comes round toward its head within six blocks or the rock ahead is not safe to dig through.${priceOut(passageExit(passage))}${outHealth}` + outsideFacts.leave,
         run: async () => {
           delete this.state.watchedSince;
-          if (night) this.state.nightPlan = { plan: 'stay_up', until: Date.now() + 120000, from: 'tunnel_out' };
+          if (night) this.state.nightPlan = { plan: 'stay_up', until: Date.now() + 120000, from: 'tunnel_out', at: Date.now(), startHealth: bot.health };
           return this.tunnelOut(task, goal, save, refuge, creeperNear, passage);
         } };
       // Away from a warden, beyond its boom: the one way out that is not a
@@ -10842,7 +10842,7 @@ class Survival {
       if (away) options.tunnel_from_warden = { description: `Dig a passage out through the pocket's ${away.direction} wall, away from the warden: ${outCells(away)}, ending ${away.clearance} blocks across from where it is now, beyond its boom's ${BOOM_ACROSS}; then go back to work from there. Digging is a vibration the warden hears and comes toward. No block is dug with lava or water behind it, and the passage stops, the bot still enclosed, if the warden comes round toward its head within six blocks.` + wardenSays(bot) + outHealth,
         run: async () => {
           delete this.state.watchedSince;
-          if (night) this.state.nightPlan = { plan: 'stay_up', until: Date.now() + 120000, from: 'tunnel_from_warden' };
+          if (night) this.state.nightPlan = { plan: 'stay_up', until: Date.now() + 120000, from: 'tunnel_from_warden', at: Date.now(), startHealth: bot.health };
           return this.tunnelOut(task, goal, save, refuge, wardenAbout, away);
         } };
       // The trip held but not driving the work: said, so the leave is not
@@ -11382,7 +11382,10 @@ class Survival {
       !sleepWaiting(this) && !isSetAside(this, 'surface_home', 'here');
     const heldPlan = this.state.nightPlan?.until > Date.now() ? this.state.nightPlan : null;
     if (homeWalk && heldPlan?.plan === 'home') { heldPlan.until = Date.now() + 120000; await this.goHomeForNight(task, goal, save, homeBed, underground); onStep(goal); return true; }
-    const plan = this.state.nightPlan?.until > Date.now() ? this.state.nightPlan : null;
+    // A night plan ends at a death or a fall of four health from where it was made (note 1929): the plan withholds the shelter (needsShelter below), and full-3 (2026-10-19 21:55 to 21:59Z), bare at the world spawn at night, chose tunnel_out (stay up) and then a hunt at 2.3 health, was shot, came back to life with the plan still held, was offered food and work but no pocket, and died twice more in two minutes.
+    const nightHeld = this.state.nightPlan, nightAt = nightHeld?.methodAt || nightHeld?.at || (nightHeld?.until ? nightHeld.until - 120000 : 0);
+    const planEnded = !!nightHeld && ((this.state.deaths || []).some(d => Date.parse(d.at) > nightAt) || (Number.isFinite(nightHeld.startHealth) && (bot.health ?? 20) <= nightHeld.startHealth - 4));
+    const plan = nightHeld?.until > Date.now() && !planEnded ? nightHeld : null;
     const stayingUp = plan?.plan === 'stay_up';
     // Before bedtime, a bed anywhere in reach (a walk that just failed
     // included) means no sealing in yet: the walk is retried in two minutes
