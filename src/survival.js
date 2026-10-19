@@ -3733,7 +3733,7 @@ class Survival {
     // A creeper is priced by where it goes off, and that is as far as the
     // bot can back from it (backRoom). The poison on the bot runs on in
     // every figure (combat-estimate effectLeft).
-    const threatOf = t => ({ name: t.entity.name, distance: t.distance, shoots: shooter(t.entity), ...sizeOf(t.entity), ...(t.entity.heldItem?.name ? { held: t.entity.heldItem.name } : {}), visible: t.visible, id: t.entity.id, ...(quietIds.has(t.entity.id) ? { quiet: quietIds.get(t.entity.id).q.minutes } : {}), ...(t.unseen ? { unseen: true } : {}), ...(apart.ids.has(t.entity.id) ? { apart: true } : {}), ...(inCellIds.has(t.entity.id) ? { inCell: true } : {}), ...(t.entity.name === 'creeper' && t.entity.position ? creeperFacts(bot, t.entity) : {}) });
+    const threatOf = t => ({ name: t.entity.name, distance: t.distance, shoots: shooter(t.entity), ...(t.entity.name === 'enderman' ? { calm: !(() => { try { return require('./danger').provokedEnderman(bot, t.entity); } catch (_) { return true; } })() } : {}), ...sizeOf(t.entity), ...(t.entity.heldItem?.name ? { held: t.entity.heldItem.name } : {}), visible: t.visible, id: t.entity.id, ...(quietIds.has(t.entity.id) ? { quiet: quietIds.get(t.entity.id).q.minutes } : {}), ...(t.unseen ? { unseen: true } : {}), ...(apart.ids.has(t.entity.id) ? { apart: true } : {}), ...(inCellIds.has(t.entity.id) ? { inCell: true } : {}), ...(t.entity.name === 'creeper' && t.entity.position ? creeperFacts(bot, t.entity) : {}) });
     const estimateArgs = ({ threats: counted.slice(0, 8).map(threatOf),
       armour: [5, 6, 7, 8].map(slot => bot.inventory.slots?.[slot]?.name).filter(Boolean), weapon: defenseWeapon(bot)?.name || null, health: bot.health, shield: shielded, atOnce: opening ? Infinity : open + inCell.length,
       poisonedFor: require('./combat-estimate').effectLeft(bot, 'poison')?.seconds || 0, burningFor: require('./combat-estimate').burnLeft(bot),
@@ -4306,8 +4306,12 @@ class Survival {
     // or under a ceiling two high, which one 2.4 tall cannot come under.
     // mid-242-ah-fortress-1 was offered neither, answered none of these at
     // 0.40 twice, and was withered to death from 10 in six seconds.
+    // A calm enderman at arm's length (note 1923): the fight and the shield guard turn the bot to it, and that look is what angers it; it hits nothing until then. full-4 (2026-10-19 21:11:15Z), three endermen about and the nearest 2.7 blocks off, read 'shield guard ... 91.9 damage' beside 'fight ... 106' with no way of leaving them be (keep_working is off the list with one within three), took the guard at 0.88, faced it, and was struck from behind and in front, 20 to none in fourteen seconds.
+    const calmAtReach = coming.filter(t => t.entity?.name === 'enderman' && t.distance <= 3 && !(() => { try { return require('./danger').provokedEnderman(bot, t.entity); } catch (_) { return true; } })());
+    const calmSays = turned => calmAtReach.length ? ` The enderman ${Math.round(calmAtReach[0].distance * 10) / 10} blocks off is calm now: it hits nothing until it is struck or looked in the eye, and ${turned} is that look; from then it is angry, teleports behind the bot, and the figures above are its.` : '';
     const guardOpt = this.shieldGuardOption(task, goal, save, { coming, mobs, shielded, oneHit });
     if (guardOpt) options.shield_guard = guardOpt;
+    if (calmAtReach.length) { if (options.fight) options.fight.description += calmSays('the turn to it to strike'); if (options.shield_guard) options.shield_guard.description += calmSays('the shield turned to it'); }
     const lowOpt = this.lowCeilingOption(task, goal, save, { coming, mobs, shielded, oneHit });
     if (lowOpt) options.low_ceiling = lowOpt;
     // Already up is the stance held, not a stance that failed: read as a
@@ -4940,7 +4944,7 @@ class Survival {
     let atCage = null;
     try { atCage = require('./cage-hold').cageFight(bot, goal); } catch (_) { atCage = null; }
     const workLabel = atCage ? 'waiting at the spawner for blazes' : (goal?.step?.action === 'combined_request' ? goal.step.detail?.action : goal?.step?.action);
-    if (!coming.some(t => t.distance <= 3)) options.keep_working = { description: `Carry on with the work${(w => w ? ` (${atCage ? w : w.replaceAll('_', ' ')})` : '')(workLabel)} and leave these mobs be for fifteen seconds${coming.length ? ` (nearest that can get to the bot ${Math.round(coming[0].distance)} blocks)` : ''}.${this.workProgress(goal)}${reachSays} The work stops at once if one comes within three blocks or lands a hit. Suits mobs that are far, slow, cannot reach the bot, or are not coming this way.${creeperCount ? (() => {
+    if (!coming.some(t => t.distance <= 3 && !calmAtReach.includes(t))) options.keep_working = { description: `Carry on with the work${(w => w ? ` (${atCage ? w : w.replaceAll('_', ' ')})` : '')(workLabel)} and leave these mobs be for fifteen seconds${coming.length ? ` (nearest that can get to the bot ${Math.round(coming[0].distance)} blocks)` : ''}.${calmAtReach.length ? ` The enderman ${Math.round(calmAtReach[0].distance * 10) / 10} blocks off is calm: it hits nothing until it is struck or looked in the eye, and the gaze is kept off every enderman's head while the work goes on.` : ''}${this.workProgress(goal)}${reachSays} The work stops at once if one comes within three blocks or lands a hit. Suits mobs that are far, slow, cannot reach the bot, or are not coming this way.${creeperCount ? (() => {
       // When the work would stop, against when the creeper lights: the
       // work stops at three blocks, which is where the fuse starts (the
       // decision review, 2026-09-26).
