@@ -219,6 +219,18 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     // (dragon-7, 2026-10-13 05:55Z) was 'stopped 35 blocks short, 0 up' with
     // 80 cobblestone carried and no word of why.
     // Out of the water to a dry cell beside first (note 1804): a jump from water reaches 0.8 and the climb stops before its first block, the body standing in the breath. 25588's dragon-123, 136, 137 and 169 (2026-10-14 to 17) each ended 'stopped before the first block: water at the feet ... a jump from water reaches 0.8', 'up out of the breath first: 0 blocks up', dead in the cloud within seconds. Once a climb; the dry cell with a block under it beside the feet, none over the void.
+    // The water at the feet taken up into an empty bucket first (note 1904): the dry cell beside is often none in a pool's trench, and 25588's dragon-281 (2026-10-19 10:5xZ) and dragon-258 were refused the climb at the pool's edge six and thirty-two times, 'water at the feet'. The source within two of the feet goes back into the bucket and the flow drains before the climb.
+    if (!rested && /water/.test(bot.blockAt(feet)?.name || '') && bot.inventory.items().some(i => i.name === 'bucket')) {
+      try {
+        const { sourceWater, fillWaterBucket } = require('./water');
+        const src = bot.findBlocks({ matching: bot.registry.blocksByName.water.id, maxDistance: 4, count: 8, useExtraInfo: sourceWater }).map(p => p.floored()).filter(p => Math.abs(p.y - feet.y) <= 1 && Math.abs(p.x - feet.x) <= 2 && Math.abs(p.z - feet.z) <= 2).sort((a, b) => a.distanceTo(feet) - b.distanceTo(feet))[0];
+        if (src) {
+          const t0 = Date.now(); await fillWaterBucket(bot, task, src, { timeoutMs: 1500 });
+          for (let i = 0; i < 30 && /water/.test(bot.blockAt(feet)?.name || ''); i++) await new Promise(r => setTimeout(r, 50));
+          console.log(`[pillar up] water at the feet at ${feet}: the source at ${src} taken up into the bucket, the feet ${/water/.test(bot.blockAt(feet)?.name || '') ? 'still wet' : 'dry'} in ${Date.now() - t0} ms`);
+        }
+      } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+    }
     if (!rested && /water/.test(bot.blockAt(feet)?.name || '')) {
       const dry = directions.map(d => feet.plus(d)).find(c => { const b = bot.blockAt(c), u = bot.blockAt(c.offset(0, -1, 0)), o = bot.blockAt(c.offset(0, 1, 0)); return b && /^(air|cave_air)$/.test(b.name) && o && /^(air|cave_air)$/.test(o.name) && u?.boundingBox === 'block' && !/water|lava/.test(u.name); });
       if (dry) { rested = true; console.log(`[pillar up] water at the feet at ${feet}: the dry cell beside at ${dry} taken before the climb`); try { await require('./bridging').creepTo(bot, task, dry, 1500); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } continue; }
