@@ -23,7 +23,7 @@ const actionbar = text => send(`title ${name} actionbar {"text":"${esc(text.slic
 const chat = (text, color = 'gray') => send(`tellraw ${name} {"text":"${esc(text.slice(0, 480))}","color":"${color}"}`);
 const words = k => String(k).replace(/_/g, ' ');
 
-let lastChat = 0, lastKey = null;
+let lastChat = 0, lastKey = null, lastBar = '', lastStep = null, lastHealth = null, lastFood = null;
 function show(d) {
   const dec = d.decision, step = d.step || {};
   if (!dec || !dec.id) return;
@@ -34,7 +34,7 @@ function show(d) {
   const bar = `${words(dec.id)}: ${words(picked).toUpperCase()}   [${top}]${health != null ? `   hp ${Math.round(health * 10) / 10} food ${food ?? '?'}` : ''}`;
   const key = `${dec.id}|${picked}|${dec.at}`;
   if (key === lastKey) return; lastKey = key;
-  actionbar(bar);
+  lastBar = bar; actionbar(bar);
   const now = Date.now();
   if (now - lastChat < 1500) return; lastChat = now;
   const opt = dec.options?.[picked];
@@ -45,8 +45,12 @@ function show(d) {
 }
 
 let world = worldOf(), file = logOf(world), pos = file ? fs.statSync(file).size : 0, rest = '';
+// The step and the health seeded from the record's tail, so the bar has something to say before the next decision.
+try { if (file) { const tail = fs.readFileSync(file, 'utf8').slice(-200000).split('\n').filter(l => l.startsWith('{"status":"running"')).pop(); if (tail) { const d = JSON.parse(tail); lastStep = d.step?.action || null; const h = /"health":([0-9.]+),"food":([0-9]+)/.exec(tail); if (h) { lastHealth = Number(h[1]); lastFood = Number(h[2]); } } } } catch (_) { /* no seed */ }
 chat(`overlay on: ${world} (${file ? path.basename(file) : 'no log yet'})`, 'green');
 console.log(`overlay for ${name} on ${port}: ${world} -> ${file}`);
+// The bar fades in about three seconds and the early game decides once a minute or less (the user, 2026-10-19: 'I don't see the actionbar'): the last decision is shown again every two seconds, with the step and the health as they stand.
+setInterval(() => { const status = `${lastStep ? `[${words(lastStep)}] ` : ''}${lastHealth != null ? `hp ${Math.round(lastHealth * 10) / 10} food ${lastFood}  ` : ''}`; if (status || lastBar) actionbar(`${status}${lastBar.replace(/\s+hp [0-9.]+ food [0-9?]+$/, '')}`); }, 2000);
 setInterval(() => {
   try {
     const w = worldOf();
@@ -60,7 +64,9 @@ setInterval(() => {
     for (const line of lines) {
       if (!line.startsWith('{')) continue;
       let d; try { d = JSON.parse(line); } catch (_) { continue; }
-      if (d.death) { chat(`JEV DIED at ${JSON.stringify(d.death.position)} in ${d.death.dimension}`, 'red'); continue; }
+      if (d.death) { chat(`JEV DIED at ${JSON.stringify(d.death.position)} in ${d.death.dimension}`, 'red'); lastBar = 'JEV DIED'; continue; }
+      if (d.step?.action) lastStep = d.step.action;
+      { const h = /"health":([0-9.]+),"food":([0-9]+)/.exec(line); if (h) { lastHealth = Number(h[1]); lastFood = Number(h[2]); } }
       show(d);
     }
   } catch (err) { /* the log rotates; try again */ }
