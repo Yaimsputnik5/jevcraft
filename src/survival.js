@@ -4485,7 +4485,7 @@ class Survival {
       : `Dig into the nearby wall, three blocks in and one to the side at the end where the rock allows, so only one mob at a time can reach, and fight them at the doorway: about ${Math.round(bunkerMs / 100) / 10} seconds of digging with the tools carried, shot at meanwhile.${undugSays}`) + buildCost + creeperNote + witchNote +
       bunkerSays(),
       run: async () => { this.report(goal, save, { action: 'dig_in_bunker', threats: danger.map(t => t.entity.name).slice(0, 6), health: bot.health, stance: true });
-        try { this.state.bunkerDug = await digBunker(bot, task, goal, save, { from: centroid(danger), navigate: this.actions.navigate, dug: this.state.bunkerDug }); save(); return true; }
+        try { this.state.bunkerDug = await digBunker(bot, task, goal, save, { from: centroid(danger), navigate: this.actions.navigate, dug: this.state.bunkerDug }); save(); await require('./bunker').holdDoorway(bot, task, goal, save, this.state.bunkerDug); return true; }
         catch (err) { task.check(); if (['NeedsAir', 'Cancelled'].includes(err.name)) throw err; return false; } } };
     // Against blazes, the stands a player takes rods from with iron and no
     // fire resistance, back to rock where a fireball's push meets a wall

@@ -603,6 +603,29 @@ async function collectRods(bot, task, goal, save, bunker, actions, item = 'blaze
   }
 }
 
+// The doorway held after the dig (note 1932), for any mob: facing the door with the shield up, striking what comes to reach, for a few seconds. The encounter's bunker had returned as soon as the dig was done or the bot stood in a bunker dug before, with no hold and no swing: full-4 (2026-10-19 22:17:02Z), bare, 6 health, two zombies 10 blocks off, chose the bunker at 0.69 standing in its own, the run came back in 7 ms twenty-one times a second, and the zombies came in and killed it at 22:17:14.
+async function holdDoorway(bot, task, goal, save, bunker, { seconds = 6 } = {}) {
+  if (!bunker?.inside) return false;
+  const inside = new Vec3(bunker.inside.x, bunker.inside.y, bunker.inside.z), watch = bunker.watch ? new Vec3(bunker.watch.x, bunker.watch.y, bunker.watch.z) : new Vec3(bunker.mouth.x, bunker.mouth.y, bunker.mouth.z);
+  const started = Date.now(); let swings = 0;
+  const sword = defenseWeapon(bot);
+  if (sword && bot.heldItem?.name !== sword.name) { try { await bot.equip(sword, 'hand'); } catch (_) { /* the hand as it is */ } }
+  try {
+    while (Date.now() - started < seconds * 1000) {
+      task.check(); checkAir(bot);
+      goal.step = { action: 'hold_bunker', kills: 0, health: bot.health, held: Math.round((Date.now() - started) / 1000) }; save();
+      const struck = await defendNearby(bot, task, goal, save);
+      if (struck) { swings++; continue; }
+      const p = bot.entity.position, c = inside.offset(0.5, 0, 0.5);
+      if (Math.hypot(p.x - c.x, p.z - c.z) > 0.6) { lowerShield(bot); await stepTo(bot, task, inside); }
+      await bot.lookAt(watch.offset(0.5, 1.2, 0.5), true);
+      raiseShield(bot);
+      await sleep(150);
+    }
+  } finally { lowerShield(bot); }
+  return swings;
+}
+
 // One bunker fight: dig, hold, collect. Returns the rods gained.
 async function bunkerFight(bot, task, goal, save, actions, { item = 'blaze_rod', want = 1 } = {}) {
   return keepingStep(goal, save, async () => {
@@ -649,4 +672,4 @@ async function raiseCover(bot, task, from) {
   return solid(bot.blockAt(cell)) ? cell : false;
 }
 
-module.exports = { keepingStep, STAND_STEPS, HOLD_MS, QUIET_MS, inBunker, liquidBehind, sideRefused, blockDigMs, digsWith, seenFrom, lineRegained, DRAW_SECONDS, coverWithin, wayTo, nookSite, digNook, bunkerDigMs, bunkerFight, digBunker, holdBunker, collectRods, digCell, stepTo, standable, cornerCell, raiseCover, openToward, reachWall, wallStands, nearWall, swarm, blazes, bunkerSide, centroid, NATURAL, WALK_TO_WALL, SWARM };
+module.exports = { holdDoorway, keepingStep, STAND_STEPS, HOLD_MS, QUIET_MS, inBunker, liquidBehind, sideRefused, blockDigMs, digsWith, seenFrom, lineRegained, DRAW_SECONDS, coverWithin, wayTo, nookSite, digNook, bunkerDigMs, bunkerFight, digBunker, holdBunker, collectRods, digCell, stepTo, standable, cornerCell, raiseCover, openToward, reachWall, wallStands, nearWall, swarm, blazes, bunkerSide, centroid, NATURAL, WALK_TO_WALL, SWARM };
