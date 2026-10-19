@@ -1619,6 +1619,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         look: new Vec3(bot._pillarUp.x + .5 + side.dx * 12, bot.entity.position.y + 1.0, bot._pillarUp.z + .5 + side.dz * 12), maxMs: 2000, tick: 25, intoFall: true, until: () => !bot.entity.onGround && bot.entity.position.y < startY - 0.5 });
     } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; console.log(`[end combat] the water drop's step off ended: ${err.name || ''} ${String(err.message || err).slice(0, 100)}`); }
     finally { bot._dropping = false; task.interruptCheck = dropInterrupt; }
+    // The drift held to the pool's cell (note 1903): scripts/drop-drill.js (arena, 2026-10-19 10:3xZ) stepped off columns of 20, 30 and 40 over water, twice each, and the body came down 2.74 to 2.89 out from the column's middle every time, whatever the height; the back key held 4 ticks in the air brought it to 2.0 to 2.3, 8 ticks to 1.1 to 1.5. 25588's dragon-277 (2026-10-19 10:2xZ) stepped off at 97 over a pool one cell out and came down three out, dry, dead. The back key is held for the ticks that land the body on the pool's own cell.
+    if (side.pool && state.pool && bot._pillarUp && !bot.entity.onGround) {
+      const u = bot._pillarUp, k = Math.abs(side.dx ? state.pool.x - u.x : state.pool.z - u.z), ticks = Math.max(0, Math.min(12, Math.round((2.8 - k) / 0.17)));
+      if (ticks > 0) { bot._dropping = true; try { bot.setControlState?.('back', true); await sleep(ticks * 50); } finally { bot.setControlState?.('back', false); bot._dropping = false; } }
+      console.log(`[end combat] the drop's drift held for the pool ${k} out: the back key ${ticks} ticks (the step lands 2.8 out with none)`);
+    }
     // What stood in the step's way, said when the step did not leave the column (note 1887): 25588's dragon-240 (2026-10-19 00:3xZ, three crystals) drew 'the water drop from (-10, 88, -43), 28 blocks ... into the pool' and then 'the water drop ended still up', two seconds of the forward key and no fall, and nothing said why; the dig down that followed under the fireballs ended it at 0.3. The cells ahead at the feet and the head, the body's place and the keys held go into the line.
     if (bot.entity.onGround && bot.entity.position.y >= startY - 0.5) {
       const p = bot.entity.position, f = p.floored(), ahead = [1, 2].map(k => [0, 1].map(dy => `${k}${dy ? 'h' : 'f'}:${bot.blockAt(f.offset(side.dx * k, dy, side.dz * k))?.name || '?'}`).join(' ')).join(' ');
