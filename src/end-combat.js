@@ -2119,7 +2119,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           } else if (!(state.tunnelRunSaid > Date.now() - 5000)) { state.tunnelRunSaid = Date.now(); console.log(`[end combat] no run along the tunnel from ${f}: no way three cells open`); }
         }
         // The run before the stub (note 1868): of 25588's fourteen deaths with logs since dragon-190 (2026-10-18), five ended in 'up out of the breath first' or its ground kin, the top of the ledger; the stub itself cost nothing in nine of thirteen, but it leaves the body standing on two blocks with open sides, and the next fireball burst on it there (dragon-205, 216, 223), a fresh cloud at the body's own height that the walls do not keep out. The run cost nothing in sixteen of eighteen and leaves the body moving. So the run first where the ground gives one, the stub where it does not.
-        if (inBreath() && actions.navigate) {
+        // Not from a pit (note 1890): a body with walls at the head's height on two sides or more runs at a wall, and the cloud's box is half a block high, one block up being clear of it (note 1889's drill). 25588's dragon-247 (2026-10-19 02:2xZ, two crystals) in a pit at (5, 56, 41): 'the straight run stalled ... taken again with a jump, 0.5 from the start', 15.8 to 4.0 in 1.6 s, dead. From a pit the stub goes up at once.
+        const pitWalls = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(bot.entity.position.floored().offset(dx, 1, dz))?.boundingBox === 'block').length;
+        if (inBreath() && pitWalls >= 2 && !(state.pitStubSaid > Date.now() - 5000)) { state.pitStubSaid = Date.now(); console.log(`[end combat] no run out of the cloud from the pit at ${bot.entity.position.floored()} (${pitWalls} walls at the head's height): the stub at once`); }
+        if (inBreath() && actions.navigate && pitWalls < 2) {
           const h0 = bot.health, p0 = bot.entity.position.floored();
           goal.step = { action: 'run_out_of_breath_first', health: bot.health }; save();
           try {
