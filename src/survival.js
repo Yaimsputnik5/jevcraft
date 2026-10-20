@@ -5006,6 +5006,18 @@ class Survival {
         }
         return true;
       } };
+    // Every mob about stood off (danger.js standsOff, note 1971): carrying
+    // on is priced as the hold is, at what they have done, nothing; it was
+    // the one way left unpriced. full-4 (2026-10-20 17:47 to 18:05Z) held a
+    // pillar eighteen minutes against two zombies said to be "not a threat
+    // that stops the work", keep_working at 0. Over 2026-10-14 to 20, with
+    // every mob stood off, keep_working was taken 3 times in 71 and no hit
+    // came in the 15 seconds after; overall 1 of 39 taken drew one.
+    if (options.keep_working && !options.keep_working.expects && danger.length) {
+      let off = false;
+      try { const { standsOff } = require('./danger'); off = danger.every(t => !!standsOff(bot, t)); } catch (_) { off = false; }
+      if (off) options.keep_working.expects = { damage: 0, seconds: 15, oneHit };
+    }
     // A golden apple carried is what a fight at low health is kept for:
     // trial 81 took one from a dungeon chest in its first minute and died to
     // a spider two minutes later with it still in the pack, never offered.
