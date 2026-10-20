@@ -8828,6 +8828,12 @@ async function crossingKitReady(bot, task, goal, save, client = task.opportunity
     if (key === 'food' && !goal.foodTrip) goal.foodTrip = { at: Date.now(), from: 'crossing' };
     delete kit.choice; save();
     bot.chat?.(`The ${key} for the Nether is empty: taking it up again first.`);
+    // The food taken up is gathered here and now, its own step run from the crossing (note 1969): handed back to the ladder, the crossing step ran again before any other stage (an enter_nether stage for the pearls as for the rods), the crossing question came back ten seconds later, and was answered cross_now. full-2 (2026-10-20 17:45:48 and 17:45:58Z, 17 of 80 food points, on notes 1964 and 1965's build) chose take_up_food and then crossed with the 17.
+    if (key === 'food') {
+      const foodItem = items.find(i => i.key === 'food');
+      try { await kitFoodStep(bot, task, goal, save, { wants: foodItem?.wants }, client); }
+      catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled', 'Stalled'].includes(err.name)) throw err; console.log(`[kit] the food taken up at the crossing stopped: ${String(err.message || err).slice(0, 120)}`); }
+    }
     return false;
   }
   const offer = entry.find(o => `top_up_${o.key}` === pick);

@@ -106,7 +106,7 @@ test('25589: the crossing counts a food kit gone empty since it last looked, and
   const goal = { kitFood: { choice: { pick: 'go_without', at: Date.now() } } };
   require('../src/progress').setAside(goal, 'rung', 'nether_food', 'went without', 1800000);
   let offered = null;
-  const client = { systemOne: async ({ questions }) => { offered = questions.branch_0.criteria; const k = Object.keys(offered).find(x => x.startsWith('take_up_')) || 'cross_now'; return { answers: { branch_0: { choice: k, confidence: 0.6 } } }; } };
+  const client = { systemOne: async ({ questions }) => { offered ||= questions.branch_0.criteria; const k = Object.keys(offered).find(x => x.startsWith('take_up_')) || 'cross_now'; return { answers: { branch_0: { choice: k, confidence: 0.6 } } }; } };
   await crossingKitReady(bot, new Task('win'), goal, () => {}, client);
   assert(!offered || !Object.keys(offered).some(k => k.startsWith('take_up_')), 'food at the reserve then: not offered');
   items = items.filter(i => i.name !== 'cooked_beef');

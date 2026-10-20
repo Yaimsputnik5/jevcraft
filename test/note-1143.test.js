@@ -15,7 +15,7 @@ test('no food carried at hunger 13 with the food step set aside by going without
   const goal = { foodTurnBack: { at: Date.now() - 60000 } };
   require('../src/progress').setAside(goal, 'rung', 'nether_food', 'Jev chose to go without: the Nether first', 1800000);
   let offered = null;
-  const client = { systemOne: async ({ questions }) => { offered = questions.branch_0.criteria; return { answers: { branch_0: { choice: 'take_up_food', confidence: 0.6 } } }; } };
+  const client = { systemOne: async ({ questions }) => { offered ||= questions.branch_0.criteria; return { answers: { branch_0: { choice: 'take_up_food', confidence: 0.6 } } }; } };
   assert.equal(await crossingKitReady(botOf(13, kit), new Task('win'), goal, () => {}, client), false);
   assert(offered.take_up_food, 'the food step offered back');
   assert.match(offered.take_up_food, /it is empty now, 0 of \d+ carried/);

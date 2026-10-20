@@ -212,3 +212,15 @@ test('take_up_food at the crossing hands the ladder the food rung next, whatever
   const stage = gp.nextGameStage(bot, goal);
   assert.equal(stage?.phase, 'nether_food', `the ladder's next is ${stage?.phase}`);
 });
+
+test('take_up_food at the crossing runs the food step there and then, not a later pass (note 1969)', async () => {
+  // full-2 (2026-10-20 17:45:48 and 17:45:58Z, 17 of 80 food points) chose take_up_food; handed back to the ladder, the crossing step ran again and the question came back ten seconds later, answered cross_now.
+  const { crossingKitReady } = require('../src/work');
+  const bot = atPortal({ cobblestone: 128, stone_pickaxe: 1 });
+  const goal = { kind: 'win' };
+  const asked = [];
+  const client = { systemOne: async ({ questions }) => { const c = questions.branch_0.criteria; asked.push(Object.keys(c)); const choice = c.take_up_food ? 'take_up_food' : Object.keys(c).find(k => k !== 'none_good'); return { answers: { branch_0: { choice, confidence: 0.6 } } }; } };
+  assert.equal(await crossingKitReady(bot, new Task('win'), goal, () => {}, client), false, 'not crossing');
+  assert.ok(asked.length >= 2, `the food step asked its own question after the crossing's: ${asked.map(a => a.slice(0, 3).join('/')).join(' | ')}`);
+  assert.ok(asked.slice(1).some(keys => keys.some(k => /food|go_without|cook/.test(k)) && !keys.includes('cross_now')), 'the food step\'s own question, not the crossing\'s again');
+});

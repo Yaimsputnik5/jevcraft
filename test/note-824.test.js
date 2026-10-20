@@ -15,10 +15,12 @@ test('25583: food under the Nether reserve with its step set aside is offered ba
   const goal = {};
   require('../src/progress').setAside(goal, 'rung', 'nether_food', 'ten working minutes on the food for the Nether without a point more', 1800000);
   let offered = null;
-  const client = { systemOne: async ({ questions }) => { offered = questions.branch_0.criteria; return { answers: { branch_0: { choice: 'take_up_food', confidence: 0.6 } } }; } };
+  // The crossing's question kept; the food step it runs then (note 1969) asks its own, answered with its first option.
+  const client = { systemOne: async ({ questions }) => { const c = questions.branch_0.criteria; offered ||= c; return { answers: { branch_0: { choice: c.take_up_food ? 'take_up_food' : (Object.keys(c).find(k => /^top_up_food/.test(k)) || Object.keys(c).find(k => k !== 'none_good' && k !== 'go_without') || Object.keys(c)[0]), confidence: 0.6 } } }; } };
   assert.equal(await crossingKitReady(bot, new Task('win'), goal, () => {}, client), false);
   assert(offered.take_up_food, 'the food step offered back');
   assert.match(offered.take_up_food, /12 of \d+ points carried, under the Nether's reserve of 36/);
   assert.doesNotMatch(offered.cross_now, /No food at all is carried/);
-  assert.equal(require('../src/progress').isSetAside(goal, 'rung', 'nether_food'), false, 'its rest lifted');
+  // Taken up: the food trip set and the food step run at once (note 1969); here it finds no food about and rests on its own account.
+  assert.ok(goal.kitFood, 'the food step ran');
 });
