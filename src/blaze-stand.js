@@ -1607,10 +1607,21 @@ function blazeStands(bot, danger, { dig = true, hunted = false, pocket = false, 
   const spawner = spawnerSite(bot, undefined, { avoid: biting });
   if (spawner) {
     const setup = round(spawner.steps / WALK);
-    const cost = standCost(bot, danger, { setup, at: spawner.cell, atOnce: Math.max(1, require('./survival').openCells(bot, spawner.cell)) });
+    const atOnce = Math.max(1, require('./survival').openCells(bot, spawner.cell));
+    // Every blaze within sixteen of the stand, seen or not (note 606's rule, as the break and the close-in have it), and the cage's own next try (note 1963): an open stand beside a live cage was priced by the blazes in sight now, and full-4 (2026-10-20 15:12:52Z, 20 health, full armour, no shield) read 'about 0 damage over 15.9 seconds' with three blazes heard through the walls; the cage put three beside it (3.3 to 6.8 blocks off) within 24 seconds, and it went 13.8 to none in six.
+    const priced = withinSixteen(bot, danger, { at: spawner.cell });
+    const base = standCost(bot, priced, { setup, at: spawner.cell, atOnce });
+    const clock = require('./spawner-clock'), next = clock.nextTry(bot, spawner.spawner);
+    const holdS = setup + ce.HOLD_SECONDS, comes = Math.round((1 - clock.doneBefore(next, holdS)) * 100) / 100;
+    const nearCage = danger.concat(priced).filter((t, i, a) => t.entity?.name === 'blaze' && a.findIndex(x => x.entity?.id === t.entity.id) === i && t.entity.position?.distanceTo(spawner.spawner.offset(0.5, 0.5, 0.5)) <= clock.NEAR_CAGE).length;
+    const room = Math.max(0, clock.CAP - nearCage), k = Math.min(room, next.lastBlazes || 2);
+    const tryMobs = k && comes > 0 ? Array.from({ length: k }, (_, i) => { const at = spawner.spawner.offset(0.5 + (i % 2 ? 1.5 : -1.5), 0.5, 0.5 + (i < 2 ? 1.5 : -1.5)); return { entity: { id: `cage-try-${i}`, name: 'blaze', type: 'hostile', position: at, height: 1.8, width: 0.6, isValid: true }, distance: at.distanceTo(spawner.cell.offset(0.5, 0, 0.5)), visible: true }; }) : [];
+    const withTry = tryMobs.length ? standCost(bot, [...priced, ...tryMobs], { setup, at: spawner.cell, atOnce }) : base;
+    const cost = { ...base, damage: round(base.damage + comes * Math.max(0, withTry.damage - base.damage)), ...(tryMobs.length ? { mobs: withTry.mobs } : {}) };
+    const trySays = tryMobs.length ? ` The cage's next try: ${clock.clockSays(next)}; about ${Math.round(comes * 100)} in 100 that it comes within the ${Math.round(holdS)} seconds here, ${k === 1 ? 'a blaze' : `about ${k} blazes`} beside the cage${next.lastBlazes ? ' (as many as its last try)' : ''}, the stand open to them: about ${round(withTry.damage)} damage with them, ${round(base.damage)} without, and ${cost.damage} counted for the chance.` : '';
     options.fight_at_spawner = { kind: 'spawner', site: spawner, expects: { damage: cost.damage, seconds: cost.seconds, oneHit: oneHit(cost.mobs) }, sees: seeingAt(spawner.cell), about: aboutAll.length, atSpawner: true,
       description: `${spawner.steps ? `Walk ${spawner.steps} block${spawner.steps === 1 ? '' : 's'} (about ${seconds(setup)}, in their fire meanwhile) to` : 'Stay at'} a cell ${spawner.off} blocks from the blaze spawner's cage, ${solid(bot.blockAt(spawner.cell.offset(0, 2, 0))) ? 'under a ceiling' : 'with rock at its back'}, with no drop or lava within a push, and fight the blazes there as they come out${shieldCarried(bot) ? ', the shield up and facing each volley as it comes' : ''}: a spawner puts its blazes within four blocks of itself, up to four at a time every ten to forty seconds while a player is within sixteen, so there they come to the sword rather than being walked to; ${solid(bot.blockAt(spawner.cell.offset(0, 2, 0))) ? 'a ceiling keeps them from hovering over the bot' : `the rock at its back keeps them in front${shieldCarried(bot) ? ', where the shield faces' : ''}`}. Broken with a pickaxe, the spawner makes no more.` + measuredSays('spawner', bot).says +
-        BLAZE_WAYS + fire + costSays(cost, hp, cost.mobs, { doing: spawner.steps ? 'walking there' : null, done: 'At the cage', over: overSays(cost, 'walking there') }) };
+        BLAZE_WAYS + fire + costSays(cost, hp, cost.mobs, { doing: spawner.steps ? 'walking there' : null, done: 'At the cage', over: overSays(cost, 'walking there') }) + trySays };
   }
   const wall = wallSite(bot, from, { avoid: biting });
   if (wall) {

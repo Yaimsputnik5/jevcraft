@@ -433,3 +433,21 @@ test('breaking the spawner ends once six health is gone, walk and dig counted, a
   assert.equal(result.ended, 'health down');
   assert.equal(result.kills, 0);
 });
+
+test('the cage stand is priced with the cage\'s next try when no blaze is in sight, and says it (note 1963)', () => {
+  // full-4 (2026-10-20 15:12:52Z): 'about 0 damage over 15.9 seconds' at an open stand by a live cage, three blazes heard through the walls; the cage put three beside the bot within 24 seconds, and it died from 13.8 in six.
+  const bot = brickWorld(floorByWall, { spawner: new Vec3(4, 64, 3), shield: false });
+  bot.entity.position = new Vec3(-4.5, 64, 2.5);
+  // One blaze about, behind the wall, out of sight (heard through the rock).
+  bot.entities = { 3: blazeAt(3, 2.5, 65, -6.5) };
+  const options = stand.blazeStands(bot, threats(bot, 24), { hunted: true });
+  const o = options.fight_at_spawner;
+  assert(o, Object.keys(options).join(','));
+  assert(o.expects.damage > 1, `the cage stand with no blaze in sight and the cage's try due is priced ${o.expects.damage}`);
+  assert.match(o.description, /The cage's next try: No try of the spawner's has been seen since the bot came near, so the next can come any moment up to 40 seconds from now; about \d+ in 100 that it comes within the \d+ seconds here, about 2 blazes beside the cage, the stand open to them: about [\d.]+ damage with them, [\d.]+ without, and [\d.]+ counted for the chance\./);
+  // A try seen just now: the next is 10 to 40 seconds off, and the chance within the hold is lower.
+  bot._spawnClock = { tries: { '4,64,3': [{ at: Date.now() - 1000, blazes: 1 }] }, near: {} };
+  const after = stand.blazeStands(bot, threats(bot, 24), { hunted: true }).fight_at_spawner;
+  assert(after.expects.damage < o.expects.damage, `${after.expects.damage} after a try just seen, ${o.expects.damage} before`);
+  assert.match(after.description, /a blaze beside the cage \(as many as its last try\)/);
+});
