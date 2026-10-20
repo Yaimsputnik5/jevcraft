@@ -41,3 +41,21 @@ test('a shield with twenty uses left goes on the arm when the arm is empty; of t
   await wearBestArmour(bot);
   assert.equal(slots[45], fresher);
 });
+
+test('the shield in hand down to its last volley is swapped for a fresher one carried; one with uses to spare is not (note 1967)', async () => {
+  // full-3 (2026-10-20 16:48 to 16:50Z) held a shield of 12 uses of 336 at a blaze spawner with a fresh spare in its pack.
+  const { bot, slots } = kit('the_nether', []);
+  const max = bot.registry.itemsByName.shield.maxDurability;
+  const spent = { name: 'shield', count: 1, durabilityUsed: max - 12 }, spare = { name: 'shield', count: 1, durabilityUsed: 0 };
+  let items = [spare];
+  slots[45] = spent;
+  bot.inventory.items = () => items;
+  bot.equip = async (item, slot) => { const was = slots[45]; slots[45] = item; items = items.filter(i => i !== item); if (was) items.push(was); };
+  assert.equal(await wearBestArmour(bot), 1);
+  assert.equal(slots[45], spare, 'the fresh one in hand');
+  // A shield in hand with 100 uses left stays, whatever is carried.
+  const half = { name: 'shield', count: 1, durabilityUsed: max - 100 };
+  slots[45] = half; items = [{ name: 'shield', count: 1, durabilityUsed: 0 }];
+  assert.equal(await wearBestArmour(bot), 0);
+  assert.equal(slots[45], half);
+});

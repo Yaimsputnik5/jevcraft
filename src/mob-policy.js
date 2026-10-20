@@ -136,6 +136,14 @@ async function wearBestArmour(bot) {
   const usesLeft = i => (bot.registry.itemsByName[i.name]?.maxDurability || 0) - (i.durabilityUsed || 0);
   const shield = bot.inventory.items().filter(i => i.name === 'shield' && usesLeft(i) >= 1).sort((x, y) => usesLeft(y) - usesLeft(x))[0];
   if (shield && !bot.inventory.slots?.[armorSlots['off-hand']]) { try { await bot.equip(shield, 'off-hand'); changed++; } catch (_) { /* next step */ } }
+  // And the held shield down to its last volley swapped for a fresher one carried (note 1967): put on only into an empty hand, the spare stayed in the pack until the held one broke. full-3 (2026-10-20 16:48 to 16:50Z), at a blaze spawner with four blazes 3 to 5 blocks off, held a shield of 12 uses of 336 ('the shield is down to its last volley: about 2 more fireballs blocked before it breaks') with a fresh spare in its pack, and went from 20 health to none in 36 seconds.
+  const held = bot.inventory.slots?.[armorSlots['off-hand']];
+  if (shield && held?.name === 'shield' && shield !== held) {
+    const { WEAR, LAST } = require('./shield-wear');
+    if (usesLeft(held) < WEAR.fireball * LAST && usesLeft(shield) > usesLeft(held)) {
+      try { await bot.equip(shield, 'off-hand'); changed++; console.log(`[shield] the shield in hand down to ${usesLeft(held)} uses: the one carried with ${usesLeft(shield)} put in its place`); } catch (_) { /* next step */ }
+    }
+  }
   return changed;
 }
 

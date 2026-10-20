@@ -10016,7 +10016,10 @@ class Survival {
       // took up its iron helmet and boots and was shot dead by a skeleton
       // twenty-three seconds on with both in its pack.
       try {
-        const carried = (this.bot.inventory?.items?.() || []).filter(i => /_(helmet|chestplate|leggings|boots)$/.test(i.name)).map(i => i.name).sort().join(',');
+        // The shield in hand at its last volley counted too (note 1967), so a fresher one carried goes on through an encounter.
+        const sw = require('./shield-wear').state(this.bot);
+        const lastVolley = sw.held && sw.spare && sw.fireballs < require('./shield-wear').LAST ? `|shield:${sw.left}` : '';
+        const carried = (this.bot.inventory?.items?.() || []).filter(i => /_(helmet|chestplate|leggings|boots)$/.test(i.name)).map(i => i.name).sort().join(',') + lastVolley;
         if (carried && carried !== this._armourSeen) { this._armourSeen = carried; await require('./mob-policy').wearBestArmour(this.bot); }
         else if (!carried) this._armourSeen = '';
       } catch (err) { task.check(); }
