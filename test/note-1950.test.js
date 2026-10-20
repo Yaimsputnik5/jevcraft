@@ -149,3 +149,52 @@ test('beside the sheet already, the walk is not run, and lava between the body a
   assert.deepEqual(placed, ['-17,87,1'], 'the lava between is capped');
   assert.equal(bot.game.dimension, 'overworld');
 });
+
+test('diagonal to the sheet with rock between and a lava source behind it: the lava is plugged, the rock dug, and the step goes through (note 1961)', async () => {
+  const { enterPortal } = require('../src/work');
+  const world = sheetWorld();
+  // full-4 (2026-10-20 13:36Z): body at (-18, 87, 1), portal cell (-17, 87, 2), netherrack at (-17, 87..88, 1), lava source at (-16, 87, 1), obsidian at (-18, 87, 2).
+  world.blocks.set('-16,87,1', 'lava'); world.blocks.set('-16,88,1', 'netherrack');
+  world.blocks.set('-17,87,1', 'netherrack'); world.blocks.set('-17,88,1', 'netherrack');
+  world.blocks.delete('-18,87,1'); world.blocks.delete('-18,88,1'); world.blocks.set('-18,86,1', 'netherrack');
+  const controls = {}, placed = [], dug = [], logs = []; let looking = null, inside = 0;
+  const bot = { entity: { position: new Vec3(-17.3, 87, 1.1), yaw: 0, pitch: 0 }, game: { dimension: 'the_nether' },
+    pathfinder: { setGoal() {}, movements: {}, goto: async () => {}, isMoving: () => false },
+    lookAt: async p => { looking = p; bot.entity.yaw = Math.atan2(-(p.x - bot.entity.position.x), -(p.z - bot.entity.position.z)); }, look: async () => {},
+    setControlState: (key, on) => { controls[key] = on; }, clearControlStates() { for (const k of Object.keys(controls)) controls[k] = false; },
+    inventory: { items: () => [{ name: 'cobblestone', count: 64 }], slots: {} }, blockAt: world.blockAt };
+  const inPortalNow = () => world.blockAt(bot.entity.position.floored()).name === 'nether_portal';
+  const tick = setInterval(() => {
+    if (controls.forward && looking) {
+      const dx = looking.x - bot.entity.position.x, dz = looking.z - bot.entity.position.z, d = Math.hypot(dx, dz) || 1;
+      const p = bot.entity.position, nx = p.offset(dx / d * 0.08, 0, 0), nz = p.offset(0, 0, dz / d * 0.08);
+      // Axis by axis, as the game's collision: a solid cell stops that axis only.
+      if (world.blockAt(nx.floored()).boundingBox === 'empty') bot.entity.position = nx;
+      if (world.blockAt(bot.entity.position.offset(0, 0, dz / d * 0.08).floored()).boundingBox === 'empty') bot.entity.position = bot.entity.position.offset(0, 0, dz / d * 0.08);
+    }
+    inside = inPortalNow() && !controls.forward ? inside + 1 : 0;
+    if (inside >= 6) bot.game.dimension = 'overworld';
+  }, 50);
+  const log = console.log; console.log = (...a) => { logs.push(a.join(' ')); };
+  try {
+    await enterPortal(bot, new Task('portal'), new Vec3(-17, 87, 2), () => bot.game.dimension === 'overworld', {
+      walk: async () => { throw new Error('beside the sheet: no walk'); },
+      dig: async (b, t, c) => { dug.push(`${c.x},${c.y},${c.z}`); world.blocks.delete(`${c.x},${c.y},${c.z}`); },
+      place: async (b, t, c, material, opts) => { assert.equal(opts?.replaceLiquid, true); placed.push(`${c.x},${c.y},${c.z}`); world.blocks.set(`${c.x},${c.y},${c.z}`, material); } });
+  } catch (err) { console.log = log; console.log(logs.join('\n'), '\nPOS', bot.entity.position); throw err; } finally { clearInterval(tick); console.log = log; }
+  assert.deepEqual(placed, ['-16,87,1'], 'the lava source behind the rock is plugged first');
+  assert.deepEqual(dug.sort(), ['-17,87,1', '-17,88,1'], 'the netherrack between, feet and head, not the obsidian frame');
+  assert.equal(bot.game.dimension, 'overworld');
+});
+
+test('capLavaBeside plugs the lava a dig would open, and says why when it cannot (note 1961)', async () => {
+  const { capLavaBeside } = require('../src/work');
+  const blocks = new Map([['1,64,0', 'lava'], ['0,65,0', 'flowing_lava']]);
+  const bot = { blockAt: p => ({ name: blocks.get(`${p.x},${p.y},${p.z}`) || 'netherrack', position: p }), inventory: { items: () => [{ name: 'netherrack', count: 5 }] } };
+  const placed = [];
+  assert.equal(await capLavaBeside(bot, new Task('t'), new Vec3(0, 64, 0), { placer: async (b, t, c, m, o) => { assert.equal(o.replaceLiquid, true); placed.push(`${c.x},${c.y},${c.z}`); blocks.set(`${c.x},${c.y},${c.z}`, m); } }), null);
+  assert.deepEqual(placed.sort(), ['0,65,0', '1,64,0']);
+  blocks.set('1,64,0', 'lava');
+  const bare = { ...bot, inventory: { items: () => [] } };
+  assert.match(await capLavaBeside(bare, new Task('t'), new Vec3(0, 64, 0), { placer: async () => {} }), /^lava at \(1, 64, 0\) beside it and no block carried to plug it$/);
+});

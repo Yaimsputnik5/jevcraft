@@ -9207,10 +9207,25 @@ class Survival {
       return true;
     }
     const doors = exit.outside ? [exit.door] : pocket;
+    // Each door on its own (note 1961): the lava a door would open is plugged first, and a door that still cannot be opened is passed over for the next, not the end of the leave. full-4 (2026-10-20 13:36 to 13:45Z, 2.6 health, hunger 6, its portal a block off) failed 'leave_shelter ... Refusing to open lava beside the bot' every three minutes on the one wall with a lava source behind it, the other wall never tried.
+    const { opensLava, capLavaBeside } = require('./work');
+    const placer = (b, tk, c, m, o) => this.actions.place(b, tk, c, m, o);
+    const opened = [], refused = [];
     for (const door of doors) {
-      await this.actions.dig(bot, task, door.offset(0, 1, 0), { requireDrops: false });
-      await this.actions.dig(bot, task, door, { requireDrops: false });
+      try {
+        for (const c of [door.offset(0, 1, 0), door]) {
+          if (bot.blockAt(c)?.boundingBox !== 'block') continue;
+          if (typeof this.actions.place === 'function' && opensLava(bot, c)) { const why = await capLavaBeside(bot, task, c, { placer }); if (why) throw new Error(why); }
+          await this.actions.dig(bot, task, c, { requireDrops: false });
+        }
+        opened.push(door);
+      } catch (err) {
+        task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled', 'Stalled'].includes(err.name)) throw err;
+        refused.push(`(${door.x}, ${door.y}, ${door.z}): ${String(err.message || err).slice(0, 100)}`);
+      }
     }
+    if (!opened.length && refused.length) throw new Error(`No wall of the pocket opened: ${refused.join('; ')}`);
+    if (refused.length) console.log(`[pocket] left by ${opened.map(d => `(${d.x}, ${d.y}, ${d.z})`).join(', ')}; not opened: ${refused.join('; ')}`);
     // Any dug-in shelter is one night's stop: left behind, it is forgotten,
     // so its shell no longer stands reserved against the next staircase.
     // Only a house persists. The bot bounced between the two floor cells of

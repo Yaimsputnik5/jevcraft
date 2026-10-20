@@ -1534,6 +1534,20 @@ function opensLava(bot, p) {
   return Math.max(Math.abs(p.x - feet.x), Math.abs(p.z - feet.z)) <= run && p.y >= feet.y - 1 && p.y <= feet.y + 2;
 }
 
+// The lava a dig at p would open, plugged first with blocks put into its cells (note 1961), as a player does: a wall with a lava source behind it is not dug into the flow. -> null when no lava is beside p any more, else why it is still there.
+const LAVA_SIDES = [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0]];
+async function capLavaBeside(bot, task, p, { placer = place } = {}) {
+  const cells = LAVA_SIDES.map(([x, y, z]) => p.offset(x, y, z)).filter(c => /^(lava|flowing_lava)$/.test(bot.blockAt(c)?.name || ''));
+  for (const c of cells) {
+    let material = null; try { material = require('./shelter').buildingItem(bot)?.name || null; } catch (_) { material = null; }
+    if (!material) return `lava at (${c.x}, ${c.y}, ${c.z}) beside it and no block carried to plug it`;
+    try { await placer(bot, task, c, material, { replaceLiquid: true }); console.log(`[lava] plugged the lava at (${c.x}, ${c.y}, ${c.z}) with ${material} before digging (${p.x}, ${p.y}, ${p.z})`); }
+    catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; return `the lava at (${c.x}, ${c.y}, ${c.z}) beside it was not plugged: ${String(err.message || err).slice(0, 80)}`; }
+  }
+  const left = LAVA_SIDES.map(([x, y, z]) => p.offset(x, y, z)).find(c => /^(lava|flowing_lava)$/.test(bot.blockAt(c)?.name || ''));
+  return left ? `lava still at (${left.x}, ${left.y}, ${left.z}) beside it after the plug` : null;
+}
+
 function opensPit(bot, p) {
   const here = bot.entity.position, feetY = Math.floor(here.y);
   if (p.y >= feetY || p.y < feetY - 2) return false;
@@ -5052,6 +5066,22 @@ async function enterPortal(bot, task, portal, arrived, { walk = navigate, dig: d
         if (!material) break;
         try { await placeBlock(bot, task, c, material, { replaceLiquid: true }); capped = true; console.log(`[portal] lava at (${c.x}, ${c.y}, ${c.z}) between the body and the sheet capped with ${material}`); }
         catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; console.log(`[portal] the lava at (${c.x}, ${c.y}, ${c.z}) between the body and the sheet was not capped: ${String(err.message || err).slice(0, 80)}`); }
+      }
+    }
+    // Diagonal to the sheet with rock on both cells between (note 1961): the body cannot pass a corner, so the rock one that is not the frame is dug, feet and head, the lava beside it plugged first. full-4 (2026-10-20 13:36 to 13:45Z) stood at (-18, 87, 1) with its portal at (-17, 87, 2), netherrack at (-17, 87, 1) with a lava source behind it at (-16, 87, 1), obsidian at (-18, 87, 2), and every dig was 'Refusing to open lava beside the bot'.
+    if (!swimming && feet.x !== portal.x && feet.z !== portal.z && Math.abs(feet.x - portal.x) <= 1 && Math.abs(feet.z - portal.z) <= 1) {
+      const sides = [feet.offset(portal.x - feet.x, 0, 0), feet.offset(0, 0, portal.z - feet.z)];
+      const open = c => bot.blockAt(c)?.boundingBox === 'empty' && bot.blockAt(c.offset(0, 1, 0))?.boundingBox === 'empty';
+      const frame = b => /obsidian|bedrock|nether_portal|crying_obsidian/.test(b?.name || '');
+      if (!sides.some(open)) {
+        for (const c of sides.filter(c => !frame(bot.blockAt(c)) && !frame(bot.blockAt(c.offset(0, 1, 0))))) {
+          const why = await capLavaBeside(bot, task, c, { placer: placeBlock }) || await capLavaBeside(bot, task, c.offset(0, 1, 0), { placer: placeBlock });
+          if (why) { console.log(`[portal] the cell at (${c.x}, ${c.y}, ${c.z}) between the body and the sheet is not dug: ${why}`); continue; }
+          try { for (const q of [c.offset(0, 1, 0), c]) if (bot.blockAt(q)?.boundingBox === 'block') await digBlock(bot, task, q, { requireDrops: false }); }
+          catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; console.log(`[portal] the cell at (${c.x}, ${c.y}, ${c.z}) between the body and the sheet was not dug: ${String(err.message || err).slice(0, 80)}`); continue; }
+          console.log(`[portal] diagonal to the sheet: the cell at (${c.x}, ${c.y}, ${c.z}) dug open to step through`);
+          break;
+        }
       }
     }
     const below = portal.y < Math.floor(bot.entity.position.y);
@@ -9716,4 +9746,4 @@ function constructionObservation(bot, goal) {
   return JSON.stringify(positions.map(p => [p.x, p.y, p.z, bot.blockAt(pos(p))?.stateId ?? bot.blockAt(pos(p))?.name ?? null]));
 }
 
-module.exports = { portalPickaxeFirst, endPortalActions, miningCandidates, portalSurfaceFirst, nightUpSays, oreToTunnel, gatherRests, gatherResting, relightPortalAt, stairPickaxeWanted, pickaxeForStair, siteHoldEnds, exploreLand, exploreLandIds, woodWhileUp, WOOD_UP, wantedItems, keepRoom, tidyMoment, smeltBatch, ladderSmeltWants, foodReservePrice, siteByLava, foodTrips, supportMaterialHere, preparePortalSupports, portalJobs, castSiteCost, castSiteSays, NO_WOOD_DEEP, smeltNeedSays, takeBackPlace, detourWork, restWork, restWorkSays, upkeepOffers, kitFoodStep, foodNearFrame, cookable, FUELS, answerOrPutOff, opensPit, persist, returnFromNether, climbSays, holdForRest, liveTurn, workClaim, methodSoFar, gatherBlocks, sculkStep, opensLava, descentTargets, portalInteriorBlockers, nearestLava, lavaGone, mineAtSource, timed, portalHere, walkToKnownPortal, portalWay, lineSays, buildPortalFrame, ruinSays, portalMethod, portalStep, crossingKitReady, walksFailed, occupant, bodyIn, occupiedSays, waitingThere, settleCraftInventory, tripTime, WOOD_RESERVE, woodUnits, crossingWater, sideTrips, plugLeak, leakResponse, logInView, patrolChoice, upkeepStep, moreOfSource, whileCooking, workstation, noteError, localBatch, takeOutBatch, castUnderWay, leftBatch, batchNoRoute, LEAVE_BATCH_MS, smelt, turnSearch, searchFor, enterPortal, gameHandlers, breakStillness, reachableBlocks, hitboxIntrudes, terrainShortage, runGoal, runIdle, idleWork, idleOptions, createSurvival, acquireStep, inventory, planningInventory, catalogPlan, selectSite, explore, dig, place, waitFor, constructionObservation, Blocked, designedBuildStep, surfaceStep, surfaceTrip, answerStall, looseEnds, breakOut, tunnelToward, stairsOrWay, craft, gatherWood, moveOnFromResource, moveOnHistorySays, pickaxeCraftHistorySays, maintainPickaxe, MOVE_ON_MEMORY_MS, PICKAXE_CRAFT_MEMORY_MS, stationCellOk, droppedFoodNear, planDueNow, planRoutes, lavaKnownFrom, straightToward };
+module.exports = { capLavaBeside, portalPickaxeFirst, endPortalActions, miningCandidates, portalSurfaceFirst, nightUpSays, oreToTunnel, gatherRests, gatherResting, relightPortalAt, stairPickaxeWanted, pickaxeForStair, siteHoldEnds, exploreLand, exploreLandIds, woodWhileUp, WOOD_UP, wantedItems, keepRoom, tidyMoment, smeltBatch, ladderSmeltWants, foodReservePrice, siteByLava, foodTrips, supportMaterialHere, preparePortalSupports, portalJobs, castSiteCost, castSiteSays, NO_WOOD_DEEP, smeltNeedSays, takeBackPlace, detourWork, restWork, restWorkSays, upkeepOffers, kitFoodStep, foodNearFrame, cookable, FUELS, answerOrPutOff, opensPit, persist, returnFromNether, climbSays, holdForRest, liveTurn, workClaim, methodSoFar, gatherBlocks, sculkStep, opensLava, descentTargets, portalInteriorBlockers, nearestLava, lavaGone, mineAtSource, timed, portalHere, walkToKnownPortal, portalWay, lineSays, buildPortalFrame, ruinSays, portalMethod, portalStep, crossingKitReady, walksFailed, occupant, bodyIn, occupiedSays, waitingThere, settleCraftInventory, tripTime, WOOD_RESERVE, woodUnits, crossingWater, sideTrips, plugLeak, leakResponse, logInView, patrolChoice, upkeepStep, moreOfSource, whileCooking, workstation, noteError, localBatch, takeOutBatch, castUnderWay, leftBatch, batchNoRoute, LEAVE_BATCH_MS, smelt, turnSearch, searchFor, enterPortal, gameHandlers, breakStillness, reachableBlocks, hitboxIntrudes, terrainShortage, runGoal, runIdle, idleWork, idleOptions, createSurvival, acquireStep, inventory, planningInventory, catalogPlan, selectSite, explore, dig, place, waitFor, constructionObservation, Blocked, designedBuildStep, surfaceStep, surfaceTrip, answerStall, looseEnds, breakOut, tunnelToward, stairsOrWay, craft, gatherWood, moveOnFromResource, moveOnHistorySays, pickaxeCraftHistorySays, maintainPickaxe, MOVE_ON_MEMORY_MS, PICKAXE_CRAFT_MEMORY_MS, stationCellOk, droppedFoodNear, planDueNow, planRoutes, lavaKnownFrom, straightToward };
