@@ -10877,10 +10877,13 @@ class Survival {
         const noPick = !(bot.inventory?.items?.() || []).some(i => /_pickaxe$/.test(i.name));
         const up = lp && noPick && lp.up?.length ? { says: String(lp.up[0]).split(':')[0] } : null;
         if (up) {
-          const about = threats(bot, 24), kinds = [...new Set(about.map(t => t.entity.name.replaceAll('_', ' ')))];
+          // Counted as riskNow counts them (note 1941): threats() left out four skeletons out of sight within 24, and full-1 (2026-10-20 02:31:34Z), bare in its night pocket, read 'no hostile mob within 24 blocks now' on leave beside riskNow's four, left at 0.34 to 0.33, and was killed by zombies two minutes later.
+          let aboutAll = []; try { aboutAll = require('./danger').hostileEntities(bot, 24); } catch (_) { aboutAll = []; }
+          const seenIds = new Set(threats(bot, 24).filter(t => t.visible).map(t => t.entity.id));
+          const about = aboutAll.map(e => ({ entity: e, visible: seenIds.has(e.id) })), kinds = [...new Set(about.map(t => t.entity.name.replaceAll('_', ' ')))], hidden = about.filter(t => !t.visible).length;
           const weapon = require('./combat').defenseWeapon(bot)?.name?.replaceAll('_', ' ') || 'bare hands';
           const points = require('./combat-estimate').armourOf([5, 6, 7, 8].map(n => bot.inventory?.slots?.[n]?.name).filter(Boolean)).points;
-          surfaceStep = ` That step is at the surface (${up.says}), and up there it is night until dawn, about ${minutesToDawn(bot)} real minutes: ${about.length ? `${about.length} hostile mob${about.length === 1 ? '' : 's'} within 24 blocks now (${kinds.join(', ')})` : 'no hostile mob within 24 blocks now, and they spawn in the dark'}, the bot with ${weapon} and ${points} armour point${points === 1 ? '' : 's'}.`;
+          surfaceStep = ` That step is at the surface (${up.says}), and up there it is night until dawn, about ${minutesToDawn(bot)} real minutes: ${about.length ? `${about.length} hostile mob${about.length === 1 ? '' : 's'} within 24 blocks now (${kinds.join(', ')})` : 'no hostile mob within 24 blocks now, and they spawn in the dark'}, the bot with ${weapon} and ${points} armour point${points === 1 ? '' : 's'}.${hidden ? ` ${hidden === about.length ? (hidden === 1 ? 'It is' : 'All of them are') : `${hidden} of them are`} out of sight.` : ''}`;
         }
       } catch (_) { surfaceStep = ''; }
       options.leave = { description: `Open the pocket and ${foodTrip ? foodTrip.to : `go back to ${waiting || 'work'}`}${night ? ' in the dark, where mobs spawn' : ''}${who ? `, past ${who}` : ''}.${foodTrip ? foodTrip.says : `${workWhere}${endSays}${tripNot}`}${night && below ? (surfaceStep || ` ${BELOW_NIGHT}${BELOW_NIGHT_SURFACE}`) : ''}${lidSays}${doorsSay}${outSays}${outHealth}` + outsideFacts.leave + wardenSays(bot) + placeSays + (waitSays?.leave || ''),
