@@ -203,7 +203,7 @@ function watchReleases(bot) {
   bot.setControlState = (key, on) => { if (!on && bot._controller && !bot._controller.failed && bot._controller.keys?.includes(key) && bot.controlState?.[key]) bot._controller.letGoBy = `set(${key}, false) at ${frames()}`; return raw(key, on); };
   if (typeof bot.clearControlStates === 'function') { const rawClear = bot.clearControlStates.bind(bot); bot.clearControlStates = () => { if (bot._controller && !bot._controller.failed) bot._controller.letGoBy = `clearControlStates at ${frames()}`; return rawClear(); }; }
 }
-async function move(bot, task, { label, keys = ['forward'], sneak = true, why, look, until = () => false, guard = () => {}, maxMs = 1500, tick = 25, throughFlames = false, intoFall = false } = {}) {
+async function move(bot, task, { label, keys = ['forward'], sneak = true, why, look, until = () => false, guard = () => {}, maxMs = 1500, tick = 25, throughFlames = false, intoFall = false, stopAt = null } = {}) {
   if (!label) throw new Error('A held-key move needs a name');
   watchReleases(bot);
   for (const key of keys) if (!MOVEMENT.has(key)) throw new Error(`Not a movement key: ${key}`);
@@ -247,6 +247,16 @@ async function move(bot, task, { label, keys = ['forward'], sneak = true, why, l
   const refused = () => {
     const hit = !escaping && burningAhead(bot, keys, { deep: !sneak, flames });
     if (!hit || (intoFall && hit.name === 'deadly_fall')) return false;
+    // A move that ends in the cell ahead (stopAt: the portal's, note 1953) is not refused for what lies past that cell: the step into a portal with lava on its far face was 'lava ahead; not walked into' though the body stops in the sheet. A hazard in the stop cell itself still refuses it.
+    if (stopAt) {
+      const p = bot.entity?.position, yaw = bot.entity?.yaw;
+      const f = keys.includes('forward') - keys.includes('back'), sd = keys.includes('right') - keys.includes('left');
+      if (p && Number.isFinite(yaw) && (f || sd)) {
+        let dx = -f * Math.sin(yaw) + sd * Math.cos(yaw), dz = -f * Math.cos(yaw) - sd * Math.sin(yaw); const n = Math.hypot(dx, dz); dx /= n; dz /= n;
+        const ahead = { x: Math.floor(p.x + dx * 0.6), z: Math.floor(p.z + dz * 0.6) };
+        if (stopAt(ahead) && !(hit.x === ahead.x && hit.z === ahead.z)) return false;
+      }
+    }
     // Said on the bot, for the caller to go another way and say why.
     bot._moveRefused = controller.refused = { label, ...hit, at: Date.now() };
     console.log(`[motion] ${label}: ${hit.name.replace('_', ' ')} at (${hit.x}, ${hit.y}, ${hit.z}) ahead; not walked into`);

@@ -1795,7 +1795,7 @@ const bodyError = (message, e, p) => Object.assign(new Error(message), { body: {
 
 // Mineflayer yaw for looking toward each horizontal facing (0 is north, -z).
 const PLACEMENT_YAW = { north: 0, west: Math.PI / 2, south: Math.PI, east: -Math.PI / 2 };
-async function place(bot, task, p, material, { face, properties, stay = false } = {}) {
+async function place(bot, task, p, material, { face, properties, stay = false, replaceLiquid = false } = {}) {
   // Breath first, as every dig checks it: mid-205-b walled a pocket in
   // under water for nine seconds, placing block after block, and nothing
   // looked at its air until two of twenty were left (2026-09-26).
@@ -1822,7 +1822,9 @@ async function place(bot, task, p, material, { face, properties, stay = false } 
   if (!air(there) && !GROUND_COVER.has(there?.name) && knockedAway(bot, there) && typeof bot.dig === 'function') {
     try { await bot.dig(there, true); } catch (_) { task.check(); }
   }
-  if (!air(bot.blockAt(p)) && !GROUND_COVER.has(bot.blockAt(p)?.name)) {
+  // A liquid's cell is replaceable in the game (water and lava alike): a block put there takes its place. Asked for by name (replaceLiquid, note 1953), not by default: a cap on lava is a step a caller means.
+  const liquidThere = /^(water|lava|flowing_water|flowing_lava)$/.test(bot.blockAt(p)?.name || '');
+  if (!air(bot.blockAt(p)) && !GROUND_COVER.has(bot.blockAt(p)?.name) && !(replaceLiquid && liquidThere)) {
     throw new Error(`Placement obstructed by ${bot.blockAt(p)?.name} at ${p}`);
   }
   const body = occupant(bot, p);
@@ -4962,7 +4964,7 @@ function lowestPortalBlock(bot) {
 // sneaking player does not walk off an edge), stop the moment the feet are
 // in the portal, and stand there.
 const inPortal = bot => [0, 1].some(dy => bot.blockAt?.(bot.entity.position.offset(0, dy, 0).floored())?.name === 'nether_portal');
-async function enterPortal(bot, task, portal, arrived, { walk = navigate, dig: digBlock = dig } = {}) {
+async function enterPortal(bot, task, portal, arrived, { walk = navigate, dig: digBlock = dig, place: placeBlock = place } = {}) {
   // Standing in the sheet already (note 1943): the portal's cooldown never
   // runs out while the body is in it, so the way through is out of the sheet
   // and back in. The way out is across the sheet's plane, not along the
@@ -4985,16 +4987,27 @@ async function enterPortal(bot, task, portal, arrived, { walk = navigate, dig: d
     for (const [dx, dz] of sides) {
       if (!inPortal(bot) || arrived()) break;
       const cell = feet.offset(dx, 0, dz), low = bot.blockAt(cell), high = bot.blockAt(cell.offset(0, 1, 0)), under = bot.blockAt(cell.offset(0, -1, 0));
-      const bad = [low, high, under].find(hot) || (!under || under.boundingBox !== 'block' ? { name: 'a drop' } : null);
+      // Lava at the feet of a face with rock under it is capped with a block put into the lava's cell, and the step out is a step up onto the cap (note 1953): full-4 (2026-10-20 11:43 to 11:55Z, the 1950 build) stood in its portal at (-17, 87, 2) with lava at (-17, 87, 1) and (-17, 87, 3) on netherrack, both faces, and was told 'Every face of the portal the bot stands in steps into fire, lava or a drop' thirty-one times with 126 cobblestone carried. Lava at the head, lava under, or nothing under is still a face not stepped out of.
+      const bad = [high, under].find(hot) || (!under || under.boundingBox !== 'block' ? { name: 'a drop' } : null);
       if (bad) { refused.push({ name: bad.name, x: cell.x, y: cell.y, z: cell.z }); continue; }
-      const rock = [cell.offset(0, 1, 0), cell].filter(c => solidRock(bot.blockAt(c)));
+      let stepUp = false;
+      if (hot(low)) {
+        let material = null; try { material = require('./shelter').buildingItem(bot)?.name || null; } catch (_) { material = null; }
+        if (!material) { refused.push({ name: `${low.name} (no block carried to cap it)`, x: cell.x, y: cell.y, z: cell.z }); continue; }
+        console.log(`[portal] standing in the sheet with ${low.name} at the feet of the face at (${cell.x}, ${cell.y}, ${cell.z}): capped with ${material} to step up onto`);
+        try { await placeBlock(bot, task, cell, material, { replaceLiquid: true }); }
+        catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; refused.push({ name: `${low.name} not capped (${String(err.message || err).slice(0, 60)})`, x: cell.x, y: cell.y, z: cell.z }); continue; }
+        if (hot(bot.blockAt(cell))) { refused.push({ name: `${low.name} still there after the cap`, x: cell.x, y: cell.y, z: cell.z }); continue; }
+        stepUp = true;
+      }
+      const rock = (stepUp ? [cell.offset(0, 2, 0), cell.offset(0, 1, 0)] : [cell.offset(0, 1, 0), cell]).filter(c => solidRock(bot.blockAt(c)));
       if (rock.length) {
         console.log(`[portal] standing in the sheet with the face at (${cell.x}, ${cell.y}, ${cell.z}) closed by ${rock.map(c => bot.blockAt(c).name).join(' and ')}: dug open to step out of the sheet`);
         try { for (const c of rock) await digBlock(bot, task, c, { requireDrops: false }); }
         catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; refused.push({ name: `rock not dug (${String(err.message || err).slice(0, 60)})`, x: cell.x, y: cell.y, z: cell.z }); continue; }
       }
       const since = Date.now();
-      if (await move(bot, task, { label: 'leave_portal', keys: ['forward'], sneak: true, look: pos(cell).offset(0.5, 0.5, 0.5), maxMs: 1500, tick: 50, until: () => !inPortal(bot) })) {
+      if (await move(bot, task, { label: 'leave_portal', keys: stepUp ? ['forward', 'jump'] : ['forward'], sneak: true, look: pos(cell).offset(0.5, stepUp ? 1.5 : 0.5, 0.5), maxMs: stepUp ? 2500 : 1500, tick: 50, until: () => !inPortal(bot) })) {
         console.log(`[portal] out of the sheet at (${cell.x}, ${cell.y}, ${cell.z}); back in once its cooldown has run out`);
         await sleep(600); break;
       }
@@ -5035,7 +5048,8 @@ async function enterPortal(bot, task, portal, arrived, { walk = navigate, dig: d
     const swimming = bot.entity.isInWater === true || wet(feet) || (!bot.entity.onGround && wet(feet.offset(0, -1, 0)));
     await move(bot, task, { label: 'enter_portal', keys: swimming ? ['forward', 'jump'] : ['forward'], sneak: !below && !swimming,
       why: swimming ? 'a climb out of the water into the portal: crouched, a swimmer sinks' : below ? 'a step down into the portal' : undefined,
-      look: pos(portal).offset(0.5, 0.5, 0.5), maxMs: 4000, tick: 50, until: () => inPortal(bot) || arrived() });
+      look: pos(portal).offset(0.5, 0.5, 0.5), maxMs: 4000, tick: 50, until: () => inPortal(bot) || arrived(),
+      stopAt: c => bot.blockAt?.(new Vec3(c.x, Math.floor(bot.entity.position.y), c.z))?.name === 'nether_portal' });
   }
   if (arrived()) return;
   if (!inPortal(bot)) throw new Error('Could not step into the portal');
