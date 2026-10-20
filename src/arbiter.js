@@ -971,8 +971,21 @@ async function take(bot, claims, ctx = {}) {
   // work's error.
   let acted;
   const began = Date.now(), reportedAt = bot?._survivalReportedAt || 0, askedBefore = lastAsked(bot);
+  // A layer that runs on with nothing reported and nothing asked, said while it runs (note 1939): full-1 (2026-10-20 01:32:54 to 01:47:26Z) was given survival's escape_threat for a deadly drop beside it and a ghast, and for fourteen and a half minutes the record held no question, no report, no step, until a stance was asked; where it waited is not in the record. Said at thirty seconds and each minute after, with what the body is at.
+  let silentTicks = 0;
+  const silent = setInterval(() => {
+    try {
+      silentTicks++;
+      if (silentTicks !== 1 && silentTicks % 2 === 0) return;
+      if ((bot?._survivalReportedAt || 0) !== reportedAt || lastAsked(bot) !== askedBefore) return;
+      const p = bot?.entity?.position, pf = bot?.pathfinder;
+      said(bot, `[arbiter] ${w.layer} ${w.action} has run ${Math.round((Date.now() - began) / 1000)} s with nothing reported or asked: step ${ctx.goal?.step?.action || 'none'}, at (${p ? `${Math.round(p.x)}, ${Math.round(p.y)}, ${Math.round(p.z)}` : '?'}), health ${Math.round((bot?.health ?? 0) * 10) / 10}, pathing ${pf?.isMoving?.() ? 'yes' : 'no'}${pf?.goal ? ' to a goal' : ''}, digging ${bot?.targetDigBlock?.name || 'nothing'}, window ${bot?.currentWindow?.type ?? 'none'}`, Date.now());
+    } catch (_) { /* the watch is not the work */ }
+  }, 30000);
+  silent.unref?.();
   try { acted = !!(w.run ? await w.run(ctx.task) : false); }
   catch (err) {
+    clearInterval(silent);
     if (err?.name === 'NeedsSafety' && state.ruling?.winner === w.layer) { state.ruling.until = 0; state.ruling.stoppedBy = String(err.message || '').slice(0, 120); }
     if (err?.name === 'NeedsSafety') stopped(state, w.layer, err.message, ctx.now ?? Date.now());
     throw err;
@@ -983,6 +996,7 @@ async function take(bot, claims, ctx = {}) {
   // given to survival for a shelter at 0.37 and held, ran 3,296 passes in
   // 81 seconds, each "acted", none reported, no shelter question asked, the
   // work's smelt begun and stopped forty times a second.
+  clearInterval(silent);
   if (acted && w.layer === 'survival' && Date.now() - began < NO_TIME_MS && (bot?._survivalReportedAt || 0) === reportedAt && lastAsked(bot) === askedBefore) {
     acted = false;
     said(bot, `[arbiter] ${w.layer} ${w.action} said it acted in ${Date.now() - began} ms with nothing reported or asked: counted as nothing done`, now);
