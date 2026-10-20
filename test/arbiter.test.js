@@ -777,3 +777,14 @@ test('live: a survival step that says it acted, in no time, with nothing reporte
     assert.equal(slow.acted, true);
   } finally { console.log = log; }
 });
+
+test('a run out of fire under way is not stopped by the watch for a newcomer, only lava would (full-4 2026-10-20 21:12Z, note 1975)', () => {
+  const { bot, stopped } = stoppable();
+  bot._arbiter = { holder: { layer: 'vitals', action: 'out_of_fire', since: 0, ids: [] } };
+  bot._bodyWayRunning = { action: 'out_of_fire', at: Date.now() };
+  assert.equal(arbiter.watchOnce(bot, { live: true, look: creeperNear(), log: () => {} }), null, 'the run goes on');
+  assert.deepEqual(stopped, []);
+  delete bot._bodyWayRunning;
+  const p = arbiter.watchOnce(bot, { live: true, look: creeperNear(), log: () => {} });
+  assert.equal(p?.by, 'creeper', 'with no run under way it preempts as before');
+});

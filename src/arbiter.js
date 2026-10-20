@@ -1037,6 +1037,21 @@ function outranks(bot, reflex, holder, now = Date.now()) {
   return true;
 }
 
+// A run out of fire under way (vitals.js wayOutRunning, at most three
+// seconds) is the answer to the fire: the watch does not stop it for a
+// newcomer, a push about or the fire itself, only for lava, which ranks
+// above it (note 1975). Note 792 kept the shield and the hurt watchdog off
+// it; the watch still let its keys go mid-move, ten times on 2026-10-20
+// ("out_of_fire: forward, sprint let go mid-move by clearControlStates at
+// stopForTurn < watchOnce / physicsOver"). full-4 (21:12:08 to 21:12:13Z),
+// three blazes about, chose out_of_their_line at 0.96 at 15 health, was cut
+// twice and burned on to 8, dead a minute later.
+function wayOutHolds(bot, by, now = Date.now()) {
+  let running = null;
+  try { running = require('./vitals').wayOutRunning(bot, now); } catch (_) { running = null; }
+  return running === 'out_of_fire' && by !== 'lava';
+}
+
 // One look of the watch: the reflexes, and a hostile newcomer while the
 // work holds the turn. When one outranks the holder, the holder is stopped
 // and bot._preempt set; it stays until the arbiter rules again (rule
@@ -1132,6 +1147,7 @@ function watchOnce(bot, { live = mode() === 'live', now = Date.now(), look = pro
   // In shadow the holder is the old loop's mark (turn.js), and survival's
   // own step answers its reflexes when it next looks: said over the work.
   if (!live) { if (holder?.layer === 'work') said(bot, `[arbiter] would preempt ${over}: ${p.why}`, now, log, `preempt ${over} ${p.by}`); return null; }
+  if (wayOutHolds(bot, p.by, now)) { said(bot, `[arbiter] held off preempting the run out of fire: ${p.why}`, now, log, `wayout ${p.by}`); return null; }
   bot._preempt = { ...p, at: now, over };
   const was = require('./turn').stopForTurn(bot, p.why);
   log(`[arbiter] preempted ${over}: ${JSON.stringify(was)}`);
@@ -1150,6 +1166,7 @@ function physicsOver(bot, pending, { now = Date.now(), look = probe, log = conso
   const state = bot._arbiter ||= {};
   const top = observeReflexes(bot, state.reflexes || [], { ...look, mobs: () => [] }).filter(r => !ALERTS.has(r.key))[0];
   if (!top || (REFLEX_RANK[top.key] ?? 99) >= (REFLEX_RANK[pending.by] ?? 99)) return pending;
+  if (wayOutHolds(bot, top.key, now)) return pending;
   const why = `${top.action.replaceAll('_', ' ')} ${JSON.stringify(top.facts)}`;
   bot._preempt = { by: top.key, layer: top.layer, action: top.action, facts: top.facts, why, ...(pending.id !== undefined ? { id: pending.id } : {}), at: now, over: pending.over, waited: pending.by };
   const was = require('./turn').stopForTurn(bot, why);
