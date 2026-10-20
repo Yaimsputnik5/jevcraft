@@ -149,3 +149,13 @@ test('taken back, the rest is cut short and said in chat (note 694)', async () =
   assert.equal(goal.rungAside, undefined);
   assert.match(said.join('\n'), /^Back to the way to the Nether after all: I set it aside 65 seconds ago\.$/m);
 });
+
+test('with a shooter in sight the pillar and span is not offered: the span would stop at its first cell with the bot on top (full-1 2026-10-20, note 1973)', t => {
+  const { netherAnswers } = require('../src/nether-travel');
+  const bridging = require('../src/bridging');
+  t.mock.method(bridging, 'spanRefused', () => ({ fire: { entity: { name: 'blaze' }, distance: 7 }, says: 'a blaze 7 blocks off can see the bot, and no span is laid while something that shoots can' }));
+  const answers = netherAnswers(tunnelBot(), new Task('work'), searchGoal(), () => {}, { actions: stallActions() });
+  assert.equal(answers.pillar_up, undefined, Object.keys(answers).join(', '));
+  assert.equal(answers.blocks_then_pillar, undefined);
+  assert(answers.cross_toward, 'the level crossing is still there');
+});

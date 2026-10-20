@@ -3722,6 +3722,16 @@ function climbWays(bot, task, goal, save, actions, state, nearest, { inView = th
     out.noPillar = `a pillar up the ${up} blocks here and a span across to the floor is not offered: at the floor's height the span stops ${span.cells} cells on, ${endOff} from the floor${span.stoppedBy ? ` (${span.stoppedBy})` : ''}`;
     return out;
   }
+  // The span's own check, as it runs before its first cell (note 695;
+  // bridging.js spanRefused): with a shooter in sight the pillar rises and
+  // the span stops at once, the bot left on top (note 1973). full-1
+  // (2026-10-20 18:16 to 18:57Z), two rods owed at (-237, 68, 20), was
+  // offered it with "In sight: a blaze 7 blocks off" beside a top whose push
+  // is a 41-block fall into lava; 67 of its step records that day end
+  // "pillar up: Not bridging with a blaze N blocks off able to see me".
+  // The span runs that check at every cell it crosses, laid or dug.
+  { const refused = require('./bridging').spanRefused(bot);
+    if (refused) { out.noPillar = `a pillar up the ${up} blocks here and a span across to the floor is not offered now: the span stops at its first cell while ${refused.says}, and the bot is left on top`; return out; } }
   const need = up + span.bridge;
   const cells = [];
   { const { stepToward } = require('./bridging'); let c = top; for (let n = 0, step; n < span.cells && (step = stepToward(c, nearest)); n++) { c = c.plus(step); if (bot.blockAt(c.offset(0, -1, 0))?.boundingBox !== 'block') cells.push(c.offset(0, -1, 0)); } }
