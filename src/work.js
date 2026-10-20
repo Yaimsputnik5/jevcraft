@@ -8550,7 +8550,8 @@ async function crossingKitReady(bot, task, goal, save, client = task.opportunity
   // shield, wood and a spare kit but not the food (note 1143).
   const turnedBackLately = !!goal.foodTurnBack && Date.now() - goal.foodTurnBack.at < 30 * 60000;
   const goingWithoutStands = (g, at) => { const r = require('./progress').attemptsFor(g).of('rung', at).nether_food; return !!r && require('./game-progress').GOING_WITHOUT.test(r.why || ''); };
-  const empty = left.filter(i => /^(food|blocks)$/.test(i.key) && ((i.carried === 0 && (seen[i.key] || 0) > 0) || (i.key === 'food' && i.carried < NETHER_FLOOR && stallRest(goal, 'nether_food', now))
+  // Food under the Nether's reserve is offered whether or not the food rung rests (note 1942): resting was the condition, and of 45 cross_now answers on 2026-10-19/20 (full-1..4) 29 crossed under the reserve of 36, the food on offer at the 10 with none carried and at none of the 19 with 2 to 30; full-4 (02:23:47Z) crossed with 8 of 80 and a chest, gold, wood and four pickaxes all in hand. Jev's own going without still stands.
+  const empty = left.filter(i => /^(food|blocks)$/.test(i.key) && ((i.carried === 0 && (seen[i.key] || 0) > 0) || (i.key === 'food' && i.carried < NETHER_FLOOR && (stallRest(goal, 'nether_food', now) || !goingWithoutStands(goal, now)))
     || (i.key === 'food' && i.carried === 0 && turnedBackLately)
     // With no food at all, the food is offered unless Jev's own going
     // without stands (note 1224): a bot back from a death has none and had
