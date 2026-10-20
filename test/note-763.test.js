@@ -362,3 +362,23 @@ test('the lava trips are priced at the bot\'s measured walking pace, and the fet
   holdLava(bot, {}, () => {}, { way: 'pool', lava: new Vec3(147, 64, 0) });
   assert.match(said[0], /^Walking to the lava pool at \(147, 64, 0\), 147 blocks off, about 4 minutes\./);
 });
+
+test('the hold on going to the Nether ends when Jev takes up the food after it began, deferrable or not (note 1965)', async () => {
+  // full-3 (2026-10-20 15:59:54Z, 12 of 80 food points) chose take_up_food at the crossing; the hold on 'nether first' read the food as deferrable and kept the crossing stage, and the question came back ten seconds later.
+  const { strategyStep } = require('../src/strategy');
+  const bot = deepBot({ iron_pickaxe: 1 }), goal = chosen();
+  const now = Date.now();
+  for (const k of Object.keys(goal.rungOptIn)) goal.rungOptIn[k] = now - 120000;
+  goal.strategy = { choice: 'stage_reach_nether', rungPhase: null, ladderNext: 'reach_nether', keys: 'stage_reach_nether', at: now - 60000, openPhases: [] };
+  const asked = [];
+  const decide = async (id, args) => { asked.push(args); const keys = Object.keys(args.tree || {}); return { path: [keys.find(k => /nether_food/.test(k)) || keys[0]] }; };
+  const stage = require('../src/game-progress').openRungs(bot, goal)[0];
+  goal.strategy.openPhases = require('../src/game-progress').openRungs(bot, goal).map(r => r.phase);
+  const held = await strategyStep(bot, new Task('win'), goal, () => {}, stage, { decide, now: () => now });
+  assert.deepEqual(held, { stage: { phase: 'reach_nether', action: 'enter_nether' } }, 'with nothing taken up, the Nether goes on');
+  // Jev takes up the food at the crossing: opted in and the food trip set, after the hold began.
+  goal.rungOptIn = { nether_food: now - 1000 }; goal.foodTrip = { at: now - 1000, from: 'crossing' };
+  const after = await strategyStep(bot, new Task('win'), goal, () => {}, stage, { decide, now: () => now });
+  assert.notDeepEqual(after, { stage: { phase: 'reach_nether', action: 'enter_nether' } }, 'the hold on the Nether does not keep the crossing stage over the food taken up');
+  assert.equal(asked.length, 1, 'the strategy is asked again with the food taken up');
+});

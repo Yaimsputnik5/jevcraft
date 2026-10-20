@@ -748,7 +748,13 @@ async function strategyStep(bot, task, goal, save, stage, { client, decide, side
     // 11 times of the 51 it finished). A rung that may not wait (a pickaxe
     // to dig with at all) still ends it.
     const fresh = openNow.filter(r => !(held.openPhases || []).includes(r.phase));
-    const ends = fresh.filter(r => !require('./game-progress').DEFERRABLE.has(r.phase));
+    // A rung Jev took up after the hold began ends it, deferrable or not (note 1965): the crossing's take_up_food opted the food rung in and lifted its rest, and the hold on 'nether first' read the food as deferrable, kept the crossing stage, and the crossing question came back ten seconds later. full-3 (2026-10-20 15:59:54Z, 12 of 80 food points, on note 1964's build) chose take_up_food at 0.61 and was asked again at 16:00:04 ('[strategy] held through the cast of the frame ... stage reach nether goes on'), crossed, and came back at 1.8 health five minutes in.
+    const familyOf = ph => { try { return require('./kit-record').familyOf(ph); } catch (_) { return ph; } };
+    const since = at => Number.isFinite(at) && at > held.at && at <= now();
+    // Only the crossing's own kit rungs (taken up at the crossing, or the food trip): an armour piece opted in meanwhile may still wait (note 777).
+    const kitPhase = ph => { try { return require('./crossing-kit').KIT_PHASES.has(ph); } catch (_) { return /^nether_/.test(ph); } };
+    const takenUp = r => kitPhase(r.phase) && (since(goal?.rungOptIn?.[familyOf(r.phase)]) || (r.phase === 'nether_food' && since(goal?.foodTrip?.at)));
+    const ends = openNow.filter(r => (fresh.includes(r) && !require('./game-progress').DEFERRABLE.has(r.phase)) || takenUp(r));
     const dim = String(bot.game?.dimension || '').replace(/^minecraft:/, '');
     // Only the ladder's own stage is taken unasked: nether_first again would
     // set rungs aside again, which is Jev's to say.
