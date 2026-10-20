@@ -605,6 +605,16 @@ function lastStrategyFact(bot, goal, now = Date.now()) {
   return { choice, rungPhase: phase, at, open, resting, why, says: `${label(choice)} was chosen ${agoWords(now - at)} ago: ${gained}.` };
 }
 
+// A crossing kit rung Jev took up after a hold began (note 1965): opted in
+// at the crossing, or the food trip set. Only the crossing's own kit rungs:
+// an armour piece opted in meanwhile may still wait (note 777).
+function kitTakenUpSince(goal, held, r, t) {
+  const familyOf = ph => { try { return require('./kit-record').familyOf(ph); } catch (_) { return ph; } };
+  const since = at => Number.isFinite(at) && at > held.at && at <= t;
+  const kitPhase = ph => { try { return require('./crossing-kit').KIT_PHASES.has(ph); } catch (_) { return /^nether_/.test(ph); } };
+  return kitPhase(r.phase) && (since(goal?.rungOptIn?.[familyOf(r.phase)]) || (r.phase === 'nether_food' && since(goal?.foodTrip?.at)));
+}
+
 // Work under way that a held win_strategy answer began (note 763): the
 // lava fetch holding its lava (obsidian.js heldLava), a cast frame being
 // filled, a climb to open sky chosen and not yet at the top, a food trip for
@@ -749,11 +759,7 @@ async function strategyStep(bot, task, goal, save, stage, { client, decide, side
     // to dig with at all) still ends it.
     const fresh = openNow.filter(r => !(held.openPhases || []).includes(r.phase));
     // A rung Jev took up after the hold began ends it, deferrable or not (note 1965): the crossing's take_up_food opted the food rung in and lifted its rest, and the hold on 'nether first' read the food as deferrable, kept the crossing stage, and the crossing question came back ten seconds later. full-3 (2026-10-20 15:59:54Z, 12 of 80 food points, on note 1964's build) chose take_up_food at 0.61 and was asked again at 16:00:04 ('[strategy] held through the cast of the frame ... stage reach nether goes on'), crossed, and came back at 1.8 health five minutes in.
-    const familyOf = ph => { try { return require('./kit-record').familyOf(ph); } catch (_) { return ph; } };
-    const since = at => Number.isFinite(at) && at > held.at && at <= now();
-    // Only the crossing's own kit rungs (taken up at the crossing, or the food trip): an armour piece opted in meanwhile may still wait (note 777).
-    const kitPhase = ph => { try { return require('./crossing-kit').KIT_PHASES.has(ph); } catch (_) { return /^nether_/.test(ph); } };
-    const takenUp = r => kitPhase(r.phase) && (since(goal?.rungOptIn?.[familyOf(r.phase)]) || (r.phase === 'nether_food' && since(goal?.foodTrip?.at)));
+    const takenUp = r => kitTakenUpSince(goal, held, r, now());
     const ends = openNow.filter(r => (fresh.includes(r) && !require('./game-progress').DEFERRABLE.has(r.phase)) || takenUp(r));
     const dim = String(bot.game?.dimension || '').replace(/^minecraft:/, '');
     // Only the ladder's own stage is taken unasked: nether_first again would
@@ -788,7 +794,14 @@ async function strategyStep(bot, task, goal, save, stage, { client, decide, side
       if (rung && rungStatus(bot, goal, held.rungPhase, now()).open) { choice = held.choice; heldOption = { rung }; }
     } else if (options[held.choice] && held.choice !== 'nether_first') { choice = held.choice; heldOption = options[held.choice]; }
     else if (/^(stage_reach_nether|nether_first)$/.test(held.choice) && stage.phase !== 'reach_nether' && dimension(bot) === 'overworld'
-      && openRungs(bot, goal, now()).every(r => require('./game-progress').DEFERRABLE.has(r.phase))) {
+      && openRungs(bot, goal, now()).every(r => require('./game-progress').DEFERRABLE.has(r.phase))
+      // Nor past a kit rung Jev took up since (note 1972): note 1965 ended
+      // the going-to-the-Nether hold on it, and this caught the same answer
+      // and held it again, the food "opened meanwhile waiting for its end".
+      // full-4 (2026-10-20 18:07:32Z, 6 of 80 food points) took up food,
+      // was held through the cast of the frame, and went through a portal
+      // at 18:14 with the 6; 87 such lines on 2026-10-20 in full-2 to 4.
+      && !openRungs(bot, goal, now()).some(r => kitTakenUpSince(goal, held, r, now()))) {
       console.log(`[strategy] held through ${errand}: ${label(held.choice)} goes on${opened.length ? `, the ${opened.join(', ')} opened meanwhile waiting for its end` : ''}`);
       return { stage: { phase: 'reach_nether', action: 'enter_nether' } };
     }

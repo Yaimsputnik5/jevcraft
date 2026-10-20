@@ -382,3 +382,22 @@ test('the hold on going to the Nether ends when Jev takes up the food after it b
   assert.notDeepEqual(after, { stage: { phase: 'reach_nether', action: 'enter_nether' } }, 'the hold on the Nether does not keep the crossing stage over the food taken up');
   assert.equal(asked.length, 1, 'the strategy is asked again with the food taken up');
 });
+
+test('a frame cast under way does not hold the Nether over the food Jev took up after the hold began (note 1972)', async () => {
+  // full-4 (2026-10-20 18:07:32Z, 6 of 80 food points) took up food; '[strategy] held through the cast of the frame ... the nether food opened meanwhile waiting for its end', and it crossed at 18:14 with the 6.
+  const { strategyStep } = require('../src/strategy');
+  const bot = deepBot({ iron_pickaxe: 1 }), goal = chosen();
+  const now = Date.now();
+  for (const k of Object.keys(goal.rungOptIn)) goal.rungOptIn[k] = now - 120000;
+  goal.portalMethod = { kind: 'cast' };
+  goal.portalFrame = { cast: true, origin: { x: -63, y: 63, z: 188 } };
+  goal.strategy = { choice: 'stage_reach_nether', rungPhase: null, ladderNext: 'reach_nether', keys: 'stage_reach_nether', at: now - 60000, openPhases: [] };
+  const asked = [];
+  const decide = async (id, args) => { asked.push(args); const keys = Object.keys(args.tree || {}); return { path: [keys.find(k => /nether_food/.test(k)) || keys[0]] }; };
+  const stage = require('../src/game-progress').openRungs(bot, goal)[0];
+  goal.strategy.openPhases = require('../src/game-progress').openRungs(bot, goal).map(r => r.phase);
+  goal.rungOptIn = { nether_food: now - 1000 }; goal.foodTrip = { at: now - 1000, from: 'crossing' };
+  const after = await strategyStep(bot, new Task('win'), goal, () => {}, stage, { decide, now: () => now });
+  assert.notDeepEqual(after, { stage: { phase: 'reach_nether', action: 'enter_nether' } }, 'the cast does not keep the crossing stage over the food taken up');
+  assert.equal(asked.length, 1, 'the strategy is asked again with the food taken up');
+});
