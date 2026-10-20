@@ -17,3 +17,17 @@ test('the chest just filled beside the bot is taken last: the far one first, and
   fresh.storedAt = new Date(now - 3600000).toISOString(); far.contents = { blaze_rod: 1 };
   assert.deepEqual(collectStage(bot, goal, now).at, { x: -62, y: 60, z: 1 });
 });
+
+test('a take rested for a walk that failed from far off is taken once the bot stands beside the chest (full-2 2026-10-20 21:48Z, note 1976)', () => {
+  const now = Date.parse('2026-10-20T21:48:00Z');
+  const { setAside } = require('../src/progress');
+  const chest = { position: { x: -295, y: 30, z: -219 }, dimension: 'overworld', contents: { ender_pearl: 1 }, storedAt: '2026-10-19T20:18:25.404Z', takeFails: 1, takeFailFrom: 222 };
+  const goal = { rodStashes: [chest] };
+  setAside(goal, 'rod_stash_take', '(-295, 30, -219)', new Error('Took to long to decide path to goal!'), 600000);
+  const far = { entity: { position: new Vec3(-100.5, 64, -100.5) }, game: { dimension: 'overworld' } };
+  assert.equal(collectStage(far, goal, Date.now()), null, 'still far off: the rest holds');
+  const beside = { entity: { position: new Vec3(-295.5, 29, -218.5) }, game: { dimension: 'overworld' } };
+  assert.deepEqual(collectStage(beside, goal, Date.now())?.at, { x: -295, y: 30, z: -219 });
+  chest.takeFailFrom = 2;
+  assert.equal(collectStage(beside, goal, Date.now()), null, 'a take that failed from beside it still rests');
+});

@@ -27,6 +27,7 @@ const ROD_MIN = 1;
 const REACH = 4.3, NEAR_STASH = 12, LAVA_NEAR = 2;
 // Six tries, ten minutes apart, before a chest is counted out (three till note 1047).
 const REST_MS = 5 * 60000, TAKE_REST_MS = 10 * 60000, TAKE_TRIES = 6;
+const NEAR_AGAIN = 6, FAR_FAIL = 16;
 // Seconds, measured on a scratch server (scripts/rod-stash-probe.js, note
 // 704): a chest carried put down and 2 stacks put in, 0.8 s; made first from
 // 3 stems with a table carried (planks, the table put down, the chest), 8 s
@@ -393,8 +394,17 @@ async function withStash(bot, task, entry, save, work) {
 function collectStage(bot, goal, now = Date.now(), { resting = false } = {}) {
   const here = bot?.entity?.position, dim = dimOf(bot);
   if (!here) return null;
-  const all = stashes(goal).filter(c => c.dimension === dim && withContents(c) && (resting || !isSetAside(goal, 'rod_stash_take', at(c.position), now)))
-    .map(c => ({ c, d: Math.round(here.distanceTo(V(c.position))) })).sort((a, b) => a.d - b.d);
+  // A take rested for a walk that failed from far off is not rested once
+  // the bot stands beside the chest (note 1976): full-2 (2026-10-20 21:41 to
+  // 21:53Z), twelve pearls and seven rods carried, had its last pearl's take
+  // at (-295, 30, -219) fail from 222 blocks off ("Took to long to decide
+  // path to goal!"), walked there, stood a block from the chest with the take
+  // resting ten minutes, and was sent through the portal to a warped forest
+  // for the pearl, the whole End kit in its pack.
+  const besideNow = (c, d) => d <= NEAR_AGAIN && (c.takeFailFrom ?? 0) > FAR_FAIL;
+  const all = stashes(goal).filter(c => c.dimension === dim && withContents(c))
+    .map(c => ({ c, d: Math.round(here.distanceTo(V(c.position))) }))
+    .filter(x => resting || !isSetAside(goal, 'rod_stash_take', at(x.c.position), now) || besideNow(x.c, x.d)).sort((a, b) => a.d - b.d);
   // The chest just filled beside the bot is the last taken, not the first
   // (note 1261): put down 'to take on the way out', it was the nearest with
   // something in it and came straight back out. 25593 (2026-10-04
@@ -512,6 +522,9 @@ async function collect(bot, task, goal, save, actions = {}) {
   } catch (err) {
     task?.check?.(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err;
     entry.takeFails = (entry.takeFails || 0) + 1; entry.lastTakeError = err.message;
+    // How far off the failed take was tried from (note 1976): a walk there
+    // that failed from far off is no reason to leave the chest once beside it.
+    try { entry.takeFailFrom = Math.round(bot.entity.position.distanceTo(V(entry.position))); } catch (_) { delete entry.takeFailFrom; }
     // Not there: lost, and no longer counted. Not reached three times: given
     // up, said, and no longer counted, so the ladder does not cross the
     // portal and back for it.
