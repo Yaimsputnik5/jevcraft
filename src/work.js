@@ -4962,42 +4962,48 @@ function lowestPortalBlock(bot) {
 // sneaking player does not walk off an edge), stop the moment the feet are
 // in the portal, and stand there.
 const inPortal = bot => [0, 1].some(dy => bot.blockAt?.(bot.entity.position.offset(0, dy, 0).floored())?.name === 'nether_portal');
-async function enterPortal(bot, task, portal, arrived, { walk = navigate } = {}) {
-  // Standing in the portal it just came through, the bot must step out
-  // first: a player is not sent back until it has left the sheet.
-  // Out of either face of the sheet: the one behind can be fire. mid-218-m-
-  // nether-3's step back went into the soul fire before its Nether-side
-  // portal, the other face clear (note 502); the move will not walk into
-  // fire (motion.js), and the sheet is left the other way.
+async function enterPortal(bot, task, portal, arrived, { walk = navigate, dig: digBlock = dig } = {}) {
+  // Standing in the sheet already (note 1943): the portal's cooldown never
+  // runs out while the body is in it, so the way through is out of the sheet
+  // and back in. The way out is across the sheet's plane, not along the
+  // bot's facing (note 1950): the keys 'back' and 'forward' went along the
+  // sheet when the bot faced along it, from one portal cell to the next, and
+  // the face closed by rock was never the one in front. full-4 (2026-10-20
+  // 02:42 to 11:30Z) stood in its own portal at (-16, 87, 2), the sheet two
+  // wide along x, netherrack on the z-1 face and lava on the z+1 face, for
+  // nine hours at 5.6 health: 'the walk into it failed (Timed out waiting
+  // for world/inventory update)' 602 times, no '[portal] standing in the
+  // sheet' line once, hunger 17 and nothing to eat on this side.
   if (inPortal(bot) && !arrived()) {
+    const feet = bot.entity.position.floored();
+    const sheet = b => /nether_portal|obsidian|crying_obsidian/.test(b?.name || '');
+    const alongX = [1, -1].some(dx => sheet(bot.blockAt(feet.offset(dx, 0, 0)))), alongZ = [1, -1].some(dz => sheet(bot.blockAt(feet.offset(0, 0, dz))));
+    const sides = alongX && !alongZ ? [[0, 1], [0, -1]] : alongZ && !alongX ? [[1, 0], [-1, 0]] : [[0, 1], [0, -1], [1, 0], [-1, 0]];
+    const solidRock = b => !!b && b.boundingBox === 'block' && !/obsidian|bedrock|nether_portal|crying_obsidian/.test(b.name);
+    const hot = b => /lava|fire|magma_block/.test(b?.name || '');
     const refused = [];
-    for (const key of ['back', 'forward']) {
+    for (const [dx, dz] of sides) {
+      if (!inPortal(bot) || arrived()) break;
+      const cell = feet.offset(dx, 0, dz), low = bot.blockAt(cell), high = bot.blockAt(cell.offset(0, 1, 0)), under = bot.blockAt(cell.offset(0, -1, 0));
+      const bad = [low, high, under].find(hot) || (!under || under.boundingBox !== 'block' ? { name: 'a drop' } : null);
+      if (bad) { refused.push({ name: bad.name, x: cell.x, y: cell.y, z: cell.z }); continue; }
+      const rock = [cell.offset(0, 1, 0), cell].filter(c => solidRock(bot.blockAt(c)));
+      if (rock.length) {
+        console.log(`[portal] standing in the sheet with the face at (${cell.x}, ${cell.y}, ${cell.z}) closed by ${rock.map(c => bot.blockAt(c).name).join(' and ')}: dug open to step out of the sheet`);
+        try { for (const c of rock) await digBlock(bot, task, c, { requireDrops: false }); }
+        catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; refused.push({ name: `rock not dug (${String(err.message || err).slice(0, 60)})`, x: cell.x, y: cell.y, z: cell.z }); continue; }
+      }
       const since = Date.now();
-      if (await move(bot, task, { label: 'leave_portal', keys: [key], sneak: true, maxMs: 1200, tick: 50, until: () => !inPortal(bot) })) break;
+      if (await move(bot, task, { label: 'leave_portal', keys: ['forward'], sneak: true, look: pos(cell).offset(0.5, 0.5, 0.5), maxMs: 1500, tick: 50, until: () => !inPortal(bot) })) {
+        console.log(`[portal] out of the sheet at (${cell.x}, ${cell.y}, ${cell.z}); back in once its cooldown has run out`);
+        await sleep(600); break;
+      }
       if (bot._moveRefused?.label === 'leave_portal' && bot._moveRefused.at >= since) refused.push(bot._moveRefused);
     }
-    if (inPortal(bot) && refused.length === 2) {
-      throw new Error(`Both faces of the portal the bot stands in step into fire or lava (${refused.map(r => `${r.name.replace('_', ' ')} at ${r.x}, ${r.y}, ${r.z}`).join('; ')}); not walked into`);
-    }
-    // Still in the sheet with a face closed by rock (note 1943): the face is dug open and stepped out of. full-4 (2026-10-20 02:42 to 03:10Z) sealed its night pocket inside its own Nether portal, lava on one face and its cobblestone on the other; the leave went nowhere, the portal's cooldown never ran out, every walk in 'timed out waiting for world/inventory update', and it stood twenty-eight minutes at 5.6 health with no move the unstuck question would check.
-    if (inPortal(bot) && !arrived()) {
-      const yaw = bot.entity.yaw, fwd = new Vec3(-Math.sin(yaw), 0, Math.cos(yaw)), feet = bot.entity.position.floored();
-      const solidRock = b => !!b && b.boundingBox === 'block' && !/obsidian|bedrock|nether_portal|crying_obsidian/.test(b.name);
-      for (const [key, dir] of [['forward', fwd], ['back', fwd.scaled(-1)]]) {
-        const cell = feet.offset(Math.round(dir.x), 0, Math.round(dir.z));
-        if (refused.some(r => r.x === cell.x && r.z === cell.z)) continue;
-        const low = bot.blockAt(cell), high = bot.blockAt(cell.offset(0, 1, 0));
-        if (!solidRock(low) && !solidRock(high)) continue;
-        console.log(`[portal] standing in the sheet with the ${key} face closed by ${[high, low].filter(solidRock).map(b => b.name).join(' and ')} at (${cell.x}, ${cell.y}, ${cell.z}): dug open to step out of the sheet`);
-        try { for (const c of [cell.offset(0, 1, 0), cell]) if (solidRock(bot.blockAt(c))) await dig(bot, task, c, { requireDrops: false }); }
-        catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; continue; }
-        if (await move(bot, task, { label: 'leave_portal', keys: [key], sneak: true, maxMs: 1200, tick: 50, until: () => !inPortal(bot) })) break;
-      }
+    if (inPortal(bot) && !arrived() && refused.length >= sides.length) {
+      throw new Error(`Every face of the portal the bot stands in steps into fire, lava or a drop (${refused.map(r => `${String(r.name).replace('_', ' ')} at ${r.x}, ${r.y}, ${r.z}`).join('; ')}); not walked into`);
     }
   }
-  // The last cells up to the frame may be taken beside lava: a portal is
-  // where it is, and the step in is crouched (below). The way there keeps
-  // off the lava's edge as every walk does (movement.js, note 516).
   const atFrame = c => Math.abs(c.x - portal.x) <= 2 && Math.abs(c.y - portal.y) <= 2 && Math.abs(c.z - portal.z) <= 2;
   // At the frame already, and the pathfinder finding no route to the sheet
   // because every cell round the arrival's platform is beside a drop it
