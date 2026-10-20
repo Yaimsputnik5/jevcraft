@@ -84,7 +84,8 @@ test('a magma cube outside is priced at its own size on the leave: the big one o
   const small = pocket({ size: 1 });
   const little = (await ask(small.bot, small.origin, goalOf(), now)).leave.description;
   const dmg = s => Number(s.match(/seconds and ([\d.]+) damage/)?.[1]);
-  assert.ok(dmg(big) > 40, `unknown size priced as the big one: ${dmg(big)}`);
+  // The big one alone, not the family a kill would make of it (note 1957): priced as thirteen mobs it read 'about 44.4 damage ... to kill the 13' to full-1 (2026-10-20 12:20Z), and every way on offer stood past the health it had.
+  assert.ok(dmg(big) > dmg(little) && dmg(big) < 25, `unknown size priced as the big one, by itself: ${dmg(big)} against the small one's ${dmg(little)}`);
   assert.ok(dmg(little) < 10, `a small one priced as small: ${dmg(little)}`);
 });
 

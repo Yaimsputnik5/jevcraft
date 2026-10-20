@@ -15,7 +15,8 @@ const { bedCarried, placeOriented, isBed, homeOf, layout, homeChores } = require
 const { kitReady } = require('./mob-policy');
 const { fightEstimate, stanceCost, RANGE, blocksPerSecond, followRange, bodyHeight, PLAYER_SPRINT, HOLD_SECONDS, slimeSize } = require('./combat-estimate');
 // A slime's or a magma cube's size, for the estimate (combat-estimate slimeOf).
-const sizeOf = entity => { const size = slimeSize(entity); return size ? { size } : {}; };
+// A slime or a magma cube is priced as itself, not as the family a kill would make of it (note 1957, as riskNow has it since note 1103): the splits were added as thirteen mobs at arm's length from the first second, and full-1 (2026-10-20 12:20:40Z, 14.2 health, iron sword, two pieces) read one big magma cube as 'about 44.4 damage ... to kill the 13 in these figures', the seal at 157, every way on offer past the health it had; it chose none that fought, and the cube killed it over eighty seconds. In the record magma cubes landed 28 hits in 18 meetings (note 1103). The mob's note still says what a kill splits it into.
+const sizeOf = entity => { const size = slimeSize(entity); return size ? { size, noSplits: true } : /^(magma_cube|slime)$/.test(entity?.name || '') ? { noSplits: true } : {}; };
 const { walkersApart, apartSays } = require('./walk-reach');
 const { darkCells, groundCells, placeTorches, lightSources, blockLight } = require('./torches');
 // Dark enough where the bot stands for monsters to spawn: a fact for the
