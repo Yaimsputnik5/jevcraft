@@ -210,7 +210,7 @@ test('crossing_kit: the cache of valuables says what the iron left in it saves a
   await crossingKitReady(b, { check() {}, opportunityClient: client }, { kind: 'win' }, () => {}, client);
   const says = asked?.cache_valuables || asked?.stash_valuables;
   assert.ok(says, Object.keys(asked || {}).join(','));
-  assert.match(says, /The 36 iron carried \(raw and ingots\) is what a kit is made of again \(a pickaxe 3, a sword 2, a shield 1, armour up to 24\): left in the chest it is (fetched from this chest on the way back to the portal|taken up again at home) after a death\. On 2026-10-03 half the minutes after a death in the Nether went to iron \(209 of 412 bot-minutes/);
+  assert.match(says, /The 36 iron carried \(raw and ingots\) is what a kit is made of again \(a pickaxe 3, a sword 2, a shield 1, armour up to 24\): left in the chest it is (fetched from this chest on the way back to the portal|taken up again at home) after a death\. On 2026-10-20 \(four fresh runs, 18 deaths in the Nether with a return\) 524 of the 1,206 bot-minutes after a death went to iron .* a median 76 minutes later; on 2026-10-03, 209 of 412 and a median 37\./);
 });
 
 test('on the trip chosen for the kit a death left in the Nether, the crossing is not asked of again (note 1234)', async () => {
