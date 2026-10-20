@@ -4979,6 +4979,21 @@ async function enterPortal(bot, task, portal, arrived, { walk = navigate } = {})
     if (inPortal(bot) && refused.length === 2) {
       throw new Error(`Both faces of the portal the bot stands in step into fire or lava (${refused.map(r => `${r.name.replace('_', ' ')} at ${r.x}, ${r.y}, ${r.z}`).join('; ')}); not walked into`);
     }
+    // Still in the sheet with a face closed by rock (note 1943): the face is dug open and stepped out of. full-4 (2026-10-20 02:42 to 03:10Z) sealed its night pocket inside its own Nether portal, lava on one face and its cobblestone on the other; the leave went nowhere, the portal's cooldown never ran out, every walk in 'timed out waiting for world/inventory update', and it stood twenty-eight minutes at 5.6 health with no move the unstuck question would check.
+    if (inPortal(bot) && !arrived()) {
+      const yaw = bot.entity.yaw, fwd = new Vec3(-Math.sin(yaw), 0, Math.cos(yaw)), feet = bot.entity.position.floored();
+      const solidRock = b => !!b && b.boundingBox === 'block' && !/obsidian|bedrock|nether_portal|crying_obsidian/.test(b.name);
+      for (const [key, dir] of [['forward', fwd], ['back', fwd.scaled(-1)]]) {
+        const cell = feet.offset(Math.round(dir.x), 0, Math.round(dir.z));
+        if (refused.some(r => r.x === cell.x && r.z === cell.z)) continue;
+        const low = bot.blockAt(cell), high = bot.blockAt(cell.offset(0, 1, 0));
+        if (!solidRock(low) && !solidRock(high)) continue;
+        console.log(`[portal] standing in the sheet with the ${key} face closed by ${[high, low].filter(solidRock).map(b => b.name).join(' and ')} at (${cell.x}, ${cell.y}, ${cell.z}): dug open to step out of the sheet`);
+        try { for (const c of [cell.offset(0, 1, 0), cell]) if (solidRock(bot.blockAt(c))) await dig(bot, task, c, { requireDrops: false }); }
+        catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; continue; }
+        if (await move(bot, task, { label: 'leave_portal', keys: [key], sneak: true, maxMs: 1200, tick: 50, until: () => !inPortal(bot) })) break;
+      }
+    }
   }
   // The last cells up to the frame may be taken beside lava: a portal is
   // where it is, and the step in is crouched (below). The way there keeps
