@@ -116,3 +116,36 @@ test('place() puts a block into a lava cell only when asked to (note 1953)', asy
   await place(bot, new Task('cap'), new Vec3(0, 64, 0), 'cobblestone', { replaceLiquid: true });
   assert.equal(blocks.get('0,64,0'), 'cobblestone');
 });
+
+test('beside the sheet already, the walk is not run, and lava between the body and the sheet is capped before the step in (note 1956)', async () => {
+  const { enterPortal } = require('../src/work');
+  const world = sheetWorld();
+  // The body diagonal from the sheet at (-18, 87, 1), lava at (-17, 87, 1) between it and the portal cell (-17, 87, 2), netherrack under the lava.
+  world.blocks.set('-17,87,1', 'lava'); world.blocks.delete('-17,88,1'); world.blocks.set('-18,86,1', 'netherrack'); world.blocks.delete('-18,87,1'); world.blocks.delete('-18,88,1');
+  const controls = {}, placed = [], logs = []; let walked = 0, looking = null, inside = 0;
+  const bot = { entity: { position: new Vec3(-17.5, 87, 1.5), yaw: 0, pitch: 0 }, game: { dimension: 'the_nether' },
+    pathfinder: { setGoal() {}, movements: {}, goto: async () => {}, isMoving: () => false },
+    lookAt: async p => { looking = p; bot.entity.yaw = Math.atan2(-(p.x - bot.entity.position.x), -(p.z - bot.entity.position.z)); }, look: async () => {},
+    setControlState: (key, on) => { controls[key] = on; }, clearControlStates() { for (const k of Object.keys(controls)) controls[k] = false; },
+    inventory: { items: () => [{ name: 'cobblestone', count: 126 }], slots: {} }, blockAt: world.blockAt };
+  const inPortalNow = () => world.blockAt(bot.entity.position.floored()).name === 'nether_portal';
+  const tick = setInterval(() => {
+    if (controls.forward && looking) {
+      const dx = looking.x - bot.entity.position.x, dz = looking.z - bot.entity.position.z, d = Math.hypot(dx, dz) || 1;
+      let next = bot.entity.position.offset(dx / d * 0.08, 0, dz / d * 0.08);
+      if (world.blockAt(next.floored()).boundingBox === 'block' && controls.jump && world.blockAt(next.floored().offset(0, 1, 0)).boundingBox === 'empty') next = next.offset(0, 1, 0);
+      if (world.blockAt(next.floored()).boundingBox === 'empty') bot.entity.position = next;
+    }
+    inside = inPortalNow() && !controls.forward ? inside + 1 : 0;
+    if (inside >= 6) bot.game.dimension = 'overworld';
+  }, 50);
+  const log = console.log; console.log = (...a) => { logs.push(a.join(' ')); };
+  try {
+    await enterPortal(bot, new Task('portal'), new Vec3(-17, 87, 2), () => bot.game.dimension === 'overworld', {
+      walk: async () => { walked++; }, dig: async () => { throw new Error('nothing to dig'); },
+      place: async (b, t, c, material, opts) => { assert.equal(opts?.replaceLiquid, true); placed.push(`${c.x},${c.y},${c.z}`); world.blocks.set(`${c.x},${c.y},${c.z}`, material); } });
+  } catch (err) { console.log = log; console.log(logs.join('\n'), '\nPOS', bot.entity.position); throw err; } finally { clearInterval(tick); console.log = log; }
+  assert.equal(walked, 0, 'beside the sheet, the pathfinder is not asked');
+  assert.deepEqual(placed, ['-17,87,1'], 'the lava between is capped');
+  assert.equal(bot.game.dimension, 'overworld');
+});

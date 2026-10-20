@@ -5018,6 +5018,8 @@ async function enterPortal(bot, task, portal, arrived, { walk = navigate, dig: d
     }
   }
   const atFrame = c => Math.abs(c.x - portal.x) <= 2 && Math.abs(c.y - portal.y) <= 2 && Math.abs(c.z - portal.z) <= 2;
+  // Beside the sheet already (within two blocks of the portal's cell), the walk is not run (note 1956): the pathfinder's 'near' took full-4 (2026-10-20 12:07Z) off the cap it had just stepped up onto, round the frame to a cell diagonal from the sheet with lava between, and the step in was refused for that lava thirty times.
+  const beside = () => bot.entity.position.distanceTo(pos(portal).offset(0.5, 0.5, 0.5)) <= 2.2;
   // At the frame already, and the pathfinder finding no route to the sheet
   // because every cell round the arrival's platform is beside a drop it
   // refuses: the step in below is crouched (a sneaking player does not walk
@@ -5026,28 +5028,35 @@ async function enterPortal(bot, task, portal, arrived, { walk = navigate, dig: d
   // for food from the portal they stood beside; each ended "No route from
   // here to (x, y, z) (partial): the way passes along a drop that would
   // kill", one block from the sheet, and the trip was never made (note 643).
-  try { await walk(bot, task, new goals.GoalNear(portal.x, portal.y, portal.z, 1), { timeoutMs: 20000, besideLava: atFrame }); }
-  catch (err) {
-    task.check();
-    if (err?.name !== 'NoRoute' || !atFrame(bot.entity.position.floored())) throw err;
+  if (!beside()) {
+    try { await walk(bot, task, new goals.GoalNear(portal.x, portal.y, portal.z, 1), { timeoutMs: 20000, besideLava: atFrame }); }
+    catch (err) {
+      task.check();
+      if (err?.name !== 'NoRoute' || !atFrame(bot.entity.position.floored())) throw err;
+    }
   }
   if (arrived()) return;
   bot.pathfinder.setGoal(null);
   if (!inPortal(bot)) {
-    // Crouched, it cannot step down: a portal a block below the bot's feet
-    // is walked into upright, the one step checked to land in the sheet.
-    const below = portal.y < Math.floor(bot.entity.position.y);
-    // From water the step in is a swimmer's climb out, forward and jump,
-    // upright: crouched, a swimmer sinks. mid-242-ab's portal had water
-    // before its face (its cast's own, note 567); the walk ended afloat at
-    // the sheet, the crouched step sank it to the bottom of the hole in
-    // front, and the step failed there every two seconds for half an hour.
-    // Afloat is in the water too, bobbing with the feet a moment above it.
     const wet = p => /^water$|^bubble_column$/.test(bot.blockAt(p)?.name || '');
     const feet = bot.entity.position.floored();
     const swimming = bot.entity.isInWater === true || wet(feet) || (!bot.entity.onGround && wet(feet.offset(0, -1, 0)));
-    await move(bot, task, { label: 'enter_portal', keys: swimming ? ['forward', 'jump'] : ['forward'], sneak: !below && !swimming,
-      why: swimming ? 'a climb out of the water into the portal: crouched, a swimmer sinks' : below ? 'a step down into the portal' : undefined,
+    // Lava between the body and the sheet, on rock, is capped first and the step in goes up onto the cap (note 1956).
+    let capped = false;
+    if (!swimming) {
+      const dx = Math.sign(portal.x - feet.x), dz = Math.sign(portal.z - feet.z);
+      const between = [...(dx ? [feet.offset(dx, 0, 0)] : []), ...(dz ? [feet.offset(0, 0, dz)] : []), ...(dx && dz ? [feet.offset(dx, 0, dz)] : [])]
+        .filter(c => !(c.x === portal.x && c.z === portal.z) && /lava/.test(bot.blockAt(c)?.name || '') && bot.blockAt(c.offset(0, -1, 0))?.boundingBox === 'block' && !/lava|fire/.test(bot.blockAt(c.offset(0, 1, 0))?.name || ''));
+      for (const c of between) {
+        let material = null; try { material = require('./shelter').buildingItem(bot)?.name || null; } catch (_) { material = null; }
+        if (!material) break;
+        try { await placeBlock(bot, task, c, material, { replaceLiquid: true }); capped = true; console.log(`[portal] lava at (${c.x}, ${c.y}, ${c.z}) between the body and the sheet capped with ${material}`); }
+        catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; console.log(`[portal] the lava at (${c.x}, ${c.y}, ${c.z}) between the body and the sheet was not capped: ${String(err.message || err).slice(0, 80)}`); }
+      }
+    }
+    const below = portal.y < Math.floor(bot.entity.position.y);
+    await move(bot, task, { label: 'enter_portal', keys: swimming || capped ? ['forward', 'jump'] : ['forward'], sneak: !below && !swimming && !capped,
+      why: capped ? 'a step up onto the cap over the lava and into the portal' : swimming ? 'a climb out of the water into the portal: crouched, a swimmer sinks' : below ? 'a step down into the portal' : undefined,
       look: pos(portal).offset(0.5, 0.5, 0.5), maxMs: 4000, tick: 50, until: () => inPortal(bot) || arrived(),
       stopAt: c => bot.blockAt?.(new Vec3(c.x, Math.floor(bot.entity.position.y), c.z))?.name === 'nether_portal' });
   }
