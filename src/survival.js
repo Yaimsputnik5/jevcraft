@@ -482,6 +482,8 @@ const PILLAR_SECONDS = 1.5;
 // How long a stance just answered is the answer to a hit while its run is in
 // flight (note 1947): its first seconds, a pillar's climb or a retreat's run.
 const STANCE_RUN_ANSWERS_MS = 4000;
+// A stance that failed at once twice running here within these seconds is left out as long again (note 1952).
+const FAILED_TWICE_MS = 5000;
 // A block of a pocket six tenths of a second (the median over 229 pocket
 // passes in the flight records of 2026-09-23 to 26); eating a second and six
 // tenths; digging down a second a block more than the dig itself (below).
@@ -4734,7 +4736,7 @@ class Survival {
           description: `${stepWords}: an enderman cannot path into a cell that low, so once the lid is up none still about can ever land a hit, and the sword goes on reaching its legs from here.` + (plan.kind === 'place' ? buildCost : '') + (plan.kind === 'here' ? '' : costSays(capCost, bot.health, mobs, { doing: plan.kind === 'place' ? 'placing the lid' : 'stepping in', done: 'Capped' })) + (danger.length > 1 ? ` ${danger.length} endermen about; capped, they are taken one at a time, whichever is struck.` : ''),
           run: async () => {
             this.report(goal, save, { action: 'cap_overhead', kind: plan.kind, blocks: plan.blocks, threats: danger.map(t => t.entity.name).slice(0, 4), health: bot.health, stance: true });
-            if (!await roof.takeRoof(bot, task, this.actions, plan)) return false;
+            if (!await roof.takeRoof(bot, task, this.actions, plan)) { this.state.failWhy = plan.why || 'the roof was not taken'; return false; }
             return fightStance ? fightStance.run() : false;
           } };
       }
@@ -6362,6 +6364,13 @@ class Survival {
     // The scene as a stance's outcome turns on it (stance-scene.js, note 659):
     // an answer that came to nothing in it is left out as the idle rule
     // leaves one out, while it is unchanged and two or more other ways stay.
+    // Failed at once twice running here within five seconds (note 1952): left out for five more, whatever the scene, and said so with its reason. The idle and scene rules below need the scene unchanged, and a crowd of teleporting endermen never gives that: full-3 (2026-10-20 08:18:54 to 57Z) was offered cap_fight again 0.2 to 0.7 seconds after each of five at-once failures ('Tried 5 times in the last 3 seconds here, and it failed'), took it each time, and died at 17.3 health to none in three seconds.
+    const twiceOut = [];
+    for (const f of latest.values()) {
+      if (f.times < 2 || Date.now() - f.at >= FAILED_TWICE_MS || !options[f.choice] || f.choice === underWay || leftOut.includes(f.choice) || /^eat/.test(f.choice)) continue;
+      if (rest().length > 2) { leftOut.push(f.choice); twiceOut.push(f); }
+    }
+    const twiceSays = f => `failed at once ${f.times} times in the last ${Math.max(1, Math.round((Date.now() - Math.min(...failed.filter(x => x.choice === f.choice).map(x => x.at))) / 1000))} seconds here${f.why ? `: ${String(f.why).slice(0, 160)}` : ''}; offered again in ${Math.round(FAILED_TWICE_MS / 1000)} seconds`;
     const scenes = require('./stance-scene');
     const scene = scenes.sceneOf(bot, danger, { apart: this.lastApart?.ids || new Set(), strikes: e => !!e.position && canStrike(bot, e), blocks: shelter.materialStock(bot) });
     const book = scenes.observe(this.state, scene);
@@ -6375,7 +6384,8 @@ class Survival {
     }
     for (const k of leftOut) delete options[k];
     const notOfferedNow = [...idle.filter(f => leftOut.includes(f.choice)).map(f => ({ choice: f.choice, why: `${idleSays(f)}; offered again when something changes` })),
-      ...sceneOut.map(f => ({ choice: f.choice, why: `${sceneSays(f)}; offered again when the scene changes` }))];
+      ...sceneOut.map(f => ({ choice: f.choice, why: `${sceneSays(f)}; offered again when the scene changes` })),
+      ...twiceOut.map(f => ({ choice: f.choice, why: twiceSays(f) }))];
     if (!Object.keys(options).length) return false;
     // A spawner in reach, said with every stance: mid-207-j fought beside a
     // dungeon's zombie spawner six blocks off, told each time of "a zombie,

@@ -67,16 +67,20 @@ async function takeRoof(bot, task, actions, plan) {
   if (plan.kind === 'gap') {
     if (feetCell(bot).equals(plan.cell)) return true;
     const { goals } = require('mineflayer-pathfinder');
+    // Why it was not taken, left on the plan for the next question (note 1952).
     try { await actions.navigate(bot, task, new goals.GoalBlock(plan.cell.x, plan.cell.y, plan.cell.z), { timeoutMs: 4000, stallMs: 1500 }); }
-    catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; return false; }
-    return feetCell(bot).equals(plan.cell);
+    catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; plan.why = `the walk to the gap at (${plan.cell.x}, ${plan.cell.y}, ${plan.cell.z}) failed: ${String(err.message || err).slice(0, 80)}`; return false; }
+    if (!feetCell(bot).equals(plan.cell)) { plan.why = `the walk ended short of the gap at (${plan.cell.x}, ${plan.cell.y}, ${plan.cell.z})`; return false; }
+    return true;
   }
   if (plan.kind === 'place') {
     const material = shelter.buildingItem(bot)?.name;
-    if (!material) return false;
-    try { await actions.place(bot, task, plan.cell.offset(0, 2, 0), material, { stay: true }); return true; }
-    catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; return false; }
+    if (!material) { plan.why = 'no block carried for the lid'; return false; }
+    const lid = plan.cell.offset(0, 2, 0);
+    try { await actions.place(bot, task, lid, material, { stay: true }); return true; }
+    catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; plan.why = `the lid at (${lid.x}, ${lid.y}, ${lid.z}) was not placed: ${String(err.message || err).slice(0, 80)}`; return false; }
   }
+  plan.why = 'no way to a lid from here';
   return false;
 }
 
