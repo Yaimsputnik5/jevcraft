@@ -6205,6 +6205,13 @@ class Survival {
     const damageOver = !!held && (held.expects ? held.health - bot.health > pacedLoss(held.health, held.expects, elapsed, { extended: extendedHold }) : bot.health <= held.health - holdLoss(held.health));
     const inTime = !!held && (extendedHold ? Date.now() < held.hold.until : Date.now() - held.at < STANCE_HOLD_MS && !(held.expects && elapsed > held.expects.seconds));
     let holding = physical && !damageOver && inTime;
+    // Why a held stance is let go, said once each time (note 1949): full-3 (2026-10-20 08:18:54 to 57Z) turned cap_fight, shield_guard, cap_fight, shield_guard, cap_fight, cap_fight, shield_guard, cap_fight, cap_fight in three seconds among three endermen, 17.3 health to none, every answer replaced before its run began and nothing in the record saying what ended each hold; the stall watch alone saw 'turning between shield guard and cap overhead 4 times in 1 seconds'.
+    if (held && !holding) {
+      const why = leftBe ? 'leaving them be ended at a threat in reach' : runStuck ? 'the run got nowhere' : unseenLong ? 'its mobs long out of sight' : crowdGrew ? 'the crowd grew' : shieldChanged ? 'the shield changed' : outageLow ? 'Jev down and the health low'
+        : (held.ids ? newcomer : held.kinds !== kinds) ? `a newcomer within ${STANCE_NEWCOMER}: ${newcomer?.entity?.name || kinds}` : hitSince ? 'hit while leaving them be' : offSpot ? 'off its spot' : lineAgain.length ? 'a shooter has its line again' : shotThrough ? 'shot through' : blockAgain ? 'the creeper block is due again' : pushedOpen ? 'pushed open' : held.lethalAgain ? 'lethal again'
+        : damageOver ? `more damage than priced (${Math.round((held.health - (bot.health ?? 0)) * 10) / 10} of ${held.health} gone in ${Math.round(elapsed * 10) / 10} s)` : !inTime ? 'its time is up' : 'no reason named';
+      console.log(`[stance] ${String(held.choice).replaceAll('_', ' ')} let go after ${Math.round((Date.now() - held.at) / 100) / 10} s: ${why}`);
+    }
     // At the end of its time, a hold with nothing new is not a question
     // (holds.js, note 599): held on, 15, 30, then 60 seconds at a time, while
     // what it was chosen on stands; asked again when that is falsified (read
