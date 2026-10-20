@@ -197,7 +197,8 @@ function burningAhead(bot, keys, { deep = false, flames = true } = {}) {
 function watchReleases(bot) {
   if (bot._releaseWatch || typeof bot.setControlState !== 'function') return;
   bot._releaseWatch = true;
-  const frames = () => new Error().stack.split('\n').slice(3, 6).map(l => l.trim().replace(/^at /, '').replace(/\(.*\/src\//, '(src/')).join(' < ');
+  // The wrapper's own frames and mineflayer's left out (note 1940): 'clearControlStates at physics.js:288 < motion.js:203' named nothing.
+  const frames = () => new Error().stack.split('\n').slice(2).map(l => l.trim().replace(/^at /, '').replace(/\(.*\/src\//, '(src/')).filter(l => !/mineflayer\/lib\/plugins\/physics\.js|src\/motion\.js:\d+/.test(l) && !/^bot\.(set|clear)ControlStates? /.test(l)).slice(0, 3).join(' < ');
   const raw = bot.setControlState.bind(bot);
   bot.setControlState = (key, on) => { if (!on && bot._controller && !bot._controller.failed && bot._controller.keys?.includes(key) && bot.controlState?.[key]) bot._controller.letGoBy = `set(${key}, false) at ${frames()}`; return raw(key, on); };
   if (typeof bot.clearControlStates === 'function') { const rawClear = bot.clearControlStates.bind(bot); bot.clearControlStates = () => { if (bot._controller && !bot._controller.failed) bot._controller.letGoBy = `clearControlStates at ${frames()}`; return rawClear(); }; }

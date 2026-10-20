@@ -156,6 +156,8 @@ async function escape(survival, task, goal, save, { log = console.log, why = 'in
   if (kept.length > 10) kept.splice(0, kept.length - 10);
   try { bot.emit?.('lava_escape', facts); } catch (_) { /* the record is not the escape */ }
   if (!took) return false;
+  // The pathfinder's goal let go first (note 1940): the walk that put the body in the lava keeps steering it by its path each tick, and the swim's jump is set and unset against it. full-2 (2026-10-20 02:09:43Z) chose retreat, walked into lava, took swim_up at 17.9 health, and sank from y 31.7 to 25.9 in 2.6 seconds with 'jump let go mid-move by clearControlStates' in the log; dead at 02:10:38.
+  try { bot.pathfinder?.setGoal?.(null); bot.pathfinder?.stop?.(); } catch (_) { /* no walk to stop */ }
   let out = false;
   try { out = (await ways[took].run()) !== false && !require('./terrain').bodyInLava(bot); }
   finally {
