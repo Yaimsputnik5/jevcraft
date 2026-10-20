@@ -63,12 +63,23 @@ function recentSays(within16 = 0) {
 }
 // The record said with the row the bot is in: its health, its hunger, and
 // how many blazes are about it (three within sixteen blocks is a spawner's).
+// The fights of the fresh runs today, first (note 1977; scripts/blaze-record.js
+// --from 2026-10-20T00:00Z --to 2026-10-21T00:00Z over the four full runs'
+// flight records): the rows below are of 2026-09-28 and 29, when a fight
+// brought a rod 30% of the time; on 2026-10-20 it was 6%, 11 rods for 17
+// deaths. [fights, died, brought a rod, rods]
+const TODAY = { day: '2026-10-20 (four fresh runs, to 21:50Z)', all: [130, 17, 8, 11], spawner: [72, 14, 6] };
+const todayPct = (k, n) => Math.round(100 * k / Math.max(1, n));
+function todaySays() {
+  const [f, d, r, rods] = TODAY.all, [sf, sd, sr] = TODAY.spawner;
+  return `On ${TODAY.day}: ${f} fights with blazes, ${todayPct(d, f)}% ended in the bot's death and ${todayPct(r, f)}% in a blaze rod (${rods} rods, ${d} deaths: ${Math.round(10 * d / rods) / 10} deaths a rod, against ${Math.round(10 * ALL.died / ALL.rods) / 10} in the trials below); with three or more blazes within sixteen ${sf} fights, ${todayPct(sd, sf)}% died and ${todayPct(sr, sf)}% brought a rod. `;
+}
 function says(bot, { day = DAY } = {}) {
   const health = bot?.health ?? 20, food = bot?.food ?? 20;
   const here = bot?.entity?.position;
   const within16 = here ? Object.values(bot.entities || {}).filter(e => e?.name === 'blaze' && e.position && e.isValid !== false && e.position.distanceTo(here) <= 16).length : 0;
   const band = HEALTH.find(h => health > h.over) || HEALTH.at(-1);
-  const parts = [`In the trials of ${day}, ${ALL.fights} fights with blazes (a run of blazes in sight, or hurting the bot, ending after thirty seconds without): ${ALL.diedPct}% ended in the bot's death and ${ALL.rodPct}% in a blaze rod (${ALL.rods} rods, ${ALL.died} deaths).`];
+  const parts = [todaySays() + `In the trials of ${day}, ${ALL.fights} fights with blazes (a run of blazes in sight, or hurting the bot, ending after thirty seconds without): ${ALL.diedPct}% ended in the bot's death and ${ALL.rodPct}% in a blaze rod (${ALL.rods} rods, ${ALL.died} deaths).`];
   parts.push(` Begun at the health this bot has, ${Math.round(health * 10) / 10}, the row is ${band.said}: ${band.fights} fights, ${band.diedPct}% died, ${rodSays(band.rodPct)}; the other rows, over 16 health ${HEALTH[0].diedPct}% died and ${HEALTH[0].rodPct}% brought a rod, 8 to 16 ${HEALTH[1].diedPct}% and ${HEALTH[1].rodPct}%, under 8 ${HEALTH[2].diedPct}% and ${HEALTH[2].rodPct ? `${HEALTH[2].rodPct}%` : 'none'}.`);
   if (food < 18) parts.push(` With hunger under 18, as here (${food}), where health does not come back: ${HUNGER.hungry.fights} fights, ${HUNGER.hungry.diedPct}% died and ${HUNGER.hungry.rodPct}% brought a rod, against ${HUNGER.fed.diedPct}% and ${HUNGER.fed.rodPct}% at 18 or more.`);
   parts.push(` By the blazes about at most: with three or more within sixteen blocks (a spawner's) ${BLAZES.spawner.fights} fights, ${BLAZES.spawner.diedPct}% died and ${BLAZES.spawner.rodPct}% brought a rod; with one or none ${BLAZES.few.fights} fights, ${BLAZES.few.diedPct}% and ${BLAZES.few.rodPct}%${within16 >= 3 ? `; ${within16} are within sixteen now` : ''}. ${ironSays()}`);

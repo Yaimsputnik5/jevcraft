@@ -92,7 +92,7 @@ test('a price that leaves less than one landing is said as a coin toss over a la
 
 test('the record of the bot\'s fights is said with the row it is in: its health, its hunger, the blazes about', () => {
   const hurt = record.says({ health: 3, food: 16, entity: { position: new Vec3(0, 60, 0) }, entities: {} });
-  assert.match(hurt, /^In the trials of 2026-09-28 to 2026-09-29T11:40Z, 624 fights with blazes \(a run of blazes in sight, or hurting the bot, ending after thirty seconds without\): 26% ended in the bot's death and 30% in a blaze rod \(261 rods, 162 deaths\)\./);
+  assert.match(hurt, /In the trials of 2026-09-28 to 2026-09-29T11:40Z, 624 fights with blazes \(a run of blazes in sight, or hurting the bot, ending after thirty seconds without\): 26% ended in the bot's death and 30% in a blaze rod \(261 rods, 162 deaths\)\./);
   assert.match(hurt, /Begun at the health this bot has, 3, the row is under 8 health: 29 fights, 62% died, 3% brought a rod;/);
   assert.match(hurt, /over 16 health 22% died and 34% brought a rod, 8 to 16 40% and 11%, under 8 62% and 3%/);
   assert.match(hurt, /With hunger under 18, as here \(16\), where health does not come back: 162 fights, 33% died and 16% brought a rod, against 23% and 35% at 18 or more\./);
