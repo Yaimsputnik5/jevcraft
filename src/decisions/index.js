@@ -304,8 +304,11 @@ function recentDeaths(bot, goal, now = Date.now()) {
 // (note 691). An option with no price is not judged by it. The weights are Jev's where Jev chose;
 // here Jev chose none of them, and the rule is what the code does meanwhile.
 const EXPOSED_S = 15;
-function pickWhenNoneGood(listed, weights, health) {
-  const keys = Object.keys(listed).filter(k => k !== NONE_GOOD_KEY);
+// `failed`: the choices that failed here just now (survival.js failedHereJustNow, note 1959); none of them is the least bad while another is listed. full-4 (2026-10-20 12:34:05 and 12:34:09Z, 3.6 health, a ghast 34 blocks off) was handed 'fight' twice as the least bad with 'fight' in failedHereJustNow 3 and 6 seconds before; full-3 (08:18:56Z) 'cap_fight' with cap_fight failed five times in the three seconds before, and died on it.
+function pickWhenNoneGood(listed, weights, health, failed = []) {
+  const all = Object.keys(listed).filter(k => k !== NONE_GOOD_KEY);
+  const fresh = all.filter(k => !failed.includes(k));
+  const keys = fresh.length ? fresh : all;
   const byWeight = keys.slice().sort((a, b) => (weights[b] || 0) - (weights[a] || 0));
   const priced = keys.filter(k => Number.isFinite(listed[k]?.expects?.damage) && Number.isFinite(listed[k]?.expects?.seconds));
   if (!Number.isFinite(health) || !priced.length) return { key: byWeight[0], why: null };
@@ -329,7 +332,7 @@ function noneGood(id, decision, listed, { bot, goal, state, last = null }) {
   const keys = Object.keys(listed);
   const byJev = children => decision.answerAt?.(children) || firstOption(children);
   const down = k => { const node = listed[k]; return node?.children ? { path: [k, ...walk(node.children, byJev).path] } : { path: [k] }; };
-  const safety = pickWhenNoneGood(listed, weights, bot?.health);
+  const safety = pickWhenNoneGood(listed, weights, bot?.health, (state?.failedHereJustNow || []).map(f => f.choice));
   let path, passedOver = null, why = safety.why;
   if (why) { path = down(safety.key).path; console.log(`[none good] ${id}: took ${safety.key}, not the next by weight: ${why}`); }
   else ({ path, passedOver } = leastBad.choose(id, keys, weights, last, k => down(k).path));
