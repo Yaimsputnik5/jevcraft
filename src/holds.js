@@ -64,8 +64,10 @@ const secs = ms => { const s = Math.round(ms / 1000); return s < 90 ? `${s} seco
 // option keys on offer.
 // The health a stance with no price may cost before it is asked again (note 952).
 const UNPRICED_LOSS = 4;
-function begin({ choice, at = Date.now(), health, expects = null, mobs = [], offered = [] }) {
-  return { choice, at, health, ...(expects ? { expects } : {}), offered: offered.filter(k => k !== 'none_good'),
+// A shield's uses blocked away are a cost the hold's price does not carry (note 1955): a hold is asked again once the shield has spent this share of the uses it had at the choice.
+const SHIELD_SPENT = 0.25;
+function begin({ choice, at = Date.now(), health, expects = null, mobs = [], offered = [], shield = null }) {
+  return { choice, at, health, ...(expects ? { expects } : {}), ...(shield?.held ? { shieldLeft: shield.left, shieldMax: shield.max } : {}), offered: offered.filter(k => k !== 'none_good'),
     against: mobs.filter(t => t?.entity).slice(0, 6).map(t => ({ id: t.entity.id, name: t.entity.name, distance: Math.round(t.distance * 10) / 10, visible: !!t.visible })),
     until: at + Math.min(15000, expects?.seconds ? expects.seconds * 1000 : 15000), extended: 0 };
 }
@@ -73,8 +75,12 @@ function begin({ choice, at = Date.now(), health, expects = null, mobs = [], off
 // Why the hold's expectation no longer stands, or null. `mobs` now in the
 // threats' shape, `offered` the option keys on offer now, `shot` a shot on
 // its way at the bot (projectile-guard.js incoming).
-function diverged(hold, { now = Date.now(), health, mobs = [], offered = [], shot = null, hurtBy = {}, at = null } = {}) {
+function diverged(hold, { now = Date.now(), health, mobs = [], offered = [], shot = null, hurtBy = {}, at = null, shield = null } = {}) {
   if (!hold) return 'no hold';
+  // The shield spent on the hold (note 1955): full-3 (2026-10-20 11:39 to 11:42Z) held a pillar 193 seconds under one skeleton, the hold extended twice as 'nothing it was chosen on has changed', every arrow blocked on the shield, until the shield broke; shot dead from 18 health within a minute of that. The arrows taken on the shield are what changed.
+  if (shield?.held && Number.isFinite(hold.shieldLeft) && hold.shieldLeft - shield.left >= Math.max(1, Math.round(hold.shieldLeft * SHIELD_SPENT))) {
+    return `the shield has taken ${hold.shieldLeft - shield.left} of its uses on this hold (${shield.left} of ${shield.max} left, ${hold.shieldLeft} when it was chosen)`;
+  }
   // Off the spot it has held since it was first held on (a pillar's top
   // left, knocked off a ledge): the stance's own place is gone.
   if (hold.spot && at && Math.hypot(at.x - hold.spot.x, at.y - hold.spot.y, at.z - hold.spot.z) >= SPOT_MOVED) return `the bot is off the spot it was holding (moved ${Math.round(Math.hypot(at.x - hold.spot.x, at.y - hold.spot.y, at.z - hold.spot.z) * 10) / 10} blocks)`;
@@ -153,4 +159,4 @@ function extend(hold, now = Date.now(), at = null) {
 // The mobs it was chosen against, as the hold says them.
 const againstSays = hold => hold.against.map(m => `the ${name(m.name)} ${Math.round(m.distance)} blocks off${m.visible ? ' in sight' : ' out of sight'}`).join(', ');
 
-module.exports = { begin, diverged, extend, againstSays, EXTEND_MS, HOLD_CAP_MS, NEARER_BY };
+module.exports = { begin, diverged, extend, againstSays, EXTEND_MS, HOLD_CAP_MS, NEARER_BY, SHIELD_SPENT };

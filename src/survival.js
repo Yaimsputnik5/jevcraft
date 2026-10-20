@@ -6257,7 +6257,7 @@ class Survival {
     if (extendable) {
       const holds = require('./holds');
       let shot = null; try { shot = require('./projectile-guard').incoming(bot, { reach: 24 })[0] || null; } catch (_) { shot = null; }
-      holdEnded = holds.diverged(held.hold, { health: bot.health, mobs: danger, offered: Object.keys(options), shot, hurtBy: bot._hurtBy || {}, at: bot.entity.position });
+      holdEnded = holds.diverged(held.hold, { health: bot.health, mobs: danger, offered: Object.keys(options), shot, hurtBy: bot._hurtBy || {}, at: bot.entity.position, shield: shieldNow });
       if (!holdEnded && inTime) holding = true;
       else if (!holdEnded) {
         const x = holds.extend(held.hold, Date.now(), bot.entity.position);
@@ -6772,7 +6772,7 @@ class Survival {
       // stance is asked again (shield-wear.js changed, note 786).
       shield: shieldNow,
       // What it was chosen on, for holding on while that stands (holds.js).
-      hold: require('./holds').begin({ choice, health: bot.health, expects: options[choice]?.expects || null, mobs: danger, offered: [...Object.keys(options), ...leftOut] }) };
+      hold: require('./holds').begin({ choice, health: bot.health, expects: options[choice]?.expects || null, mobs: danger, offered: [...Object.keys(options), ...leftOut], shield: shieldNow }) };
     // An answer in this scene, asked or held without asking (note 659).
     if (!holding || held.choice !== choice) {
       scenes.answered(this.state, { choice, asked: askedNow, noneGood: noneGoodNow, striking: STRIKING_STANCES.has(choice), start: this.state.stance.start });
@@ -6876,7 +6876,7 @@ class Survival {
       this.state.stanceFailed = [...failed, { choice, kinds, where: { x: feet.x, y: feet.y, z: feet.z }, at: Date.now(), ...(why ? { why } : {}) }];
       if (resumable) {
         const now = Date.now();
-        this.state.stance = { ...resumable, at: now, health: bot.health, crowd: { n: crowdNow.length }, shield: shieldNow, hold: require('./holds').begin({ choice: resumable.choice, health: bot.health, expects: resumable.expects || null, mobs: danger, offered: Object.keys(options) }) };
+        this.state.stance = { ...resumable, at: now, health: bot.health, crowd: { n: crowdNow.length }, shield: shieldNow, hold: require('./holds').begin({ choice: resumable.choice, health: bot.health, expects: resumable.expects || null, mobs: danger, offered: Object.keys(options) , shield: shieldNow}) };
         bot._stance = this.state.stance;
         console.log(`[stance] ${choice.replaceAll('_', ' ')} failed at once${why ? ` (${String(why).slice(0, 80)})` : ''}: ${resumable.choice.replaceAll('_', ' ')} goes on, the failure said at the next asking`);
       }
