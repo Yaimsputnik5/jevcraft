@@ -6816,7 +6816,14 @@ class Survival {
       catch (err) { if (['NeedsAir', 'Cancelled'].includes(err.name)) throw err; }
     }
     try { done = await options[choice].run(); }
-    catch (err) { if (err.name === 'NoRoute') why = noRouteSays(err, `the ${choice.replaceAll('_', ' ')} walk`); else if (err.name === 'StanceFailed') why = err.message; else if (err.name !== 'SetAside') throw err; done = false; }
+    catch (err) {
+      if (err.name === 'NoRoute') why = noRouteSays(err, `the ${choice.replaceAll('_', ' ')} walk`);
+      else if (err.name === 'StanceFailed') why = err.message;
+      // A stance whose report was refused (set aside for a spin or a stall) failed without a word (note 1951): the pillar was chosen and nothing ran, and the record held only the next question. Said once each time, and said to the next question as the failure's reason.
+      else if (err.name === 'SetAside') { why = String(err.message || err).slice(0, 160); console.log(`[stance] ${choice.replaceAll('_', ' ')} did not run: ${why}`); }
+      else throw err;
+      done = false;
+    }
     finally { stance.running = false; stance.ranAt = Date.now(); }
     if (!done && !why && this.state.failWhy) why = this.state.failWhy;
     delete this.state.failWhy;
