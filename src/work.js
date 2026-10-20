@@ -8754,7 +8754,7 @@ async function crossingKitReady(bot, task, goal, save, client = task.opportunity
     const ago = Math.max(1, Math.round((Date.now() - turnedBack.at) / 60000));
     tree.cross_now.description += ` The last crossing turned back through the portal for food ${ago} minute${ago === 1 ? '' : 's'} ago, the first thing asked on the far side; ${foodItem.carried} food points are carried now and hunger is ${hungerNow}: crossed so, the same question is asked there again.`;
   }
-  for (const i of empty) tree[`take_up_${i.key}`] = { description: `Take up the ${i.key} for the Nether again first: ${i.carried === 0 ? `it is empty now, 0 of ${i.wants} carried${seen[i.key] ? ` (${seen[i.key]} when the crossing last looked)` : ''}` : `${i.carried} of ${i.wants} points carried, under the Nether's reserve of ${NETHER_FLOOR}`}, and its step was set aside by the ladder; its rest is lifted and the ladder takes it up next.` };
+  for (const i of empty) tree[`take_up_${i.key}`] = { takesUp: `nether_${i.key}`, description: `Take up the ${i.key} for the Nether again first: ${i.carried === 0 ? `it is empty now, 0 of ${i.wants} carried${seen[i.key] ? ` (${seen[i.key]} when the crossing last looked)` : ''}` : `${i.carried} of ${i.wants} points carried, under the Nether's reserve of ${NETHER_FLOOR}`}, and its step was set aside by the ladder; its rest is lifted and the ladder takes it up next.` };
   const pickMade = noPickaxe ? (countOf(bot, 'iron_ingot') >= 3 ? 'iron_pickaxe' : ['cobblestone', 'cobbled_deepslate', 'blackstone'].some(n => countOf(bot, n) >= 3) ? 'stone_pickaxe' : 'wooden_pickaxe') : null;
   if (noPickaxe) {
     let budget = null; try { budget = require('./pickaxe-budget').pickaxeBudget(bot, goal); } catch (_) { budget = null; }

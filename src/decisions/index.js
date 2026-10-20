@@ -516,6 +516,8 @@ function waitingByChoice(goal, id, now = Date.now()) {
 // back within a second were recorded as waits, none came to nothing, and
 // the rung's question read "17 answers given, 1 coming to nothing" (note
 // 605). What an answer is (WAIT_ANSWERS) and a hold step still make a wait.
+// An answer that hands the ladder another rung (`takeBack` or `takesUp` on its node) is not judged by the ledgers (note 1962): its run changes nothing in the world by design, and the rung it takes up is measured on its own. full-2 (2026-10-20 13:35:29Z, 31 of 80 food points, under the Nether's reserve) chose take_up_food at the crossing; the rung ledger judged it by the rung it left ('nothing gained on the rung: no obsidian or flint and steel'), the outcome judge a second later ('changed nothing within 1 second (its own time 90 seconds); recorded failed'), the option read 'Tried once ... and it came to nothing' at the next asking, and Jev crossed with the 31; dead fourteen minutes later at 5.6 health with nothing to eat, burned by a blaze.
+const handsOff = node => !!(node?.takeBack || node?.takesUp);
 const ledgerWaits = (goal, id, path = null) => id !== 'stillness_detour' && ((tried.workBelowRung(id) ? HOLDS_STEP(goal) : waitingByChoice(goal, id)) || WAIT_ANSWERS.has(String(path?.at?.(-1) || '')));
 const HOLDS_STEP = goal => require('../stillness').HOLDS.has(goal?.step?.action);
 // Answers that are waits by what they are, whatever holds the turn when
@@ -840,8 +842,8 @@ async function decide(id, { client, bot, task, goal, save = () => {}, tree, stat
     const decision = { ...one, id, ...(held ? { held } : { only: true }) };
     if (bot) bot._lastDecision = { id, choice: one.path.at(-1), at: Date.now() };
     if (decision.action?.valid && !decision.action.valid()) decision.stale = true;
-    if (ledgered && !decision.stale) tried.begin(bot, goal, { q: id, method: one.path.join('/'), target: decision.action?.target || target, waiting: ledgerWaits(goal, id, one.path), offered: offeredOf(original, target) });
-    if (ledgered && !decision.stale) outcome.begin(bot, goal, spec, one.path, decision.action, { target, held: !!held });
+    if (ledgered && !decision.stale && !handsOff(decision.action)) tried.begin(bot, goal, { q: id, method: one.path.join('/'), target: decision.action?.target || target, waiting: ledgerWaits(goal, id, one.path), offered: offeredOf(original, target) });
+    if (ledgered && !decision.stale && !handsOff(decision.action)) outcome.begin(bot, goal, spec, one.path, decision.action, { target, held: !!held });
     if (ledgered && !decision.stale && !held) require('../intention').after(bot, goal, id, one.path, { target: decision.action?.target || target, state, chosen: false });
     if (ledgered && !decision.stale && !held) require('../plan-chain').note(bot, goal, id, one.path);
     return decision;
@@ -1235,8 +1237,8 @@ async function decide(id, { client, bot, task, goal, save = () => {}, tree, stat
       }
     }
   }
-  if (ledgered && !decision.stale && decision.path) tried.begin(bot, goal, { q: id, method: decision.path.join('/'), target: decision.action?.target || target, waiting: ledgerWaits(goal, id, decision.path), offered: offeredOf(original, target) });
-  if (ledgered && !decision.stale && decision.path) outcome.begin(bot, goal, spec, decision.path, decision.action, { target });
+  if (ledgered && !decision.stale && decision.path && !handsOff(decision.action)) tried.begin(bot, goal, { q: id, method: decision.path.join('/'), target: decision.action?.target || target, waiting: ledgerWaits(goal, id, decision.path), offered: offeredOf(original, target) });
+  if (ledgered && !decision.stale && decision.path && !handsOff(decision.action)) outcome.begin(bot, goal, spec, decision.path, decision.action, { target });
   // The least bad is not Jev's choice, and a walk taken as one begins no
   // intention (note 693): abandoning a walk costs only the time spent, and
   // its own yield measure already ends it once it gains nothing (note 699),
