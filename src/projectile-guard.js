@@ -108,7 +108,12 @@ async function deflect(bot, task, { holdMs = 700 } = {}) {
       if (!incoming(bot).length) break;
       await sleep(50);
     }
-  } finally { lowerShield(bot); }
+  } finally {
+    // Kept up where a shield stance holds it (survival.js keepShieldForStance,
+    // note 1970): the stance's own shield, raised before this shot came.
+    let kept = false; try { kept = require('./survival').keepShieldForStance(bot); } catch (_) { kept = false; }
+    if (!kept) lowerShield(bot);
+  }
   return true;
 }
 

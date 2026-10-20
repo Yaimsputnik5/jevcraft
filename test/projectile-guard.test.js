@@ -62,3 +62,20 @@ test('a shot still fifteen blocks off holds the shield up while it comes, not up
   assert.equal(await deflect(bot, new Task('guard'), { holdMs: 200 }), true);
   assert(heldFor >= 150, `held ${heldFor} ms`);
 });
+
+test('under a shield guard a shooter in sight keeps the shield up, between passes and after a deflected shot (full-2 2026-10-20 17:56:52Z, note 1970)', async () => {
+  const { keepShieldForStance } = require('../src/survival');
+  const bot = fixture({ 1: mob(1, 'skeleton', 0.5, 8.5), 9: arrow });
+  Object.assign(bot, { game: { dimension: 'overworld' }, blockAt: p => ({ name: p.y < 14 ? 'stone' : 'air', boundingBox: p.y < 14 ? 'block' : 'empty', position: p }) });
+  bot.entity.metadata = [0];
+  bot._stance = { choice: 'shield_guard', at: Date.now() };
+  bot._shieldRaised = true;
+  assert.equal(keepShieldForStance(bot), true, 'a skeleton 8 blocks off in sight: kept up');
+  assert.equal(await deflect(bot, new Task('guard'), { holdMs: 50 }), true);
+  assert.equal(bot._shieldRaised, true, 'the guard\'s shield is not lowered by the deflected shot');
+  const calm = fixture({ 1: mob(1, 'skeleton', 0.5, 8.5), 9: arrow });
+  assert.equal(await deflect(calm, new Task('guard'), { holdMs: 50 }), true);
+  assert.notEqual(calm._shieldRaised, true, 'with no stance the shot\'s raise is lowered after it');
+  delete bot.entities[1];
+  assert.equal(keepShieldForStance(bot), false, 'no shooter and no biter: lowered');
+});

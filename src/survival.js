@@ -1732,9 +1732,8 @@ function keepShieldForStance(bot) {
   const holding = !SHIELD_STANCES.has(choice) && require('./shot-reflex').STANCE_SHOTS.holding.has(choice);
   if (!bot._shieldRaised || !(SHIELD_STANCES.has(choice) || holding) || !bot.entity?.position) return false;
   if ((bot.entity.metadata?.[0] & 1) || inLava(bot)) return false;
-  if (holding) {
-    try { return threats(bot, 16).some(t => shooter(t.entity) && t.visible && t.distance <= (RANGE[t.entity.name] || 15)); } catch (_) { return false; }
-  }
+  const shooterInReach = () => { try { return threats(bot, 16).some(t => shooter(t.entity) && t.visible && t.distance <= (RANGE[t.entity.name] || 15)); } catch (_) { return false; } };
+  if (holding) return shooterInReach();
   const wg = require('./wither-guard');
   // Any biter the guard faces within five (about two seconds' walk at a
   // zombie's pace), not only one at its reach: lowered
@@ -1743,7 +1742,16 @@ function keepShieldForStance(bot) {
   // blow landed in. 25593 (17:51:40 to 17:51:53Z) took seven hits under
   // shield_guard, five "shield rising, not yet blocking"; 25588 three of
   // three (note 752f).
-  try { return threats(bot, 6).some(t => wg.guardable(t) && (wg.bladeReaches(t.entity, bot.entity.position) || t.distance <= 5)); } catch (_) { return false; }
+  try { if (threats(bot, 6).some(t => wg.guardable(t) && (wg.bladeReaches(t.entity, bot.entity.position) || t.distance <= 5))) return true; } catch (_) { /* none read */ }
+  // Or a shooter in sight with the bot in its reach, as for the holding
+  // stances above (note 1970): with only a crossbow piglin at 6.5 blocks
+  // the guard's shield was lowered between passes and by each deflected
+  // shot, and the re-ask after it (2.6 seconds, stance options 1.1 of
+  // them) stood unshielded. full-2 (2026-10-20 17:56:52 to 17:56:56Z) took
+  // an arrow and two enderman blows in that gap, 18 health to none; over
+  // 2026-10-14 to 19, 8 of the 11 arrows that landed under shield_guard
+  // landed with the shield down or still rising.
+  return shooterInReach();
 }
 // Seconds between a biter's blows at its reach (a hoglin two, most one).
 // A swarm of blazes at arm's length, and the break out of it (note 872).
