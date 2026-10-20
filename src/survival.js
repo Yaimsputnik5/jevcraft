@@ -479,6 +479,9 @@ const MOVING_STANCES = new Set(['retreat', 'leave_reach', 'fight_from_footing', 
 // Two blocks up: from the pillar's report to two up took a second and a
 // half to two seconds in mid-92-e, mid-92-g and mid-110-k (2026-09-26).
 const PILLAR_SECONDS = 1.5;
+// How long a stance just answered is the answer to a hit while its run is in
+// flight (note 1947): its first seconds, a pillar's climb or a retreat's run.
+const STANCE_RUN_ANSWERS_MS = 4000;
 // A block of a pocket six tenths of a second (the median over 229 pocket
 // passes in the flight records of 2026-09-23 to 26); eating a second and six
 // tenths; digging down a second a block more than the dig itself (below).
@@ -2859,7 +2862,20 @@ class Survival {
         // fire with a blaze 0.8 blocks off, and its four blows in four
         // seconds, 14.3 health to none, stopped nothing.
         const atArm = !!byMob && !!source?.position && source.position.distanceTo(bot.entity.position) <= 3;
-        const answering = (held && held.choice !== 'keep_working' && !require('./vitals').inFire(bot)) || (!!require('./vitals').wayOutRunning(bot, now) && !atArm);
+        // A stance whose run is still in flight in its first seconds is the
+        // answer, whatever a blow just took (note 1947): stanceHeld drops it
+        // once six health went (note 793, a hold to the death), and this
+        // stop then cut the body's own motion in Jev's answer and aborted
+        // its step (compatibility.js, NeedsSafety) for a question the
+        // arbiter's "health fell" was asking anyway. Of the four fresh runs'
+        // 105 stops (2026-10-19/20), 20 came within four seconds of a stance
+        // answer, 5 of them followed by a death within fifteen: full-2
+        // (23:07:37Z) chose the pillar at 19 and was stopped mid-climb at 7,
+        // 'the jump carried the body' two cells over, shot dead four seconds
+        // on; full-1 (10:36:23Z) was stopped in charge_nearest at 6, its
+        // retreat then run from a question asked at 20.
+        const stanceRunning = !!bot._stance?.running && now - (bot._stance.at || 0) < STANCE_RUN_ANSWERS_MS && bot._stance.choice !== 'keep_working' && !require('./vitals').inFire(bot);
+        const answering = (held && held.choice !== 'keep_working' && !require('./vitals').inFire(bot)) || (!!require('./vitals').wayOutRunning(bot, now) && !atArm) || stanceRunning;
         // Not in the End (note 1431): the fight there owns every tick and
         // answers the hurt itself, and this stop cut its answers short: 25588
         // (dragon-15, 2026-10-13 07:13Z), in the dragon's breath on its column,

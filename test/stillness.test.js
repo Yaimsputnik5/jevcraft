@@ -492,7 +492,12 @@ test('a stance Jev chose is the answer while it is carried out: a hit does not t
   assert.equal(stopped, 0, 'the run goes on');
   bot.health = 10.5;
   bot.emit('entityHurt', bot.entity, zombie);
-  assert.equal(stopped, 1, 'six health gone since the choice: the watchdog stops it');
+  // Six gone in the stance's first seconds, its run still in flight (note 1947): the run is the answer, and the arbiter's "health fell" asks again meanwhile. full-2 (2026-10-19 23:07:37Z) took the pillar at 19 and was stopped here mid-climb at 7, the jump carrying the body two cells over, and was shot dead four seconds on; 20 such stops in the four fresh runs of 10-19/20, 5 followed by a death within fifteen seconds.
+  assert.equal(stopped, 0, 'six health gone a second into the run: the run goes on, the next question has the health as it is');
+  bot._threatAbort = false; bot._threatAbortAt = 0;
+  bot._stance = { choice: 'retreat', at: Date.now() - 4500, health: 17, running: true };
+  bot.emit('entityHurt', bot.entity, zombie);
+  assert.equal(stopped, 1, 'six health gone since the choice, past its first seconds: the watchdog stops it');
   bot._threatAbort = false; bot._threatAbortAt = 0; bot.health = 17;
   bot._stance = { choice: 'retreat', at: Date.now() - 5000, health: 17, running: false, ranAt: Date.now() - 4000 };
   bot.emit('entityHurt', bot.entity, zombie);
