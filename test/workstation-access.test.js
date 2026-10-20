@@ -55,6 +55,8 @@ test('an inaccessible saved furnace never switches to a different furnace or los
   set(other, 'furnace');
   bot.findBlocks = () => [other];
   bot.pathfinder.getPathTo = () => ({ status: 'noPath' });
+  // No walk there either (note 1978 walks to a far furnace before giving up on it).
+  bot.pathfinder.goto = async () => { throw Object.assign(new Error('No path to the goal!'), { name: 'NoPath' }); };
   bot.openFurnace = async () => assert.fail('saved ingredients belong to the inaccessible furnace');
   const goal = { smelting: { item: 'glass', from: 'sand', count: 2, targetInventory: 2, position: { ...p } } }, saved = structuredClone(goal);
   await assert.rejects(smelt(bot, new Task('resume furnace'), goal.smelting, goal), { name: 'Blocked', message: "I can't reach the furnace holding our saved batch" });
@@ -163,3 +165,16 @@ test('a craft that made nothing is clicked once more before the step fails', asy
   assert.equal(stock.stick, 4);
 });
 
+
+test('a saved batch whose furnace is out of the approach\'s reach from more than six blocks off is walked to with the bot\'s own walk, then opened (full-2 2026-10-20 22:17Z, note 1978)', async () => {
+  const { bot, p } = fixture();
+  bot.pathfinder.getPathTo = () => ({ status: 'noPath' });
+  let walked = 0;
+  bot.pathfinder.goto = async () => { walked++; bot.entity.position = new Vec3(6.5, 64, .5); };
+  let opened = 0;
+  bot.openFurnace = async () => { opened++; throw Object.assign(new Error('opened'), { name: 'Opened' }); };
+  const goal = { smelting: { item: 'glass', from: 'sand', count: 2, targetInventory: 2, position: { ...p } } };
+  await assert.rejects(smelt(bot, new Task('resume furnace'), goal.smelting, goal), /opened/);
+  assert(walked >= 1, 'walked there with the bot\'s own walk');
+  assert.equal(opened, 1, 'the saved furnace, reached, is opened');
+});

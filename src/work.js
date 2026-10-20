@@ -3212,6 +3212,7 @@ function localBatch(bot, goal, save = () => {}) {
   }
   return goal.smelting || null;
 }
+const BATCH_WALK_FROM = 6;
 const LEAVE_BATCH_MS = 20 * 60000, LEFT_NEAR = 16, AWAY_FROM_BATCH = 64, BATCH_NO_ROUTE_MS = 10 * 60000;
 // A portal frame being cast (portal_method's cast, a frame kept): the job in
 // hand outranks a batch in a furnace (note 775b).
@@ -3532,6 +3533,21 @@ async function smelt(bot, task, step, goal, save = () => {}) {
     }
     // Never switch furnaces while the saved ingredients/output belong to this one.
     block = await approachWorkstation(bot, task, 'furnace', [p]);
+    // From more than six blocks off, the bot's own walk there first, then the
+    // approach again (note 1978): the approach walks with no digging and no
+    // blocks laid, so a furnace in the bot's own mine, left by the pillar or
+    // the stair it climbed out on, was "out of reach" from the surface.
+    // full-2 (2026-10-20 22:17 to 22:20Z) put 3 raw iron in at (-303, 19,
+    // -682) and stood 23 blocks over it at (-309, 42, -676); 33 batches were
+    // left in their furnaces so that day across the four runs, the raw iron
+    // mined again (full-3, 19:20 to 19:35Z). A walk that fails falls through
+    // to the out-of-reach count below, as before.
+    if (!block && bot.entity.position.distanceTo(p.offset(0.5, 0.5, 0.5)) > BATCH_WALK_FROM) {
+      let walked = false;
+      try { await navigate(bot, task, new goals.GoalNear(p.x, p.y, p.z, 3)); walked = true; }
+      catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
+      if (walked) block = await approachWorkstation(bot, task, 'furnace', [p]);
+    }
     // A furnace that stays out of reach costs the batch, not the run: the
     // dream run retried an unreachable one-beef batch for good.
     // Twice, like any failure (persist leaves a rung that failed twice):
