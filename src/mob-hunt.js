@@ -2039,9 +2039,15 @@ async function prepareMobHunt(bot, task, step, goal, save, actions) {
         goal.step = { action: 'to_mineshaft_webs', target: { x: m.x, y: m.y, z: m.z }, distance: m.d }; save();
         const near = () => bot.entity.position.distanceTo(new Vec3(m.x, m.y, m.z)) <= 24;
         if (!near()) {
+          let walkWhy = null;
           try { await actions.navigate(bot, task, new goals.GoalNear(m.x, m.y, m.z, 4), { timeoutMs: 120000, stallMs: 15000 }); }
-          catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
-          if (!near()) return;
+          catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; walkWhy = String(err.message || err).slice(0, 120); }
+          // A walk there that ends short sets the mineshaft aside with why, and the way to the string is asked again (note 1966): returned bare, the next pass walked again, the walk guard refused it at once ('not walked again from here until a question is answered'), and no question came. full-1 (2026-10-20 16:24 to 16:37Z) stood at (-516, 70, 339) with the mineshaft 37 blocks below at (-515, 33, 343), 'no route' 48 times, half a megabyte of record every ten seconds.
+          if (!near()) {
+            setAside(goal, 'mineshaft_webs', `${m.x},${m.z}`, `the walk to it ended ${Math.round(bot.entity.position.distanceTo(new Vec3(m.x, m.y, m.z)))} blocks short${walkWhy ? `: ${walkWhy}` : ''}`, 1800000);
+            delete goal.stringWay; save();
+            return;
+          }
         }
         const webId = bot.registry.blocksByName.cobweb?.id;
         const webs = webId != null && bot.findBlocks ? bot.findBlocks({ matching: webId, maxDistance: 32, count: 48 }) : [];

@@ -2393,3 +2393,23 @@ test('with iron pieces short in the Overworld, one piece alone is offered beside
   assert(isSetAside(goal, 'rung', 'iron_helmet'));
   assert.equal(goal.combatKit, undefined);
 });
+
+test('the walk to the mineshaft\'s webs ending short sets it aside with why, and the way to the string is asked again (note 1966)', async () => {
+  // full-1 (2026-10-20 16:24 to 16:37Z) stood 37 blocks above its mineshaft, 'no route' 48 times, no question asked.
+  const { bot, task, goal } = fixture('spider');
+  bot.game.dimension = 'overworld'; bot.game.minY = 0; bot.game.height = 256;
+  delete bot.entities[7];
+  bot.inventory.slots[36] = { name: 'iron_sword', slot: 36, count: 1, durabilityUsed: 0, type: registry.itemsByName.iron_sword.id };
+  goal.landmarks = [{ kind: 'mineshaft', x: 100, y: 40, z: 0, dimension: 'overworld' }];
+  let asks = 0;
+  task.opportunityClient = { systemOne: async () => { asks++; return { answers: { branch_0: { choice: 'mineshaft_webs' } } }; } };
+  const actions = { acquireStep: async () => {}, explore: async () => {}, dig: async () => {}, navigate: async () => { throw Object.assign(new Error('No route from here to (100, 40, 0) (noPath)'), { name: 'NoRoute' }); } };
+  await prepareMobHunt(bot, task, { entity: 'spider', item: 'string', count: 3 }, goal, () => {}, actions);
+  const { isSetAside, attemptsFor } = require('../src/progress');
+  assert.ok(isSetAside(goal, 'mineshaft_webs', '100,0'), 'the mineshaft is set aside');
+  assert.match(String(attemptsFor(goal).why('mineshaft_webs', '100,0') || ''), /^the walk to it ended \d+ blocks short: No route from here to \(100, 40, 0\) \(noPath\)$/);
+  assert.equal(goal.stringWay, undefined, 'the way to the string is asked again');
+  // The next pass: the mineshaft set aside, so not walked at once; the spiders searched for.
+  await prepareMobHunt(bot, task, { entity: 'spider', item: 'string', count: 3 }, goal, () => {}, actions);
+  assert.equal(asks, 1, 'the set-aside mineshaft is not offered again');
+});
