@@ -43,3 +43,14 @@ if [ "$free" -lt 6 ]; then
   find .clean-run*/recordings -type f -mmin +60 -delete 2>/dev/null
   echo "very low disk: recordings older than 1h removed"
 fi
+
+# Stage worlds the auto-restart left behind (2026-10-20: 256 copies of the dragon stage, 85 GB, in .clean-run-25588): a
+# server's old `*-dragon-N` / `*-stronghold-N` world dirs not named in its server.properties and older than 12 hours go.
+for srv in .clean-run .clean-run-*; do
+  [ -f "$srv/server.properties" ] || continue
+  live=$(grep -a '^level-name=' "$srv/server.properties" | cut -d= -f2)
+  for w in $(find "$srv" -maxdepth 1 -mindepth 1 -type d \( -name 'mid-*-dragon-*' -o -name 'mid-*-stronghold-*' -o -name 'mid-*-fortress-*' -o -name 'mid-*-nether-*' \) -mmin +720 -exec basename {} \; 2>/dev/null); do
+    [ "$w" = "$live" ] && continue
+    rm -rf "$srv/$w" && echo "$srv/$w removed (old stage world, not the live one)"
+  done
+done
