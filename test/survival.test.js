@@ -878,7 +878,7 @@ test('Jev picks the stance once and it holds; unsure, its pick still stands', as
   assert(!unsure.goal.decisions.some(d => d.id === 'ranged_response'), 'no second question from the rules');
 });
 
-test('a carried bed goes down at bedtime, the night passes, and the first stays as the respawn bed; the next comes back up', async () => {
+test('a carried bed goes down at bedtime, the night passes, and every bed slept in stays as the respawn bed', async () => {
   const { Survival, bedSite } = require('../src/survival');
   const blocks = new Map(); let items = [{ name: 'white_bed', count: 1 }, { name: 'iron_sword' }];
   const bot = Object.assign(new EventEmitter(), { game: { dimension: 'overworld', difficulty: 'normal', gameMode: 'survival' }, entities: {}, time: { timeOfDay: 13000 },
@@ -901,10 +901,13 @@ test('a carried bed goes down at bedtime, the night passes, and the first stays 
   assert.equal(dug.length, 0, 'the first bed is not picked up'); assert(!items.some(i => i.name === 'white_bed'));
   assert.deepEqual(survival.state.spawnBed.foot, { x: 1, y: 64, z: 0 });
   assert.deepEqual(survival.state.respawn, { x: 1, y: 64, z: 0, dimension: 'overworld' });
-  // The next carried bed, with the respawn bed standing, comes back up as before.
+  // The next carried bed slept in stays too (note 1948): the game moves the respawn to the bed last slept in, and full-2 (2026-10-20 05:27Z), its first bed standing, slept in a second and took it up, and its next four deaths came back to life at the world spawn.
   items.push({ name: 'white_bed', count: 1 }); bot.time.timeOfDay = 13000; bot.entity.position = new Vec3(10.5, 64, 0.5); actions.length = 0;
   await survival.sleepStep(new Task('test', 'sleep'), goal, () => {});
-  assert(dug.length >= 1, 'the second bed is picked back up'); assert(items.some(i => i.name === 'white_bed'));
+  assert.equal(dug.length, 0, 'the second bed stays as well'); assert(!items.some(i => i.name === 'white_bed'));
+  assert.deepEqual(survival.state.spawnBed.foot, { x: 11, y: 64, z: 0 }, 'the record points at the bed last slept in');
+  assert.deepEqual(survival.state.respawn, { x: 11, y: 64, z: 0, dimension: 'overworld' });
+  assert.deepEqual(actions, ['sleep', 'spawn_bed_left', 'leave_shelter']);
 });
 
 test('a sleep the server confirms late still counts: the clock decides, not mineflayer\'s three-second timeout', async () => {
@@ -2658,18 +2661,19 @@ test('a bed nook is two cells in a line dug beside the feet, the floor kept; not
   assert.equal(bedNook(bot, {}).enclosed, false, 'unsealed, it is offered and said to be open');
 });
 
-test('from a sealed pocket the nook is dug, the carried bed slept in and picked back up, and the pocket\'s wall goes back', async () => {
+test('from a sealed pocket the nook is dug, the carried bed slept in and left as the respawn bed, and the pocket\'s wall goes back above it', async () => {
   const { bot, origin, actions, dug, placed, refuge } = nookFixture();
   const survival = new Survival(bot, actions, { state: { shelters: [refuge] } });
   const reports = []; survival.report = (g, sv, a) => reports.push(a.action);
   assert(shelter.sealed(bot, refuge), 'sealed before');
   await survival.nookSleep(new Task('night'), { kind: 'win' }, () => {}, { pocket: refuge });
   assert.equal(bot.time.timeOfDay, 0, 'the night passed');
-  assert.deepEqual(reports, ['bed_nook', 'sleep', 'leave_shelter']);
+  // The nook's bed stays in its wall as the respawn point (note 1948): the game moves the respawn to the bed last slept in, and full-2 (2026-10-20 05:27Z) took its nook bed up and came back to life at the world spawn four deaths running. The wall goes back above it.
+  assert.deepEqual(reports, ['bed_nook', 'sleep', 'spawn_bed_left', 'leave_shelter']);
   assert.deepEqual(dug.slice(0, 4).sort(), [origin.offset(1, 0, 0), origin.offset(1, 1, 0), origin.offset(2, 0, 0), origin.offset(2, 1, 0)].map(String).sort());
-  assert(bot.inventory.items().some(i => i.name === 'white_bed'), 'the bed is carried again');
-  assert.deepEqual(placed, [origin.offset(1, 0, 0), origin.offset(1, 1, 0)].map(String), 'the two cells dug out of the wall go back');
-  assert(shelter.sealed(bot, refuge), 'and the pocket is shut again');
+  assert(!bot.inventory.items().some(i => i.name === 'white_bed'), 'the bed stays in the nook');
+  assert.deepEqual(survival.state.spawnBed.foot, { x: origin.x + 1, y: origin.y, z: origin.z });
+  assert.deepEqual(placed, [origin.offset(1, 1, 0)].map(String), 'the wall goes back above the bed');
 
   // Refused, with a monster behind the rock: the bed comes up, the wall goes back, and the sleep waits.
   const refused = nookFixture();

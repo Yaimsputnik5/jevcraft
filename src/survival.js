@@ -9310,11 +9310,15 @@ class Survival {
       // comes near threw Cancelled out of this block and the bed stayed
       // standing with its item on the floor (mid-243-bg, note 633).
       // The first carried bed slept in stays standing as the respawn point (the user, 2026-10-20: 'add the bed to the ladder so Jev respawns at base'): picked up, the respawn went back to the world spawn, and of the night's 31 deaths on full-1..4 about half were a bare body come back to life at the world spawn at night among the mobs that had killed it. Left here, a death comes back to this bed, and the ladder wants another bed to carry (game-progress bedRung: none carried, the home's not claimed).
-      const leaveAsSpawn = !placed && !nook && slept && !this.state.spawnBed && !this.state.home?.bed?.claimedAt && [site.foot, site.head].every(p => isBed(bot.blockAt(p)));
-      if (leaveAsSpawn) {
-        this.state.spawnBed = { name: item, foot: { x: site.foot.x, y: site.foot.y, z: site.foot.z }, head: { x: site.head.x, y: site.head.y, z: site.head.z }, at: new Date().toISOString() };
-        this.report(goal, save, { action: 'spawn_bed_left', bed: item, at: { ...site.foot } });
-        bot.chat?.(`This bed stays here as my respawn point; I'll make another to carry.`);
+      // Every bed slept in stays (note 1948), the nook's in its wall too: the game moves the respawn to the bed last slept in, so a later night in a carried bed and its pickup put the respawn back at the world spawn with the first bed still standing. full-2 (2026-10-20) left its first bed at (87, 67, 359) at 04:16Z and came back to it from two deaths; at 05:27Z it crafted another, slept in a nook at (-25, 116, 601) and took it up, and its next four deaths (05:40 to 10:35Z) came back to life at the world spawn, (1.5, 80, 4.5) and about, the bed at (87, 67, 359) standing the whole while. The record then points at the bed last slept in, and the ladder makes another to carry.
+      const leaveAsSpawn = !placed && slept && [site.foot, site.head].every(p => isBed(bot.blockAt(p)));
+      if (slept && [site.foot, site.head].every(p => isBed(bot.blockAt(p)))) {
+        const was = this.state.spawnBed;
+        this.state.spawnBed = { name: item || bot.blockAt(site.foot)?.name || 'bed', foot: { x: site.foot.x, y: site.foot.y, z: site.foot.z }, head: { x: site.head.x, y: site.head.y, z: site.head.z }, at: new Date().toISOString() };
+        if (leaveAsSpawn) {
+          this.report(goal, save, { action: 'spawn_bed_left', bed: item, at: { ...site.foot }, ...(was && (was.foot.x !== site.foot.x || was.foot.y !== site.foot.y || was.foot.z !== site.foot.z) ? { before: { ...was.foot } } : {}) });
+          bot.chat?.(`This bed stays here as my respawn point; I'll make another to carry.`);
+        }
       }
       if (!placed && !leaveAsSpawn) {
         const bed = item;
@@ -9333,9 +9337,8 @@ class Survival {
     if (!slept) throw new Error(this.state.lastSleepError || 'The night did not pass in bed');
     attemptsFor(this).clear('sleep', 'bed'); delete this.state.nightPlan;
     this.state.sleptAtAge = worldAge(bot);
-    // A night in the home's bed sets the respawn point there; a carried bed
-    // is picked up again, and the respawn goes back to the world's spawn.
-    this.state.respawn = placed || this.state.spawnBed ? { x: site.foot.x, y: site.foot.y, z: site.foot.z, dimension: 'overworld' } : null;
+    // A night in any bed sets the respawn point there, and the bed stays (note 1948).
+    this.state.respawn = { x: site.foot.x, y: site.foot.y, z: site.foot.z, dimension: 'overworld' };
     this.report(goal, save, { action: 'leave_shelter', reason: 'Morning. Back to it.' });
   }
 
@@ -11704,7 +11707,7 @@ class Survival {
       const refused = byBed ? refusalSays(bot, homeBed && !bed ? homeBed.foot : bot.entity.position) : '';
       const safety = bedSafetyAt(bot, homeBed && !bed ? homeBed.foot : bot.entity.position);
       state.bedSafety = safety.facts;
-      tree.sleep_in_bed = { description: homeBed && !bed ? `Walk to the bed ${walk} blocks away (about ${Math.round(walk / 4.3)} seconds) and sleep in it. The night passes in seconds, nothing is built or spent, and the request resumes at dawn.${nowAbout}${sleepRuleSays}${refused}${creeperRaceSays}${safety.says}` : `Put the carried bed down here and sleep. The night passes in seconds, nothing is built or spent, and the request resumes at dawn.${!this.state.spawnBed && !homeBed ? ' This first bed stays standing afterwards as the respawn point: a death comes back to it, not to the world spawn, and another bed is made to carry.' : ''}${nowAbout}${sleepRuleSays}${refused}${creeperRaceSays}${safety.says}`, run: () => this.sleepStep(task, goal, save) };
+      tree.sleep_in_bed = { description: homeBed && !bed ? `Walk to the bed ${walk} blocks away (about ${Math.round(walk / 4.3)} seconds) and sleep in it. The night passes in seconds, nothing is built or spent, and the request resumes at dawn.${nowAbout}${sleepRuleSays}${refused}${creeperRaceSays}${safety.says}` : `Put the carried bed down here and sleep. The night passes in seconds, nothing is built or spent, and the request resumes at dawn.${' This bed stays standing afterwards as the respawn point: a death comes back to it, not to the world spawn, and another bed is made to carry (three wool and three planks).'}${nowAbout}${sleepRuleSays}${refused}${creeperRaceSays}${safety.says}`, run: () => this.sleepStep(task, goal, save) };
     }
     // Where the carried bed does not fit (a staircase, a shaft), a nook dug
     // for it beside the bot: the bed that went down in the midgame trials
