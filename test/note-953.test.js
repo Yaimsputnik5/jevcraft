@@ -29,3 +29,12 @@ test('a block the Nether makes that is not natural rock still stops it (a bastio
   const s = surveyCrossing(flat('the_nether', 'gold_block'), new Vec3(20, 64, 0), { cells: 16 });
   assert.match(s.stoppedBy || '', /gold block in the way/);
 });
+
+test('in the Overworld an ore in the line is rock to dig through, not a stop (full-1 2026-10-20 coal_ore, note 1974)', () => {
+  for (const kind of ['coal_ore', 'deepslate_iron_ore', 'copper_ore']) {
+    const s = surveyCrossing(flat('overworld', kind), new Vec3(20, 64, 0), { cells: 16 });
+    assert.ok(!/in the way/.test(s.stoppedBy || ''), `${kind}: ${s.stoppedBy}`);
+  }
+  const built = surveyCrossing(flat('overworld', 'furnace'), new Vec3(20, 64, 0), { cells: 16 });
+  assert.match(built.stoppedBy || '', /furnace in the way/, 'a furnace is still not dug through');
+});

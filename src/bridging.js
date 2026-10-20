@@ -8,13 +8,17 @@ const { move } = require('./motion');
 const { Vec3 } = require('vec3');
 const { equipBestTool } = require('./skills');
 
+// The Overworld's ores are its rock as the Nether's are (note 1974): a
+// tunnel down stopped at "The span is blocked by coal_ore". full-1
+// (2026-10-20 20:37 to 21:07Z) walked its corpse run's way down 11 times,
+// stopped 11 blocks over its things each time, for half an hour.
 // nether_bricks (note 906): what a fortress's walls drop, laid like the rest.
 const MATERIALS = ['netherrack', 'cobblestone', 'cobbled_deepslate', 'stone', 'dirt', 'andesite', 'diorite', 'granite', 'blackstone', 'basalt', 'nether_bricks'];
 // The Nether's ores are its rock: gold and quartz lie through the
 // netherrack, and a crossing or a leg that stopped at them ("nether gold ore
 // in the way") stopped in plain rock. mid-242-ab-nether-4's legs east and
 // north rested for it beside a fortress 102 blocks off (note 591).
-const NATURAL = /^(netherrack|nether_gold_ore|nether_quartz_ore|crimson_nylium|warped_nylium|soul_sand|soul_soil|basalt|blackstone|magma_block|nether_wart_block|warped_wart_block|shroomlight|crimson_stem|warped_stem|crimson_hyphae|warped_hyphae|nether_sprouts|crimson_roots|warped_roots|crimson_fungus|warped_fungus|weeping_vines|twisting_vines|glowstone|gravel|stone|dirt|grass_block|sand|sandstone|andesite|diorite|granite|tuff|deepslate|cobblestone|cobbled_deepslate)/;
+const NATURAL = /^(netherrack|nether_gold_ore|nether_quartz_ore|crimson_nylium|warped_nylium|soul_sand|soul_soil|basalt|blackstone|magma_block|nether_wart_block|warped_wart_block|shroomlight|crimson_stem|warped_stem|crimson_hyphae|warped_hyphae|nether_sprouts|crimson_roots|warped_roots|crimson_fungus|warped_fungus|weeping_vines|twisting_vines|glowstone|gravel|stone|dirt|grass_block|sand|sandstone|andesite|diorite|granite|tuff|deepslate|cobblestone|cobbled_deepslate|(?:deepslate_)?(?:coal|iron|copper|gold|redstone|lapis|emerald|diamond)_ore)/;
 const passable = b => !b || b.boundingBox === 'empty';
 const solid = b => b?.boundingBox === 'block';
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
