@@ -8823,6 +8823,8 @@ async function crossingKitReady(bot, task, goal, save, client = task.opportunity
     // Optional before the Nether (note 776): taken up, it is chosen.
     require('./game-progress').optIn(goal, phase);
     if (key === 'food' && goal.kitFood?.choice?.pick === 'go_without') delete goal.kitFood.choice;
+    // The food taken up is the ladder's next rung whatever rest it had, as the trip back for food is (note 763's foodTrip; note 1964): the opt-in alone left the rung resting, the ladder went on to the crossing, and the question came back ten seconds later with nothing done. full-3 (2026-10-20 15:14:15Z, 0 of 80 food points) chose take_up_food at 0.63, was asked again at 15:14:25 ('Chosen 10 seconds ago, and it changed nothing'), crossed, and turned back for food three minutes in; full-2 did the same at 13:35 with 31 of 80 and died at 5.6 health with nothing to eat.
+    if (key === 'food' && !goal.foodTrip) goal.foodTrip = { at: Date.now(), from: 'crossing' };
     delete kit.choice; save();
     bot.chat?.(`The ${key} for the Nether is empty: taking it up again first.`);
     return false;

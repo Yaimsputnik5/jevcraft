@@ -196,3 +196,19 @@ test('the bot\'s own chests in the Nether with the End\'s makings: crossing says
   assert.equal(await crossingKitReady(bot, new Task('win'), goal, () => {}, client), true);
   assert.match(asked.cross_now, /What waits there: 2 chests of the bot's own in the Nether, 5 blaze rods; 11 ender pearls, the farthest 220 blocks from its portal there; with what is kept here, 6 blaze rods and 12 ender pearls in all, about 12 eyes of ender\. Out to the chests and back is about 18 minutes/);
 });
+
+test('take_up_food at the crossing hands the ladder the food rung next, whatever rest it had (note 1964)', async () => {
+  // full-3 (2026-10-20 15:14:15Z, 0 of 80 food points) chose take_up_food; the opt-in alone left the rung resting, the ladder went on to the crossing, and it was asked again ten seconds later and crossed with nothing to eat.
+  const { crossingKitReady } = require('../src/work');
+  const gp = require('../src/game-progress');
+  const { setAside } = require('../src/progress');
+  const bot = atPortal({ cobblestone: 128, stone_pickaxe: 1 });
+  const goal = { kind: 'win' };
+  // The food rung resting from an earlier failure, as it was.
+  setAside(goal, 'rung', 'nether_food', 'came to nothing', 20 * 60000);
+  const client = { systemOne: async ({ questions }) => ({ answers: { branch_0: { choice: questions.branch_0.criteria.take_up_food ? 'take_up_food' : 'cross_now', confidence: 0.63 } } }) };
+  assert.equal(await crossingKitReady(bot, new Task('win'), goal, () => {}, client), false, 'not crossing: the food first');
+  assert.ok(goal.foodTrip?.at, 'the food trip is set');
+  const stage = gp.nextGameStage(bot, goal);
+  assert.equal(stage?.phase, 'nether_food', `the ladder's next is ${stage?.phase}`);
+});
