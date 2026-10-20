@@ -369,3 +369,14 @@ test('the close-in counts the fire its landings light as it comes, a second late
   const ce = require('../src/combat-estimate');
   assert(ce.burnBetween([{ from: 0, to: 4, perSecond: 0.2 }], 0, 4) < (1 - Math.exp(-5 * 0.2)) * 4);
 });
+
+test('the corner is priced with the wither skeletons it does not keep off, and says them (full-3 2026-10-20 22:59:41Z, note 1979)', () => {
+  const open = floorWorld({ spawner: null, solid: p => p.y <= 63, at: new Vec3(0.5, 64, 0.5) });
+  blazeAt(open, 1, 9.5, 64.5, 0.5);
+  const alone = stand.blazeStands(open, near(open)).corner_ambush;
+  open.entities[2] = { id: 2, name: 'wither_skeleton', type: 'hostile', position: new Vec3(-1.5, 64, 0.5), height: 2.4, width: 0.7, isValid: true, metadata: {} };
+  const bitten = stand.blazeStands(open, near(open)).corner_ambush;
+  assert.ok(bitten, 'still offered');
+  assert.ok(bitten.expects.damage > alone.expects.damage, `${bitten.expects.damage} against ${alone.expects.damage} with the blaze alone`);
+  assert.match(bitten.description, /Not kept off by it: the wither skeleton \d+(\.\d+)? blocks off/);
+});

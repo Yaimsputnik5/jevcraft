@@ -1969,6 +1969,20 @@ function tacticOptions(bot, danger, { blazes, biting, from, aboutAll, hp, pocket
     options.wait_far_off = { kind: 'far', site: far, expects: { damage: round(setup.damage), seconds: round(setup.wall + T.FAR.seconds), oneHit: fireHit },
       description: `Go out of their reach and let the room thin: walk ${n(far.blocks, 'block')} (about ${setup.time} in their fire${shield ? ', the shield up for each volley' : ''}, about ${setup.hurt}) to a place ${far.radius} blocks from the cage, the nearest blaze now ${far.nearestNow} blocks off and none nearer than that along the way (${far.nearestAlong} at the closest)${far.lava ? `; lava lies beside ${far.lava.beside ?? far.lava.cells ?? 'some'} of its cells` : ''}, and stay ${T.FAR.seconds} seconds${heals ? `, eating what is carried (health comes back at hunger 18 or more)` : `; at hunger ${hunger} with ${eatable ? `only ${eatable} points of food` : 'nothing to eat'} no health comes back there`}. It ends sooner if a mob other than a blaze comes to arm's length or the health falls under eight.${rule}${back} It kills no blaze itself.` };
   }
+  // The biters among them (a wither skeleton, a brute) are not kept off by a
+  // corner, a light or a heal spot (note 1979): priced at their own pace over
+  // the stance's seconds, as close_in's are (biteCost). full-3 (2026-10-20
+  // 22:59:41Z), three wither skeletons 1.6 to 6 blocks off and a blaze
+  // 19.6, was told corner_ambush 'about 0 damage' (the blaze's alone), set it
+  // aside for shield_guard at 47.7 and was dead three seconds on.
+  for (const o of Object.values(options)) {
+    if (!['corner', 'light', 'heal'].includes(o.kind) || !o.expects) continue;
+    const bite = biteCost(bot, danger, o.expects.seconds);
+    if (!(bite.damage > 0)) continue;
+    o.expects.damage = round(o.expects.damage + bite.damage);
+    const who = bite.biters.map(b => `the ${b.name.replaceAll('_', ' ')} ${b.distance} blocks off`).join(', ');
+    o.description += ` Not kept off by it: ${who}, walkers that come to the bot wherever it stands; about ${bite.damage} from them over its ${o.expects.seconds} seconds, counted in the figure above.`;
+  }
   return options;
 }
 
