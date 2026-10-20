@@ -878,14 +878,14 @@ test('Jev picks the stance once and it holds; unsure, its pick still stands', as
   assert(!unsure.goal.decisions.some(d => d.id === 'ranged_response'), 'no second question from the rules');
 });
 
-test('a carried bed goes down at bedtime, the night passes, and the bed comes back up', async () => {
+test('a carried bed goes down at bedtime, the night passes, and the first stays as the respawn bed; the next comes back up', async () => {
   const { Survival, bedSite } = require('../src/survival');
   const blocks = new Map(); let items = [{ name: 'white_bed', count: 1 }, { name: 'iron_sword' }];
   const bot = Object.assign(new EventEmitter(), { game: { dimension: 'overworld', difficulty: 'normal', gameMode: 'survival' }, entities: {}, time: { timeOfDay: 13000 },
     entity: { position: new Vec3(0.5, 64, 0.5) }, health: 20, food: 20, isSleeping: false, registry: require('minecraft-data')('26.1'),
     inventory: { items: () => items, slots: {} }, heldItem: null,
     equip: async item => { bot.heldItem = item; }, lookAt: async () => {},
-    placeBlock: async () => { blocks.set(`${new Vec3(1, 64, 0)}`, 'white_bed'); blocks.set(`${new Vec3(2, 64, 0)}`, 'white_bed'); items = items.filter(i => i.name !== 'white_bed'); },
+    placeBlock: async () => { const s = bedSite(bot); blocks.set(`${s.foot}`, 'white_bed'); blocks.set(`${s.head}`, 'white_bed'); items = items.filter(i => i.name !== 'white_bed'); },
     sleep: async block => { assert.equal(block.name, 'white_bed'); bot.isSleeping = true; setTimeout(() => { bot.time.timeOfDay = 0; bot.isSleeping = false; }, 50); },
     wake: async () => { bot.isSleeping = false; },
     blockAt: p => ({ name: blocks.get(`${p}`) || (p.y < 64 ? 'grass_block' : 'air'), boundingBox: blocks.has(`${p}`) || p.y < 64 ? 'block' : 'empty', position: p }) });
@@ -895,9 +895,16 @@ test('a carried bed goes down at bedtime, the night passes, and the bed comes ba
   const goal = {}; const actions = [];
   survival.report = (g, sv, action) => actions.push(action.action);
   await survival.sleepStep(new Task('test', 'sleep'), goal, () => {});
-  assert.deepEqual(actions, ['sleep', 'leave_shelter']);
+  // The first bed slept in stays standing as the respawn point (note 1944, the user's rule of 2026-10-20); the ladder makes another to carry.
+  assert.deepEqual(actions, ['sleep', 'spawn_bed_left', 'leave_shelter']);
   assert.equal(bot.time.timeOfDay, 0);
-  assert(dug.length >= 1, 'the bed is picked back up'); assert(items.some(i => i.name === 'white_bed'));
+  assert.equal(dug.length, 0, 'the first bed is not picked up'); assert(!items.some(i => i.name === 'white_bed'));
+  assert.deepEqual(survival.state.spawnBed.foot, { x: 1, y: 64, z: 0 });
+  assert.deepEqual(survival.state.respawn, { x: 1, y: 64, z: 0, dimension: 'overworld' });
+  // The next carried bed, with the respawn bed standing, comes back up as before.
+  items.push({ name: 'white_bed', count: 1 }); bot.time.timeOfDay = 13000; bot.entity.position = new Vec3(10.5, 64, 0.5); actions.length = 0;
+  await survival.sleepStep(new Task('test', 'sleep'), goal, () => {});
+  assert(dug.length >= 1, 'the second bed is picked back up'); assert(items.some(i => i.name === 'white_bed'));
 });
 
 test('a sleep the server confirms late still counts: the clock decides, not mineflayer\'s three-second timeout', async () => {
