@@ -11263,6 +11263,9 @@ class Survival {
             threats: threats(bot).filter(t => t.distance < 20).slice(0, 6).map(t => ({ name: t.entity.name, distance: Math.round(t.distance * 10) / 10, visible: t.visible, shoots: shooter(t.entity), ...(onLid.some(o => o.entity === t.entity) ? { onLid: true, inReach: false, canReachBot: false } : {}) })) } }); }
         catch (err) {
           const up = err.name === 'Stalled' && err.stall?.escalated?.from === 'pocket_next' ? err.stall : null;
+          // Escalated again with the rests already standing for this pocket (note 1960): a second's wait before the next pass, not the next pass at once. The ask is kept (note 757: a way come back drops the rests), but asked anew each pass with every way still resting, pocket_next escalated to survival priority before any ask twenty times a second: full-4 (2026-10-20 13:19 to 13:27Z, 2.6 health, nothing within 16 blocks) ran so for eight minutes, the loop guard's quarter-second between, half a megabyte of record every ten seconds and nothing done.
+          const again = up && pocketRestsOf(this.state, refuge);
+          if (again) { this.report(goal, save, { action: 'wait_in_shelter', reason: `every way from the pocket rests ${again.forSeconds} seconds more: ${String(again.says).slice(0, 160)}` }); await sleep(1000); }
           if (up) { this.state.pocketRests = { origin: { ...refuge.origin }, at: Date.now(), until: up.until > Date.now() ? up.until : Date.now() + 60000, says: String(up.escalated.says || up.why).replace(/^pocket next: (every way it had from here rests: )?/, '').slice(0, 400) }; save(); }
           throw err;
         }

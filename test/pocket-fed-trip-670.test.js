@@ -99,3 +99,26 @@ test('the food kit answered go_on, restock_food or raid_bastion after a trip bac
   const rods = { leaveNether: { reason: 'obtain_blaze_rods', pick: 'go_back', until: 0, at: 1 } };
   kitEndsTrip(rods, 'go_on'); assert.equal(rods.leaveNether.pick, 'go_back', 'the rods\' go_back is not the kit\'s');
 });
+
+test('every way from the pocket resting and the question escalating again, one second waited before the next pass; asked once, as note 757 has it (note 1960)', async () => {
+  const { bot, origin } = pocket();
+  const goal = goalOf();
+  const now = T(fx.askedAt), sealedAt = T(fx.sealedAt);
+  const survival = new Survival(bot, {}, { state: { shelters: [{ origin: { ...origin }, dimension: 'the_nether', emergency: true }],
+    stance: { choice: 'seal', ids: fx.sealedAgainst.ids, mobs: fx.sealedAgainst.mobs, at: sealedAt - 1000 },
+    sealing: { origin: { ...origin }, at: sealedAt }, pocketOutAt: sealedAt - 30000,
+    pocketRests: { origin: { ...origin }, at: now - 5000, until: now + 55000, says: 'stay: held from about here 2 times in the last 8 minutes and nothing changed' } }, client: { systemOne: async () => ({}) } });
+  let asked = 0; const reports = []; let slept = 0;
+  const { Stalled } = require('../src/stillness');
+  survival.decide = async (task, g, save, { id }) => { if (id === 'pocket_next') { asked++; throw new Stalled({ why: 'pocket next: every way it had from here rests: stay', escalated: { from: 'pocket_next', to: 'survival_priority', says: 'pocket next: every way it had from here rests: stay: held' } }); } return { path: ['stay'], stale: false }; };
+  survival.report = (g, sv, a) => reports.push(a);
+  survival.wait = async () => {};
+  const real = Date.now; Date.now = () => now;
+  const realTimeout = global.setTimeout; global.setTimeout = (fn, ms, ...a) => { if (ms >= 1000) slept++; return realTimeout(fn, Math.min(ms, 5), ...a); };
+  try { await survival.step(new Task('wait'), goal, () => {}); } catch (err) { if (err.name !== 'Stalled') throw err; } finally { Date.now = real; global.setTimeout = realTimeout; }
+  assert.equal(asked, 1, 'asked once (a way come back would drop the rests)');
+  assert.equal(slept, 1, 'escalated again with the rests standing: a second waited before the next pass');
+  const w = reports.find(r => r.action === 'wait_in_shelter');
+  assert.match(w?.reason || '', /^every way from the pocket rests 55 seconds more: stay: held from about here/);
+  assert.ok(survival.state.pocketRests?.until > now, 'the rests stand on');
+});
