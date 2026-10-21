@@ -22,8 +22,25 @@ function bearingFromSamples(samples) {
     descending: last.y < origin.y - 3, samples: samples.map(point) };
 }
 
+// Whether an earlier bearing can point at the stronghold the latest points
+// at (note 2001): an eye goes toward the nearest stronghold, and from a
+// place far enough off that is another. Its line crosses the latest's ahead
+// of both throws, or runs beside it the same way; one that crosses only
+// behind either throw points elsewhere. full-3 (2026-10-21 11:27Z), five
+// bearings from about (600, -230) all 8 to 9 degrees west of north and a
+// sixth from (753, 262) southeast, would have had every place two new
+// throws met rejected by the five until eight more were thrown.
+function sameStronghold(r, last) {
+  const u = r.direction, v = last.direction, cross = u.x * v.z - u.z * v.x;
+  if (Math.abs(cross) < .02) return u.x * v.x + u.z * v.z > 0;
+  const dx = last.origin.x - r.origin.x, dz = last.origin.z - r.origin.z;
+  const t = (dx * v.z - dz * v.x) / cross, s = (dx * u.z - dz * u.x) / cross;
+  return t >= 0 && s >= 0;
+}
+
 function triangulate(bearings) {
-  const rays = bearings.filter(b => b.direction).slice(-8);
+  const all = bearings.filter(b => b.direction), latest = all.at(-1);
+  const rays = all.filter(r => r === latest || sameStronghold(r, latest)).slice(-8);
   let best = null;
   for (let a = 0; a < rays.length; a++) for (let b = a + 1; b < rays.length; b++) {
     const first = rays[a], second = rays[b], u = first.direction, v = second.direction;
@@ -92,4 +109,4 @@ async function throwEye(bot, task, { reserve = 12, timeoutMs = 7000 } = {}) {
   }
 }
 
-module.exports = { bearingFromSamples, triangulate, throwEye, horizontal };
+module.exports = { sameStronghold, bearingFromSamples, triangulate, throwEye, horizontal };

@@ -144,3 +144,14 @@ test('bearings all taken along one line send the next throw off to the side of i
   const est = travelTarget({ bearings: met }, { x: 470, y: 79, z: -250 });
   assert(Math.abs(est.x - 520) < 2 && Math.abs(est.z + 1300) < 2);
 });
+
+test('bearings that point at another stronghold, from far off, do not hold back the place the newest meet at (note 2001, full-3 11:27Z)', () => {
+  const at = (x, z, deg) => { const r = deg * Math.PI / 180; return { origin: { x, y: 79, z }, direction: { x: Math.sin(r), z: -Math.cos(r) } }; };
+  const old = [at(596, -209, -8.25), at(602, -330, -8.91), at(600, -232, -8.42), at(593, -336, -8.66), at(602, -230, -8.46)];
+  const target = { x: 1100, z: 600 }, toward = (x, z) => { const l = Math.hypot(target.x - x, target.z - z); return { origin: { x, y: 79, z }, direction: { x: (target.x - x) / l, z: (target.z - z) / l } }; };
+  const est = triangulate([...old, toward(753, 262), toward(850, 200)]);
+  assert(est && Math.abs(est.x - 1100) < 2 && Math.abs(est.z - 600) < 2, JSON.stringify(est));
+  const { sameStronghold } = require('../src/ender-eye');
+  assert.equal(sameStronghold(old[0], toward(753, 262)), false, 'the north bearing crosses the southeast one only behind');
+  assert.equal(sameStronghold(toward(850, 200), toward(753, 262)), true);
+});
