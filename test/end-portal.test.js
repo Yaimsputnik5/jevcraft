@@ -144,3 +144,15 @@ test('a portal room whose floor a cave took: footing beside the far frame is lai
     assert(p.offset(.5, 1.62, .5).distanceTo(frame.offset(.5, .5, .5)) <= 5, `${p} reaches the frame`);
   }
 });
+
+test('with no route to any footing (lava under the open floor round the ring) a span is laid at the bot\'s own height to the nearest, and the eye goes in (full-2 2026-10-21 00:12Z, note 1980)', async t => {
+  const { bot, goal, actions, activations } = fixture({ filled: 8, eyes: 5 });
+  bot.entity.position = new Vec3(14.5, 64, 0.5);
+  bot.pathfinder.getPathTo = () => ({ status: 'noPath', path: [] });
+  const bridging = require('../src/bridging');
+  const spans = [];
+  t.mock.method(bridging, 'bridgeTo', async (_b, _t, target) => { spans.push(`${target}`); bot.entity.position = new Vec3(target.x + .5, target.y, target.z + .5); return 2; });
+  const out = await enterEnd(bot, new Task('portal'), goal, () => {}, actions).catch(e => e);
+  assert(spans.length >= 1, `a span was laid: ${out?.message || out} step ${JSON.stringify(goal.step)}`);
+  assert.equal(activations(), 1, 'and the frame it reached took its eye');
+});

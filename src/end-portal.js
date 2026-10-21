@@ -209,6 +209,19 @@ async function enterEnd(bot, task, goal, save, actions, { confirmationMs = 3000,
     }
     throw blocked('No observed dry route to the outside of the End portal');
   };
+  // A level span to the nearest footing at the bot's own height (note 1980): true once within reach of the frame from outside the ring.
+  const spanToFooting = async frame => {
+    const here = bot.entity.position.floored();
+    const level = bridgeFootings(bot, frame, outside).filter(p => p.y === here.y).slice(0, 3);
+    for (const p of level) {
+      check();
+      goal.step = { action: 'go_to_end_portal', target: { x: center.x, y: center.y, z: center.z }, way: 'a span to the ring\'s side', cell: { x: p.x, y: p.y, z: p.z } }; save();
+      try { await require('./bridging').bridgeTo(bot, task, p, { maxBlocks: 12 }); }
+      catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; console.log(`[end portal] the span toward ${p} stopped: ${String(err.message || err).slice(0, 120)}`); continue; }
+      if (outside(bot.entity.position) && miningReach(bot, bot.entity.position, frame)) return true;
+    }
+    return false;
+  };
   // No walk to the ring's side from where the bot stands in the rock: the stair goes on to a cell beside it (note 1178).
   // Toward the side of the ring the frame wanted stands on: a cell one out
   // from it and one up, not always the east side. The rehearsal of
@@ -252,7 +265,24 @@ async function enterEnd(bot, task, goal, save, actions, { confirmationMs = 3000,
         catch (err) {
           if (!/No observed dry route/.test(err.message)) throw err;
           try { await approach(bridgeFootings(bot, position, outside), { scaffold: true, reach: position }); }
-          catch (again) { if (!/No observed dry route/.test(again.message) || !actions.tunnel) throw again; await digBeside(position); return; }
+          catch (again) {
+            if (!/No observed dry route/.test(again.message)) throw again;
+            // Over a fall that kills the pathfinder lays no block (movement.js
+            // refuses a cell beside or over one), so a footing across open
+            // air over lava has no route however many blocks are carried:
+            // the span is laid crouched at the bot's own height, as across
+            // the Nether's lava sea (bridging.js bridgeTo, with its refusals
+            // for a shooter in sight and a pusher at a one-wide span) (note
+            // 1980). full-2 (2026-10-20 23:55Z to 2026-10-21 00:12Z), five eyes for the
+            // four frames left of its portal at (-412, 1, -1583), stood on the
+            // room's wall with lava under the open floor round the ring: every
+            // footing 'noPath', 'paced the same few cells' 40 times and more.
+            // Spanned within reach: the eye goes in on this pass.
+            if (!await spanToFooting(position)) {
+              if (!actions.tunnel) throw again;
+              await digBeside(position); return;
+            }
+          }
         }
       }
       check();
