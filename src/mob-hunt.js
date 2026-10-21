@@ -240,7 +240,7 @@ function carriedFightSays(bot, mob) {
 // twenty-five minutes, then died (note 476). The answer holds ten minutes
 // while the same pieces are missing in the same dimension, and is not
 // planned again meanwhile.
-const KIT_CHOICE_HOLD_MS = 10 * 60000;
+const KIT_CHOICE_HOLD_MS = 10 * 60000, FIGHT_WITH_CARRIED_MS = 5 * 60000;
 // The End's fight through the armour worn now and with the pieces this
 // question offers (note 1340): the dragon's head and wing and an enderman's
 // blow on Normal, the game's armour formula (combat-estimate.js).
@@ -295,7 +295,7 @@ async function kitChoice(bot, task, goal, save, actions, missing, { client, mob,
     const all = [...k.here, ...k.away, ...k.unplanned].map(p => words(p.item));
     const carriedIron = countOf(bot, 'iron_ingot');
     const tree = {
-      fight_with_carried: { description: `Go on with what is carried: ${carriedFightSays(bot, mob)} Without ${listed(all)} for now; the pieces are left for half an hour, then offered again.` },
+      fight_with_carried: { description: `Go on with what is carried: ${carriedFightSays(bot, mob)} Without ${listed(all)} for this fight; the pieces are back on the ladder in five minutes.` },
     };
     if (here.length) tree.make_kit_here = { description: `Make ${listed(here.map(p => words(p.item)))} here first${k.hereIron ? `: ${k.hereIron} iron ingots, ${carriedIron} carried` : ''}. It takes: ${k.hereSteps.map(s => `${words(s.action)} ${s.count || 1} ${words(s.item || s.block || s.entity)}`).join(', ')}.${away.length ? ` The rest (${listed(away.map(p => words(p.item)))}) cannot be made in the ${Dimension(dimension(bot))}.` : ''}` };
     // One iron piece alone, the most armour for its iron, beside the whole
@@ -387,7 +387,13 @@ async function kitChoice(bot, task, goal, save, actions, missing, { client, mob,
     goal.combatKit = { pick, sig, missing, at: now, here, away, ...(pick === 'make_one_here' ? { one } : {}) }; save();
   }
   if (pick === 'fight_with_carried') {
-    for (const destination of missing) setAside(goal, 'rung', PIECE_RUNG[destination][0], 'Jev chose to fight with what is carried', 1800000);
+    // For the fight at hand, not the half hour (note 1997): the pieces are
+    // back on the ladder five minutes on. Asked as a mob came, the answer
+    // was the fight's, and it set the whole kit aside for half an hour each
+    // time: in the four full runs of 2026-10-20 and 21, 109 of 116 answers
+    // were this one, and full-2 went bare from 06:09Z to 08:35Z and on,
+    // its step the End, re-asked each half hour as the next mob came.
+    for (const destination of missing) setAside(goal, 'rung', PIECE_RUNG[destination][0], 'Jev chose to fight with what is carried', FIGHT_WITH_CARRIED_MS);
     delete goal.combatKit; save();
     return true;
   }

@@ -303,6 +303,12 @@ test('in the Nether with a stone sword and no armour, the kit is Jev\'s choice w
   assert(isSetAside(goal, 'rung', 'iron_helmet') && isSetAside(goal, 'rung', 'shield'));
   assert.equal(await prepareCombatGear(bot, task, goal, () => {}, actions, { client }), true);
   assert.equal(asked.length, 2, 'not asked again while the pieces wait');
+  // For the fight at hand: back on the ladder five minutes on, not half an hour (note 1997).
+  assert.match(asked[1].options.fight_with_carried, /for this fight; the pieces are back on the ladder in five minutes/);
+  const until = goal.setAside?.['rung:iron_helmet']?.until ?? Object.values(goal.setAside || {}).find(v => v?.until)?.until;
+  if (until) assert.ok(until - Date.now() <= 5 * 60000 + 1000, `set aside ${Math.round((until - Date.now()) / 60000)} minutes`);
+  const realNow = Date.now; Date.now = () => realNow() + 5 * 60000 + 1000;
+  try { assert.equal(isSetAside(goal, 'rung', 'iron_helmet'), false, 'back on the ladder after five minutes'); } finally { Date.now = realNow; }
 });
 
 test('golden boots go on in the Nether and come off for iron in the Overworld', async () => {
