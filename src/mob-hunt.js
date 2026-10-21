@@ -295,7 +295,7 @@ async function kitChoice(bot, task, goal, save, actions, missing, { client, mob,
     const all = [...k.here, ...k.away, ...k.unplanned].map(p => words(p.item));
     const carriedIron = countOf(bot, 'iron_ingot');
     const tree = {
-      fight_with_carried: { description: `Go on with what is carried: ${carriedFightSays(bot, mob)} Without ${listed(all)} for this fight; the pieces are back on the ladder in five minutes.` },
+      fight_with_carried: { description: `Go on with what is carried: ${carriedFightSays(bot, mob)} Without ${listed(all)} ${mob ? 'for this fight' : 'for now'}; the pieces are back on the ladder in five minutes.` },
     };
     if (here.length) tree.make_kit_here = { description: `Make ${listed(here.map(p => words(p.item)))} here first${k.hereIron ? `: ${k.hereIron} iron ingots, ${carriedIron} carried` : ''}. It takes: ${k.hereSteps.map(s => `${words(s.action)} ${s.count || 1} ${words(s.item || s.block || s.entity)}`).join(', ')}.${away.length ? ` The rest (${listed(away.map(p => words(p.item)))}) cannot be made in the ${Dimension(dimension(bot))}.` : ''}` };
     // One iron piece alone, the most armour for its iron, beside the whole

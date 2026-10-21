@@ -81,3 +81,19 @@ test('the arrows the feathers and flint carried make are crafted first, not held
   await prepareEndSupplies(bot, task, goal, () => {}, { acquireStep: async (b, t, name, count) => calls.push({ name, count }) });
   assert.deepEqual(calls, [{ name: 'arrow', count: 35 }], '7 carried and 28 from the seven feathers');
 });
+
+// full-3 (2026-10-21 17:29 to 22:13Z): the End's kit asked for armour as a fight with the spider hunted before (note 2015).
+test('the End kit asks for armour as the kit, not as a fight with a mob hunted before', async () => {
+  const { bot, goal, task } = fixture();
+  for (const s of [5, 6, 7, 8, 45]) bot.inventory.slots[s] = null;
+  bot.game = { dimension: 'overworld' }; bot.entity = { position: { x: 0, y: 64, z: 0 } };
+  goal.mobHunt = { entity: 'spider' };
+  const asked = [];
+  task.opportunityClient = { systemOne: async ({ questions, state }) => { asked.push(JSON.stringify({ questions, state })); return { answers: Object.fromEntries(Object.keys(questions).map(k => [k, { choice: 'fight_with_carried', confidence: 0.6 }])) }; } };
+  try { await prepareEndSupplies(bot, task, goal, () => {}, { acquireStep: async () => {} }); } catch (_) {}
+  const kit = asked.find(a => /fight_with_carried/.test(a));
+  assert.ok(kit, `asked: ${asked.length}`);
+  assert.doesNotMatch(kit, /spider/);
+  assert.doesNotMatch(kit, /for this fight/);
+  assert.match(kit, /for now; the pieces are back on the ladder/);
+});

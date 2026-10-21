@@ -192,7 +192,13 @@ async function topUp(bot, task, goal, save, actions, item) {
 
 async function prepareEndSupplies(bot, task, goal, save, actions, client = task.opportunityClient) {
   task.check(); goal.preparingEnd = true; save();
-  if (!await prepareCombatGear(bot, task, goal, save, actions)) return false;
+  // Asked as the End's kit, not for a mob hunted before (note 2015): the
+  // hunt's spider stayed in goal.mobHunt, and the question read 'against:
+  // spider', 'One spider fought so' and 'for this fight'. full-3 (2026-10-21
+  // 17:29 to 22:13Z), its End portal lit and nothing worn, answered it
+  // fight_with_carried 28 times out of 30 with no mob within eight blocks,
+  // and died eight times bare in the Overworld.
+  if (!await prepareCombatGear(bot, task, goal, save, actions, { mob: null })) return false;
   const now = Date.now(), items = kitItems(bot, goal, actions, now), short = items.filter(i => i.short);
   if (!short.length) { delete goal.preparingEnd; delete goal.endKit; save(); return true; }
   const kit = goal.endKit ||= {}, sig = short.map(i => `${i.key}:${i.carried}`).join(',');
