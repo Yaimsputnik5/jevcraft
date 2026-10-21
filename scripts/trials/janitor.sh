@@ -11,7 +11,9 @@ find artifacts -maxdepth 1 -name 'midgame-*.log' -mmin +180 -size +1M -exec gzip
 # its next line goes on at the start; nothing written is lost. 2026-10-06
 # 01:15Z the disk was down to 1 GB free with 8 GB in live logs, 25589's
 # growing 95 KB a second (a pass repeated fifteen times a second).
-for f in $(find artifacts -maxdepth 1 -name 'midgame-*.log' -mmin -180 -size +500M 2>/dev/null); do
+# The full runs' logs too (first-days-*.log, note 2008): four of them had
+# grown to 1.6 to 2.1 GB each by 2026-10-21 19:20Z, unrotated.
+for f in $(find artifacts -maxdepth 1 \( -name 'midgame-*.log' -o -name 'first-days-*.log' \) -mmin -180 -size +500M 2>/dev/null); do
   part="${f%.log}.part-$(date -u +%Y%m%dT%H%M%SZ).log.gz"
   gzip -c "$f" > "$part" && : > "$f" && echo "$f gzipped to $part"
 done
