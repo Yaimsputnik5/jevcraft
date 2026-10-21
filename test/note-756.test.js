@@ -249,3 +249,16 @@ test('the ways out of lava are worked out in a small part of the time they took 
   assert.equal(Object.keys(ways)[0], 'to_dry_ground', Object.keys(ways).join(', '));
   assert.match(ways.to_dry_ground.description, /^Onto the dry cell [\d.]+ blocks off by the way through at \(-145, -54, -516\)/);
 });
+
+test('after a join the mobs the server sends a moment later are waited for before the ground is read (note 1993, full-1 07:31Z)', async () => {
+  const { entitiesArrived } = require('../src/lava-escape');
+  const bot = { entities: {} };
+  let ticks = 0;
+  const sleep = async () => { ticks++; if (ticks === 6) Object.assign(bot.entities, { 1: { name: 'zombie' }, 2: { name: 'zombie' }, 3: { name: 'zombie' } }); };
+  // A fake clock: each sleep is 50 ms.
+  const realNow = Date.now; let now = realNow(); Date.now = () => now; const step = async () => { now += 50; await sleep(); };
+  try { await entitiesArrived(bot, { sleep: step }); } finally { Date.now = realNow; }
+  assert.equal(Object.keys(bot.entities).length, 3, 'waited until the zombies had come');
+  assert.ok(ticks >= 6 + 6, `waited 300 ms of quiet after they came (${ticks} ticks)`);
+  assert.ok(ticks <= 30, 'and no longer than a second and a half');
+});

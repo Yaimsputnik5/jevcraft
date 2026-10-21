@@ -177,10 +177,33 @@ async function escape(survival, task, goal, save, { log = console.log, why = 'in
 // nearest dry cell whose cell, floor and way are clear of lava and fire, as
 // the water's flow carries a body standing in it. The facts are logged, kept
 // (state.joinSurvey) and put on the flight record ('join_survey').
+const JOIN_ENTITIES_MS = 1500, JOIN_QUIET_MS = 300;
+async function entitiesArrived(bot, { maxMs = JOIN_ENTITIES_MS, quietMs = JOIN_QUIET_MS, sleep = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
+  const start = Date.now();
+  let count = Object.keys(bot.entities || {}).length, since = Date.now();
+  while (Date.now() - start < maxMs) {
+    await sleep(50);
+    const n = Object.keys(bot.entities || {}).length;
+    if (n !== count) { count = n; since = Date.now(); }
+    else if (Date.now() - since >= quietMs) break;
+  }
+  return Date.now() - start;
+}
+
 async function settleAfterJoin(bot, survival, { log = console.log, task = null } = {}) {
   if (!bot?.entity?.position || typeof bot.blockAt !== 'function' || bot.game?.gameMode === 'creative') return null;
   const { Task } = require('./skills');
   const t = task || new Task('join', 'read the ground on joining');
+  // The mobs about come a moment after a respawn's join, in the server's own
+  // packets: waited for, up to a second and a half and until none new has
+  // come for 300 ms, before anything is read or asked (note 1993); not in
+  // lava, where the way out is taken at once. full-1 (2026-10-21 07:30:44
+  // to 07:32:30Z) died five times in two minutes where it respawned, its
+  // bed among a crowd of zombies: each join read no mob about, the first
+  // question asked within half a second was the night's shelter, answered
+  // with a room built six blocks off, and the zombies were at arm's length.
+  // After a death, where the bed's ground is the one the last life ended on.
+  if (survival?.state?.recovery?.status === 'pending' && !surroundings(bot).inLava) await entitiesArrived(bot);
   const facts = surroundings(bot);
   facts.at = new Date().toISOString();
   // And the mobs about and the hour, said with the rest (note 752h): four
@@ -239,4 +262,4 @@ async function outOfWaterByLava(bot, task, facts, { log = console.log } = {}) {
   return f.x === exit.x && f.z === exit.z && !/water/.test(bot.blockAt(f)?.name || '');
 }
 
-module.exports = { mustEscape, targetHot, hotSays, hotUnder, lavaNear, surroundings, escape, settleAfterJoin, outOfWaterByLava };
+module.exports = { entitiesArrived, mustEscape, targetHot, hotSays, hotUnder, lavaNear, surroundings, escape, settleAfterJoin, outOfWaterByLava };
