@@ -97,3 +97,25 @@ test('the End kit asks for armour as the kit, not as a fight with a mob hunted b
   assert.doesNotMatch(kit, /for this fight/);
   assert.match(kit, /for now; the pieces are back on the ladder/);
 });
+
+// full-3 (2026-10-21 17:29 to 23:03Z): portal lit at (2052, 42, 1511), spawn bed 1,800 blocks off, nine deaths far from it (note 2017).
+test('with the portal lit and the bed slept in last far from it, making the portal home is offered, and walks a leg toward the ring with a bed', async () => {
+  const { bot, items, goal, task } = fixture();
+  items.find(i => i.name === 'bow').durabilityUsed = registry.itemsByName.bow.maxDurability - 1;
+  bot.game = { dimension: 'overworld' }; bot.entity = { position: { x: 700.5, y: 103, z: 293.5 } };
+  bot._survivalState = { spawnBed: { foot: { x: 700, y: 103, z: 293 } } };
+  goal.endPortal = { center: { x: 2052, y: 42, z: 1511 }, neededEyes: 0 };
+  let text = '';
+  task.opportunityClient = { systemOne: async ({ questions }) => { text = JSON.stringify(Object.values(questions)[0]); return { answers: Object.fromEntries(Object.keys(questions).map(k => [k, { choice: 'home_by_portal', confidence: 0.6 }])) }; } };
+  const walks = [];
+  await prepareEndSupplies(bot, task, goal, () => {}, { acquireStep: async () => assert.fail('a bed is carried'), navigate: async (b, t, g) => walks.push(g) });
+  assert.match(text, /Make the portal home first: carry the beds carried to the portal's ring, 18[12][90] blocks off/);
+  assert.match(text, /The bed slept in last is 18[12][90] blocks from the portal/);
+  assert.equal(walks.length, 1);
+  assert.ok(Math.abs(Math.hypot(walks[0].x - 700.5, walks[0].z - 293.5) - 64) < 2, `leg to ${walks[0].x}, ${walks[0].z}`);
+  assert.equal(goal.endKit.choice.pick, 'home_by_portal');
+  // Near its own bed: not offered.
+  const { homeByPortal } = require('../src/end-supplies');
+  bot._survivalState.spawnBed.foot = { x: 2040, y: 42, z: 1500 };
+  assert.equal(homeByPortal(bot, goal), null);
+});

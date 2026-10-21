@@ -34,6 +34,23 @@ const END_BEDS = 4, END_BED_MS = 20 * 60000;
 // from skeletons after it.
 const WANTS = { arrow: 64, cobblestone: 64, water_bucket: 2, food: 64, health: 18 };
 const HOLD_MS = 15 * 60000, ARROW_STEP = 32, FILL_HOLD_MS = 30 * 60000;
+// A home by the portal (note 2017): with the portal lit and the bed slept in
+// last far from it, a bed carried to the ring and slept in there, so a death
+// comes back beside the portal and the kit's errands start from it. full-3
+// (2026-10-21 17:29 to 23:03Z), its portal lit at (2052, 42, 1511) and its
+// spawn bed 1,800 blocks off at (700, 103, 293), died nine times, each 1,365
+// to 1,771 blocks from the portal, came back bare to the old bed, and gained
+// not one item of the kit in five and a half hours.
+const HOME_FAR = 300, HOME_NEAR = 24, HOME_LEG = 64;
+const bedtimeSays = bot => { const t = bot.time?.timeOfDay; if (!Number.isFinite(t)) return ''; const left = t >= 12542 && t < 23460 ? 0 : Math.round(((12542 - t + 24000) % 24000) / 20 / 60); return left ? ` (in about ${left} real minutes)` : ' (now)'; };
+const spawnBedOf = bot => bot._survivalState?.spawnBed?.foot || null;
+function homeByPortal(bot, goal) {
+  const ep = goal.endPortal, here = bot.entity?.position, sb = spawnBedOf(bot);
+  if (!(ep?.litAt || ep?.neededEyes === 0) || !ep.center || !here || !/overworld/.test(String(bot.game?.dimension || 'overworld'))) return null;
+  const bedOff = sb ? Math.round(Math.hypot(sb.x - ep.center.x, sb.z - ep.center.z)) : null;
+  if (bedOff != null && bedOff <= HOME_FAR) return null;
+  return { bedOff, off: Math.round(Math.hypot(here.x - ep.center.x, here.z - ep.center.z)), beds: bedsOf(bot), center: ep.center };
+}
 // The dragon's fight as rehearsed (scripts/endgame.js dragon, port 25578,
 // 2026-10-04; a bow, a diamond sword, iron armour and a shield, no bed
 // used). By the bow (01:12Z, a fresh End): the ten crystals and the dragon's
@@ -223,6 +240,7 @@ async function prepareEndSupplies(bot, task, goal, save, actions, client = task.
   const worse = held?.pick === 'enter_now' && (Object.entries(held.counts || {}).some(([k, n]) => (counts[k] ?? 0) < n) || (held.counts && short.some(i => !(i.key in held.counts))));
   if (held?.pick === 'enter_now' && held.counts && !worse) pick = 'enter_now';
   else if (held?.pick === 'fill_frame_first') pick = 'fill_frame_first';
+  else if (held?.pick === 'home_by_portal' && homeByPortal(bot, goal)) pick = 'home_by_portal';
   else if (held && held.pick !== 'enter_now') {
     const item = short.find(i => `top_up_${i.key}` === held.pick);
     if (item && !(held.target != null && item.carried >= held.target)) pick = held.pick;
@@ -259,6 +277,9 @@ async function prepareEndSupplies(bot, task, goal, save, actions, client = task.
       const carried = countOf(bot, 'ender_eye');
       tree.fill_frame_first = { description: `Take the eyes to the portal now and set the ${need} it wants in its frame, then see to the kit: the portal's ring is ${off} blocks off, and ${carried >= need ? `the ${carried} eyes are carried` : `${carried} eyes are carried and the rest are taken from the chest first`}. Set in the frame, no eye is lost to a death; carried, a death drops them where it happens. The portal lit, this question is asked again there, the kit as it stands then.` };
     }
+    const home = homeByPortal(bot, goal);
+    if (home && home.beds && home.off <= HOME_NEAR) tree.home_by_portal = { description: `Stay by the portal's ring (${home.off} blocks off) until bedtime${bedtimeSays(bot)} and sleep in the carried bed here; the bed slept in stays the respawn. ${home.bedOff != null ? `The bed slept in last is ${home.bedOff} blocks from the portal, and a death before then comes back there.` : 'No bed has been slept in yet.'} Nothing else is done meanwhile.` };
+    else if (home) tree.home_by_portal = { description: `Make the portal home first: ${home.beds ? `carry the bed${home.beds === 1 ? '' : 's'} carried` : 'make a bed (three wool, three planks) and carry it'} to the portal's ring, ${home.off} blocks off, and sleep in it there the next night; the bed slept in stays the respawn. ${home.bedOff != null ? `The bed slept in last is ${home.bedOff} blocks from the portal: a death now comes back there, everything carried left where it fell, and the walk back to the ring is the ${home.bedOff} blocks again.` : 'No bed has been slept in yet: a death now comes back at the world spawn.'} Beside the ring a death comes back within reach of the portal and its chest, and the kit's errands go out from there.` };
     // The old order, for the tests' stand-in only (note 707).
     const oldOrder = `top_up_${(short.find(i => !['food', 'health'].includes(i.key)) || short[0]).key}`;
     const decision = await decide('end_kit', { client, bot, task, goal, save, tree, context: { oldOrder },
@@ -269,6 +290,26 @@ async function prepareEndSupplies(bot, task, goal, save, actions, client = task.
     kit.choice = { pick, at: now, sig, ...(pick === 'enter_now' ? { counts } : {}), ...(item?.target != null ? { target: item.target } : {}) }; save();
   }
   if (pick === 'enter_now' || pick === 'fill_frame_first') { delete goal.preparingEnd; save(); return true; }
+  if (pick === 'home_by_portal') {
+    const home = homeByPortal(bot, goal);
+    if (!home) { delete kit.choice; save(); return false; }
+    if (!home.beds) { await topUp(bot, task, goal, save, actions, { key: 'beds', item: 'bed', carried: 0, wants: 1, short: true }); return false; }
+    if (home.off <= HOME_NEAR) {
+      // By the ring with a bed: the night's sleep is the survival layer's
+      // (a carried bed is slept in where the bot is); the day waits here.
+      goal.step = { action: 'prepare_end_supplies', item: 'home_by_portal', waiting: 'bedtime', off: home.off }; save();
+      for (let n = 0; n < 50; n++) { task.check(); checkThreats(bot); await new Promise(resolve => setTimeout(resolve, 100)); }
+      return false;
+    }
+    // Legs of 64 blocks toward the ring (note 2010's walks): asked of the
+    // whole way at once, the route search gives up far off.
+    const here = bot.entity.position, k = Math.min(1, HOME_LEG / home.off);
+    const to = { x: Math.round(here.x + (home.center.x - here.x) * k), z: Math.round(here.z + (home.center.z - here.z) * k) };
+    goal.step = { action: 'prepare_end_supplies', item: 'home_by_portal', to, off: home.off }; save();
+    const { goals } = require('mineflayer-pathfinder');
+    await actions.navigate(bot, task, home.off <= HOME_LEG ? new goals.GoalNearXZ(Math.round(home.center.x), Math.round(home.center.z), HOME_NEAR - 4) : new goals.GoalNearXZ(to.x, to.z, 4), { timeoutMs: 90000, stallMs: 10000 });
+    return false;
+  }
   const item = short.find(i => `top_up_${i.key}` === pick);
   if (!item) { delete kit.choice; save(); return false; }
   // The eyes carried, asked of before the errand (eye-bank.js, note 1193).
@@ -282,4 +323,4 @@ async function prepareEndSupplies(bot, task, goal, save, actions, client = task.
   finally { sp.ms += Date.now() - began; save(); }
   return false;
 }
-module.exports = { prepareEndSupplies, kitItems, rehearsedSays, END_BEDS, REHEARSED };
+module.exports = { prepareEndSupplies, kitItems, homeByPortal, HOME_FAR, rehearsedSays, END_BEDS, REHEARSED };

@@ -541,6 +541,7 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | --- | --- | --- | --- |
 | `enter_now` | root | go to the End with what is carried | always; said with each item of the kit, what is short, what the rehearsed fight took in arrows and minutes, and that there is no way back but the dragon's death or the bot's own |
 | `fill_frame_first` | root | take the eyes to the portal and set them in its frame now, the kit after | the portal found and not lit, the eyes it wants held (carried or in the bot's chests); said with how far the ring is and where the eyes are; held until the portal is lit, then this is asked again (note 1380) |
+| `home_by_portal` | root | make the portal home first: a bed carried to its ring and slept in there | the portal lit, in the Overworld, the bed slept in last more than 300 blocks from it (or none); said with how far the ring and that bed are, and that a death comes back at the bed slept in last (note 2017); held until the bot is within 24 blocks of the ring with a bed |
 | `top_up_(bow\|arrows\|snowballs\|blocks\|pickaxe\|spare_pickaxe\|water\|beds\|enchant\|food\|health)` (pattern: names the kit item) | root | top up this item of the kit first | the item is short of what the code would take; said with what it is for in the End and how it is got here (arrows only from skeletons, none to two each; beds from sheared wool; water for a landing and against endermen) |
 
 ### `crossing_kit`
