@@ -325,3 +325,14 @@ test('a hoglin that cannot be struck from where the bot stands, shuffling nearer
   assert.equal(steps, 3);
   assert.match(goal.netherFood.hunts.at(-1).why, /^the hoglin within thirty-two blocks could not be reached to strike \(1 given up after three steps that got no nearer\)/);
 });
+
+test('food a furnace in this dimension is cooking is offered as food, with where and when it is done (note 1996, full-3 08:12Z)', () => {
+  const { furnaceFood } = require('../src/survival');
+  const bot = { entity: { position: new Vec3(450.5, 79, 102.5) }, game: { dimension: 'the_nether' }, registry };
+  const goal = { smelting: { item: 'cooked_mutton', from: 'mutton', fuelItem: 'coal', position: { x: 456, y: 79, z: 117 }, dimension: 'nether', count: 6, startedAt: Date.now() - 70000 } };
+  const f = furnaceFood(bot, goal);
+  assert.equal(f.distance, 16);
+  assert.match(f.says, /^Take the 6 cooked mutton out of the furnace at \(456, 79, 117\), 16 blocks off .*: 36 food points, done now/);
+  assert.equal(furnaceFood({ ...bot, game: { dimension: 'overworld' } }, goal), null, 'not from another dimension');
+  assert.equal(furnaceFood(bot, { smelting: { ...goal.smelting, item: 'iron_ingot' } }), null, 'not a batch that is not food');
+});

@@ -1266,6 +1266,23 @@ function runFromCreeper(bot, creepers, from, blocks, worn) {
   return cr.creeperRunSays(cr.wayAgainstCreepers(bot, path, creepers), { worn, health: bot.health });
 }
 
+// The food a furnace in this dimension is cooking for the bot (the batch
+// goal.smelting keeps), within 64 blocks: what, where, when done (note 1996).
+const FURNACE_FOOD_WITHIN = 64;
+function furnaceFood(bot, goal) {
+  const b = goal?.smelting, here = bot.entity?.position;
+  if (!b?.position || !here || !b.item) return null;
+  const dim = String(bot.game?.dimension || '').replace(/^minecraft:/, '').replace(/^the_/, '');
+  if (b.dimension && String(b.dimension).replace(/^the_/, '') !== dim) return null;
+  const food = bot.registry?.foodsByName?.[b.item];
+  if (!food) return null;
+  const d = Math.round(Math.hypot(b.position.x - here.x, b.position.y - here.y, b.position.z - here.z));
+  if (d > FURNACE_FOOD_WITHIN) return null;
+  const left = Math.max(0, Math.round((b.startedAt || 0) / 1000 + (b.count || 1) * 10 - Date.now() / 1000));
+  const points = Math.round((food.foodPoints || 0) * (b.count || 1));
+  return { distance: d, says: `Take the ${b.count} ${b.item.replaceAll('_', ' ')} out of the furnace at (${b.position.x}, ${b.position.y}, ${b.position.z}), ${d} blocks off (about ${Math.max(1, Math.round(d / 4.3))} seconds at a walk): ${points} food points, ${left ? `done in about ${left} seconds` : 'done now'}, and eaten from there.` };
+}
+
 const CROUCH_SPEED = 4.317 * 0.3;
 // A creeper's blast two blocks off through the armour the bot wears (note
 // 1988): the way-out options said it as the first 'about' of the fight
@@ -9664,6 +9681,15 @@ class Survival {
     let closed = null; try { closed = require('./mob-hunt').tripHomeClosed(bot, goal); } catch (_) { closed = null; }
     if (!closed) children.return_for_food = { description: 'Go back through the portal to the Overworld, where food can be hunted and cooked.' + (/nether/.test(String(bot.game?.dimension || '')) ? ' In the Nether hoglins are the only meat.' : ' Nothing here is safe to eat.') + trip + there + keptOn,
       run: async () => { require('./nether-travel').chooseReturnForFood(goal); goal.survivalAction = { action: 'return_for_food', at: new Date().toISOString() }; save(); await this.actions.returnOverworld(bot, task, goal, save); } };
+    // Food cooking in a furnace in this dimension, the batch left there
+    // (goal.smelting): taken out, said with where and when it is done (note
+    // 1996). full-3 (2026-10-21 08:04 to 08:13Z) left its 6 mutton cooking
+    // in a pocket at a blaze spawner, came back to 1.9 health, said 'I've got
+    // nothing to eat here', was offered the portal, the hoglins and a
+    // bastion, and died at 1.9 sixteen blocks from the cooked mutton.
+    const cooking = furnaceFood(bot, goal);
+    if (cooking) children.furnace_food = { description: cooking.says,
+      run: async () => { const b = goal.smelting; delete b.left; save(); await require('./work').smelt(bot, task, { item: b.item, from: b.from, fuelItem: b.fuelItem, count: b.count }, goal, save); } };
     if (/nether/.test(String(bot.game?.dimension || ''))) {
       const { hoglinsKnown, hoglinSays } = require('./nether-travel');
       const known = hoglinsKnown(bot, goal);
@@ -12553,4 +12579,4 @@ function claim(bot, goal = {}, survival = null) {
   return made;
 }
 
-module.exports = { runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
+module.exports = { furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
