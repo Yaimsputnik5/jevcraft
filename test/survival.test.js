@@ -1396,7 +1396,9 @@ test('sealed in, the mobs the wall hides are named in the choice to leave', asyn
   await survival.step(new Task('night'), { kind: 'win' }, () => {});
   assert.match(leave || '', /past a creeper 10 blocks off \(heard, not seen: the wall is between\)/);
   // mid-83-i: the fight's figure left the creepers out, and said so nowhere.
-  assert.match(leave || '', /the creeper not counted in it: each that reaches the bot goes off for about [\d.]+ health/);
+  assert.match(leave || '', /the creeper not counted in it: each that reaches the bot goes off for about [\d.]+ health two blocks off, through the armour worn/);
+  // Note 1988: the blast's own figure, nothing worn, not the fuse's 0.25.
+  assert.ok(Number(leave.match(/goes off for about ([\d.]+) health/)[1]) >= 20, leave.match(/goes off for about [\d.]+ health/)[0]);
   // mid-230-l: what leaving does with a creeper by the doors, said.
   assert.match(leave || '', /A door within six blocks of a creeper stays shut \(the creeper 10 blocks off now, behind the rock\): with every door so, the pocket waits for it to move off/);
 });

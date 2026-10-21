@@ -1252,6 +1252,14 @@ function openWhileBuildingSays(bot, over, seconds, what) {
 // way's cells from the first step to its end; null with nothing that can
 // push the bot, { beside: 0 } where no cell of the way is by such a fall.
 const CROUCH_SPEED = 4.317 * 0.3;
+// A creeper's blast two blocks off through the armour the bot wears (note
+// 1988): the way-out options said it as the first 'about' of the fight
+// estimate's creeper line, its fuse's quarter second: 'goes off for about
+// 0.25 health', all 71 times in the four full runs of 2026-10-20 and 21.
+function creeperBlastNow(bot) {
+  const ce = require('./combat-estimate');
+  return Math.round(ce.afterArmour(ce.creeperBlast(2), ce.armourOf([5, 6, 7, 8].map(slot => bot.inventory?.slots?.[slot]?.name).filter(Boolean))));
+}
 // The bot's own Overworld walks of 40 blocks or more, arrived (four full runs,
 // 2026-10-20 and 21, 526 walks, straight-line blocks a second): the median
 // 3.4, one in four slower than 2.8, one in ten than 2.2; not the 4.3 of a
@@ -10833,7 +10841,7 @@ class Survival {
         const creeperCount = pricedOut.filter(t => t.entity.name === 'creeper').length;
         // Every one of them held off out of sight through the wait: the fight
         // is what it costs should they all come, not what leaving is.
-        const allSays = (outCost ? `${waitSays?.heldOff ? ' Should they all come at the bot at once, fighting them is estimated at about' : way.apart.length ? ` Out among the ones in the way (${pricedOut.slice(0, 4).map(t => `a ${t.entity.name.replaceAll('_', ' ')} ${Math.round(t.distance)} blocks off`).join(', ')}), fighting them is estimated at about` : ' Out among them, fighting them all is estimated at about'} ${outCost.seconds} seconds and ${outCost.damageTaken} damage, from ${outCost.healthNow} health${outCost.healthAfter <= 0 ? ' (more than the bot has)' : ''}${creeperCount ? `, the ${creeperCount === 1 ? 'creeper' : `${creeperCount} creepers`} not counted in it: each that reaches the bot goes off for about ${outCost.creeper?.match(/about ([\d.]+)/)?.[1] || 18} health` : ''}.` : '') + require('./way-out').apartSays(way.apart) + quietSays;
+        const allSays = (outCost ? `${waitSays?.heldOff ? ' Should they all come at the bot at once, fighting them is estimated at about' : way.apart.length ? ` Out among the ones in the way (${pricedOut.slice(0, 4).map(t => `a ${t.entity.name.replaceAll('_', ' ')} ${Math.round(t.distance)} blocks off`).join(', ')}), fighting them is estimated at about` : ' Out among them, fighting them all is estimated at about'} ${outCost.seconds} seconds and ${outCost.damageTaken} damage, from ${outCost.healthNow} health${outCost.healthAfter <= 0 ? ' (more than the bot has)' : ''}${creeperCount ? `, the ${creeperCount === 1 ? 'creeper' : `${creeperCount} creepers`} not counted in it: each that reaches the bot goes off for about ${creeperBlastNow(bot)} health two blocks off, through the armour worn` : ''}.` : '') + require('./way-out').apartSays(way.apart) + quietSays;
         // The nearest alone beside the all-at-once figure, and a slime's or a
         // magma cube's size where it is not known (priced as a big one, its
         // splits with it): 25595 (mid-243-jf, 13:25:36Z) was told 345.8
