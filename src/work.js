@@ -1738,6 +1738,13 @@ const FLAMES = new Set(['fire', 'soul_fire']);
 // was refused its crafting table at (48, 63, 140) eight times, "the block is
 // still firefly_bush" (note 761).
 const GROUND_COVER = new Set(['water', 'short_grass', 'tall_grass', 'fern', 'large_fern', 'snow', 'leaf_litter', 'dead_bush', 'seagrass', 'vine', 'short_dry_grass', 'tall_dry_grass', 'bush', ...FLAMES]);
+// Ground cover a placed block does not take the place of (note 1983): leaf
+// litter is like pink petals in the game, not replaceable, so the server
+// refused the block ("the block is still leaf_litter", 378 times on
+// 2026-10-20 and 21 across the four full runs) and the cell was never
+// cleared. It still counts as open ground; it is knocked away first.
+const NOT_REPLACED = new Set(['leaf_litter']);
+const replacedCover = name => GROUND_COVER.has(name) && !NOT_REPLACED.has(name);
 // A cell a workstation can go in: open or only covered, over a full block.
 // In snowy plains every cell at the feet is a snow layer over grass, and
 // trial 40 found "no place for crafting_table" forty times in a minute.
@@ -1833,12 +1840,12 @@ async function place(bot, task, p, material, { face, properties, stay = false, r
   // of first-days-212's pen was "placement obstructed" seven times until
   // the audit called the loop (2026-09-26). Not a crop.
   const there = bot.blockAt(p);
-  if (!air(there) && !GROUND_COVER.has(there?.name) && knockedAway(bot, there) && typeof bot.dig === 'function') {
+  if (!air(there) && !replacedCover(there?.name) && knockedAway(bot, there) && typeof bot.dig === 'function') {
     try { await bot.dig(there, true); } catch (_) { task.check(); }
   }
   // A liquid's cell is replaceable in the game (water and lava alike): a block put there takes its place. Asked for by name (replaceLiquid, note 1953), not by default: a cap on lava is a step a caller means.
   const liquidThere = /^(water|lava|flowing_water|flowing_lava)$/.test(bot.blockAt(p)?.name || '');
-  if (!air(bot.blockAt(p)) && !GROUND_COVER.has(bot.blockAt(p)?.name) && !(replaceLiquid && liquidThere)) {
+  if (!air(bot.blockAt(p)) && !replacedCover(bot.blockAt(p)?.name) && !(replaceLiquid && liquidThere)) {
     throw new Error(`Placement obstructed by ${bot.blockAt(p)?.name} at ${p}`);
   }
   const body = occupant(bot, p);

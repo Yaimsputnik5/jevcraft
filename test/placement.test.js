@@ -100,6 +100,13 @@ test('a flower in the cell is punched out before placing; a crop is not', async 
   const flowered = world('dandelion');
   await place(flowered, new Task('fence'), target, 'oak_fence');
   assert.deepEqual(flowered.dug, ['dandelion']);
+  // Leaf litter is not replaceable in the game (note 1983): punched out first too.
+  const littered = world('leaf_litter');
+  await place(littered, new Task('fence'), target, 'oak_fence');
+  assert.deepEqual(littered.dug, ['leaf_litter']);
+  const grassy = world('short_grass');
+  await place(grassy, new Task('fence'), target, 'oak_fence');
+  assert.deepEqual(grassy.dug, [], 'short grass is replaced by the block, as the game does');
   const cropped = world('wheat');
   await assert.rejects(place(cropped, new Task('fence'), target, 'oak_fence'), /obstructed by wheat/);
   assert.deepEqual(cropped.dug, []);
