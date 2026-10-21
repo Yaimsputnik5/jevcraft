@@ -414,3 +414,21 @@ test('mid-244-ad-nether-3: the pearl step failing every two seconds with nothing
   assert.match(escalated.says, /^stillness detour: /);
   assert(n <= 16, `within sixteen failures of the step, not twenty-four and on: ${n}`);
 });
+
+// full-2 (2026-10-21 20:59:51 to 21:00:01Z): sealed at night, bare, zombies about; stay and go_to_bed had
+// changed nothing and rested, and the pocket's question offered leave and three hunts only (note 2011).
+test('staying in a sealed pocket is never left out for resting, only said', () => {
+  const tried = require('../src/tried');
+  const bot = { entity: { position: new Vec3(-461.7, 69, -1551.6) }, game: { dimension: 'overworld' }, inventory: { items: () => [] } };
+  const goal = { kind: 'win', step: { action: 'mine' } };
+  const now = Date.parse('2026-10-21T21:00:01Z');
+  tried.hold(bot, goal, 'pocket_next', ['stay', 'go_to_bed'], 'changed nothing', { now: now - 10000 });
+  const tree = () => ({ go_to_bed: { description: 'Go to the bed 60 blocks away.' }, leave: { description: 'Open the pocket and go back to work.' }, hunt_zombie: { description: 'Hunt the zombie.' }, hunt_spider: { description: 'Hunt the spider.' }, stay: { description: 'Stay sealed in the pocket.' }, none_good: { description: 'None.' } });
+  const plain = tried.read(bot, goal, 'pocket_next', tree(), { now });
+  assert.ok(!plain.tree.stay && !plain.tree.go_to_bed, 'without kept, both rest out');
+  const read = tried.read(bot, goal, 'pocket_next', tree(), { kept: ['stay'], now });
+  assert.ok(read.tree.stay, 'stay stays on offer');
+  assert.match(read.tree.stay.description, /kept on offer: it is the wait itself/);
+  assert.ok(!read.tree.go_to_bed, 'the bed walk that changed nothing still rests');
+  assert.ok(read.tree.leave && read.tree.none_good);
+});

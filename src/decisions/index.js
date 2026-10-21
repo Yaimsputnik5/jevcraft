@@ -548,6 +548,11 @@ const SAY_ONLY = new Set(['encounter_stance', 'body_way', 'shot_answer', 'ranged
 // outside came to nothing, and a zombie had it at 10:12:24.
 const CALM_WHEN_NONE_GOOD = new Set(['upkeep', 'pocket_next']);
 const CALM_KEY = Object.freeze({ pocket_next: 'stay' });
+// Night in the overworld, where a pocket's wait ends at dawn: there the stay
+// is kept on offer when it rests (tried.js `kept`, note 2011). Elsewhere a
+// stay that changed nothing twice rests as note 599 has it: in the Nether
+// nothing it waits for comes. 12542 is where the night's mobs begin.
+const dawnComing = bot => { const t = bot?.time?.timeOfDay; return /overworld/.test(String(bot?.game?.dimension || '')) && Number.isFinite(t) && t >= 12542 && t < 23460; };
 // Before keep_at_it at a stall's rung question, where the bot is stuck in
 // the terrain: working free of it (note 1285). 25597 (2026-10-05 07:23 to
 // 07:40Z), in a sandstone pit eight blocks under the sky by its End portal
@@ -754,7 +759,7 @@ async function decide(id, { client, bot, task, goal, save = () => {}, tree, stat
       console.log(`[none good] ${id}: ${why}`);
       escalateFrom(bot, goal, spec, why);
     }
-    const read = tried.read(bot, goal, id, tree, { target, sayOnly: SAY_ONLY.has(id), leave: require('../intention').GATED.has(id) ? require('../fortress-hold').isLeave : null });
+    const read = tried.read(bot, goal, id, tree, { target, sayOnly: SAY_ONLY.has(id), kept: CALM_KEY[id] && dawnComing(bot) ? [CALM_KEY[id]] : null, leave: require('../intention').GATED.has(id) ? require('../fortress-hold').isLeave : null });
     keptBesideLeave = read.keptBesideLeave || [];
     if (read.allResting && spec.parent !== undefined && spec.parent !== null) escalateFrom(bot, goal, spec, `every way it had from here rests: ${read.resting.join('; ')}`, { until: read.until });
     tree = read.tree;

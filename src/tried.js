@@ -426,7 +426,15 @@ function leafAt(tree, key) {
 // rest in view, not left as the one option the ledger did not rest. 25584
 // (critic-20260930T0436Z item 1) had its walk and staircase resting and
 // keep_searching taken as "the only way offered" (note 721).
-function read(bot, goal, q, tree, { target = null, sayOnly = false, leave = null, now = Date.now() } = {}) {
+// `kept`: the answers never left out for resting, only said: staying in a
+// sealed pocket through an overworld night, which changes nothing by what
+// it is until dawn (note 2011). full-2
+// (2026-10-21 20:59:51Z), sealed at night 60 blocks from its bed, bare, with
+// two zombies about, chose stay; it changed nothing, rested, and ten seconds
+// later the pocket's question offered leave and three hunts only. Jev
+// answered none good, leave was taken in stay's place (note 1205's calm
+// answer gone from the list), and the zombies had it 27 seconds later.
+function read(bot, goal, q, tree, { target = null, sayOnly = false, leave = null, kept = null, now = Date.now() } = {}) {
   const here = P(bot?.entity?.position);
   // The walks' stall memory bears too (failed-places.js, note 777).
   if (!goal || (!goal.tried?.entries?.length && !bot?._stallSpots?.length && !bot?._walks?.length) || !here) return { tree, resting: [], allResting: false };
@@ -452,6 +460,11 @@ function read(bot, goal, q, tree, { target = null, sayOnly = false, leave = null
     const own = P(node?.target);
     const place = !sayOnly && !until && own ? require('./failed-places').read(bot, goal, own, { here, now, restMs: REST_MS }) : null;
     const said = [triedSays(list, { here, now, toward: !!t }), sayOnly ? null : justNow(goal, { q, method: key, here, now, counted: list }), place && !(place.until > now) ? place.says : null].filter(Boolean).join(' ') || null;
+    if (kept?.includes(key) && (until || (place && place.until > now))) {
+      const rest = Math.max(until || 0, place?.until || 0);
+      nodes.set(key, addSays(node, `${[said, place?.until > now ? place.says : null].filter(Boolean).join(' ')} It would rest ${ago(rest - now)} more from here; kept on offer: it is the wait itself, and the night ends at dawn.`));
+      continue;
+    }
     if (place && place.until > now) {
       const both = [said, place.says].filter(Boolean).join(' ');
       resting.push({ key, until: place.until, held: false, wait: false, place: place.kind, said: both, says: `${label(key)}: ${both} It rests ${ago(place.until - now)} more from here.` });

@@ -260,3 +260,22 @@ test('a resting wait is left out for two open ways, not for ways that rest thems
   const open = tried.read(bot, goal, 'pocket_next', { ...tree, go_for_food: { description: 'Food.' }, work_here: { description: 'Work.' } }, { now });
   assert.deepEqual(Object.keys(open.tree).sort(), ['go_for_food', 'work_here'], 'the resting wait and ways left out, two open');
 });
+
+// full-2 (2026-10-21 20:59:51 to 21:00:01Z, time of day 12889): sealed at night in the overworld, bare, zombies
+// about; the stay that changed nothing rested, and the question offered leave and three hunts only (note 2011).
+test('at night in the overworld a pocket stay that came to nothing stays on offer, said: its wait ends at dawn', async t => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-21T20:57:00Z') });
+  const { decide } = require('../src/decisions');
+  const bot = { ...pocketBot(), game: { dimension: 'overworld', gameMode: 'survival' }, time: { timeOfDay: 12889 }, health: 20, food: 20 };
+  const goal = { kind: 'win', step: { action: 'mine' } };
+  const asked = [];
+  const client = answering(asked, c => c.stay ? 'stay' : Object.keys(c)[0]);
+  const tree = () => ({ stay: { description: 'Stay in the pocket.' }, leave: { description: 'Open the pocket and go back to work.' }, hunt_zombie: { description: 'Hunt the zombie.' }, hunt_spider: { description: 'Hunt the spider.' } });
+  for (let i = 0; i < 3; i++) {
+    goal.survivalAction = { action: 'wait_in_shelter', at: new Date().toISOString() };
+    await decide('pocket_next', { client, bot, goal, tree: tree(), state: { health: 20 } });
+    t.mock.timers.tick(90000);
+  }
+  assert.ok(asked[2].keys.includes('stay'), `offered: ${asked[2].keys}`);
+  assert.match(asked[2].criteria.stay, /kept on offer: it is the wait itself/);
+});
