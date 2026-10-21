@@ -6712,6 +6712,19 @@ class Survival {
       }
       // Each stance's price rides with it (not in its words): what the code
       // takes when Jev says none is good (decisions/index.js pickWhenNoneGood, note 691).
+      // What a stance priced at or over the bot's health came to (note 1981):
+      // the price is said on each option, and the record of choosing one so
+      // priced is said beside it. On 2026-10-20 (four fresh runs, 4,038
+      // stances), 45 of the 246 chosen at or over the bot's health were
+      // followed by its death within 30 seconds, against 56 of the 3,792
+      // priced under it; of the 39 deaths that day, the last stance before
+      // 20 was one so priced (full-2 02:05:47Z shield_guard 31.5 at 18.5,
+      // full-4 02:06:39Z charge_nearest 21.6 at 12.8, both at 0.2 or under).
+      for (const o of Object.values(options)) {
+        const d = o?.expects?.damage;
+        if (!Number.isFinite(d) || !(d >= (bot.health ?? 20)) || typeof o.description !== 'string') continue;
+        o.description += ` Priced at or over the bot's health: on 2026-10-20, of the 246 stances chosen so priced, 45 (18%) were followed by the bot's death within 30 seconds, against 56 of the 3,792 (1.5%) priced under it.`;
+      }
       const tree = Object.fromEntries(Object.entries(options).map(([k, o]) => [k, { description: o.description, ...(o.expects ? { expects: o.expects } : {}) }]));
       let decision;
       try {

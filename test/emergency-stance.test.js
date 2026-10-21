@@ -95,3 +95,17 @@ test('an answer held in one pocket is not carried into another: the new pocket i
   await survival.step(new Task('other'), goal, () => {});
   assert.deepEqual(asked, ['pocket_next', 'pocket_next'], 'asked again in the other pocket');
 });
+
+test('an option priced at or over the bot\'s health says the record of choosing one so priced; one under it does not (note 1981)', async () => {
+  const { survival, goal, bot } = besidePool();
+  bot.health = 3;
+  let tree = null;
+  survival.decide = async (task, g, save, a) => { if (a.id === 'encounter_stance') tree = a.tree; return { stale: true, path: [] }; };
+  survival.shieldPolicy = () => null;
+  await survival.step(new Task('pass'), goal, () => {});
+  assert(tree, 'the stance was asked');
+  const over = Object.values(tree).filter(o => o.expects && o.expects.damage >= 3), under = Object.values(tree).filter(o => o.expects && o.expects.damage < 3);
+  assert(over.length, 'some option is priced over 3 health');
+  for (const o of over) assert.match(o.description, /Priced at or over the bot's health: on 2026-10-20, of the 246 stances chosen so priced, 45 \(18%\)/);
+  for (const o of under) assert.doesNotMatch(o.description, /Priced at or over the bot's health/);
+});
