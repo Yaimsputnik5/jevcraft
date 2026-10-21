@@ -44,6 +44,23 @@ function portalAt(bot, center) {
   return frames.every(Boolean) ? { center: { ...center }, frames, dimension: 'overworld', source: 'observed_end_portal_frame_ring' } : null;
 }
 
+// The number of bearings, two or more, thrown from along one line and
+// pointing the same way (none met at a place): a throw from that line again
+// gives the same bearing.
+function alongOneLine(bearings) {
+  const rays = bearings.filter(b => b.direction).slice(-8), last = rays.at(-1);
+  if (rays.length < 2 || triangulate(rays)) return 0;
+  const offLine = r => Math.abs((r.origin.x - last.origin.x) * last.direction.z - (r.origin.z - last.origin.z) * last.direction.x);
+  const same = r => Math.abs(r.direction.x * last.direction.z - r.direction.z * last.direction.x) < .04 && r.direction.x * last.direction.x + r.direction.z * last.direction.z > 0;
+  return rays.every(r => offLine(r) < 24 && same(r)) ? rays.length : 0;
+}
+
+// How far the bot stands off the line those bearings lie along.
+function offTheLine(bearings, position) {
+  const last = bearings.filter(b => b.direction).at(-1);
+  return last ? Math.abs((position.x - last.origin.x) * last.direction.z - (position.z - last.origin.z) * last.direction.x) : Infinity;
+}
+
 function travelTarget(search, current) {
   const last = search.bearings.at(-1);
   if (!last) return null;
@@ -52,6 +69,16 @@ function travelTarget(search, current) {
   search.estimate = estimate;
   if (estimate) return { ...estimate, y: current.y, reason: 'Intersection of consistent observed Eye bearings' };
   if (!last.direction) return null;
+  // Bearings all taken along one line meet nowhere, and a throw from that
+  // line again tells nothing more: the next is taken from off to its side,
+  // 128 blocks across it (note 1985). full-3 (2026-10-21 05:41 to 06:10Z)
+  // threw five eyes between z -209 and -336 at x 593 to 602, every one
+  // pointing 8 to 9 degrees west of north, back and forth to the chest its
+  // eyes were kept in, and had no place they met; its eyes ran short and it
+  // went back to the Nether for another.
+  const along = alongOneLine(search.bearings);
+  if (along) return { x: last.origin.x - last.direction.z * 128 + last.direction.x * 16, y: current.y,
+    z: last.origin.z + last.direction.x * 128 + last.direction.z * 16, reason: `Off to the side of the ${along} Eye bearings taken along one line, so the next one crosses them` };
   // A lateral baseline makes the next throw informative even when the first
   // ray points at a stronghold thousands of blocks away.
   const lateral = search.bearings.length === 1 ? 48 : 0;
@@ -189,7 +216,8 @@ async function walkBearing(bot, task, goal, save, target, actions, client) {
     const origin = bot.entity.position.clone(), dimension = bot.game.dimension;
     const decision = await decide('stronghold_waypoint', { client, bot, task, goal, save, tree, interrupt: () => checkThreats(bot),
       state: { request: goal.request, task: 'Follow observed Eyes of Ender', target,
-        latestBearing: search.bearings.at(-1), estimatedTargetIsUnverified: true, health: bot.health, food: bot.food,
+        latestBearing: search.bearings.at(-1), estimatedTargetIsUnverified: true, targetReason: target.reason,
+        bearingsAlongOneLine: alongOneLine(search.bearings) || undefined, health: bot.health, food: bot.food,
         // The time and the risk, as other walks say them (the decision audit).
         timeOfDay: bot.time?.timeOfDay, riskNow: (() => { try { return require('./risk').riskNow(bot); } catch (_) { return null; } })() },
       isFresh: () => bot.game.dimension === dimension && bot.entity.position.distanceTo(origin) < 1 });
@@ -244,8 +272,11 @@ async function findStronghold(bot, task, goal, save, actions, client) {
   const toEstimate = estimate ? horizontal(bot.entity.position, estimate) : null;
   const settled = estimate && search.bearings.length >= 3 && toEstimate >= 96;
   const every = estimate && toEstimate < 96 ? 24 : settled ? Math.min(400, Math.max(96, toEstimate / 3)) : 96;
-  const throwAgain = !last || sinceThrow >= every ||
-    (target && horizontal(bot.entity.position, target) < 12 && sinceThrow >= 12);
+  // Not from the line the bearings were all taken along (note 1985): the
+  // walk off to its side first.
+  const onTheLine = !estimate && alongOneLine(search.bearings) && offTheLine(search.bearings, bot.entity.position) < 48;
+  const throwAgain = !onTheLine && (!last || sinceThrow >= every ||
+    (target && horizontal(bot.entity.position, target) < 12 && sinceThrow >= 12));
   // With no spare Eye (twelve or fewer, the portal's own) and the bearings
   // met at one place, no more is thrown and none is fetched: the walk goes
   // on to that place, and there the ground is searched for the portal's
@@ -342,4 +373,4 @@ async function findStronghold(bot, task, goal, save, actions, client) {
   finally { if (search.moves > movesWere && bot.entity.position.distanceTo(began) < 4) { search.moves = movesWere; save(); } }
 }
 
-module.exports = { observedPortal, portalAt, frameOffsets, travelTarget, findStronghold };
+module.exports = { observedPortal, portalAt, frameOffsets, travelTarget, alongOneLine, findStronghold };

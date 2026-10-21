@@ -3,7 +3,7 @@ const test = require('node:test'), assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events'), { Vec3 } = require('vec3');
 const { Task } = require('../src/skills');
 const { bearingFromSamples, triangulate, throwEye } = require('../src/ender-eye');
-const { observedPortal, frameOffsets, travelTarget, findStronghold } = require('../src/stronghold');
+const { observedPortal, frameOffsets, travelTarget, alongOneLine, findStronghold } = require('../src/stronghold');
 const registry = require('minecraft-data')('26.1');
 const ray = (x, z, target) => { const length = Math.hypot(target.x - x, target.z - z);
   return { origin: { x, y: 64, z }, direction: { x: (target.x - x) / length, z: (target.z - z) / length } }; };
@@ -124,4 +124,23 @@ test('a contradictory new bearing clears a stale triangulated target and follows
   const next = travelTarget(search, { x: 200, y: 64, z: 0 });
   assert.equal(search.estimate, null);
   assert(next.x < 200 && next.z > 0);
+});
+
+test('bearings all taken along one line send the next throw off to the side of it (note 1985)', () => {
+  // full-3's five, 2026-10-21 05:41 to 06:10Z.
+  const at = (x, z, deg) => { const r = deg * Math.PI / 180; return { origin: { x, y: 79, z }, direction: { x: Math.sin(r), z: -Math.cos(r) } }; };
+  const bearings = [at(596, -209, -8.25), at(602, -330, -8.91), at(600, -232, -8.42), at(593, -336, -8.66), at(602, -230, -8.46)];
+  const search = { bearings };
+  assert.equal(alongOneLine(bearings), 5);
+  const next = travelTarget(search, { x: 602, y: 79, z: -230 });
+  assert.equal(search.estimate, null);
+  const d = bearings.at(-1).direction, off = Math.abs((next.x - 602) * d.z - (next.z + 230) * d.x);
+  assert(off > 120, `off the line by ${off}`);
+  assert.match(next.reason, /5 Eye bearings taken along one line/);
+  // From the side, the bearings meet and the next is said as their crossing.
+  const target = { x: 520, z: -1300 }, ray2 = (x, z) => { const l = Math.hypot(target.x - x, target.z - z); return { origin: { x, y: 79, z }, direction: { x: (target.x - x) / l, z: (target.z - z) / l } }; };
+  const met = [ray2(600, -230), ray2(470, -250)];
+  assert.equal(alongOneLine(met), 0);
+  const est = travelTarget({ bearings: met }, { x: 470, y: 79, z: -250 });
+  assert(Math.abs(est.x - 520) < 2 && Math.abs(est.z + 1300) < 2);
 });
