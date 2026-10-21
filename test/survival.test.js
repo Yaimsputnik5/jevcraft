@@ -6397,3 +6397,20 @@ test('the spawn bed is home for the night where no base is kept, within the reac
   assert.equal(spawnBedNear(mk(-407 + 20, 14000, { name: 'air' })), null, 'gone');
   assert.equal(spawnBedNear({ ...mk(-407, 6000), game: { dimension: 'the_nether' } }), null);
 });
+
+// full-3 (2026-10-21 20:46:58Z): a spider at 2 blocks in a mineshaft, told the run was "about 0 damage over about
+// 14 seconds" beside a fight at 10.4; it ran four times and was bitten to nothing (note 2012).
+test('a run from a biter at arm\'s length is priced by what such runs have cost, and said', () => {
+  const { runFromRecord, RUN_FROM_RECORD } = require('../src/survival');
+  assert.equal(runFromRecord(1.4), RUN_FROM_RECORD.near);
+  assert.equal(runFromRecord(3.1), RUN_FROM_RECORD.far);
+  assert.equal(runFromRecord(6), null);
+  const bot = creeperBot({ wall: false, creeper: null, weapon: 'dirt', health: 20 });
+  const spider = { id: 7, name: 'spider', type: 'hostile', position: new Vec3(1.9, 64, 0.5), height: 0.9, width: 1.4, isValid: true };
+  bot.entities = { 7: spider };
+  const survival = new Survival(bot, { place: async () => {}, dig: async () => {}, navigate: async () => {} }, { state: { shelters: [] } });
+  const options = survival.stanceOptions(new Task('x'), {}, () => {}, [{ entity: spider, distance: 1.4, visible: true }], false);
+  assert.ok(options.run_from, `offered: ${Object.keys(options)}`);
+  assert.ok(options.run_from.expects.damage >= RUN_FROM_RECORD.near.median, `priced ${options.run_from.expects.damage}`);
+  assert.match(options.run_from.description, /within 2 blocks begun at 6 health or more: 75 in the records, the health lost in the 14 seconds after 6\.5 on the median, 12 or more in one run in four, and the bot dead within them in 24/);
+});
