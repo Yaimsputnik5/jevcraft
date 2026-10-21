@@ -1251,6 +1251,21 @@ function openWhileBuildingSays(bot, over, seconds, what) {
 // ghast's fireball threw it off where it stood (note 610). `cells` are the
 // way's cells from the first step to its end; null with nothing that can
 // push the bot, { beside: 0 } where no cell of the way is by such a fall.
+// The run from what bites or shoots goes away from the creepers within
+// eight blocks as well, and is priced along that way (note 1998): it went
+// away from the spiders alone, and its creeper was walked against along a
+// line away from the first of them. full-2 (2026-10-21 09:57:12Z), with
+// two spiders and a creeper about, was told 0 damage of a run from the
+// spiders, ran past the creeper, and the blast ended it two seconds on.
+function creepersNear(creepers, within = 8) {
+  return (creepers || []).filter(c => c.distance <= within && c.entity?.position).map(c => c.entity);
+}
+function fleeFrom(lead, creepers) {
+  const all = [lead, ...creepersNear(creepers)].filter(e => e?.position);
+  const n = all.length || 1;
+  return { x: all.reduce((a, e) => a + e.position.x, 0) / n, y: lead.position.y, z: all.reduce((a, e) => a + e.position.z, 0) / n };
+}
+
 // The creeper on a run straight away from `from` (a mob's position) for
 // `blocks`, the way run_from goes with no footing picked (note 1991): said
 // and priced as the retreat's way is (creeper-run.js). 24 run_from answers
@@ -5235,7 +5250,7 @@ class Survival {
         const lead = biters[0], speed = Math.round(ce.blocksPerSecond(lead.entity.name) * 10) / 10;
         const secs = Math.round(RUN_FROM / (SPRINT - speed) * 10) / 10;
         const others = danger.filter(t => shooter(t.entity) && t.visible).length;
-        const runC = runFromCreeper(bot, runCreepers, lead.entity.position, RUN_FROM, runWorn);
+        const runC = runFromCreeper(bot, runCreepers, fleeFrom(lead.entity, runCreepers), RUN_FROM, runWorn);
         options.run_from = { expects: { damage: Math.round((runShotCost(secs) + runC.damage) * 10) / 10, seconds: Math.max(1, secs), oneHit },
           description: runC.says.trim() + (runC.says ? ' ' : '') + `Run from ${biters.length === 1 ? `the ${lead.entity.name.replaceAll('_', ' ')}` : `the ${biters.length} that bite`} at a sprint, to the first cell the walk reaches ${RUN_FROM} blocks or more from ${biters.length === 1 ? 'it' : 'every one of them'}: no footing is picked beforehand and nothing is searched while standing. The ${lead.entity.name.replaceAll('_', ' ')} walks about ${speed} blocks a second and the bot sprints about ${SPRINT}: the gap opens about ${Math.round((SPRINT - speed) * 10) / 10} a second, ${RUN_FROM} blocks in about ${secs} seconds, the back to ${biters.length === 1 ? 'it' : 'them'} and the shield down while it runs${others ? `; ${others} that shoot keep shooting` : ''}.${noWayOut || ' Where it ends is open ground, and what follows is asked of there.'}`,
           run: async () => {
@@ -5247,7 +5262,9 @@ class Survival {
             // from them came 1 blocks: No route"), the same run with a block dug or
             // laid where the way wants one (note 1054).
             const away = e => new goals.GoalInvert(new goals.GoalNear(e.position.x, e.position.y, e.position.z, RUN_FROM));
-            const goalAway = () => biters.length > 1 && typeof goals.GoalCompositeAll === 'function' ? new goals.GoalCompositeAll(biters.slice(0, 4).map(t => away(t.entity))) : away(lead.entity);
+            // Away from the creepers near too (note 1998).
+            const fled = [...biters.slice(0, 4).map(t => t.entity), ...creepersNear(runCreepers)];
+            const goalAway = () => fled.length > 1 && typeof goals.GoalCompositeAll === 'function' ? new goals.GoalCompositeAll(fled.map(away)) : away(lead.entity);
             try {
               try { await this.actions.navigate(bot, task, goalAway(), { timeoutMs: 9000, stallMs: 2500, sprint: true, onFoot: true }); }
               catch (err) { task.check(); if (['NeedsAir', 'Cancelled'].includes(err.name) || bot.entity.position.distanceTo(from) >= 4) throw err; await this.actions.navigate(bot, task, goalAway(), { timeoutMs: 9000, stallMs: 2500, sprint: true }); }
@@ -5269,7 +5286,7 @@ class Survival {
         const OUT = 28, lead = walkers[0];
         const secs = Math.max(1, Math.round((OUT - lead.distance) / SPRINT * 10) / 10);
         const named = walkers.length === 1 ? `the ${lead.entity.name.replaceAll('_', ' ')}` : `the ${walkers.length} that shoot`;
-        const runC = runFromCreeper(bot, runCreepers, lead.entity.position, OUT - lead.distance, runWorn);
+        const runC = runFromCreeper(bot, runCreepers, fleeFrom(lead.entity, runCreepers), OUT - lead.distance, runWorn);
         options.run_from = { expects: { damage: Math.round((runShotCost(secs) + runC.damage) * 10) / 10, seconds: secs, oneHit },
           description: runC.says.trim() + (runC.says ? ' ' : '') + `Run from ${named} at a sprint, out of ${walkers.length === 1 ? 'its' : 'their'} range: to the first cell the walk reaches ${OUT} blocks or more from ${walkers.length === 1 ? 'it' : 'every one of them'}, no footing picked beforehand and nothing searched while standing. A skeleton sets on a player within 16 blocks and aims to about 15: past that it has no shot, and one that has lost the bot does not come after it. About ${secs} seconds at the bot's ${SPRINT} blocks a second, the back to ${walkers.length === 1 ? 'it' : 'them'} and the shield down while it runs; ${walkers.length === 1 ? 'it shoots' : 'they shoot'} until the bot is out of range.${noWayOut || ' Where it ends is open ground, and what follows is asked of there.'}`,
           run: async () => {
@@ -5277,7 +5294,8 @@ class Survival {
             lowerShield(bot);
             const from = bot.entity.position.clone();
             const away = e => new goals.GoalInvert(new goals.GoalNear(e.position.x, e.position.y, e.position.z, OUT));
-            const goalAway = () => walkers.length > 1 && typeof goals.GoalCompositeAll === 'function' ? new goals.GoalCompositeAll(walkers.slice(0, 4).map(t => away(t.entity))) : away(lead.entity);
+            const fled = [...walkers.slice(0, 4).map(t => t.entity), ...creepersNear(runCreepers)];
+            const goalAway = () => fled.length > 1 && typeof goals.GoalCompositeAll === 'function' ? new goals.GoalCompositeAll(fled.map(away)) : away(lead.entity);
             try {
               try { await this.actions.navigate(bot, task, goalAway(), { timeoutMs: 9000, stallMs: 2500, sprint: true, onFoot: true }); }
               catch (err) { task.check(); if (['NeedsAir', 'Cancelled'].includes(err.name) || bot.entity.position.distanceTo(from) >= 4) throw err; await this.actions.navigate(bot, task, goalAway(), { timeoutMs: 9000, stallMs: 2500, sprint: true }); }
@@ -12579,4 +12597,4 @@ function claim(bot, goal = {}, survival = null) {
   return made;
 }
 
-module.exports = { furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
+module.exports = { fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };

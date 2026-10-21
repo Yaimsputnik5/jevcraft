@@ -315,3 +315,17 @@ test('a run past a lit creeper that clears it at the median is priced by what su
   assert.match(clear.says, /of 48 runs told a lit creeper burned back down, 8 were followed by its blast/);
   assert.ok(clear.damage > 0 && clear.damage < off.damage, `priced ${clear.damage}`);
 });
+
+test('the run from spiders goes away from a creeper near as well, and is priced along that way (note 1998, full-2 09:57:12Z)', () => {
+  const { fleeFrom, runFromCreeper } = require('../src/survival');
+  const bot = groundBot(openGround(), { at: new Vec3(0.5, 64, 0.5) });
+  bot.health = 20;
+  const spider = { name: 'spider', position: new Vec3(-3.5, 64, 0.5) };
+  // The creeper 3 blocks off to the east-north, beside the line away from the spider.
+  const creeper = { entity: { name: 'creeper', position: new Vec3(2.5, 64, -2.5), height: 1.7 }, distance: 3.6 };
+  const from = fleeFrom(spider, [creeper]);
+  assert.ok(from.z < 0.5 && from.x > -3.5, 'the way away leans from the creeper too');
+  const straight = runFromCreeper(bot, [creeper], spider.position, 20, { points: 0, toughness: 0 });
+  const both = runFromCreeper(bot, [creeper], from, 20, { points: 0, toughness: 0 });
+  assert.ok(both.damage <= straight.damage, `away from both ${both.damage}, from the spider alone ${straight.damage}`);
+});
