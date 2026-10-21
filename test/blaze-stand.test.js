@@ -460,3 +460,17 @@ test('the charge of the nearest blaze says what charges like it came to, and is 
   const high = chargeRecord(19, 1);
   assert.match(high.says, /of 54 charges .* at 12 health or more with two or fewer other blazes about, 1 ended/);
 });
+
+test('the fight at a blaze spawner says the bot\'s own deaths about the place (note 1999)', () => {
+  const { deathsHereSays } = require('../src/blaze-stand');
+  const { Vec3 } = require('vec3');
+  const now = Date.parse('2026-10-21T10:00:00Z');
+  const bot = { entity: { position: new Vec3(455, 79, 100) }, game: { dimension: 'the_nether' },
+    _survivalState: { deaths: [
+      { at: '2026-10-21T08:13:28Z', position: { x: 452, y: 79, z: 102 }, dimension: 'the_nether' },
+      { at: '2026-10-21T09:59:28Z', position: { x: 456, y: 79, z: 96 }, dimension: 'the_nether' },
+      { at: '2026-10-21T09:24:54Z', position: { x: 314, y: 64, z: -18 }, dimension: 'overworld' },
+      { at: '2026-10-21T07:00:00Z', position: { x: 368, y: 76, z: 76 }, dimension: 'the_nether' }] } };
+  assert.equal(deathsHereSays(bot, { now }), ' The bot has died 2 times within 24 blocks of here, the last 1 minutes ago; each death dropped what it carried here.');
+  assert.equal(deathsHereSays({ ...bot, _survivalState: { deaths: [] } }, { now }), '');
+});

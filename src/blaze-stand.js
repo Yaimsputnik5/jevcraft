@@ -1741,7 +1741,24 @@ function blazeStands(bot, danger, { dig = true, hunted = false, pocket = false, 
   // situation (blaze-record.js, note 645).
   const record = require('./blaze-record'), situation = record.situationOf(bot);
   for (const [k, o] of Object.entries(options)) o.description += record.optionSays(bot, k, situation);
+  const here = deathsHereSays(bot);
+  if (here) for (const o of Object.values(options)) o.description += here;
   return options;
+}
+
+// The bot's own deaths about this place in this dimension, said with every
+// way of the fight (note 1999): a player who has died at a spawner three
+// times goes at it another way, or to another. full-3 (2026-10-21) died
+// four times within 24 blocks of (453, 106) between 08:13 and 09:59Z, and
+// full-4 three times about (-149, -92) between 07:51 and 10:02Z, each told
+// the fight's ways as if for the first time.
+const DEATHS_NEAR = 24;
+function deathsHereSays(bot, { now = Date.now() } = {}) {
+  const here = bot.entity?.position, dim = String(bot.game?.dimension || '');
+  const deaths = (bot._survivalState?.deaths || []).filter(d => d?.position && String(d.dimension || '') === dim && Math.hypot(d.position.x - here.x, d.position.z - here.z) <= DEATHS_NEAR);
+  if (!here || !deaths.length) return '';
+  const ago = deaths.map(d => Math.round((now - Date.parse(d.at)) / 60000)).filter(Number.isFinite).sort((a, b) => a - b);
+  return ` The bot has died ${deaths.length === 1 ? 'once' : `${deaths.length} times`} within ${DEATHS_NEAR} blocks of here${ago.length ? `, the last ${ago[0]} minutes ago` : ''}; each death dropped what it carried here.`;
 }
 
 // The tactics of note 606 (blaze-tactics.js), as options: the box with a
@@ -2400,4 +2417,4 @@ function chargeRecord(hp, others) {
   return { charges, died, says: ` In the flight records, of ${charges} charges of the nearest blaze chosen at ${low ? 'under 12 health' : '12 health or more'} with ${many ? 'three or more' : 'two or fewer'} other blazes about, ${died} ended in the bot's death within 30 seconds.` };
 }
 
-module.exports = { chargeRecord, biterInReach, riseOrAwait, reachWalk, REACH_MEMO_MS, sortieFloor, eatInHold, fourNearSays, FOUR_NEAR, walkTakes, behindAtStrike, spawnerNewcomers, SPAWN_CAP, SPAWN_SECONDS, rodsNeeded, rodsTarget, rodsOf, towardRods, ROD_CHANCE, TACTICS, tacticOptions, runTactic, claimBlazes, blazeRate, closeInCost, closeInSays, shieldArc, SHIELD_LEAK, SHIELD_COVER, DUE_SECONDS, holdSays, heldHereSays, breakSite, breakSpawner, sortie, spawnerHoleSite, VOLLEY, MEASURED, volleyComing, flamesTouching, putOutFlames, CLOSE_SECONDS, charged, volleyWatch, volleyDue, volleyIn, shieldVolley, closeIn, strikeCells, measuredSays, blazeStands, holeSite, windowSite, inHole, wallSite, spawnerSite, spawnerReach, spawnerAt, standCost, knockSays, knockLands, lavaWithin, takeStand, huntFromStand, BLAZE_WAYS, noteSiteFailed, siteFailedNear, SITE_FAILED_MS, walkableToBlaze, blazeReach, pushedOnly, REACH_STEPS, riseSite, riseOrAwait };
+module.exports = { deathsHereSays, chargeRecord, biterInReach, riseOrAwait, reachWalk, REACH_MEMO_MS, sortieFloor, eatInHold, fourNearSays, FOUR_NEAR, walkTakes, behindAtStrike, spawnerNewcomers, SPAWN_CAP, SPAWN_SECONDS, rodsNeeded, rodsTarget, rodsOf, towardRods, ROD_CHANCE, TACTICS, tacticOptions, runTactic, claimBlazes, blazeRate, closeInCost, closeInSays, shieldArc, SHIELD_LEAK, SHIELD_COVER, DUE_SECONDS, holdSays, heldHereSays, breakSite, breakSpawner, sortie, spawnerHoleSite, VOLLEY, MEASURED, volleyComing, flamesTouching, putOutFlames, CLOSE_SECONDS, charged, volleyWatch, volleyDue, volleyIn, shieldVolley, closeIn, strikeCells, measuredSays, blazeStands, holeSite, windowSite, inHole, wallSite, spawnerSite, spawnerReach, spawnerAt, standCost, knockSays, knockLands, lavaWithin, takeStand, huntFromStand, BLAZE_WAYS, noteSiteFailed, siteFailedNear, SITE_FAILED_MS, walkableToBlaze, blazeReach, pushedOnly, REACH_STEPS, riseSite, riseOrAwait };
