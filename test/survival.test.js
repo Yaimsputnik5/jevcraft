@@ -6380,3 +6380,10 @@ test('sealed in at night with raw meat, fuel and a furnace carried: cooking it i
   assert(tree?.cook_here, `cooking is offered (${Object.keys(tree || {}).join(', ')})`);
   assert.match(tree.cook_here.description, /6 beef, 18 food points as carried and 48 cooked \(\+30\); the furnace carried put down in the pocket, coal for fuel/);
 });
+
+test('at dusk the bed counts as far as the walk reaches before dark, not 160 blocks whatever the hour; after dark the short walk only (note 2004)', () => {
+  const { homeBedReach } = require('../src/survival');
+  assert.equal(homeBedReach({ time: { timeOfDay: 6000 } }), 160, 'by day as before');
+  assert.equal(homeBedReach({ time: { timeOfDay: 9500 } }), 425, 'at dusk, 125 seconds to dark at 3.4 blocks a second');
+  assert.equal(homeBedReach({ time: { timeOfDay: 14000 } }), 48, 'after dark');
+});

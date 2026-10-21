@@ -2457,12 +2457,25 @@ const sleepable = bot => bot.time?.timeOfDay >= SLEEP_FROM && bot.time.timeOfDay
 // there twice (2026-09-24 00:48).
 const HOME_BED_WALK = 160, NIGHT_BED_WALK = 48;
 const darkNow = bot => { const t = bot.time?.timeOfDay ?? 0; return t >= 13000 && t < 23000; };
+// From dusk to dark, the bed as far as the bot's walks reach before it is
+// dark (WALK_PACE, note 1986), not 160 blocks whatever the hour (note 2004):
+// full-2 (2026-10-21), its bed at (-408, -1574), was offered no walk home
+// on 59 nights' questions out 150 to 360 blocks from it, only a pocket or
+// staying up, and of its last ten deaths eight came 148 to 363 blocks off.
+// After dark the short walk only, as before.
+function homeBedReach(bot) {
+  if (darkNow(bot)) return NIGHT_BED_WALK;
+  const t = bot.time?.timeOfDay;
+  const { DAY } = require('./day');
+  if (!Number.isFinite(t) || t < DAY.DUSK) return HOME_BED_WALK;
+  return Math.max(HOME_BED_WALK, Math.round(Math.max(0, DAY.DARK - t) / 20 * WALK_PACE.median));
+}
 function nearbyHomeBed(bot, goal) {
   const home = homeOf(bot, goal);
   if (!home?.bed?.claimedAt) return null;
   const { bed } = layout(home);
   const foot = pos(bed.foot), block = bot.blockAt(foot);
-  if (foot.distanceTo(bot.entity.position) > (darkNow(bot) ? NIGHT_BED_WALK : HOME_BED_WALK) || (block && !isBed(block))) return null;
+  if (foot.distanceTo(bot.entity.position) > homeBedReach(bot) || (block && !isBed(block))) return null;
   return { foot, head: pos(bed.head), stand: pos(bed.stand), placed: true };
 }
 // Any bed in view, not only our own: the live run sealed itself into a
@@ -11829,7 +11842,7 @@ class Survival {
       // decision audit, 2026-09-25).
       const { climbToSurface, climbMinutes } = require('./surface');
       const climb = underground ? climbToSurface(bot, bot.entity.position) : 0;
-      const seconds = Math.round(distance / 4.3) + (climb || 0) * 3;
+      const seconds = Math.round(distance / WALK_PACE.median) + (climb || 0) * 3;
       const arrives = Math.round(bot.time.timeOfDay + seconds * 20);
       const arrival = arrives >= DAY.NIGHT ? `arriving about ${arrives % 24000}, after nightfall at ${DAY.NIGHT}` : `arriving about ${arrives}, before nightfall at ${DAY.NIGHT}`;
       // A bed seen (a village's) is not home: said as what it is (note 755b).
@@ -12597,4 +12610,4 @@ function claim(bot, goal = {}, survival = null) {
   return made;
 }
 
-module.exports = { fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
+module.exports = { homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
