@@ -6166,9 +6166,11 @@ test('a zombie at arm\'s length with bare hands: run_from is offered, priced by 
   assert.equal(walked.length, 1);
   assert.equal(walked[0].opts.sprint, true);
   assert.equal(typeof walked[0].goal.isEnd, 'function');
+  // The way priced: twenty-four blocks straight away from it (note 2013).
   assert.equal(walked[0].goal.isEnd({ x: 3, y: 64, z: 0 }), false, 'beside it is not the end');
-  assert.equal(walked[0].goal.isEnd({ x: -20, y: 64, z: 0 }), false, 'twenty-two from it is not');
-  assert.equal(walked[0].goal.isEnd({ x: -28, y: 64, z: 0 }), true, 'twenty-four and more from it is');
+  assert.equal(walked[0].goal.isEnd({ x: -15, y: 64, z: 0 }), false, 'sixteen from it is not');
+  assert.equal(walked[0].goal.isEnd({ x: -23, y: 64, z: 0 }), true, 'twenty-four from it, straight away, is');
+  assert.equal(walked[0].goal.isEnd({ x: 0, y: 64, z: 24 }), false, 'twenty-four off to the side is not the way priced');
   // Two that bite: the run ends that far from each, not from the nearest alone.
   const two = creeperBot({ wall: false, creeper: null, weapon: 'dirt', health: 20 });
   const other = { id: 8, name: 'zombie', type: 'hostile', position: new Vec3(0.5, 64, 6.5), height: 1.95, width: 0.6, isValid: true };
@@ -6178,8 +6180,16 @@ test('a zombie at arm\'s length with bare hands: run_from is offered, priced by 
     .stanceOptions(new Task('x'), {}, () => {}, [{ entity: zombie, distance: 1.4, visible: true }, { entity: other, distance: 6, visible: true }], false);
   assert.match(both.run_from.description, /24 blocks or more from every one of them/);
   await both.run_from.run();
-  assert.equal(ran[0].isEnd({ x: -23, y: 64, z: 3 }), false, 'twenty-four from the first, twenty-three from the second');
-  assert.equal(ran[0].isEnd({ x: -26, y: 64, z: 3 }), true);
+  assert.equal(ran[0].isEnd({ x: -23, y: 64, z: 1 }), true, 'the way priced, straight away from the nearest');
+  // Where the way priced has no route, the walk to be that far from each.
+  const ran2 = [];
+  const fallback = new Survival(two, { place: async () => {}, dig: async () => {}, navigate: async (_b, _t, goal) => { ran2.push(goal); if (ran2.length === 1) { const e = new Error('No route'); e.name = 'NoPath'; throw e; } } }, { state: { shelters: [] } })
+    .stanceOptions(new Task('x'), {}, () => {}, [{ entity: zombie, distance: 1.4, visible: true }, { entity: other, distance: 6, visible: true }], false);
+  two.entity.position = new Vec3(0.5, 64, 0.5);
+  await fallback.run_from.run();
+  assert.ok(ran2.length >= 2, `walks: ${ran2.length}`);
+  assert.equal(ran2[1].isEnd({ x: -23, y: 64, z: 3 }), false, 'twenty-four from the first, twenty-three from the second');
+  assert.equal(ran2[1].isEnd({ x: -26, y: 64, z: 3 }), true);
   // Hunger too low to sprint: not offered.
   const hungry = creeperBot({ wall: false, creeper: null, weapon: 'dirt', health: 20 }); hungry.food = 5; hungry.entities = { 7: zombie };
   const none = new Survival(hungry, { place: async () => {}, dig: async () => {}, navigate: async () => {} }, { state: { shelters: [] } }).stanceOptions(new Task('x'), {}, () => {}, [{ entity: zombie, distance: 1.4, visible: true }], false);
@@ -6197,8 +6207,9 @@ test('skeletons about and nothing that bites near, bare-handed: the run out of t
   assert.match(options.run_from.description, /Run from the 2 that shoot at a sprint, out of their range: to the first cell the walk reaches 28 blocks or more from every one of them.*A skeleton sets on a player within 16 blocks and aims to about 15/);
   await options.run_from.run();
   assert.equal(ran[0].opts.sprint, true);
+  // Straight away from the middle of them, 28 blocks (note 2013): 33 from the first and 36 from the second.
   assert.equal(ran[0].goal.isEnd({ x: -19, y: 64, z: 0 }), false, 'twenty-eight from the first, under it from the second');
-  assert.equal(ran[0].goal.isEnd({ x: -25, y: 64, z: -20 }), true);
+  assert.equal(ran[0].goal.isEnd({ x: -16, y: 64, z: -22 }), true);
   // Past sixteen blocks they have not set on the bot: no run is offered for them.
   const far = survival.stanceOptions(new Task('x'), {}, () => {}, [{ entity: s1, distance: 20, visible: true }], false);
   assert.equal(far.run_from, undefined);
