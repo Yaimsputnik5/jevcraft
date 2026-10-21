@@ -6387,3 +6387,13 @@ test('at dusk the bed counts as far as the walk reaches before dark, not 160 blo
   assert.equal(homeBedReach({ time: { timeOfDay: 9500 } }), 425, 'at dusk, 125 seconds to dark at 3.4 blocks a second');
   assert.equal(homeBedReach({ time: { timeOfDay: 14000 } }), 48, 'after dark');
 });
+
+test('the spawn bed is home for the night where no base is kept, within the reach of the hour, and not once seen gone (note 2005)', () => {
+  const { spawnBedNear } = require('../src/survival');
+  const mk = (x, t, block = { name: 'white_bed' }) => ({ entity: { position: new Vec3(x, 63, -1575) }, game: { dimension: 'overworld' }, time: { timeOfDay: t },
+    blockAt: () => block, inventory: { items: () => [] }, _survivalState: { spawnBed: { name: 'white_bed', foot: { x: -407, y: 63, z: -1575 }, head: { x: -406, y: 63, z: -1575 } } } });
+  assert.ok(spawnBedNear(mk(-407 + 300, 9500)), 'at dusk 300 blocks off, within the 425 it reaches before dark');
+  assert.equal(spawnBedNear(mk(-407 + 300, 14000)), null, 'after dark only the short walk');
+  assert.equal(spawnBedNear(mk(-407 + 20, 14000, { name: 'air' })), null, 'gone');
+  assert.equal(spawnBedNear({ ...mk(-407, 6000), game: { dimension: 'the_nether' } }), null);
+});
