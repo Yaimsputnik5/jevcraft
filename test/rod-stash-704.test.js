@@ -304,3 +304,16 @@ test('pearls carried with no rod in the pack are offered the chest too, said as 
   assert.match(rs.carriedSays(offer), /^4 ender pearls carried and no rod\. A death drops them where the bot falls/);
   assert.equal(rs.stashOffer(frameBot({ inventory: { ...rec.inventory, blaze_rod: 0, ender_pearl: 0, chest: 1 } }), goal), null, 'nothing to keep: no offer');
 });
+
+test('a pearl in a Nether chest whose take rests is not had meanwhile: the pearl ways here, not the walk home (note 2000, full-3 11:17Z)', () => {
+  const { nextGameStage } = require('../src/game-progress');
+  const { setAside } = require('../src/progress');
+  // Seven rods carried, twelve pearls carried of thirteen, the last in a chest.
+  const bot = frameBot({ inventory: { ...rec.inventory, blaze_rod: 7, ender_pearl: 12 } });
+  const goal = { kind: 'win', gameProgress: { milestones: {} },
+    rodStashes: [{ position: { x: 140, y: 105, z: 19 }, dimension: 'nether', contents: { ender_pearl: 1 }, placedAt: new Date().toISOString(), takeFails: 1 }] };
+  setAside(goal, 'rod_stash_take', '(140, 105, 19)', 'navigation timed out without reaching new ground', 600000);
+  const stage = nextGameStage(bot, goal);
+  assert.notEqual(stage.phase, 'return_with_blaze_supplies', JSON.stringify(stage));
+  assert.equal(stage.phase, 'obtain_ender_pearls');
+});

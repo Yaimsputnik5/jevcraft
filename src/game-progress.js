@@ -1078,7 +1078,16 @@ function nextGameStage(bot, goal, skip = new Set()) {
   const rodsShort = keptAll && pearlsWanting
     ? count(bot, 'blaze_rod') + (keptAll.blaze_rod || 0) < rodsFor(target - eyes - (keptAll.ender_eye || 0), count(bot, 'blaze_powder') + (keptAll.blaze_powder || 0))
     : count(bot, 'blaze_rod') + (kept?.blaze_rod || 0) < keptRods;
-  const pearlsHereShort = count(bot, 'ender_pearl') + (kept?.ender_pearl || 0) < target - eyes - keptEyes;
+  // A pearl in a chest whose take rests (a walk to it that failed) is not
+  // had here meanwhile (note 2000): counted, it left nothing short on this
+  // side, and no take was offered while it rested, so the step was the way
+  // home; on the other side it was short, and the step the Nether. full-3
+  // (2026-10-21 11:17 to 11:22Z), its last pearl in a chest at (140, 105,
+  // 19) whose take rested, went through its portal and back five times in
+  // five minutes.
+  const keptPearls = (kept?.chests || []).filter(c => !isSetAside(goal, 'rod_stash_take', `(${c.position.x}, ${c.position.y}, ${c.position.z})`))
+    .reduce((n, c) => n + (c.contents?.ender_pearl || 0), 0);
+  const pearlsHereShort = count(bot, 'ender_pearl') + keptPearls < target - eyes - keptEyes;
   const collect = where === 'nether' && kept?.chests.length ? require('./rod-stash').collectStage(bot, goal) : null;
   // The pearls from the Overworld's endermen, Jev's route while the rods
   // wait (pearl-routes.js): back through the portal, and there the pearls
