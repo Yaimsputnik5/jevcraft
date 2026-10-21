@@ -164,6 +164,17 @@ function compatibilityPlugin(bot) {
   const refill = () => { ownOxygen = 20; bot.oxygenLevel = 20; };
   bot.on?.('respawn', refill);
   bot.on?.('spawn', refill);
+  // The hotbar slot said to the server again after a respawn (note 1984):
+  // Mineflayer's setQuickBarSlot sends nothing when it believes the slot is
+  // already held, and the body the server makes at a respawn holds its own,
+  // so every block the bot then placed was refused ('the block is still
+  // air') until the next connection. full-2 (2026-10-21 05:03 to 05:09Z,
+  // after its death at 04:59) was refused 112 crafting tables and blocks in
+  // a row; across the four full runs every refusal in the flight records
+  // (114) came between a death and the next connection, none after one.
+  bot._client?.on?.('respawn', () => setTimeout(() => {
+    try { if (Number.isInteger(bot.quickBarSlot)) { bot._client.write('held_item_slot', { slotId: bot.quickBarSlot }); bot.updateHeldItem?.(); } } catch (_) { /* not connected */ }
+  }, 250));
 }
 
 function fixPathfinderResults() {

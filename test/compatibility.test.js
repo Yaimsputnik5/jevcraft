@@ -192,3 +192,14 @@ test('a position set against a wall is taken out of a hairline overlap with it, 
   const open = { ...bot, entity: { position: new Vec3(307.5, 14.2, 139.5) } };
   assert.equal(clearHairlineOverlap(open), false);
 });
+
+test('after a respawn the hotbar slot is said to the server again, though Mineflayer thinks it is held (full-2 2026-10-21 05:03Z, note 1984)', async () => {
+  const { EventEmitter } = require('node:events');
+  const bot = new EventEmitter(); bot._client = new EventEmitter();
+  const wrote = []; bot._client.write = (name, data) => wrote.push({ name, data });
+  bot.entity = { id: 2 }; bot.entities = {}; bot.quickBarSlot = 3;
+  require('../src/compatibility').compatibilityPlugin(bot);
+  bot._client.emit('respawn', {});
+  await new Promise(r => setTimeout(r, 300));
+  assert.deepEqual(wrote.filter(w => w.name === 'held_item_slot'), [{ name: 'held_item_slot', data: { slotId: 3 } }]);
+});
