@@ -309,3 +309,19 @@ test('the survival layer runs the hunt from a pillar (walk near, pillar, wait) a
   assert.deepEqual({ route: noted.route, kills: noted.kills, meat: noted.meat, why: noted.why }, { route: 'hoglin_pillar', kills: 0, meat: 0, why: 'no hoglin within thirty-two blocks' });
   assert(noted.at >= now);
 });
+
+test('a hoglin that cannot be struck from where the bot stands, shuffling nearer and further, is given up after three steps that move the bot nowhere, and the hunt ends saying so (note 1989, full-3 06:47Z)', async () => {
+  const { Survival } = require('../src/survival');
+  // Five blocks up on a ledge, 1.5 to 2.4 blocks off across: out of reach either way.
+  const h = hoglin(1, 1.5, 46, 0.5);
+  const bot = netherBot({ items: [item('stone_sword')], entities: { 1: h }, worn });
+  Object.assign(bot, { oxygenLevel: 20, pathfinder: { movements: {}, setGoal() {} }, clearControlStates() {}, setControlState() {}, getControlState: () => false, lookAt: async () => {}, look: async () => {} });
+  let steps = 0;
+  const survival = new Survival(bot, { place: async () => {}, dig: async () => {}, navigate: async () => { steps++; h.position = new Vec3(steps % 2 ? 2.4 : 1.5, 46, 0.5); } }, { state: { shelters: [] } });
+  const goal = { survival: {} };
+  survival.foodHunt(goal, save, 'hoglin', { method: 'walk' });
+  for (let i = 0; i < 4 && survival.state.nightPlan; i++) await survival.huntStep(new Task('t'), goal, save);
+  assert.equal(survival.state.nightPlan, undefined, 'the hunt is over');
+  assert.equal(steps, 3);
+  assert.match(goal.netherFood.hunts.at(-1).why, /^the hoglin within thirty-two blocks could not be reached to strike \(1 given up after three steps that got no nearer\)/);
+});

@@ -9685,7 +9685,7 @@ class Survival {
     const here = bot.entity.position;
     const target = Object.values(bot.entities).filter(e => e.name === plan.kind && e.isValid !== false && e.position && e.position.distanceTo(here) <= 32 && !(plan.skip || []).includes(e.id))
       .sort((a, b) => a.position.distanceTo(here) - b.position.distanceTo(here))[0];
-    if (!target) return end(`no ${plan.kind.replaceAll('_', ' ')} within thirty-two blocks`);
+    if (!target) return end(plan.skip?.length ? `the ${plan.kind.replaceAll('_', ' ')}${plan.skip.length === 1 ? '' : 's'} within thirty-two blocks could not be reached to strike (${plan.skip.length} given up after three steps that got no nearer)` : `no ${plan.kind.replaceAll('_', ' ')} within thirty-two blocks`);
     bot._nightHunt = { name: plan.kind, until: plan.until };
     plan.targetId = target.id; plan.lastAt = { x: target.position.x, y: target.position.y, z: target.position.z };
     this.report(goal, save, { action: 'night_hunt', target: plan.kind, distance: Number(target.position.distanceTo(here).toFixed(1)), kills: plan.kills || 0, health: bot.health });
@@ -9716,11 +9716,19 @@ class Survival {
     const movements = bot.pathfinder?.movements;
     const kept = movements && { canDig: movements.canDig, allow1by1towers: movements.allow1by1towers };
     if (movements) Object.assign(movements, { canDig: false, allow1by1towers: false });
-    const before = target.position.distanceTo(here);
+    const before = target.position.distanceTo(here), from = here.clone();
     try { await this.actions.navigate(bot, task, new goals.GoalFollow(target, 1.5), { timeoutMs: 4000, stallMs: 2000, stopWhen: () => canStrike(bot, target) || target.isValid === false }); }
     catch (err) { task.check(); if (['NeedsAir', 'Cancelled'].includes(err.name)) throw err; }
     finally { if (movements) Object.assign(movements, kept); }
-    if (target.isValid !== false && target.position.distanceTo(bot.entity.position) >= before - 0.5 && !canStrike(bot, target)) {
+    // A step that neither strikes nor moves the bot is a miss, however the
+    // mob shuffles about (note 1989): full-3 (2026-10-21 06:47 to 06:53Z),
+    // a hoglin 1.5 to 2.4 blocks off that it could not strike nor it the
+    // bot, took 6,000 such steps at 37 a second, its health 10.6 and its
+    // food gone, the misses never counted since the hoglin's distance came
+    // and went by more than half a block.
+    const stood = bot.entity.position.distanceTo(from) < 0.5;
+    if (target.isValid !== false && !canStrike(bot, target) && (stood || target.position.distanceTo(bot.entity.position) >= before - 0.5)) {
+      if (stood) await sleep(250);
       plan.misses = { ...(plan.misses || {}), [target.id]: (plan.misses?.[target.id] || 0) + 1 };
       if (plan.misses[target.id] >= 3) { plan.skip = [...(plan.skip || []), target.id]; delete plan.targetId; }
     }
