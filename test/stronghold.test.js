@@ -155,3 +155,13 @@ test('bearings that point at another stronghold, from far off, do not hold back 
   assert.equal(sameStronghold(old[0], toward(753, 262)), false, 'the north bearing crosses the southeast one only behind');
   assert.equal(sameStronghold(toward(850, 200), toward(753, 262)), true);
 });
+
+test('bearings pointing the same way 30 blocks apart across the line, with older ones toward another stronghold, still send the next throw to the side (note 2003, full-3 14:13Z)', () => {
+  const at = (x, z, deg) => { const r = deg * Math.PI / 180; return { origin: { x, y: 79, z }, direction: { x: Math.sin(r), z: -Math.cos(r) } }; };
+  const bearings = [at(596, -209, -8.25), at(602, -330, -8.91), at(600, -232, -8.42), at(593, -336, -8.66), at(602, -230, -8.46), at(753, 262, 134.2), at(800, 351, 133.1), at(892, 434, 133.2)];
+  assert.equal(alongOneLine(bearings), 3);
+  const next = travelTarget({ bearings }, { x: 892, y: 79, z: 434 });
+  assert.match(next.reason, /3 Eye bearings taken along one line/);
+  const d = bearings.at(-1).direction;
+  assert(Math.abs((next.x - 892) * d.z - (next.z - 434) * d.x) > 120);
+});

@@ -48,11 +48,18 @@ function portalAt(bot, center) {
 // pointing the same way (none met at a place): a throw from that line again
 // gives the same bearing.
 function alongOneLine(bearings) {
-  const rays = bearings.filter(b => b.direction).slice(-8), last = rays.at(-1);
+  // The bearings toward the stronghold the newest points at (ender-eye.js
+  // sameStronghold, note 2001), not ones from far off toward another.
+  const all = bearings.filter(b => b.direction), last = all.at(-1);
+  const rays = all.filter(r => r === last || require('./ender-eye').sameStronghold(r, last)).slice(-8);
   if (rays.length < 2 || triangulate(rays)) return 0;
-  const offLine = r => Math.abs((r.origin.x - last.origin.x) * last.direction.z - (r.origin.z - last.origin.z) * last.direction.x);
+  // Pointing the same way and meeting nowhere is the case, however far
+  // apart across the line they were thrown (note 2003): full-3 (2026-10-21
+  // 11:27 to 14:13Z), three bearings 133 to 134 degrees from (753, 262),
+  // (800, 351) and (892, 434), the first 30 blocks off the line of the
+  // last, was walked on along them and not sent to the side.
   const same = r => Math.abs(r.direction.x * last.direction.z - r.direction.z * last.direction.x) < .04 && r.direction.x * last.direction.x + r.direction.z * last.direction.z > 0;
-  return rays.every(r => offLine(r) < 24 && same(r)) ? rays.length : 0;
+  return rays.every(same) ? rays.length : 0;
 }
 
 // How far the bot stands off the line those bearings lie along.
