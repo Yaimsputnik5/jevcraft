@@ -2023,42 +2023,67 @@ async function prepareMobHunt(bot, task, step, goal, save, actions) {
   // bot's 86 spider hunts of 2026-10-05 15 were followed by a death within
   // five minutes; 25593 remembered four mineshafts and hunted spiders for
   // its bow's string four hours.
+  // The way to string beyond the spiders (note 2006): cobwebs in view now
+  // (a stronghold's library, a mineshaft's corridor), a remembered mineshaft
+  // or trial chambers (their halls hung with webs) at whatever distance, the
+  // walk said, and the spiders' own yield. Asked only for a mineshaft within
+  // 400 blocks before, the four full runs of 2026-10-20 and 21 spent 50
+  // minutes on spider hunts for 3 string (32 by day for 3, 18 by night for
+  // none); full-3, its End portal lit at 17:29Z and no bow, stood in its
+  // stronghold with its mineshafts over a thousand blocks off.
   if (step.item === 'string' && dimension(bot) === 'overworld' && actions.dig && actions.navigate && bot.inventory.items().some(i => /_sword$/.test(i.name))) {
     const here = bot.entity.position, now = Date.now();
-    const shafts = (goal.landmarks || []).filter(l => l.kind === 'mineshaft' && (l.dimension || 'overworld') === 'overworld')
-      .map(l => ({ ...l, d: Math.round(Math.hypot(l.x - here.x, l.z - here.z)) })).filter(l => l.d <= 400 && !isSetAside(goal, 'mineshaft_webs', `${l.x},${l.z}`)).sort((p, q) => p.d - q.d);
-    if (shafts.length) {
-      const m = shafts[0];
+    const webId = bot.registry.blocksByName.cobweb?.id;
+    const inView = webId != null && bot.findBlocks && !isSetAside(goal, 'webs_here', 'any') ? bot.findBlocks({ matching: webId, maxDistance: 32, count: 48 }) : [];
+    const SITES = { mineshaft: 'mineshaft', trial_chambers: 'trial chambers' }, KEY = { mineshaft: 'mineshaft_webs', trial_chambers: 'trial_webs' };
+    const sites = (goal.landmarks || []).filter(l => SITES[l.kind] && (l.dimension || 'overworld') === 'overworld')
+      .map(l => ({ ...l, d: Math.round(Math.hypot(l.x - here.x, l.z - here.z)) })).filter(l => l.d <= STRING_SITE_REACH && !isSetAside(goal, 'mineshaft_webs', `${l.x},${l.z}`)).sort((p, q) => p.d - q.d);
+    const nearestOf = kind => sites.find(l => l.kind === kind);
+    const choices = Object.keys(SITES).map(nearestOf).filter(Boolean);
+    if (inView.length || choices.length) {
+      const wanted = Math.max(1, (step.count || 1) - countOf(bot, 'string'));
       let pick = goal.stringWay && now - goal.stringWay.at < 20 * 60000 ? goal.stringWay.pick : null;
+      let site = pick && pick !== 'webs_here' && pick !== 'search_spiders' ? choices.find(c => KEY[c.kind] === pick) : null;
+      if (pick && pick !== 'webs_here' && pick !== 'search_spiders' && !site) pick = null;
+      if (pick === 'webs_here' && !inView.length) pick = null;
       if (!pick) {
         const rec = HUNT_RECORD.spider;
-        const tree = {
-          mineshaft_webs: { description: `Walk to the mineshaft seen ${m.d} blocks off at (${m.x}, ${m.y}, ${m.z}) and cut its cobwebs with the sword, a string a web and no fight: a mineshaft's corridors are hung with them, and often a cave spider's spawner sits among them (its spiders poison).` },
-          search_spiders: { description: `Go on looking for spiders here, rings of 24 blocks about; they come out at night. The record (${HUNT_RECORD.when}): of the bot's ${rec.n} spider hunts, ${rec.died5} were followed by a death within five minutes.` },
-        };
-        const d = await require('./decisions').decide('string_way', { client: task.opportunityClient, bot, task, goal, save, tree, state: { wanted: Math.max(0, (step.count || 1) - countOf(bot, 'string')), mineshaft: { distance: m.d, y: m.y } } });
+        const tree = {};
+        if (inView.length) tree.webs_here = { description: `Cut the ${inView.length} cobweb${inView.length === 1 ? '' : 's'} in view within 32 blocks with the sword: a string a web, no fight, ${wanted} wanted.` };
+        for (const c of choices) tree[KEY[c.kind]] = { description: `Walk to the ${SITES[c.kind]} seen ${c.d} blocks off at (${c.x}, ${c.y}, ${c.z}), about ${Math.round(c.d / 3.4)} seconds at the bot's walking pace, and cut its cobwebs with the sword, a string a web and no fight: ${c.kind === 'mineshaft' ? "a mineshaft's corridors are hung with them, and often a cave spider's spawner sits among them (its spiders poison)" : "the trial chambers' halls are hung with them, and their trial spawners send waves of mobs at a player who comes near"}.` };
+        tree.search_spiders = { description: `Go on looking for spiders here, rings of 24 blocks about; they come out at night. ${STRING_HUNT_YIELD} The record (${HUNT_RECORD.when}): of the bot's ${rec.n} spider hunts, ${rec.died5} were followed by a death within five minutes.` };
+        const d = await require('./decisions').decide('string_way', { client: task.opportunityClient, bot, task, goal, save, tree, state: { wanted, websInView: inView.length, sites: choices.map(c => ({ kind: c.kind, distance: c.d })) } });
         if (d.stale) return;
-        pick = d.path.at(-1) === 'mineshaft_webs' ? 'mineshaft_webs' : 'search_spiders';
+        pick = tree[d.path.at(-1)] ? d.path.at(-1) : 'search_spiders';
+        if (pick === 'none_good') pick = 'search_spiders';
+        site = choices.find(c => KEY[c.kind] === pick) || null;
         goal.stringWay = { pick, at: now }; save();
       }
-      if (pick === 'mineshaft_webs') {
-        goal.step = { action: 'to_mineshaft_webs', target: { x: m.x, y: m.y, z: m.z }, distance: m.d }; save();
+      if (pick === 'webs_here') {
+        goal.step = { action: 'cut_webs', webs: inView.length }; save();
+        try { await require('./home-base').cutCobwebs(bot, task, goal, save, actions, inView, wanted); }
+        catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; setAside(goal, 'webs_here', 'any', String(err.message).slice(0, 120), 600000); delete goal.stringWay; save(); }
+        return;
+      }
+      if (site) {
+        const m = site;
+        goal.step = { action: 'to_mineshaft_webs', site: m.kind, target: { x: m.x, y: m.y, z: m.z }, distance: m.d }; save();
         const near = () => bot.entity.position.distanceTo(new Vec3(m.x, m.y, m.z)) <= 24;
         if (!near()) {
           let walkWhy = null;
           try { await actions.navigate(bot, task, new goals.GoalNear(m.x, m.y, m.z, 4), { timeoutMs: 120000, stallMs: 15000 }); }
           catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; walkWhy = String(err.message || err).slice(0, 120); }
-          // A walk there that ends short sets the mineshaft aside with why, and the way to the string is asked again (note 1966): returned bare, the next pass walked again, the walk guard refused it at once ('not walked again from here until a question is answered'), and no question came. full-1 (2026-10-20 16:24 to 16:37Z) stood at (-516, 70, 339) with the mineshaft 37 blocks below at (-515, 33, 343), 'no route' 48 times, half a megabyte of record every ten seconds.
+          // A walk there that ends short sets the site aside with why, and the way to the string is asked again (note 1966).
+          // A leg that made ground is not that: the walk goes on next pass (note 2006: a site a thousand blocks off is several legs).
           if (!near()) {
-            setAside(goal, 'mineshaft_webs', `${m.x},${m.z}`, `the walk to it ended ${Math.round(bot.entity.position.distanceTo(new Vec3(m.x, m.y, m.z)))} blocks short${walkWhy ? `: ${walkWhy}` : ''}`, 1800000);
-            delete goal.stringWay; save();
-            return;
+            const left = Math.round(bot.entity.position.distanceTo(new Vec3(m.x, m.y, m.z)));
+            if (left >= m.d - 16) { setAside(goal, 'mineshaft_webs', `${m.x},${m.z}`, `the walk to it ended ${left} blocks short${walkWhy ? `: ${walkWhy}` : ''}`, 1800000); delete goal.stringWay; }
+            save(); return;
           }
         }
-        const webId = bot.registry.blocksByName.cobweb?.id;
         const webs = webId != null && bot.findBlocks ? bot.findBlocks({ matching: webId, maxDistance: 32, count: 48 }) : [];
         if (!webs.length) { setAside(goal, 'mineshaft_webs', `${m.x},${m.z}`, 'no cobweb within 32 blocks of it', 3600000); delete goal.stringWay; save(); return; }
-        try { await require('./home-base').cutCobwebs(bot, task, goal, save, actions, webs, Math.max(1, (step.count || 1) - countOf(bot, 'string'))); }
+        try { await require('./home-base').cutCobwebs(bot, task, goal, save, actions, webs, wanted); }
         catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; setAside(goal, 'mineshaft_webs', `${m.x},${m.z}`, String(err.message).slice(0, 120), 1800000); save(); }
         return;
       }
@@ -2097,6 +2122,11 @@ function rememberedSpot(state, bot) {
     .sort((a, b) => (b.seen - a.seen) || (b.at - a.at))[0] || null;
 }
 
+// How far a remembered mineshaft or trial chambers is offered for its
+// cobwebs' string, the walk said (note 2006), and what the spider hunts for
+// string came to in the four full runs of 2026-10-20 and 21.
+const STRING_SITE_REACH = 1500;
+const STRING_HUNT_YIELD = 'In the four full runs of 2026-10-20 and 21, 50 minutes on spider hunts for string came to 3 string: 32 minutes by day for 3, 18 by night for none.';
 const FORTRESS_MIN_BRICKS = 24;
 // Bricks looked for: the nearest this many, and where they fill it, the
 // wider count (findFortressStep).

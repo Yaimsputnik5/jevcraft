@@ -2355,7 +2355,7 @@ test('string wanted, no spider in view, a mineshaft remembered: where the string
     navigate: async () => { bot.entity.position = new Vec3(100.5, 40, 0.5); },
     dig: async (b, t, p) => { cut.push(`${p.x},${p.y},${p.z}`); webs.delete(`${p.x},${p.y},${p.z}`); } };
   await prepareMobHunt(bot, task, { entity: 'spider', item: 'string', count: 3 }, goal, () => {}, actions);
-  assert.match(asked.mineshaft_webs, /Walk to the mineshaft seen 100 blocks off at \(100, 40, 0\) and cut its cobwebs/);
+  assert.match(asked.mineshaft_webs, /Walk to the mineshaft seen 100 blocks off at \(100, 40, 0\), about 29 seconds at the bot's walking pace, and cut its cobwebs/);
   assert.match(asked.search_spiders, /of the bot's 86 spider hunts, 15 were followed by a death within five minutes/);
   assert.equal(cut.length, 2);
 });
@@ -2418,4 +2418,26 @@ test('the walk to the mineshaft\'s webs ending short sets it aside with why, and
   // The next pass: the mineshaft set aside, so not walked at once; the spiders searched for.
   await prepareMobHunt(bot, task, { entity: 'spider', item: 'string', count: 3 }, goal, () => {}, actions);
   assert.equal(asks, 1, 'the set-aside mineshaft is not offered again');
+});
+
+test('string wanted: the cobwebs in view and trial chambers far off are ways to it too, said with the walk and the spiders\' yield; the webs in view chosen are cut there (note 2006)', async () => {
+  const { bot, task, goal } = fixture('spider');
+  bot.game.dimension = 'overworld'; bot.game.minY = 0; bot.game.height = 256;
+  delete bot.entities[7];
+  bot.inventory.slots[36] = { name: 'stone_sword', slot: 36, count: 1, durabilityUsed: 0, type: registry.itemsByName.stone_sword.id };
+  goal.landmarks = [{ kind: 'trial_chambers', x: 1100, y: -30, z: 0, dimension: 'overworld' }, { kind: 'mineshaft', x: -1400, y: 30, z: 0, dimension: 'overworld' }];
+  const webs = new Set(['3,64,0', '4,64,0', '5,64,0']);
+  bot.findBlocks = ({ matching }) => matching === registry.blocksByName.cobweb.id ? [...webs].map(k => new Vec3(...k.split(',').map(Number))) : [];
+  const was = bot.blockAt; bot.blockAt = p => webs.has(`${p.x},${p.y},${p.z}`) ? { name: 'cobweb' } : was(p);
+  let asked = null;
+  task.opportunityClient = { systemOne: async ({ questions }) => { const c = questions.branch_0.criteria; if (c.fight_with_carried) return { answers: { branch_0: { choice: 'fight_with_carried' } } }; asked = c; return { answers: { branch_0: { choice: 'webs_here' } } }; } };
+  const cut = [];
+  const actions = { acquireStep: async () => {}, explore: async () => assert.fail('not a spider search'), navigate: async () => assert.fail('no walk for the webs in view'),
+    dig: async (b, t, p) => { cut.push(`${p.x},${p.y},${p.z}`); webs.delete(`${p.x},${p.y},${p.z}`); } };
+  await prepareMobHunt(bot, task, { entity: 'spider', item: 'string', count: 3 }, goal, () => {}, actions);
+  assert.deepEqual(Object.keys(asked).filter(k => k !== 'none_good').sort(), ['mineshaft_webs', 'search_spiders', 'trial_webs', 'webs_here']);
+  assert.match(asked.webs_here, /^Cut the 3 cobwebs in view within 32 blocks with the sword/);
+  assert.match(asked.trial_webs, /trial chambers seen 1100 blocks off .* about 324 seconds at the bot's walking pace/);
+  assert.match(asked.search_spiders, /50 minutes on spider hunts for string came to 3 string/);
+  assert.equal(cut.length, 3);
 });

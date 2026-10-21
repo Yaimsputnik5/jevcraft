@@ -450,9 +450,9 @@ Questions that ride in one call together (the intake batch is one call per chat 
 
 ### `string_way`
 
-**String is wanted and no spider is in view: walk to a remembered mineshaft and cut its cobwebs, or go on looking for spiders here?**
+**String is wanted and no spider is in view: cut the cobwebs in view, walk to a remembered mineshaft or trial chambers and cut theirs, or go on looking for spiders here?**
 
-- When: A hunt for string in the Overworld with a sword carried and a mineshaft remembered within 400 blocks; asked again after twenty minutes.
+- When: A hunt for string in the Overworld with a sword carried and cobwebs in view, or a mineshaft or trial chambers remembered within 1500 blocks (note 2006); asked again after twenty minutes.
 - Decision tree, choice; stakes medium; ledger kind `strategy`
 - Bar: none
 - Jev unreachable: no fallback: nothing is decided by code; the bot holds, says once that it is waiting for Jev, asks again with a backoff, and asks it fresh when Jev answers
@@ -461,8 +461,10 @@ Questions that ride in one call together (the intake batch is one call per chat 
 
 | Option | Level | What it is | Offered when |
 | --- | --- | --- | --- |
-| `mineshaft_webs` | root | walk to the mineshaft and cut its cobwebs | always here; said with the walk and the cave spider spawner a mineshaft often holds |
-| `search_spiders` | root | go on looking for spiders here | always here; said with the record of the bot's spider hunts |
+| `webs_here` | root | cut the cobwebs in view | cobwebs within 32 blocks (a stronghold library, a mineshaft corridor) |
+| `mineshaft_webs` | root | walk to the mineshaft and cut its cobwebs | a mineshaft remembered within 1500 blocks; said with the walk and the cave spider spawner a mineshaft often holds |
+| `trial_webs` | root | walk to the trial chambers and cut their cobwebs | trial chambers remembered within 1500 blocks; said with the walk and the trial spawners there |
+| `search_spiders` | root | go on looking for spiders here | always here; said with the record of the bot's spider hunts and their yield in string |
 
 ### `hunt_target`
 

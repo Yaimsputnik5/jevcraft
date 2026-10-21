@@ -20,12 +20,14 @@ define({
 // String from a mineshaft's cobwebs or the spiders (src/mob-hunt.js prepareMobHunt, note 1318).
 define({
   id: 'string_way', area: 'combat', parent: null, kind: 'strategy', primitive: 'choice', stakes: 'medium', tree: true,
-  question: 'String is wanted and no spider is in view: walk to a remembered mineshaft and cut its cobwebs, or go on looking for spiders here?',
-  trigger: 'A hunt for string in the Overworld with a sword carried and a mineshaft remembered within 400 blocks; asked again after twenty minutes.',
+  question: 'String is wanted and no spider is in view: cut the cobwebs in view, walk to a remembered mineshaft or trial chambers and cut theirs, or go on looking for spiders here?',
+  trigger: 'A hunt for string in the Overworld with a sword carried and cobwebs in view, or a mineshaft or trial chambers remembered within 1500 blocks (note 2006); asked again after twenty minutes.',
   source: 'src/mob-hunt.js (prepareMobHunt)',
   options: [
-    { key: 'mineshaft_webs', label: 'walk to the mineshaft and cut its cobwebs', when: 'always here; said with the walk and the cave spider spawner a mineshaft often holds', level: 'root' },
-    { key: 'search_spiders', label: 'go on looking for spiders here', when: 'always here; said with the record of the bot\'s spider hunts', level: 'root' },
+    { key: 'webs_here', label: 'cut the cobwebs in view', when: 'cobwebs within 32 blocks (a stronghold library, a mineshaft corridor)', level: 'root' },
+    { key: 'mineshaft_webs', label: 'walk to the mineshaft and cut its cobwebs', when: 'a mineshaft remembered within 1500 blocks; said with the walk and the cave spider spawner a mineshaft often holds', level: 'root' },
+    { key: 'trial_webs', label: 'walk to the trial chambers and cut their cobwebs', when: 'trial chambers remembered within 1500 blocks; said with the walk and the trial spawners there', level: 'root' },
+    { key: 'search_spiders', label: 'go on looking for spiders here', when: 'always here; said with the record of the bot\'s spider hunts and their yield in string', level: 'root' },
   ],
   instructions: { task: 'String is wanted for a bow or a fishing rod. Choose where it comes from.', guidance: 'Each option says what it costs: the walk and what lies at a mineshaft, or the record of the bot\'s own spider hunts.' },
 });
