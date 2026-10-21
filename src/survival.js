@@ -1252,6 +1252,15 @@ function openWhileBuildingSays(bot, over, seconds, what) {
 // way's cells from the first step to its end; null with nothing that can
 // push the bot, { beside: 0 } where no cell of the way is by such a fall.
 const CROUCH_SPEED = 4.317 * 0.3;
+// The bot's own Overworld walks of 40 blocks or more, arrived (four full runs,
+// 2026-10-20 and 21, 526 walks, straight-line blocks a second): the median
+// 3.4, one in four slower than 2.8, one in ten than 2.2; not the 4.3 of a
+// walk on the flat (note 1986). full-2 (2026-10-21 06:08:54Z), told 'about
+// 18 seconds at a walk' of a shelter 76 blocks off at nightfall, was stopped
+// by the walk's twenty seconds 12 blocks short of it with a zombie villager
+// and three zombies come up, and died in 13 seconds; of the five walks to a
+// saved shelter 48 blocks off or more those two days, four were stopped so.
+const WALK_PACE = { median: 3.4, slow: 2.2, says: 'the bot\'s own walks of 40 blocks or more made 3.4 blocks a second, half of them; one in four was slower than 2.8' };
 // A walk whose own figures make it the likelier death is not a way on offer
 // (physical safety, note 1237): beside lava or a fall that kills, with a shot
 // more likely than not to land on the way, and a shot that lands there the
@@ -7729,14 +7738,14 @@ class Survival {
       // whether a shaft has a dry column to go down at all.
       const about = threats(bot, 64);
       const walkTo = dest => {
-        const distance = dest.distanceTo(bot.entity.position), seconds = Math.round(distance / 4.3), tod = bot.time?.timeOfDay ?? 6000;
+        const distance = dest.distanceTo(bot.entity.position), seconds = Math.round(distance / WALK_PACE.median), tod = bot.time?.timeOfDay ?? 6000;
         const there = about.filter(t => t.entity.position.distanceTo(dest) <= 16);
         const dark = tod >= DAY.DARK && tod < DAY.DAWN ? ' It is dark already: mobs spawn along the way.' : tod + seconds * 20 >= DAY.DARK ? ' It arrives after dark.' : '';
-        return ` About ${seconds} seconds at a walk.${dark}${there.length ? ` Within sixteen blocks of it now: ${there.slice(0, 4).map(t => `a ${t.entity.name.replaceAll('_', ' ')}`).join(', ')}${there.some(t => t.entity.name === 'creeper') ? ' (a creeper among them)' : ''}.` : ''}`;
+        return ` About ${seconds} seconds at a walk${distance >= 24 ? ` (${WALK_PACE.says})` : ''}.${dark}${there.length ? ` Within sixteen blocks of it now: ${there.slice(0, 4).map(t => `a ${t.entity.name.replaceAll('_', ' ')}`).join(', ')}${there.some(t => t.entity.name === 'creeper') ? ' (a creeper among them)' : ''}.` : ''}`;
       };
       // And those coming at the bot, against each way's seconds (note 544).
       const toward = comingAt(bot, { list: about.filter(t => t.distance <= 24) });
-      const walkRace = (dest, blocks) => comingSays(toward, { seconds: dest.distanceTo(bot.entity.position) / 4.3 + blocks * BLOCK_SECONDS, doing: 'the sealing there', at: dest });
+      const walkRace = (dest, blocks) => comingSays(toward, { seconds: dest.distanceTo(bot.entity.position) / WALK_PACE.median + blocks * BLOCK_SECONDS, doing: 'the sealing there', at: dest });
       // Whether a way to it is found from here, said (note 755); one with no
       // way was left out already (reachableRefuge), and a walk that then
       // finds none sets it aside (below).
@@ -8049,7 +8058,12 @@ class Survival {
       movement.exclusionAreasBreak = (previous || []).filter(rule => rule !== bot._constructionProtection);
       movement.exclusionAreasBreak.push(block => reservedForConstruction(approaching, block.position) ? 100 : 0);
     }
-    try { await this.actions.navigate(bot, task, destination, { timeoutMs: 20000 }); }
+    // Time for the walk by its length, at the pace of the slowest walks in
+    // ten (note 1986): twenty seconds for any was stopped short of every
+    // shelter much past fifty blocks, and the bot stood in the open at night
+    // with the mobs it had walked through.
+    const far = destination.x === undefined ? 0 : Math.hypot(destination.x - bot.entity.position.x, destination.z - bot.entity.position.z);
+    try { await this.actions.navigate(bot, task, destination, { timeoutMs: Math.max(20000, Math.round((far / WALK_PACE.slow + 5) * 1000)) }); }
     finally { if (movement) movement.exclusionAreasBreak = previous; }
   }
 
