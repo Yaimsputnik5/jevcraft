@@ -272,7 +272,7 @@ test('on the bridge over the creeper, out of its sight, staying behind the bridg
   assert.ok(stay, 'offered');
   assert.match(stay.description, /^The creeper [^]*?\. Stay behind the netherrack at \(-40, 13, -5\), in the line from the eyes of the creeper \(3\.1 blocks off\) to the bot's\./);
   assert.match(stay.description, /within 3 blocks of the bot the creeper stands where it is, lit or not, and out of its sight it does not light/);
-  assert.equal(stay.expects.damage, 0);
+  assert.equal(stay.expects.damage, 0.5, "out of sight, the record's 4 blasts in 160 (note 2016)");
 });
 
 test('a creeper 7.1 blocks off walking in: the block in its line is offered, and the meal says its fuse when it is done (12:06:55)', () => {

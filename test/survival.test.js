@@ -5648,7 +5648,7 @@ test('a block in a creeper\'s line is offered, priced by the seconds until the l
   assert.match(o.description, /Here that point is about [\d.]+ blocks' walk from it, about [\d.]+ seconds, [\d.]+ blocks from the bot, where the block still stops its line: it stands there and does not light\./);
   assert.match(o.description, /Out of its sight three seconds on end, it forgets the bot/);
   assert.match(o.description, /If the bot backs off past 3 blocks from it, it walks round the block and lights again/);
-  assert.equal(o.expects.damage, 0, 'nothing else here reaches it');
+  assert.equal(o.expects.damage, 2, 'nothing else here reaches it: the record of blocking with it in sight, 42 blasts in 450 (note 2016)');
   assert(options.fight.expects.damage > 4.8, 'the fight still costs more than the bot has');
   assert.equal(await o.run(), true);
   assert.deepEqual(placed, ['(1, 64, 0)', '(1, 65, 0)'], 'the foot first, then the cell the line crosses');
@@ -6435,4 +6435,13 @@ test('a bed up to 24 blocks over a pocket and 48 across is within the go-home cl
   assert.equal(bedClimbable(at(711.5, 70, 300.5), new Vec3(700, 103, 293)), false, '33 under');
   assert.equal(bedClimbable(at(760, 88, 300.5), new Vec3(700, 103, 293)), false, '60 across');
   assert.equal(bedClimbable(at(700, 110, 293), new Vec3(700, 103, 293)), false, 'above it');
+});
+
+// full-2 (2026-10-21 22:51:27Z): block_creeper priced 0.1 with the creeper in sight at 1.7 blocks, held, blast (note 2016).
+test("block_creeper's record by the creeper's distance and sight", () => {
+  const { blockRecord } = require('../src/survival');
+  assert.deepEqual([blockRecord(1.7, true).chosen, blockRecord(1.7, true).blasts], [16, 4]);
+  assert.equal(blockRecord(3, true).band, '2 to 3.5 blocks off');
+  assert.equal(blockRecord(6, true).blasts, 42);
+  assert.equal(blockRecord(1.7, false).band, 'at any distance');
 });

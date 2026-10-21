@@ -1298,6 +1298,23 @@ function bedClimbable(bot, foot) {
   const up = foot.y - here.y;
   return up > 0 && up <= BED_CLIMB.up && Math.hypot(foot.x - here.x, foot.z - here.z) <= BED_CLIMB.across;
 }
+// block_creeper's record (note 2016): in the flight records of 2026-10
+// (scratchpad block-creeper.py), the answers block_creeper by the nearest
+// creeper's distance and whether it was in sight, and how many were
+// followed by a blast within 8 seconds. Priced at 0.1 with the creeper in
+// sight at 1.7 blocks, full-2 (2026-10-21 22:51:27Z) held it, and the blast
+// took it from 20 to nothing two seconds later.
+const BLOCK_RECORD = Object.freeze([
+  { within: 2, seen: true, chosen: 16, blasts: 4 },
+  { within: 3.5, seen: true, chosen: 227, blasts: 27 },
+  { within: Infinity, seen: true, chosen: 450, blasts: 42 },
+  { within: Infinity, seen: false, chosen: 160, blasts: 4 },
+]);
+function blockRecord(distance, seen) {
+  const r = BLOCK_RECORD.find(x => x.seen === !!seen && distance <= x.within);
+  const band = !r.seen ? 'at any distance' : r.within === 2 ? 'within 2 blocks' : r.within === 3.5 ? '2 to 3.5 blocks off' : 'more than 3.5 blocks off';
+  return { ...r, band };
+}
 function pricedRunCell(here, from, blocks) {
   const dx = here.x - from.x, dz = here.z - from.z, len = Math.hypot(dx, dz) || 1;
   return { x: Math.round(here.x + dx / len * blocks), z: Math.round(here.z + dz / len * blocks) };
@@ -9048,7 +9065,12 @@ class Survival {
     const othersSays = others.length ? ` ${others.length === 1 ? `The other creeper (${Math.round(others[0].t.distance)} blocks off) is` : `${others.length} other creepers (${others.map(o => Math.round(o.t.distance)).join(', ')} blocks off) are`} not in this line.` : '';
     const rest = mobs.filter(m => m.id !== c.entity.id);
     const cost = stanceCost({ mobs: rest, setup: total, reaches: () => true, shield: shielded });
-    const damage = Math.round((cost.damage + (b.inTime || behind ? roundBlast : b.blast)) * 10) / 10;
+    // What blocking has come to (note 2016): no lower than its record's
+    // share of a blast here, and the record said.
+    const rec = blockRecord(c.distance, c.visible !== false);
+    const recBlast = Math.round(rec.blasts / rec.chosen * creeperBlastNow(bot) * 10) / 10;
+    const damage = Math.round(Math.max(cost.damage + (b.inTime || behind ? roundBlast : b.blast), cost.damage + recBlast) * 10) / 10;
+    const recSays = ` In the record, ${rec.chosen} times chosen with a creeper ${rec.band} and ${rec.seen ? 'in sight' : 'out of sight'}, a blast hit the bot within 8 seconds ${rec.blasts} times (one in ${Math.round(rec.chosen / Math.max(1, rec.blasts))}): it walks round the block, the cell beside the line is left open, or another comes.`;
     const what = `the creeper (${d} blocks off${lit ? ', lit' : ''})`;
     // Long enough, the standoff is said: what staying has come to, and the
     // two ways that end it (note 778).
@@ -9068,8 +9090,8 @@ class Survival {
         return ` A standoff: ${standoffSays(standoff)}. Behind the block it neither lights nor leaves, so staying ends nothing and the work waits. It ends with the creeper dead,${fightSays}; or with the bot more than ${fr} blocks from it, past the range a creeper follows a player from: about ${Math.round(away)} blocks more, about ${awaySeconds} seconds at a sprint (it walks after the bot at about ${ce.APPROACH} blocks a second, and lights only within ${ce.LIGHTS_AT} blocks with the bot in its sight)${noRun ? '; but the run has found no way from here (said on it), so of the two only the fight is open now' : ''}.`;
       })() : '';
     const description = behind
-      ? `Stay behind the ${plan.stoppedBy.name.replaceAll('_', ' ')} at ${plan.stoppedBy.cell}, in the line from the eyes of ${what} to the bot's.${rule}${fuse}${next}${othersSays}${standoffNow}` + costSays(cost, bot.health, rest, { done: 'Behind it' }) + edge
-      : `Put ${n === 1 ? 'a block' : `${n} blocks, two high,`} in the line from the eyes of ${what} to the bot's, ${whereSays(bot, plan.cuts)}: about ${Math.round(cutSeconds * 10) / 10} seconds until the line is cut${n > 1 ? ` (the ${plan.cutAfter === 1 ? 'first' : 'second'} block), ${Math.round(total * 10) / 10} for both` : ''}, and stay behind it.${rule}${fuse}${verdict}${next}${othersSays}${standoffNow}` + costSays(cost, bot.health, rest, { doing: 'placing', done: 'Behind it' }) + edge;
+      ? `Stay behind the ${plan.stoppedBy.name.replaceAll('_', ' ')} at ${plan.stoppedBy.cell}, in the line from the eyes of ${what} to the bot's.${rule}${fuse}${next}${othersSays}${standoffNow}${recSays}` + costSays(cost, bot.health, rest, { done: 'Behind it' }) + edge
+      : `Put ${n === 1 ? 'a block' : `${n} blocks, two high,`} in the line from the eyes of ${what} to the bot's, ${whereSays(bot, plan.cuts)}: about ${Math.round(cutSeconds * 10) / 10} seconds until the line is cut${n > 1 ? ` (the ${plan.cutAfter === 1 ? 'first' : 'second'} block), ${Math.round(total * 10) / 10} for both` : ''}, and stay behind it.${rule}${fuse}${verdict}${next}${othersSays}${standoffNow}${recSays}` + costSays(cost, bot.health, rest, { doing: 'placing', done: 'Behind it' }) + edge;
     return { expects: { damage, seconds: cost.seconds, oneHit }, description, ...(standoffNow ? { standoff: ` This ends the standoff with the creeper (${standoffSays(standoff)}).` } : {}),
       run: async () => {
         const e = bot.entities?.[c.entity.id] || c.entity;
@@ -12682,4 +12704,4 @@ function claim(bot, goal = {}, survival = null) {
   return made;
 }
 
-module.exports = { bedClimbable, BED_CLIMB, pricedRunCell, runFromRecord, RUN_FROM_RECORD, spawnBedNear, homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
+module.exports = { blockRecord, BLOCK_RECORD, bedClimbable, BED_CLIMB, pricedRunCell, runFromRecord, RUN_FROM_RECORD, spawnBedNear, homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
