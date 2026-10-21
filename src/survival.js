@@ -1251,6 +1251,21 @@ function openWhileBuildingSays(bot, over, seconds, what) {
 // ghast's fireball threw it off where it stood (note 610). `cells` are the
 // way's cells from the first step to its end; null with nothing that can
 // push the bot, { beside: 0 } where no cell of the way is by such a fall.
+// The creeper on a run straight away from `from` (a mob's position) for
+// `blocks`, the way run_from goes with no footing picked (note 1991): said
+// and priced as the retreat's way is (creeper-run.js). 24 run_from answers
+// in the flight records with a creeper within seven blocks, none priced for
+// it, were followed by its blast within six seconds 7 times: full-3
+// (2026-10-21 07:05:28Z), at 4.4 health with a creeper 2.7 blocks off, was
+// told 1.5 damage of a run from the skeleton, and the blast ended it.
+function runFromCreeper(bot, creepers, from, blocks, worn) {
+  if (!creepers?.length) return { says: '', damage: 0 };
+  const here = bot.entity.position, dx = here.x - from.x, dz = here.z - from.z, len = Math.hypot(dx, dz) || 1;
+  const path = Array.from({ length: Math.max(1, Math.round(blocks)) }, (_, i) => ({ x: here.x + dx / len * (i + 1), y: here.y, z: here.z + dz / len * (i + 1) }));
+  const cr = require('./creeper-run');
+  return cr.creeperRunSays(cr.wayAgainstCreepers(bot, path, creepers), { worn, health: bot.health });
+}
+
 const CROUCH_SPEED = 4.317 * 0.3;
 // A creeper's blast two blocks off through the armour the bot wears (note
 // 1988): the way-out options said it as the first 'about' of the fight
@@ -5203,8 +5218,9 @@ class Survival {
         const lead = biters[0], speed = Math.round(ce.blocksPerSecond(lead.entity.name) * 10) / 10;
         const secs = Math.round(RUN_FROM / (SPRINT - speed) * 10) / 10;
         const others = danger.filter(t => shooter(t.entity) && t.visible).length;
-        options.run_from = { expects: { damage: Math.round(runShotCost(secs) * 10) / 10, seconds: Math.max(1, secs), oneHit },
-          description: `Run from ${biters.length === 1 ? `the ${lead.entity.name.replaceAll('_', ' ')}` : `the ${biters.length} that bite`} at a sprint, to the first cell the walk reaches ${RUN_FROM} blocks or more from ${biters.length === 1 ? 'it' : 'every one of them'}: no footing is picked beforehand and nothing is searched while standing. The ${lead.entity.name.replaceAll('_', ' ')} walks about ${speed} blocks a second and the bot sprints about ${SPRINT}: the gap opens about ${Math.round((SPRINT - speed) * 10) / 10} a second, ${RUN_FROM} blocks in about ${secs} seconds, the back to ${biters.length === 1 ? 'it' : 'them'} and the shield down while it runs${others ? `; ${others} that shoot keep shooting` : ''}.${noWayOut || ' Where it ends is open ground, and what follows is asked of there.'}`,
+        const runC = runFromCreeper(bot, runCreepers, lead.entity.position, RUN_FROM, runWorn);
+        options.run_from = { expects: { damage: Math.round((runShotCost(secs) + runC.damage) * 10) / 10, seconds: Math.max(1, secs), oneHit },
+          description: runC.says.trim() + (runC.says ? ' ' : '') + `Run from ${biters.length === 1 ? `the ${lead.entity.name.replaceAll('_', ' ')}` : `the ${biters.length} that bite`} at a sprint, to the first cell the walk reaches ${RUN_FROM} blocks or more from ${biters.length === 1 ? 'it' : 'every one of them'}: no footing is picked beforehand and nothing is searched while standing. The ${lead.entity.name.replaceAll('_', ' ')} walks about ${speed} blocks a second and the bot sprints about ${SPRINT}: the gap opens about ${Math.round((SPRINT - speed) * 10) / 10} a second, ${RUN_FROM} blocks in about ${secs} seconds, the back to ${biters.length === 1 ? 'it' : 'them'} and the shield down while it runs${others ? `; ${others} that shoot keep shooting` : ''}.${noWayOut || ' Where it ends is open ground, and what follows is asked of there.'}`,
           run: async () => {
             this.report(goal, save, { action: 'run_from', threats: biters.map(t => t.entity.name).slice(0, 4), health: bot.health, stance: true });
             lowerShield(bot);
@@ -5236,8 +5252,9 @@ class Survival {
         const OUT = 28, lead = walkers[0];
         const secs = Math.max(1, Math.round((OUT - lead.distance) / SPRINT * 10) / 10);
         const named = walkers.length === 1 ? `the ${lead.entity.name.replaceAll('_', ' ')}` : `the ${walkers.length} that shoot`;
-        options.run_from = { expects: { damage: Math.round(runShotCost(secs) * 10) / 10, seconds: secs, oneHit },
-          description: `Run from ${named} at a sprint, out of ${walkers.length === 1 ? 'its' : 'their'} range: to the first cell the walk reaches ${OUT} blocks or more from ${walkers.length === 1 ? 'it' : 'every one of them'}, no footing picked beforehand and nothing searched while standing. A skeleton sets on a player within 16 blocks and aims to about 15: past that it has no shot, and one that has lost the bot does not come after it. About ${secs} seconds at the bot's ${SPRINT} blocks a second, the back to ${walkers.length === 1 ? 'it' : 'them'} and the shield down while it runs; ${walkers.length === 1 ? 'it shoots' : 'they shoot'} until the bot is out of range.${noWayOut || ' Where it ends is open ground, and what follows is asked of there.'}`,
+        const runC = runFromCreeper(bot, runCreepers, lead.entity.position, OUT - lead.distance, runWorn);
+        options.run_from = { expects: { damage: Math.round((runShotCost(secs) + runC.damage) * 10) / 10, seconds: secs, oneHit },
+          description: runC.says.trim() + (runC.says ? ' ' : '') + `Run from ${named} at a sprint, out of ${walkers.length === 1 ? 'its' : 'their'} range: to the first cell the walk reaches ${OUT} blocks or more from ${walkers.length === 1 ? 'it' : 'every one of them'}, no footing picked beforehand and nothing searched while standing. A skeleton sets on a player within 16 blocks and aims to about 15: past that it has no shot, and one that has lost the bot does not come after it. About ${secs} seconds at the bot's ${SPRINT} blocks a second, the back to ${walkers.length === 1 ? 'it' : 'them'} and the shield down while it runs; ${walkers.length === 1 ? 'it shoots' : 'they shoot'} until the bot is out of range.${noWayOut || ' Where it ends is open ground, and what follows is asked of there.'}`,
           run: async () => {
             this.report(goal, save, { action: 'run_from', threats: walkers.map(t => t.entity.name).slice(0, 4), health: bot.health, stance: true });
             lowerShield(bot);
@@ -12536,4 +12553,4 @@ function claim(bot, goal = {}, survival = null) {
   return made;
 }
 
-module.exports = { deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
+module.exports = { runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };

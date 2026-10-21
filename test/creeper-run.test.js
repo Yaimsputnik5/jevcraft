@@ -293,3 +293,15 @@ test('a run the creeper does not light at the median pace but goes off on at the
   const clear = creeperRunSays({ ...result, slow: { goesOff: false } }, { health: 5.8 });
   assert.equal(clear.damage, 0);
 });
+
+test('a run straight away from a skeleton past a creeper 2.7 blocks off is priced for its blast (note 1991, full-3 07:05:28Z)', () => {
+  const { runFromCreeper } = require('../src/survival');
+  const bot = groundBot(openGround(), { at: new Vec3(0.5, 64, 0.5) });
+  bot.health = 4.4;
+  // The skeleton 8 blocks off to the west; the creeper 2.7 off to the east, the way the run goes.
+  const creeper = { entity: { name: 'creeper', position: new Vec3(3.2, 64, 0.5), height: 1.7 }, distance: 2.7 };
+  const run = runFromCreeper(bot, [creeper], new Vec3(-7.5, 64, 0.5), 20, { points: 0, toughness: 0 });
+  assert.ok(run.damage >= 4.4, `priced ${run.damage}`);
+  assert.match(run.says, /goes off/);
+  assert.deepEqual(runFromCreeper(bot, [], new Vec3(-7.5, 64, 0.5), 20, { points: 0, toughness: 0 }), { says: '', damage: 0 });
+});
