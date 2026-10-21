@@ -244,3 +244,12 @@ test('the walk, the boat and the staircase to the portal all failed: the way is 
   assert.equal(await pass(), false, 'the one passed over is not made for again');
   assert.equal(asked.length, 2);
 });
+
+test('a remembered portal is judged gone only from where its sheet would be seen, not from the end of a leg toward it (note 1990, full-4)', () => {
+  const { portalToJudge } = require('../src/work');
+  const goal = { portals: [{ x: -558, y: 109, z: -540, dimension: 'overworld' }, { x: 0, y: 64, z: 0, dimension: 'nether' }] };
+  const at = (x, y, z) => ({ entity: { position: new Vec3(x, y, z) } });
+  assert.equal(portalToJudge(at(-690, 70, -570), goal), null, '130 blocks off: not judged');
+  assert.deepEqual(portalToJudge(at(-560, 109, -536), goal), goal.portals[0], 'beside it with no sheet in view: judged');
+  assert.equal(portalToJudge(at(-558, 70, -540), goal), null, 'under it, 39 blocks down: not judged');
+});

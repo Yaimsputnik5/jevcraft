@@ -5183,6 +5183,21 @@ function portalSurfaceFirst(bot, p) {
     return rock >= SURFACE_WINS * over ? { up, rock: Math.round(rock), over: Math.round(over) } : null;
   } catch (_) { return null; }
 }
+// The remembered Overworld portal to judge gone when no sheet is in view:
+// only one the bot stands within sixteen blocks of, where its sheet would be
+// seen (note 1990). The walk to it returns after a leg of thirty-two blocks
+// or the climb to open sky, short of it, and the sheet was looked for from
+// there: full-4 (2026-10-21 05:00 to 07:00Z), its portal at (-558, 109,
+// -540) lit and standing, was told it 'is not found where it was
+// remembered' 621 times from 130 blocks off, passed it over for half an hour
+// each time and walked about the hills for two hours.
+const PORTAL_SEEN_WITHIN = 16;
+function portalToJudge(bot, goal) {
+  const here = bot.entity.position;
+  const p = (goal.portals || []).filter(q => q.dimension === 'overworld').sort((u, v) => Math.hypot(u.x - here.x, u.z - here.z) - Math.hypot(v.x - here.x, v.z - here.z))[0];
+  return p && Math.hypot(p.x - here.x, p.y - here.y, p.z - here.z) <= PORTAL_SEEN_WITHIN ? p : null;
+}
+
 async function walkToKnownPortal(bot, task, goal, save, where) {
   const here = bot.entity.position;
   // One Jev chose to pass over for a portal made here (portal_way) is not
@@ -6633,9 +6648,8 @@ async function crossing(bot, task, goal, save, client) {
     // half from its remembered Overworld portal with no sheet in it, "return
     // to portal" fifteen passes a second: the walk arrived, no sheet was
     // found, the step returned, and its log grew 2.5 GB.
-    if (!lowestPortalBlock(bot)) {
-      const here = bot.entity.position;
-      const p = (goal.portals || []).filter(q => q.dimension === 'overworld').sort((u, v) => Math.hypot(u.x - here.x, u.z - here.z) - Math.hypot(v.x - here.x, v.z - here.z))[0];
+    const p = !lowestPortalBlock(bot) ? portalToJudge(bot, goal) : null;
+    if (p) {
       try { if (!await relightPortalAt(bot, task, goal, save, 'overworld') && p) throw new Blocked(`The portal at (${p.x}, ${p.y}, ${p.z}) is not found where it was remembered`); }
       catch (err) {
         if (!(err instanceof Blocked)) throw err;
@@ -9778,4 +9792,4 @@ function constructionObservation(bot, goal) {
   return JSON.stringify(positions.map(p => [p.x, p.y, p.z, bot.blockAt(pos(p))?.stateId ?? bot.blockAt(pos(p))?.name ?? null]));
 }
 
-module.exports = { capLavaBeside, portalPickaxeFirst, endPortalActions, miningCandidates, portalSurfaceFirst, nightUpSays, oreToTunnel, gatherRests, gatherResting, relightPortalAt, stairPickaxeWanted, pickaxeForStair, siteHoldEnds, exploreLand, exploreLandIds, woodWhileUp, WOOD_UP, wantedItems, keepRoom, tidyMoment, smeltBatch, ladderSmeltWants, foodReservePrice, siteByLava, foodTrips, supportMaterialHere, preparePortalSupports, portalJobs, castSiteCost, castSiteSays, NO_WOOD_DEEP, smeltNeedSays, takeBackPlace, detourWork, restWork, restWorkSays, upkeepOffers, kitFoodStep, foodNearFrame, cookable, FUELS, answerOrPutOff, opensPit, persist, returnFromNether, climbSays, holdForRest, liveTurn, workClaim, methodSoFar, gatherBlocks, sculkStep, opensLava, descentTargets, portalInteriorBlockers, nearestLava, lavaGone, mineAtSource, timed, portalHere, walkToKnownPortal, portalWay, lineSays, buildPortalFrame, ruinSays, portalMethod, portalStep, crossingKitReady, walksFailed, occupant, bodyIn, occupiedSays, waitingThere, settleCraftInventory, tripTime, WOOD_RESERVE, woodUnits, crossingWater, sideTrips, plugLeak, leakResponse, logInView, patrolChoice, upkeepStep, moreOfSource, whileCooking, workstation, noteError, localBatch, takeOutBatch, castUnderWay, leftBatch, batchNoRoute, LEAVE_BATCH_MS, smelt, turnSearch, searchFor, enterPortal, gameHandlers, breakStillness, reachableBlocks, hitboxIntrudes, terrainShortage, runGoal, runIdle, idleWork, idleOptions, createSurvival, acquireStep, inventory, planningInventory, catalogPlan, selectSite, explore, dig, place, waitFor, constructionObservation, Blocked, designedBuildStep, surfaceStep, surfaceTrip, answerStall, looseEnds, breakOut, tunnelToward, stairsOrWay, craft, gatherWood, moveOnFromResource, moveOnHistorySays, pickaxeCraftHistorySays, maintainPickaxe, MOVE_ON_MEMORY_MS, PICKAXE_CRAFT_MEMORY_MS, stationCellOk, droppedFoodNear, planDueNow, planRoutes, lavaKnownFrom, straightToward };
+module.exports = { portalToJudge, capLavaBeside, portalPickaxeFirst, endPortalActions, miningCandidates, portalSurfaceFirst, nightUpSays, oreToTunnel, gatherRests, gatherResting, relightPortalAt, stairPickaxeWanted, pickaxeForStair, siteHoldEnds, exploreLand, exploreLandIds, woodWhileUp, WOOD_UP, wantedItems, keepRoom, tidyMoment, smeltBatch, ladderSmeltWants, foodReservePrice, siteByLava, foodTrips, supportMaterialHere, preparePortalSupports, portalJobs, castSiteCost, castSiteSays, NO_WOOD_DEEP, smeltNeedSays, takeBackPlace, detourWork, restWork, restWorkSays, upkeepOffers, kitFoodStep, foodNearFrame, cookable, FUELS, answerOrPutOff, opensPit, persist, returnFromNether, climbSays, holdForRest, liveTurn, workClaim, methodSoFar, gatherBlocks, sculkStep, opensLava, descentTargets, portalInteriorBlockers, nearestLava, lavaGone, mineAtSource, timed, portalHere, walkToKnownPortal, portalWay, lineSays, buildPortalFrame, ruinSays, portalMethod, portalStep, crossingKitReady, walksFailed, occupant, bodyIn, occupiedSays, waitingThere, settleCraftInventory, tripTime, WOOD_RESERVE, woodUnits, crossingWater, sideTrips, plugLeak, leakResponse, logInView, patrolChoice, upkeepStep, moreOfSource, whileCooking, workstation, noteError, localBatch, takeOutBatch, castUnderWay, leftBatch, batchNoRoute, LEAVE_BATCH_MS, smelt, turnSearch, searchFor, enterPortal, gameHandlers, breakStillness, reachableBlocks, hitboxIntrudes, terrainShortage, runGoal, runIdle, idleWork, idleOptions, createSurvival, acquireStep, inventory, planningInventory, catalogPlan, selectSite, explore, dig, place, waitFor, constructionObservation, Blocked, designedBuildStep, surfaceStep, surfaceTrip, answerStall, looseEnds, breakOut, tunnelToward, stairsOrWay, craft, gatherWood, moveOnFromResource, moveOnHistorySays, pickaxeCraftHistorySays, maintainPickaxe, MOVE_ON_MEMORY_MS, PICKAXE_CRAFT_MEMORY_MS, stationCellOk, droppedFoodNear, planDueNow, planRoutes, lavaKnownFrom, straightToward };
