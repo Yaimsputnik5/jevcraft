@@ -126,3 +126,15 @@ test('a loop spun a minute with nothing done and no hurt is restarted for the ne
     assert(lines.some(l => /its loop has spun for \d+ seconds with nothing done, not hurt meanwhile: quitting for the new build/.test(l)), lines.join('\n'));
   } finally { console.log = log; stop(); }
 });
+
+test('a new build asked for since the process began is pending at a death, whatever connection the bot is on; not without a supervisor, nor one asked for before (note 1994)', () => {
+  const fs = require('fs'), os = require('os'), path = require('path');
+  const { pendingRestart } = require('../src/quiet-restart');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'qr-')), 'restart-requested');
+  assert.equal(pendingRestart(file, { startedAt: 0, watched: () => true }), false, 'none asked for');
+  fs.writeFileSync(file, '');
+  const asked = fs.statSync(file).mtimeMs;
+  assert.equal(pendingRestart(file, { startedAt: asked - 60000, watched: () => true }), true, 'asked for after the process began');
+  assert.equal(pendingRestart(file, { startedAt: asked - 60000, watched: () => false }), false, 'no supervisor to start the new one');
+  assert.equal(pendingRestart(file, { startedAt: asked + 1000, watched: () => true }), false, 'asked for before this process began');
+});

@@ -148,7 +148,7 @@ function createSession(config, client, { stateDirectory = path.join(__dirname, '
   // A world search that holds the event loop, said by its caller (note 772).
   bot.once('spawn', () => { try { require('./slow-calls').install(bot); } catch (_) { /* not watched */ } });
   // A new build is taken at a quiet moment (quiet-restart.js).
-  if (!process.env.JEV_NO_QUIET_RESTART) bot.once('spawn', () => require('./quiet-restart').watchRestartRequest(bot, path.join(stateDirectory, 'restart-requested'), { startedAt: connectedAt, port: config.port }));
+  if (!process.env.JEV_NO_QUIET_RESTART) bot.once('spawn', () => require('./quiet-restart').watchRestartRequest(bot, path.join(stateDirectory, 'restart-requested'), { startedAt: require('./quiet-restart').PROCESS_STARTED, port: config.port }));
   const identity = `${config.host}-${config.port}-${config.username}`.replace(/[^a-zA-Z0-9_-]/g, '_');
   const commandLog = path.join(stateDirectory, `${identity}-commands.jsonl`);
   bot._client.on('declare_commands', tree => {
@@ -755,6 +755,14 @@ function createSession(config, client, { stateDirectory = path.join(__dirname, '
     // Reconnect to discard all old inventory/window promises before respawning.
     // They must not issue a late action against the new life's inventory.
     stop('recovering').catch(console.error);
+    // A new build waiting is taken here, where the bot reconnects anyway
+    // (quiet-restart.js pendingRestart, note 1994).
+    if (!process.env.JEV_NO_QUIET_RESTART && require('./quiet-restart').pendingRestart(path.join(stateDirectory, 'restart-requested'), { port: config.port })) {
+      console.log('[restart] asked for, and the bot died: quitting for the new build');
+      bot.quit('restart for a new build');
+      setTimeout(() => process.exit(0), 500);
+      return;
+    }
     bot.quit('Respawning after death');
   });
   function close(reason) {

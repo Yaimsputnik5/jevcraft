@@ -132,4 +132,16 @@ function watchRestartRequest(bot, file, { startedAt = Date.now(), every = 2000, 
   return () => clearInterval(timer);
 }
 
-module.exports = { watchRestartRequest, quiet, calm, spun, supervised, WAIT_MS, LAST_MS };
+// A new build asked for since this process began, with a supervisor to
+// start it (note 1994): taken at a death, where the bot reconnects anyway
+// and nothing is cut. full-1 (2026-10-21 07:30 to 07:35Z), its bed among a
+// crowd of zombies, died eight times in five minutes on a build that had
+// a mend for it waiting, never quiet enough to take it.
+const PROCESS_STARTED = Date.now() - Math.round(process.uptime() * 1000);
+function pendingRestart(file, { startedAt = PROCESS_STARTED, port = null, watched = supervised } = {}) {
+  let mtime = 0;
+  try { mtime = fs.statSync(file).mtimeMs; } catch (_) { return false; }
+  return mtime > startedAt && watched(port);
+}
+
+module.exports = { pendingRestart, PROCESS_STARTED, watchRestartRequest, quiet, calm, spun, supervised, WAIT_MS, LAST_MS };
