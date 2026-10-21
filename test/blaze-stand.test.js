@@ -451,3 +451,12 @@ test('the cage stand is priced with the cage\'s next try when no blaze is in sig
   assert(after.expects.damage < o.expects.damage, `${after.expects.damage} after a try just seen, ${o.expects.damage} before`);
   assert.match(after.description, /a blaze beside the cage \(as many as its last try\)/);
 });
+
+test('the charge of the nearest blaze says what charges like it came to, and is priced no lower than its death share (note 1995, full-4 07:50:46Z)', () => {
+  const { chargeRecord } = require('../src/blaze-stand');
+  const low = chargeRecord(8.3, 15);
+  assert.match(low.says, /of 12 charges of the nearest blaze chosen at under 12 health with three or more other blazes about, 6 ended in the bot's death within 30 seconds/);
+  assert.deepEqual([low.charges, low.died], [12, 6]);
+  const high = chargeRecord(19, 1);
+  assert.match(high.says, /of 54 charges .* at 12 health or more with two or fewer other blazes about, 1 ended/);
+});

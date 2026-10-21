@@ -1675,9 +1675,10 @@ function blazeStands(bot, danger, { dig = true, hunted = false, pocket = false, 
     // looks again. Priced by the same sum, up to its one kill (upTo).
     if (aboutAll.length > 1) {
       const one = closeInCost(bot, withinSixteen(bot, danger, { at: strikeCells(bot, first.entity)[0] || null }), { upTo: 1 });
-      options.charge_nearest = { kind: 'charge', site: { target: first.entity.id }, expects: { damage: one.damage, seconds: Math.max(1, one.seconds), oneHit: oneHit(standCost(bot, danger, {}).mobs) }, cost: one,
+      const rec = chargeRecord(hp, aboutAll.length - 1);
+      options.charge_nearest = { kind: 'charge', site: { target: first.entity.id }, expects: { damage: Math.max(one.damage, Math.round(hp * rec.died / rec.charges * 10) / 10), seconds: Math.max(1, one.seconds), oneHit: oneHit(standCost(bot, danger, {}).mobs) }, cost: one,
         description: `Charge the nearest blaze alone: ${round(first.distance)} blocks off, over ground the bot can stand on within a sword's reach of it; ${shield ? 'walk in on it while the volleys rest, behind the shield for each as it comes' : 'no shield carried: walk straight in on it'}, strike it until it dies, pick up its rod if it drops one, and be asked again then with what is left; the other ${aboutAll.length - 1} about are not gone at.${backSays}` +
-          closeInSays(one, hp) + ` It ends at the kill, after ${runs} seconds, or once six health is gone.` + fourNearSays(bot, goal, aboutAll.length) };
+          closeInSays(one, hp) + ` It ends at the kill, after ${runs} seconds, or once six health is gone.` + fourNearSays(bot, goal, aboutAll.length) + rec.says };
     }
   }
   // A blaze in sight that no walk reaches (note 774): 25584 at (136, 59,
@@ -2386,4 +2387,17 @@ async function runTactic(bot, task, goal, save, option, { navigate, seconds, ite
   return null;
 }
 
-module.exports = { biterInReach, riseOrAwait, reachWalk, REACH_MEMO_MS, sortieFloor, eatInHold, fourNearSays, FOUR_NEAR, walkTakes, behindAtStrike, spawnerNewcomers, SPAWN_CAP, SPAWN_SECONDS, rodsNeeded, rodsTarget, rodsOf, towardRods, ROD_CHANCE, TACTICS, tacticOptions, runTactic, claimBlazes, blazeRate, closeInCost, closeInSays, shieldArc, SHIELD_LEAK, SHIELD_COVER, DUE_SECONDS, holdSays, heldHereSays, breakSite, breakSpawner, sortie, spawnerHoleSite, VOLLEY, MEASURED, volleyComing, flamesTouching, putOutFlames, CLOSE_SECONDS, charged, volleyWatch, volleyDue, volleyIn, shieldVolley, closeIn, strikeCells, measuredSays, blazeStands, holeSite, windowSite, inHole, wallSite, spawnerSite, spawnerReach, spawnerAt, standCost, knockSays, knockLands, lavaWithin, takeStand, huntFromStand, BLAZE_WAYS, noteSiteFailed, siteFailedNear, SITE_FAILED_MS, walkableToBlaze, blazeReach, pushedOnly, REACH_STEPS, riseSite, riseOrAwait };
+// What charges of the nearest blaze came to in the flight records of
+// 2026-10 to 2026-10-21 07:55Z, by the health it was chosen at and the
+// other blazes about (note 1995): [charges, died within 30 seconds]. The
+// price counts the blazes that see the bot, and the ones about turn on it
+// as it goes in: full-4 (2026-10-21 07:50:46Z), at 8.3 health with 15 more
+// about, three of them 5 to 6 blocks behind where it would strike from, was
+// told 3.1 damage, and burned to death in 21 seconds.
+const CHARGE_RECORD = { low: { few: [2, 0], many: [12, 6] }, high: { few: [54, 1], many: [97, 4] } };
+function chargeRecord(hp, others) {
+  const low = hp < 12, many = others >= 3, [charges, died] = CHARGE_RECORD[low ? 'low' : 'high'][many ? 'many' : 'few'];
+  return { charges, died, says: ` In the flight records, of ${charges} charges of the nearest blaze chosen at ${low ? 'under 12 health' : '12 health or more'} with ${many ? 'three or more' : 'two or fewer'} other blazes about, ${died} ended in the bot's death within 30 seconds.` };
+}
+
+module.exports = { chargeRecord, biterInReach, riseOrAwait, reachWalk, REACH_MEMO_MS, sortieFloor, eatInHold, fourNearSays, FOUR_NEAR, walkTakes, behindAtStrike, spawnerNewcomers, SPAWN_CAP, SPAWN_SECONDS, rodsNeeded, rodsTarget, rodsOf, towardRods, ROD_CHANCE, TACTICS, tacticOptions, runTactic, claimBlazes, blazeRate, closeInCost, closeInSays, shieldArc, SHIELD_LEAK, SHIELD_COVER, DUE_SECONDS, holdSays, heldHereSays, breakSite, breakSpawner, sortie, spawnerHoleSite, VOLLEY, MEASURED, volleyComing, flamesTouching, putOutFlames, CLOSE_SECONDS, charged, volleyWatch, volleyDue, volleyIn, shieldVolley, closeIn, strikeCells, measuredSays, blazeStands, holeSite, windowSite, inHole, wallSite, spawnerSite, spawnerReach, spawnerAt, standCost, knockSays, knockLands, lavaWithin, takeStand, huntFromStand, BLAZE_WAYS, noteSiteFailed, siteFailedNear, SITE_FAILED_MS, walkableToBlaze, blazeReach, pushedOnly, REACH_STEPS, riseSite, riseOrAwait };
