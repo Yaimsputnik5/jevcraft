@@ -6425,3 +6425,14 @@ test('a run from a biter at arm\'s length is priced by what such runs have cost,
   assert.ok(options.run_from.expects.damage >= RUN_FROM_RECORD.near.median, `priced ${options.run_from.expects.damage}`);
   assert.match(options.run_from.description, /within 2 blocks begun at 6 health or more: 75 in the records, the health lost in the 14 seconds after 6\.5 on the median, 12 or more in one run in four, and the bot dead within them in 24/);
 });
+
+// full-3 (2026-10-21 21:22 to 21:27Z): a shaft pocket 15 blocks under its bed and 12 across offered no bed (note 2014).
+test('a bed up to 24 blocks over a pocket and 48 across is within the go-home climb', () => {
+  const { bedClimbable, BED_CLIMB } = require('../src/survival');
+  const at = (x, y, z) => ({ entity: { position: new Vec3(x, y, z) } });
+  assert.deepEqual(BED_CLIMB, { up: 24, across: 48 });
+  assert.equal(bedClimbable(at(711.5, 88, 300.5), new Vec3(700, 103, 293)), true, "full-3's pocket and bed");
+  assert.equal(bedClimbable(at(711.5, 70, 300.5), new Vec3(700, 103, 293)), false, '33 under');
+  assert.equal(bedClimbable(at(760, 88, 300.5), new Vec3(700, 103, 293)), false, '60 across');
+  assert.equal(bedClimbable(at(700, 110, 293), new Vec3(700, 103, 293)), false, 'above it');
+});
