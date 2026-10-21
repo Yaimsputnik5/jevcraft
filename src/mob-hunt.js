@@ -2031,7 +2031,14 @@ async function prepareMobHunt(bot, task, step, goal, save, actions) {
   // minutes on spider hunts for 3 string (32 by day for 3, 18 by night for
   // none); full-3, its End portal lit at 17:29Z and no bow, stood in its
   // stronghold with its mineshafts over a thousand blocks off.
-  if (step.item === 'string' && dimension(bot) === 'overworld' && actions.dig && actions.navigate && bot.inventory.items().some(i => /_sword$/.test(i.name))) {
+  // With no sword carried the webs are still offered, a stone sword made
+  // first (note 2009): a web cut by hand drops nothing, and with the ways to
+  // the webs asked only with a sword carried, full-3 (2026-10-21 18:46 to
+  // 19:42Z), its sword lost at a death, hunted spiders at night bare-handed
+  // and died three times in an hour, a mineshaft 290 blocks from its bed.
+  const swordCarried = bot.inventory.items().some(i => /_sword$/.test(i.name));
+  const swordFirst = !swordCarried && typeof actions.acquireStep === 'function' ? ' No sword is carried: a stone sword is made first (two cobblestone and a stick), as a web cut by hand drops nothing.' : null;
+  if (step.item === 'string' && dimension(bot) === 'overworld' && actions.dig && actions.navigate && (swordCarried || swordFirst)) {
     const here = bot.entity.position, now = Date.now();
     const webId = bot.registry.blocksByName.cobweb?.id;
     const inView = webId != null && bot.findBlocks && !isSetAside(goal, 'webs_here', 'any') ? bot.findBlocks({ matching: webId, maxDistance: 32, count: 48 }) : [];
@@ -2049,8 +2056,8 @@ async function prepareMobHunt(bot, task, step, goal, save, actions) {
       if (!pick) {
         const rec = HUNT_RECORD.spider;
         const tree = {};
-        if (inView.length) tree.webs_here = { description: `Cut the ${inView.length} cobweb${inView.length === 1 ? '' : 's'} in view within 32 blocks with the sword: a string a web, no fight, ${wanted} wanted.` };
-        for (const c of choices) tree[KEY[c.kind]] = { description: `Walk to the ${SITES[c.kind]} seen ${c.d} blocks off at (${c.x}, ${c.y}, ${c.z}), about ${Math.round(c.d / 3.4)} seconds at the bot's walking pace, and cut its cobwebs with the sword, a string a web and no fight: ${c.kind === 'mineshaft' ? "a mineshaft's corridors are hung with them, and often a cave spider's spawner sits among them (its spiders poison)" : "the trial chambers' halls are hung with them, and their trial spawners send waves of mobs at a player who comes near"}.` };
+        if (inView.length) tree.webs_here = { description: `Cut the ${inView.length} cobweb${inView.length === 1 ? '' : 's'} in view within 32 blocks with the sword: a string a web, no fight, ${wanted} wanted.${swordFirst || ''}` };
+        for (const c of choices) tree[KEY[c.kind]] = { description: `Walk to the ${SITES[c.kind]} seen ${c.d} blocks off at (${c.x}, ${c.y}, ${c.z}), about ${Math.round(c.d / 3.4)} seconds at the bot's walking pace, and cut its cobwebs with the sword, a string a web and no fight: ${c.kind === 'mineshaft' ? "a mineshaft's corridors are hung with them, and often a cave spider's spawner sits among them (its spiders poison)" : "the trial chambers' halls are hung with them, and their trial spawners send waves of mobs at a player who comes near"}.${swordFirst || ''}` };
         tree.search_spiders = { description: `Go on looking for spiders here, rings of 24 blocks about; they come out at night. ${STRING_HUNT_YIELD} The record (${HUNT_RECORD.when}): of the bot's ${rec.n} spider hunts, ${rec.died5} were followed by a death within five minutes.` };
         const d = await require('./decisions').decide('string_way', { client: task.opportunityClient, bot, task, goal, save, tree, state: { wanted, websInView: inView.length, sites: choices.map(c => ({ kind: c.kind, distance: c.d })) } });
         if (d.stale) return;
@@ -2058,6 +2065,12 @@ async function prepareMobHunt(bot, task, step, goal, save, actions) {
         if (pick === 'none_good') pick = 'search_spiders';
         site = choices.find(c => KEY[c.kind] === pick) || null;
         goal.stringWay = { pick, at: now }; save();
+      }
+      if ((pick === 'webs_here' || site) && !bot.inventory.items().some(i => /_sword$/.test(i.name))) {
+        goal.step = { action: 'sword_for_webs' }; save();
+        try { await actions.acquireStep(bot, task, 'stone_sword', 1, goal, save); }
+        catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; setAside(goal, 'webs_here', 'any', `no sword for the webs: ${String(err.message).slice(0, 100)}`, 600000); delete goal.stringWay; save(); }
+        return;
       }
       if (pick === 'webs_here') {
         goal.step = { action: 'cut_webs', webs: inView.length }; save();

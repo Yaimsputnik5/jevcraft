@@ -2441,3 +2441,20 @@ test('string wanted: the cobwebs in view and trial chambers far off are ways to 
   assert.match(asked.search_spiders, /50 minutes on spider hunts for string came to 3 string/);
   assert.equal(cut.length, 3);
 });
+
+test('string wanted with no sword carried: the webs are still offered, said with the stone sword made first, and made first when chosen (note 2009, full-3 19:42Z)', async () => {
+  const { bot, task, goal } = fixture('spider');
+  bot.game.dimension = 'overworld'; bot.game.minY = 0; bot.game.height = 256;
+  delete bot.entities[7];
+  for (const [k, v] of Object.entries(bot.inventory.slots)) if (v && /_sword$/.test(v.name)) bot.inventory.slots[k] = null;
+  goal.landmarks = [{ kind: 'mineshaft', x: 290, y: 40, z: 0, dimension: 'overworld' }];
+  bot.findBlocks = () => [];
+  let asked = null;
+  task.opportunityClient = { systemOne: async ({ questions }) => { const c = questions.branch_0.criteria; if (c.fight_with_carried) return { answers: { branch_0: { choice: 'fight_with_carried' } } }; asked = c; return { answers: { branch_0: { choice: 'mineshaft_webs' } } }; } };
+  const made = [];
+  const actions = { acquireStep: async (b, t, item) => { made.push(item); }, explore: async () => assert.fail('not a spider search'), navigate: async () => assert.fail('the sword first'), dig: async () => {} };
+  await prepareMobHunt(bot, task, { entity: 'spider', item: 'string', count: 3 }, goal, () => {}, actions);
+  assert.ok(asked?.mineshaft_webs, 'the webs were offered with no sword');
+  assert.match(asked.mineshaft_webs, /No sword is carried: a stone sword is made first/);
+  assert.ok(made.includes('stone_sword'), JSON.stringify(made));
+});
