@@ -14,19 +14,24 @@ const KEEP_CLOSED = 20;
 const KEEP_OPEN = 20;
 const TICKS_PER_DAY = 24000;
 
-const tally = () => ({ calls: 0, failed: 0, inputTokens: 0, outputTokens: 0, latencyMs: 0 });
+const tally = () => ({ calls: 0, failed: 0, inputTokens: 0, outputTokens: 0, latencyMs: 0, costUsd: 0 });
 // TypeSafe names the counts input/output; OpenRouter names them prompt/completion.
 const inputOf = usage => Number(usage?.input_tokens ?? usage?.prompt_tokens) || 0;
 const outputOf = usage => Number(usage?.output_tokens ?? usage?.completion_tokens) || 0;
+// What a call cost in dollars, where the service says (OpenRouter's usage.cost;
+// TypeSafe's calls carry none): the spend kept here, not only on the
+// provider's dashboard (note 2002).
+const costOf = usage => Number(usage?.cost) || 0;
 function charge(bucket, { usage, latencyMs, ok = true }) {
   bucket.calls++;
   if (!ok) bucket.failed++;
   bucket.inputTokens += inputOf(usage);
   bucket.outputTokens += outputOf(usage);
   bucket.latencyMs += Number.isFinite(latencyMs) ? Math.round(latencyMs) : 0;
+  bucket.costUsd = (bucket.costUsd || 0) + costOf(usage);
 }
 function merge(into, from) {
-  for (const key of Object.keys(tally())) into[key] += from[key] || 0;
+  for (const key of Object.keys(tally())) into[key] = (into[key] || 0) + (from[key] || 0);
 }
 const iso = ms => new Date(ms).toISOString();
 const newRun = ({ id, kind, name, startedAt }) => ({ id, kind, name, status: 'open', startedAt, endedAt: null, restarts: 0, processId: null, ...tally(), byKind: {}, byDay: {} });

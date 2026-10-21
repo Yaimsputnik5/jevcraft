@@ -146,3 +146,19 @@ test('tree decisions carry their kind to the client', async () => {
   assert.equal(asked.kind, 'survival'); assert.deepEqual(decision.path, ['gather']);
 });
 
+
+test('the dollars a call cost are kept where the service says them, and a ledger saved before the field counts on from it (note 2002)', t => {
+  const dir = scratch(t), time = clock(Date.parse('2026-10-21T13:00:00Z')), file = path.join(dir, 'ledger.json');
+  const ledger = new Ledger(file, { processId: 'a', now: time.now, age: () => 1000 });
+  const run = ledger.open({ kind: 'request', name: 'beat the game' });
+  ledger.record({ run: run.id, kind: 'stance', usage: { input_tokens: 2668, output_tokens: 44, cost: 0.000112056 } });
+  ledger.record({ run: run.id, kind: 'stance', usage: { input_tokens: 100, output_tokens: 5 } });
+  assert.ok(Math.abs(ledger.state.runs[run.id].costUsd - 0.000112056) < 1e-12);
+  assert.ok(Math.abs(ledger.state.runs[run.id].byKind.stance.costUsd - 0.000112056) < 1e-12);
+  // A bucket saved without the field: counted on from nothing, not NaN.
+  delete ledger.state.runs[run.id].costUsd; delete ledger.state.runs[run.id].byKind.stance.costUsd;
+  ledger.record({ run: run.id, kind: 'stance', usage: { input_tokens: 1, output_tokens: 1, cost: 0.001 } });
+  assert.equal(ledger.state.runs[run.id].costUsd, 0.001);
+  ledger.fold(run.id);
+  assert.ok(Number.isFinite(ledger.state.idle.costUsd));
+});
