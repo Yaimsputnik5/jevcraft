@@ -37,9 +37,9 @@ function openGround({ walls = [] } = {}) {
 test('a lit creeper is outrun straight away, and goes off on a way that circles it at four blocks (the game\'s fuse, walked in time)', () => {
   const bot = groundBot(openGround(), { at: new Vec3(0.5, 64, 0.5) });
   const creeper = { name: 'creeper', position: new Vec3(-2, 64, 0.5), height: 1.7 };
-  // Straight away along +x, a block a step.
+  // Straight away along +x, a block a step, at a sprint's 4 blocks a second.
   const away = Array.from({ length: 14 }, (_, i) => ({ x: i + 1, y: 64, z: 0 }));
-  const run = creeperOnWay(bot, creeper, timedWay(bot.entity.position, away), { litFor: 0.2 });
+  const run = creeperOnWay(bot, creeper, timedWay(bot.entity.position, away, 4), { litFor: 0.2 });
   assert.equal(run.goesOff, false);
   assert.equal(run.why, 'seven');
   assert.ok(run.clearAt < 1.3, `past seven blocks ${run.clearAt} seconds in, before the 1.3 left of its fuse`);
@@ -95,8 +95,8 @@ test('the recorded run off the bridge: out of its sight up there, it lights as t
   assert.equal(ran.slow.goesOff, true);
   assert.ok(ran.slow.distance < ran.worst.distance, 'nearer at the slower pace');
   const said = creeperRunSays(ran, { worn: WORN, health: 6.94 });
-  assert.match(said.says, /^ On this way, at the pace the bot's runs keep in their first seconds \(about 3\.9 blocks a second along the way on the median; one run in four is slower than 3\.2\), the creeper 3 blocks off lights about [\d.]+ seconds in, and goes off about [\d.]+ seconds in with the bot about [\d.]+ blocks from it and in its sight, about \d+ after the armour worn/);
-  assert.match(said.says, /At the slower quarter's pace \(3\.2 blocks a second\) it goes off with the bot about [\d.]+ blocks from it/);
+  assert.match(said.says, /^ On this way, at the pace the bot's runs keep in their first seconds \(about 3\.3 blocks a second along the way on the median; one run in four is slower than 1\.6\), the creeper 3 blocks off lights about [\d.]+ seconds in, and goes off about [\d.]+ seconds in with the bot about [\d.]+ blocks from it and in its sight, about \d+ after the armour worn/);
+  assert.match(said.says, /At the slower quarter's pace \(1\.6 blocks a second\) it goes off with the bot about [\d.]+ blocks from it/);
   assert.match(said.says, /past 7 or out of its sight it burns back down/);
   assert.ok(said.damage > 0);
 });
@@ -282,4 +282,14 @@ test('a creeper 7.1 blocks off walking in: the block in its line is offered, and
   assert.match(options.block_creeper?.description || '', /^The creeper [^]*?\. Put \d blocks?(, two high,)? in the line from the eyes of the creeper \(7\.1 blocks off\) to the bot's/);
   assert.match(options.block_creeper.description, /The line is cut about [\d.]+ seconds before it would go off\./);
   assert.match(options.eat.description, /While it eats, the creeper 7 blocks off, coming on at about 2\.7 blocks a second, is within three about 1\.\d seconds in and lights there: done eating, about 1\.\d seconds of its fuse are left, and with the bot still there it goes off [\d.]+ blocks from it, about \d+ after the armour worn, more than the bot has, unless the bot is more than 7 blocks from it or out of its sight by then\./);
+});
+
+test('a run the creeper does not light at the median pace but goes off on at the slower quarter\'s says so and is priced at its quarter (note 1987, full-2 06:31:02Z)', () => {
+  const result = { worst: { creeper: { distance: 2.7 }, goesOff: false, lights: null, nearest: 2.7 }, slow: { goesOff: true, distance: 2.5, blast: 30 } };
+  const said = creeperRunSays(result, { worn: { points: 5, toughness: 0 }, health: 5.8 });
+  assert.match(said.says, /does not light; at the slower quarter's pace \(1\.6 blocks a second\) it goes off with the bot about 2\.5 blocks from it, about \d+ after the armour worn, more than the bot has: one run in four\./);
+  assert.match(said.says, /of 259 retreats in the flight records told a creeper near them did not light, 20 \(8%\) were followed by its blast within five seconds/);
+  assert(said.damage > 4, `priced ${said.damage}`);
+  const clear = creeperRunSays({ ...result, slow: { goesOff: false } }, { health: 5.8 });
+  assert.equal(clear.damage, 0);
 });

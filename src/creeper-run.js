@@ -41,7 +41,13 @@ const { lineCells, eyeOf, EYE } = require('./creeper-sight');
 // at one second, 5.8 at one and a half and 8 at two (the quartiles 4.8 and
 // 6.8 at one and a half); the price of a run takes 5.6, the sprint's top
 // speed, which it does not reach from a standstill round turns and drops.
-const RUN_PACE = 3.9, RUN_SLOW = 3.2;
+// The same over the four full runs of 2026-10-20 and 21 (531 retreats,
+// note 1987): 3 blocks at one second, 4.9 at one and a half (the quartiles
+// 2.4 and 6.2) and 6 at two; the slow quarter's pace about half the
+// median's. A retreat told a creeper 'does not light' was followed by its
+// blast within five seconds 20 times in 259 over every flight record.
+const RUN_PACE = 3.3, RUN_SLOW = 1.6;
+const RETREAT_RECORD = 'of 259 retreats in the flight records told a creeper near them did not light, 20 (8%) were followed by its blast within five seconds';
 const TICK = 0.05, SWELL_TICKS = Math.round(FUSE / TICK);
 const r1 = n => Math.round(n * 10) / 10;
 
@@ -177,7 +183,16 @@ function creeperRunSays(result, { worn = { points: 0, toughness: 0 }, health = 2
     return { says, damage: w.distance >= BLAST_CLEAR ? 0 : hit };
   }
   if (standing) return { says: w.lights != null ? ` Standing still meanwhile, ${state} lights about ${w.lights} seconds from now: from then the run has ${FUSE} seconds to be past ${FUSE_KEPT} blocks from it or out of its sight.` : '', damage: 0 };
-  if (w.lights == null) return { says: w.nearest < LIGHTS_AT + 2 ? ` On this way, ${pace}, ${name} is ${w.nearest.toFixed(1)} blocks off at its nearest, or out of its sight while within ${LIGHTS_AT}, and does not light.` : '', damage: 0 };
+  if (w.lights == null) {
+    // The run at the slow quarter's pace, said and priced at its quarter
+    // (note 1987): full-2 (2026-10-21 06:31:02Z), at 5.8 health behind a
+    // block from a creeper 2.7 blocks off, was told its run 'does not light'
+    // it at 3.9 blocks a second, went a block and a half in a second and a
+    // half climbing out, and the blast ended it.
+    const slow = result.slow, slowHit = slow?.goesOff && slow.distance < BLAST_CLEAR ? r1(afterArmour(slow.blast, worn)) : 0;
+    if (slowHit >= 1) return { says: ` On this way, ${pace}, ${name} is ${w.nearest.toFixed(1)} blocks off at its nearest, or out of its sight while within ${LIGHTS_AT}, and does not light; at the slower quarter's pace (${RUN_SLOW} blocks a second) it goes off with the bot about ${slow.distance} blocks from it, about ${Math.round(slowHit)} after the armour worn${slowHit >= health ? ', more than the bot has' : ''}: one run in four. In the bot's own record, ${RETREAT_RECORD}. ${rule}`, damage: r1(slowHit / 4) };
+    return { says: w.nearest < LIGHTS_AT + 2 ? ` On this way, ${pace}, ${name} is ${w.nearest.toFixed(1)} blocks off at its nearest, or out of its sight while within ${LIGHTS_AT}, and does not light.` : '', damage: 0 };
+  }
   const clear = w.why === 'seven' ? `more than ${FUSE_KEPT} blocks from it` : 'out of its sight';
   return { says: ` On this way, ${pace}, ${state}${w.lights > 0 ? ` lights about ${w.lights} seconds in and` : ''} the bot is ${clear} about ${w.clearAt} seconds in, before its fuse ends: it burns back down.${slowSays(result.slow, w, worn)} ${rule}`, damage: 0 };
 }
