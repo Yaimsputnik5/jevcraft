@@ -305,3 +305,13 @@ test('a run straight away from a skeleton past a creeper 2.7 blocks off is price
   assert.match(run.says, /goes off/);
   assert.deepEqual(runFromCreeper(bot, [], new Vec3(-7.5, 64, 0.5), 20, { points: 0, toughness: 0 }), { says: '', damage: 0 });
 });
+
+test('a run past a lit creeper that clears it at the median is priced by what such runs came to (note 1992, full-1 07:30:41Z)', () => {
+  const lit = { worst: { creeper: { distance: 1.9, litFor: 0.3 }, goesOff: false, lights: 0, clearAt: 0.8, why: 'sight', nearest: 1.9 } };
+  const off = creeperRunSays({ ...lit, slow: { goesOff: true, distance: 3.7, blast: 20 } }, { worn: { points: 5, toughness: 0 }, health: 17 });
+  assert.match(off.says, /of 9 runs told a lit creeper burned back down and went off at the slower quarter's pace, 4 were followed by its blast within six seconds/);
+  assert.ok(off.damage >= 4, `priced ${off.damage}`);
+  const clear = creeperRunSays({ ...lit, slow: { goesOff: false } }, { worn: { points: 5, toughness: 0 }, health: 17 });
+  assert.match(clear.says, /of 48 runs told a lit creeper burned back down, 8 were followed by its blast/);
+  assert.ok(clear.damage > 0 && clear.damage < off.damage, `priced ${clear.damage}`);
+});

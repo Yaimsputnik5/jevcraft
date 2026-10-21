@@ -47,6 +47,11 @@ const { lineCells, eyeOf, EYE } = require('./creeper-sight');
 // median's. A retreat told a creeper 'does not light' was followed by its
 // blast within five seconds 20 times in 259 over every flight record.
 const RUN_PACE = 3.3, RUN_SLOW = 1.6;
+// Runs (retreat, run_from) told a lit creeper burned back down before its
+// fuse ended, in every flight record to 2026-10-21 07:35Z: [runs, followed
+// by its blast within six seconds], by whether the slower quarter's pace
+// went off (note 1992).
+const LIT_RECORD = { slowOff: [9, 4], slowClear: [48, 8] };
 const RETREAT_RECORD = 'of 259 retreats in the flight records told a creeper near them did not light, 20 (8%) were followed by its blast within five seconds';
 const TICK = 0.05, SWELL_TICKS = Math.round(FUSE / TICK);
 const r1 = n => Math.round(n * 10) / 10;
@@ -194,7 +199,16 @@ function creeperRunSays(result, { worn = { points: 0, toughness: 0 }, health = 2
     return { says: w.nearest < LIGHTS_AT + 2 ? ` On this way, ${pace}, ${name} is ${w.nearest.toFixed(1)} blocks off at its nearest, or out of its sight while within ${LIGHTS_AT}, and does not light.` : '', damage: 0 };
   }
   const clear = w.why === 'seven' ? `more than ${FUSE_KEPT} blocks from it` : 'out of its sight';
-  return { says: ` On this way, ${pace}, ${state}${w.lights > 0 ? ` lights about ${w.lights} seconds in and` : ''} the bot is ${clear} about ${w.clearAt} seconds in, before its fuse ends: it burns back down.${slowSays(result.slow, w, worn)} ${rule}`, damage: 0 };
+  // Lit on the way, clear of it in time at the median: priced by what such
+  // runs came to (note 1987's record kept apart; note 1992), the blast at
+  // the slower quarter's distance where it goes off there, else at three
+  // blocks. full-1 (2026-10-21 07:30:41Z), at 17 health with a lit creeper
+  // 1.9 blocks off, was told its run would be out of its sight 0.8 seconds
+  // in and priced 7.3 for a skeleton's arrows, and the blast ended it.
+  const slowOff = !!(result.slow?.goesOff && result.slow.distance < BLAST_CLEAR), rec = slowOff ? LIT_RECORD.slowOff : LIT_RECORD.slowClear;
+  const blastAt = r1(afterArmour(creeperBlast(slowOff ? result.slow.distance : LIGHTS_AT), worn));
+  const recSays = ` In the flight records, of ${rec[0]} runs told a lit creeper burned back down${slowOff ? ' and went off at the slower quarter\'s pace' : ''}, ${rec[1]} were followed by its blast within six seconds.`;
+  return { says: ` On this way, ${pace}, ${state}${w.lights > 0 ? ` lights about ${w.lights} seconds in and` : ''} the bot is ${clear} about ${w.clearAt} seconds in, before its fuse ends: it burns back down.${slowSays(result.slow, w, worn)}${recSays} ${rule}`, damage: r1(blastAt * rec[1] / rec[0]) };
 }
 // The slower quarter of runs, said where it ends worse than the median.
 function slowSays(slow, w, worn) {
