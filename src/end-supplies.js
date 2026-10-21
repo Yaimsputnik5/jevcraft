@@ -171,6 +171,20 @@ async function topUp(bot, task, goal, save, actions, item) {
     await actions.acquireStep(bot, task, 'white_bed', countOf(bot, 'white_bed') + 1, goal, save);
     return;
   }
+  // The arrows the feathers and flint carried make, crafted first (note
+  // 1982): a batch a feather short of its whole target went to the chickens
+  // for it with the rest uncrafted. full-2 (2026-10-21 03:02 to 03:40Z), its
+  // End portal lit, carried 7 arrows, 7 feathers and 8 flint toward 39, and
+  // hunted chickens forty minutes with 28 arrows' makings in its pack.
+  if (item.key === 'arrows') {
+    const k = Math.min(countOf(bot, 'feather'), countOf(bot, 'flint'));
+    const can = countOf(bot, 'arrow') + 4 * k;
+    if (k > 0 && can < item.target) {
+      goal.step = { action: 'prepare_end_supplies', item: 'arrow', count: can, from: 'the feathers and flint carried' }; save();
+      await actions.acquireStep(bot, task, 'arrow', can, goal, save);
+      return;
+    }
+  }
   const count = item.key === 'bow' || item.key === 'pickaxe' || item.key === 'spare_pickaxe' ? 1 + countOf(bot, item.item) : item.target;
   goal.step = { action: 'prepare_end_supplies', item: item.item, count }; save();
   await actions.acquireStep(bot, task, item.item, count, goal, save);

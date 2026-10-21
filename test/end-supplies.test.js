@@ -72,3 +72,12 @@ test('the water option says what a bucket costs and what the live End fights wit
   assert.match(water.says, /three iron ingots at a crafting table \(0 empty buckets, 0 iron ingots and 2 raw iron carried\)/);
   assert.match(water.says, /thrown 56 blocks up as it took off and died of the fall/);
 });
+
+test('the arrows the feathers and flint carried make are crafted first, not held back for a feather short of the whole step (full-2 2026-10-21, note 1982)', async () => {
+  const { bot, items, goal, task } = fixture();
+  items.find(i => i.name === 'arrow').count = 7;
+  items.push({ name: 'feather', count: 7 }, { name: 'flint', count: 8 }, { name: 'stick', count: 11 });
+  const calls = [];
+  await prepareEndSupplies(bot, task, goal, () => {}, { acquireStep: async (b, t, name, count) => calls.push({ name, count }) });
+  assert.deepEqual(calls, [{ name: 'arrow', count: 35 }], '7 carried and 28 from the seven feathers');
+});
