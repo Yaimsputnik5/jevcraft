@@ -107,9 +107,10 @@ function creeperOnWay(bot, creeper, way, { litFor, until = null } = {}) {
   let swell = Number.isFinite(litFor) ? Math.min(SWELL_TICKS - 1, Math.round(litFor / TICK)) : 0, burning = Number.isFinite(litFor);
   let lights = burning ? 0 : null, clearAt = null, why = null, nearest = Infinity;
   const end = (until ?? way.at(-1).t + FUSE) + TICK;
+  let lastD = Infinity;
   for (let t = 0; t <= end; t += TICK) {
     const feet = feetAt(way, t), d = at.distanceTo(feet);
-    nearest = Math.min(nearest, d);
+    nearest = Math.min(nearest, d); lastD = d;
     if (burning || d < LIGHTS_AT) {
       if (d <= FUSE_KEPT && seesAt(bot, creeper, at, feet)) {
         if (lights == null) lights = t;
@@ -131,6 +132,12 @@ function creeperOnWay(bot, creeper, way, { litFor, until = null } = {}) {
       }
     }
   }
+  // Still burning in its sight when the way and the fuse's time are done:
+  // not clear of it (note 2007). Said 'out of its sight about null seconds
+  // in' and priced as clear: full-3 (2026-10-21 18:02:52Z), a lit creeper 2
+  // blocks off in its stronghold, was told 4.3 of a retreat back along its
+  // own cells, and the blast came as it set off.
+  if (burning && until == null && lights != null && lights <= way.at(-1).t) return { goesOff: true, t: r1(end), distance: r1(lastD), blast: creeperBlast(lastD), lights: r1(lights ?? 0), unresolved: true };
   return { goesOff: false, lights: lights == null ? null : r1(lights), clearAt: clearAt == null ? null : r1(clearAt), why, nearest: r1(nearest) };
 }
 

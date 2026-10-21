@@ -329,3 +329,17 @@ test('the run from spiders goes away from a creeper near as well, and is priced 
   const both = runFromCreeper(bot, [creeper], from, 20, { points: 0, toughness: 0 });
   assert.ok(both.damage <= straight.damage, `away from both ${both.damage}, from the spider alone ${straight.damage}`);
 });
+
+test('a creeper still burning in sight when the run and its fuse time are done is not cleared: it goes off where the bot is then (note 2007, full-3 18:02:52Z)', () => {
+  // A lit creeper beside a run that comes back toward it: in and out of its sight, the fuse
+  // burning down and up, still lit at the end, which said 'out of its sight about null seconds in'.
+  const walls = [];
+  for (let z = -3; z <= 3; z++) for (const y of [64, 65]) if (z !== 0) walls.push(new Vec3(1, y, z));
+  const bot = groundBot(openGround({ walls }), { at: new Vec3(0.5, 64, 0.5) });
+  const creeper = { name: 'creeper', position: new Vec3(2.5, 64, 0.5), height: 1.7 };
+  const way = [{ at: new Vec3(0.5, 64, 0.5), t: 0 }, { at: new Vec3(0.5, 64, 1.5), t: 0.4 }, { at: new Vec3(0.5, 64, 0.5), t: 0.8 }, { at: new Vec3(0.5, 64, 1.5), t: 1.2 }, { at: new Vec3(0.5, 64, 0.5), t: 1.6 }];
+  const r = creeperOnWay(bot, creeper, way, { litFor: 0.1 });
+  if (!r.goesOff) assert.notEqual(r.clearAt, null, 'not cleared with no time it cleared');
+  const said = creeperRunSays({ worst: { creeper: { distance: 2, litFor: 0.1 }, ...r }, slow: { goesOff: false } }, { worn: { points: 6, toughness: 0 }, health: 20 });
+  assert.doesNotMatch(said.says, /null seconds/);
+});
