@@ -2458,3 +2458,22 @@ test('string wanted with no sword carried: the webs are still offered, said with
   assert.match(asked.mineshaft_webs, /No sword is carried: a stone sword is made first/);
   assert.ok(made.includes('stone_sword'), JSON.stringify(made));
 });
+
+test('a far site for string is walked in legs of 64 blocks, and a leg that made ground does not set it aside (note 2010, full-3 20:28Z)', async () => {
+  const { isSetAside } = require('../src/progress');
+  const { bot, task, goal } = fixture('spider');
+  bot.game.dimension = 'overworld'; bot.game.minY = 0; bot.game.height = 256;
+  delete bot.entities[7];
+  bot.inventory.slots[36] = { name: 'stone_sword', slot: 36, count: 1, durabilityUsed: 0, type: registry.itemsByName.stone_sword.id };
+  goal.landmarks = [{ kind: 'mineshaft', x: 300, y: 40, z: 0, dimension: 'overworld' }];
+  bot.findBlocks = () => [];
+  task.opportunityClient = { systemOne: async ({ questions }) => { const c = questions.branch_0.criteria; if (c.fight_with_carried) return { answers: { branch_0: { choice: 'fight_with_carried' } } }; return { answers: { branch_0: { choice: 'mineshaft_webs' } } }; } };
+  const legs = [];
+  const actions = { acquireStep: async () => {}, explore: async () => assert.fail('not a spider search'), dig: async () => {},
+    navigate: async (b, t, g) => { legs.push(g); bot.entity.position = bot.entity.position.offset(60, 0, 0); } };
+  const start = bot.entity.position.x;
+  await prepareMobHunt(bot, task, { entity: 'spider', item: 'string', count: 3 }, goal, () => {}, actions);
+  assert.equal(legs.length, 1);
+  assert.ok(Math.abs(legs[0].x - (start + 64)) <= 1, `the leg ends 64 on, at ${legs[0].x}`);
+  assert.equal(isSetAside(goal, 'mineshaft_webs', '300,0'), false, 'ground made: not set aside');
+});

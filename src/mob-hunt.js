@@ -2084,13 +2084,20 @@ async function prepareMobHunt(bot, task, step, goal, save, actions) {
         const near = () => bot.entity.position.distanceTo(new Vec3(m.x, m.y, m.z)) <= 24;
         if (!near()) {
           let walkWhy = null;
-          try { await actions.navigate(bot, task, new goals.GoalNear(m.x, m.y, m.z, 4), { timeoutMs: 120000, stallMs: 15000 }); }
+          // In legs of 64 blocks at the most (note 2010): asked of the whole
+          // way at once, the route search gave up on every site 139 to 583
+          // blocks off ('Took to long to decide path to goal!'), and full-3
+          // (2026-10-21 20:28 to 20:33Z) set five mineshafts aside in two
+          // minutes and went back to the spiders.
+          const here0 = bot.entity.position, dx = m.x - here0.x, dz = m.z - here0.z, len = Math.hypot(dx, dz) || 1, step = Math.min(64, len);
+          const leg = len > 64 ? new goals.GoalNearXZ(Math.round(here0.x + dx / len * step), Math.round(here0.z + dz / len * step), 4) : new goals.GoalNear(m.x, m.y, m.z, 4);
+          try { await actions.navigate(bot, task, leg, { timeoutMs: 120000, stallMs: 15000 }); }
           catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; walkWhy = String(err.message || err).slice(0, 120); }
           // A walk there that ends short sets the site aside with why, and the way to the string is asked again (note 1966).
           // A leg that made ground is not that: the walk goes on next pass (note 2006: a site a thousand blocks off is several legs).
           if (!near()) {
-            const left = Math.round(bot.entity.position.distanceTo(new Vec3(m.x, m.y, m.z)));
-            if (left >= m.d - 16) { setAside(goal, 'mineshaft_webs', `${m.x},${m.z}`, `the walk to it ended ${left} blocks short${walkWhy ? `: ${walkWhy}` : ''}`, 1800000); delete goal.stringWay; }
+            const left = Math.round(bot.entity.position.distanceTo(new Vec3(m.x, m.y, m.z))), before = Math.round(here0.distanceTo(new Vec3(m.x, m.y, m.z)));
+            if (left >= before - 8) { setAside(goal, 'mineshaft_webs', `${m.x},${m.z}`, `the walk to it ended ${left} blocks short${walkWhy ? `: ${walkWhy}` : ''}`, 1800000); delete goal.stringWay; }
             save(); return;
           }
         }
