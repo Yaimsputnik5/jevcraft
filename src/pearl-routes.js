@@ -149,6 +149,14 @@ function pearlRoutes(bot, goal, { now = Date.now(), save = () => {}, actions = {
 // found no warped forest, 73 minutes of play on the sweeps and none on the
 // Overworld's endermen in the run, and came back each time with no pearl.
 const SWEEP_ASK_MIN = 10;
+// The Overworld's hunt said with its own way and record (note 2027): it was
+// offered with no plan beside the sweep's eight legs, and full-1 chose the
+// sweep seven times running (03:14 to 08:42Z) at 0.62 to 0.68. The lit
+// runs' pearls came from endermen met at night work: stalking 21 and 42
+// minutes and the fights at the slot 11 and 19 (their play clocks at
+// 2026-10-22 10:00Z).
+const OVERWORLD_HUNT_RECORD = ' The two runs that lit their portals had their pearls this way, from endermen met at night work: about 21 and 42 minutes stalking them and 11 and 19 fighting them from a slot, against no minutes on the sweep that found a forest.';
+const shelterSays = goal => { const m = clockMin(goal, 'obtain_ender_pearls: wait_in_shelter') + clockMin(goal, 'obtain_ender_pearls: wait_for_dawn'); return m >= 30 ? ` This run has spent ${m} minutes of the pearls' time sealed in through nights, the hours endermen spawn.` : ''; };
 // The four full runs' pearls by way (note 2025), from their play clocks at
 // 2026-10-22 08:10Z: the two whose End portals were lit had hunted endermen
 // where they met them (stalking and fighting) 39 and 86 minutes and swept
@@ -166,7 +174,7 @@ function routeTree(bot, goal) {
   let trip = ''; try { trip = ` ${portalTrip(bot, goal)}`; } catch (_) { trip = ''; }
   return {
     warped_forest: { description: `Cross into the Nether and sweep for a warped forest, where endermen spawn by day and night alike, eight legs of 64 blocks; a sweep that finds none rests half an hour.${trip}${record}${ROUTE_RECORD}` },
-    overworld_hunt: { description: `Hunt the Overworld's endermen: they spawn in the dark on the surface, in ones and twos, each dropping a pearl about half the time, tall and slow to turn on a player who does not look at them.${overworldHourSays(bot)}${endermenHereSays(bot)} The crossing is not made; held half an hour.${record}${ROUTE_RECORD}` },
+    overworld_hunt: { description: `Hunt the Overworld's endermen: they spawn in the dark on the surface, in ones and twos, each dropping a pearl about half the time, tall and slow to turn on a player who does not look at them. The patrol takes on any enderman in view, struck from under a roof two high or with the back to a wall so it cannot reach over, and with none in view does the work at hand on the surface (wood, food, ore, a shelter) and takes any that comes; the night is its time, not spent sealed in.${OVERWORLD_HUNT_RECORD}${shelterSays(goal)}${overworldHourSays(bot)}${endermenHereSays(bot)} The crossing is not made; held half an hour.${record}${ROUTE_RECORD}` },
   };
 }
 async function askRoute(bot, task, goal, save, actions = {}) {
