@@ -494,6 +494,19 @@ define({
   instructions: workInstructions('The bot is in the Nether on the way to the dragon and needs both blaze rods and ender pearls; the ladder\'s order takes the rods first. Choose whether to go on with the rods or to take a way to the pearls that is real from here first. Each way says what it shares with the rods\' trip (the fortress, the forest, the gold carried) and its record: the trials\' (what the bot did there, not a promise), the arena\'s drills, the measured barter, and this run\'s own. A way with no record in the trials is untried there, not good or bad.'),
 });
 
+// Which way to the pearls from the Overworld, the warped sweep open again (note 2020).
+define({
+  id: 'pearl_route', area: 'strategy', parent: 'rung_progress', kind: 'strategy', primitive: 'choice', stakes: 'medium', tree: true,
+  question: 'In the Overworld, short of ender pearls, the sweep for a warped forest open again: cross into the Nether for it, or hunt the Overworld\'s endermen?',
+  trigger: 'On the game ladder in the Overworld, pearls short, the warped sweep open (not resting), no pearl route held, and ten minutes of play or more already spent on warped sweeps in the run; the answer held half an hour.',
+  source: 'src/pearl-routes.js (routeAsked, routeTree, askRoute), src/game-progress.js (nextGameStage)',
+  options: [
+    { key: 'warped_forest', trip: 'the portal', label: 'cross into the Nether and sweep for a warped forest', when: 'always here; said with the portal trip and the minutes spent on sweeps and on the Overworld\'s endermen in the run, and the pearls held', level: 'root' },
+    { key: 'overworld_hunt', label: 'hunt the Overworld\'s endermen', when: 'always here; said with the Overworld\'s hour, the endermen in view and the same record', level: 'root' },
+  ],
+  instructions: workInstructions('The bot needs ender pearls and is in the Overworld. Choose whether to cross into the Nether to sweep for a warped forest or to hunt endermen in the Overworld.'),
+});
+
 // The rods carried at a fortress: out now, or stay for more (note 871).
 define({
   id: 'rods_now', area: 'strategy', parent: 'rung_progress', kind: 'strategy', primitive: 'choice', stakes: 'medium', tree: true,

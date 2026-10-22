@@ -1172,8 +1172,13 @@ function nextGameStage(bot, goal, skip = new Set()) {
     return { phase: 'obtain_ender_pearls', action: 'trade', item: 'ender_pearl', count: target - eyes };
   // A warped forest (remembered, or looked for) beats a night walk here:
   // the Overworld hunt is the fallback once the Nether search has rested.
-  if (count(bot, 'ender_pearl') < target - eyes && warped.warpedOpen(goal, Date.now(), { bot }) && !overworldPearls)
+  if (count(bot, 'ender_pearl') < target - eyes && warped.warpedOpen(goal, Date.now(), { bot }) && !overworldPearls) {
+    // Which way, Jev's (note 2020): once the sweep has had its time, the
+    // crossing for it and the Overworld's own endermen are asked, each with
+    // what it has come to, the answer held half an hour.
+    if (!pearlRouteHeld(goal) && require('./pearl-routes').routeAsked(goal)) return { phase: 'obtain_ender_pearls', action: 'pearl_route', item: 'ender_pearl', count: target - eyes };
     return { phase: 'obtain_ender_pearls', action: 'enter_nether', item: 'ender_pearl', count: target - eyes, via: 'warped_forest' };
+  }
   // Endermen when they show, and something worth doing while they do not:
   // walking rings about looking for one was the dullest hour of the run
   // (the user, 2026-09-23). The patrol hunts one in view and otherwise
@@ -1382,6 +1387,7 @@ async function gameStep(bot, task, goal, save, actions) {
   else if (stage.action === 'elsewhere') await elsewhereStep(bot, task, goal, save, stage, null, actions);
   else if (stage.action === 'rods_waiting') await leaveNetherStep(bot, task, goal, save, stage, actions);
   else if (stage.action === 'pearl_order') await require('./pearl-order').ask(bot, task, goal, save, actions);
+  else if (stage.action === 'pearl_route') await require('./pearl-routes').askRoute(bot, task, goal, save, actions);
   else if (stage.action === 'collect_rod_stash') await require('./rod-stash').collect(bot, task, goal, save, actions.stashActions || actions);
   else if (stage.action === 'bank_rods') await require('./rod-bank').bank(bot, task, goal, save, actions.stashActions || actions);
   else if (stage.action === 'home_with_rods') await readyForHomeStep(bot, task, goal, save, actions);

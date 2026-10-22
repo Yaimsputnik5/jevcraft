@@ -142,4 +142,36 @@ function pearlRoutes(bot, goal, { now = Date.now(), save = () => {}, actions = {
   return { options, notOffered };
 }
 
-module.exports = { pearlRoutes, blocksCarried, changesSay, overworldHourSays, noteChange };
+// In the Overworld, the warped sweep open again, which way to the pearls
+// (note 2020). The ladder crossed for the sweep by rule whenever its rest
+// ended, the Overworld's hunt only the fallback: full-1 (2026-10-21 23:30 to
+// 2026-10-22 02:51Z), its rods banked, crossed four times for a sweep that
+// found no warped forest, 73 minutes of play on the sweeps and none on the
+// Overworld's endermen in the run, and came back each time with no pearl.
+const SWEEP_ASK_MIN = 10;
+const clockMin = (goal, key) => Math.round((goal.gameProgress?.clock?.byDoing?.[key] || 0) / 60000);
+const routeAsked = goal => clockMin(goal, 'obtain_ender_pearls: warped_search') >= SWEEP_ASK_MIN;
+function routeTree(bot, goal) {
+  const sweep = clockMin(goal, 'obtain_ender_pearls: warped_search'), patrol = clockMin(goal, 'obtain_ender_pearls: pearl_patrol') + clockMin(goal, 'obtain_ender_pearls: hunt_mob');
+  const all = Object.entries(goal.gameProgress?.clock?.byDoing || {}).filter(([k]) => k.startsWith('obtain_ender_pearls:')).reduce((n, [, v]) => n + v, 0);
+  const held = pearlsHeld(bot, goal);
+  const record = ` On the pearls in this run so far: about ${Math.round(all / 60000)} minutes of play, ${sweep} of them on sweeps for a warped forest and ${patrol} on the Overworld's endermen; ${held} pearl${held === 1 ? '' : 's'} or eye${held === 1 ? '' : 's'} held now.`;
+  const { portalTrip } = require('./game-progress');
+  let trip = ''; try { trip = ` ${portalTrip(bot, goal)}`; } catch (_) { trip = ''; }
+  return {
+    warped_forest: { description: `Cross into the Nether and sweep for a warped forest, where endermen spawn by day and night alike, eight legs of 64 blocks; a sweep that finds none rests half an hour.${trip}${record}` },
+    overworld_hunt: { description: `Hunt the Overworld's endermen: they spawn in the dark on the surface, in ones and twos, each dropping a pearl about half the time, tall and slow to turn on a player who does not look at them.${overworldHourSays(bot)}${endermenHereSays(bot)} The crossing is not made; held half an hour.${record}` },
+  };
+}
+async function askRoute(bot, task, goal, save, actions = {}) {
+  const now = Date.now(), { PEARL_ROUTE_MS } = require('./game-progress');
+  const decision = await require('./decisions').decide('pearl_route', { client: actions.client || task.opportunityClient, bot, task, goal, save, tree: routeTree(bot, goal),
+    state: { pearlsHeld: pearlsHeld(bot, goal), dimension: 'overworld' } });
+  if (decision.stale) return false;
+  const pick = decision.path.at(-1);
+  noteChange(bot, goal, pick === 'overworld_hunt' ? 'overworld' : 'nether', now);
+  goal.pearlRoute = { pick: pick === 'overworld_hunt' ? 'overworld' : 'nether', at: now, until: now + PEARL_ROUTE_MS, asked: 'pearl_route' }; save();
+  return false;
+}
+
+module.exports = { pearlRoutes, blocksCarried, changesSay, overworldHourSays, noteChange, routeAsked, routeTree, askRoute, SWEEP_ASK_MIN };
