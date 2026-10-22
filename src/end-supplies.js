@@ -49,8 +49,21 @@ function homeByPortal(bot, goal) {
   if (!(ep?.litAt || ep?.neededEyes === 0) || !ep.center || !here || !/overworld/.test(String(bot.game?.dimension || 'overworld'))) return null;
   const bedOff = sb ? Math.round(Math.hypot(sb.x - ep.center.x, sb.z - ep.center.z)) : null;
   if (bedOff != null && bedOff <= HOME_FAR) return null;
-  return { bedOff, off: Math.round(Math.hypot(here.x - ep.center.x, here.z - ep.center.z)), beds: bedsOf(bot), center: ep.center };
+  // What the time since the portal was lit has come to (note 2018): the
+  // deaths since and how far from the ring each was, and the kit's items
+  // gained in the time on them.
+  const litAt = ep.litAt || Math.max(0, ...(ep.insertions || []).map(i => i.at || 0)) || null;
+  const deaths = litAt ? (bot._survivalState?.deaths || []).filter(d => Date.parse(d.at) > litAt) : [];
+  const far = deaths.map(d => d.position).filter(p => p && Number.isFinite(p.x)).map(p => Math.round(Math.hypot(p.x - ep.center.x, p.z - ep.center.z)));
+  const spent = Object.values(goal.endKit?.spent || {}).reduce((n, sp) => n + (sp.ms || 0), 0);
+  return { bedOff, off: Math.round(Math.hypot(here.x - ep.center.x, here.z - ep.center.z)), beds: bedsOf(bot), center: ep.center, litAt, deaths: deaths.length, far, spentMin: Math.round(spent / 60000) };
 }
+const sinceLitSays = home => {
+  if (!home.litAt) return '';
+  const h = Math.round((Date.now() - home.litAt) / 360000) / 10;
+  const where = home.far.length ? `, ${Math.min(...home.far)} to ${Math.max(...home.far)} blocks from the ring` : '';
+  return ` Since the portal was lit, ${h} hours ago: ${home.deaths} death${home.deaths === 1 ? '' : 's'}${where}, each coming back at the bed slept in last with nothing carried${home.spentMin ? `, and ${home.spentMin} minutes on the kit's top-ups` : ''}.`;
+};
 // The dragon's fight as rehearsed (scripts/endgame.js dragon, port 25578,
 // 2026-10-04; a bow, a diamond sword, iron armour and a shield, no bed
 // used). By the bow (01:12Z, a fresh End): the ten crystals and the dragon's
@@ -279,7 +292,7 @@ async function prepareEndSupplies(bot, task, goal, save, actions, client = task.
     }
     const home = homeByPortal(bot, goal);
     if (home && home.beds && home.off <= HOME_NEAR) tree.home_by_portal = { description: `Stay by the portal's ring (${home.off} blocks off) until bedtime${bedtimeSays(bot)} and sleep in the carried bed here; the bed slept in stays the respawn. ${home.bedOff != null ? `The bed slept in last is ${home.bedOff} blocks from the portal, and a death before then comes back there.` : 'No bed has been slept in yet.'} Nothing else is done meanwhile.` };
-    else if (home) tree.home_by_portal = { description: `Make the portal home first: ${home.beds ? `carry the bed${home.beds === 1 ? '' : 's'} carried` : 'make a bed (three wool, three planks) and carry it'} to the portal's ring, ${home.off} blocks off, and sleep in it there the next night; the bed slept in stays the respawn. ${home.bedOff != null ? `The bed slept in last is ${home.bedOff} blocks from the portal: a death now comes back there, everything carried left where it fell, and the walk back to the ring is the ${home.bedOff} blocks again.` : 'No bed has been slept in yet: a death now comes back at the world spawn.'} Beside the ring a death comes back within reach of the portal and its chest, and the kit's errands go out from there.` };
+    else if (home) tree.home_by_portal = { description: `Make the portal home first: ${home.beds ? `carry the bed${home.beds === 1 ? '' : 's'} carried` : 'make a bed (three wool, three planks) and carry it'} to the portal's ring, ${home.off} blocks off, and sleep in it there the next night; the bed slept in stays the respawn. ${home.bedOff != null ? `The bed slept in last is ${home.bedOff} blocks from the portal: a death now comes back there, everything carried left where it fell, and the walk back to the ring is the ${home.bedOff} blocks again.` : 'No bed has been slept in yet: a death now comes back at the world spawn.'} Beside the ring a death comes back within reach of the portal and its chest, and the kit's errands go out from there.${sinceLitSays(home)}` };
     // The old order, for the tests' stand-in only (note 707).
     const oldOrder = `top_up_${(short.find(i => !['food', 'health'].includes(i.key)) || short[0]).key}`;
     const decision = await decide('end_kit', { client, bot, task, goal, save, tree, context: { oldOrder },

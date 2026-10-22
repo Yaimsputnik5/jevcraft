@@ -103,14 +103,18 @@ test('with the portal lit and the bed slept in last far from it, making the port
   const { bot, items, goal, task } = fixture();
   items.find(i => i.name === 'bow').durabilityUsed = registry.itemsByName.bow.maxDurability - 1;
   bot.game = { dimension: 'overworld' }; bot.entity = { position: { x: 700.5, y: 103, z: 293.5 } };
-  bot._survivalState = { spawnBed: { foot: { x: 700, y: 103, z: 293 } } };
-  goal.endPortal = { center: { x: 2052, y: 42, z: 1511 }, neededEyes: 0 };
+  const lit = Date.now() - 5.5 * 3600000;
+  bot._survivalState = { spawnBed: { foot: { x: 700, y: 103, z: 293 } }, deaths: [{ at: new Date(lit - 60000).toISOString(), position: { x: 2050, z: 1500 } },
+    { at: new Date(lit + 3600000).toISOString(), position: { x: 851, z: 390 } }, { at: new Date(lit + 7200000).toISOString(), position: { x: 700, z: 300 } }] };
+  goal.endPortal = { center: { x: 2052, y: 42, z: 1511 }, neededEyes: 0, insertions: [{ at: lit }] };
+  goal.endKit = { spent: { bow: { ms: 73 * 60000, since: lit, from: 0 } } };
   let text = '';
   task.opportunityClient = { systemOne: async ({ questions }) => { text = JSON.stringify(Object.values(questions)[0]); return { answers: Object.fromEntries(Object.keys(questions).map(k => [k, { choice: 'home_by_portal', confidence: 0.6 }])) }; } };
   const walks = [];
   await prepareEndSupplies(bot, task, goal, () => {}, { acquireStep: async () => assert.fail('a bed is carried'), navigate: async (b, t, g) => walks.push(g) });
   assert.match(text, /Make the portal home first: carry the beds carried to the portal's ring, 18[12][90] blocks off/);
   assert.match(text, /The bed slept in last is 18[12][90] blocks from the portal/);
+  assert.match(text, /Since the portal was lit, 5\.5 hours ago: 2 deaths, 1\d{3} to 18\d\d blocks from the ring, each coming back at the bed slept in last with nothing carried, and 73 minutes on the kit's top-ups\./);
   assert.equal(walks.length, 1);
   assert.ok(Math.abs(Math.hypot(walks[0].x - 700.5, walks[0].z - 293.5) - 64) < 2, `leg to ${walks[0].x}, ${walks[0].z}`);
   assert.equal(goal.endKit.choice.pick, 'home_by_portal');
