@@ -161,6 +161,9 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | Option | Level | What it is | Offered when |
 | --- | --- | --- | --- |
 | `stock_stash` | root | put spares in the chest | spares are carried |
+| `kit_by_bed` | root | put a chest beside the bed slept in and leave the spare kit and armour in it | no home base chest by the bed slept in, spares or spare armour carried and wood for a chest (note 2029) |
+| `stock_bed_kit` | root | put spares in the chest beside the bed slept in | that chest stands, spares or spare armour carried (note 2029) |
+| `take_bed_kit` | root | take the kit out of the chest beside the bed slept in | that chest holds kit the pockets lack (note 2029) |
 | `harvest_and_bake` | root | harvest the ripe wheat and bake bread | enough ripe or carried wheat for a loaf |
 | `tend_farm` | root | till, harvest or plant the plot | the plot needs work |
 | `breed_cows` | root | breed the cows in the pen | two adults, two wheat, and the cooldown past |
@@ -787,6 +790,9 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | `lure_cows` | root | lead loose cows into the home pen | by day in the Overworld, and the pen has fewer than two cows and cows are in view |
 | `fetch_cows` | root | walk to cows seen earlier and lead two back to the pen | by day in the Overworld, and the pen has fewer than two cows, none in view, wheat carried, and cows remembered within 160 blocks |
 | `stock_stash` | root | put spares in the stash chest | by day in the Overworld, and the stash chest is within reach and spares are carried |
+| `kit_by_bed` | root | put a chest beside the bed slept in and leave the spare kit and armour in it | by day in the Overworld, and no home base chest by the bed slept in, within 16 blocks of it, spares or spare armour carried and wood for a chest (note 2029) |
+| `stock_bed_kit` | root | put spares in the chest beside the bed slept in | by day in the Overworld, and that chest stands, within 16 blocks, spares or spare armour carried (note 2029) |
+| `take_bed_kit` | root | take the kit out of the chest beside the bed slept in | by day in the Overworld, and that chest holds kit the pockets lack, within 16 blocks (note 2029) |
 | `light_home` | root | put torches where monsters could spawn around home | by day in the Overworld, and the bed and the chest are down, ground around home is dark, and torches are carried or can be made |
 | `wall_home` | root | build a wall two blocks high round home, with a door by the bed | by day in the Overworld, and the bed and the chest are down and home is not walled yet |
 | `again` | root | try the failed step again as it was | a step failed again and again (persist), and it does not rest in the ledger from here (src/tried.js): tried twice from here and come to nothing, it rests five minutes; only this answer puts the failed step back in hand |
@@ -1483,6 +1489,9 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | `lure_cows` | root | lead loose cows into the home pen | the pen has fewer than two cows and cows are in view |
 | `fetch_cows` | root | walk to cows seen earlier and lead two back to the pen | the pen has fewer than two cows, none in view, wheat carried, and cows remembered within 160 blocks |
 | `stock_stash` | root | put spares in the stash chest | the stash chest is within reach and spares are carried |
+| `kit_by_bed` | root | put a chest beside the bed slept in and leave the spare kit and armour in it | no home base chest by the bed slept in, within 16 blocks of it, spares or spare armour carried and wood for a chest (note 2029) |
+| `stock_bed_kit` | root | put spares in the chest beside the bed slept in | that chest stands, within 16 blocks, spares or spare armour carried (note 2029) |
+| `take_bed_kit` | root | take the kit out of the chest beside the bed slept in | that chest holds kit the pockets lack, within 16 blocks (note 2029) |
 | `light_home` | root | put torches where monsters could spawn around home | the bed and the chest are down, ground around home is dark, and torches are carried or can be made |
 | `wall_home` | root | build a wall two blocks high round home, with a door by the bed | the bed and the chest are down and home is not walled yet |
 | `long_game` | root | work toward beating the game | the dream is to beat the game and its ladder is not complete |
@@ -1561,6 +1570,9 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | `lure_cows` | root | lead loose cows into the home pen | by day in the Overworld, and the pen has fewer than two cows and cows are in view |
 | `fetch_cows` | root | walk to cows seen earlier and lead two back to the pen | by day in the Overworld, and the pen has fewer than two cows, none in view, wheat carried, and cows remembered within 160 blocks |
 | `stock_stash` | root | put spares in the stash chest | by day in the Overworld, and the stash chest is within reach and spares are carried |
+| `kit_by_bed` | root | put a chest beside the bed slept in and leave the spare kit and armour in it | by day in the Overworld, and no home base chest by the bed slept in, within 16 blocks of it, spares or spare armour carried and wood for a chest (note 2029) |
+| `stock_bed_kit` | root | put spares in the chest beside the bed slept in | by day in the Overworld, and that chest stands, within 16 blocks, spares or spare armour carried (note 2029) |
+| `take_bed_kit` | root | take the kit out of the chest beside the bed slept in | by day in the Overworld, and that chest holds kit the pockets lack, within 16 blocks (note 2029) |
 | `light_home` | root | put torches where monsters could spawn around home | by day in the Overworld, and the bed and the chest are down, ground around home is dark, and torches are carried or can be made |
 | `wall_home` | root | build a wall two blocks high round home, with a door by the bed | by day in the Overworld, and the bed and the chest are down and home is not walled yet |
 | `again` | root | try the failed step again as it was | a step failed again and again (persist), and it does not rest in the ledger from here (src/tried.js): tried twice from here and come to nothing, it rests five minutes; only this answer puts the failed step back in hand |

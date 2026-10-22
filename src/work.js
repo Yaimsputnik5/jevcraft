@@ -7573,6 +7573,8 @@ function idleOptions(bot, goal) {
   // The base's chores, each one already checked feasible: a plot to tend,
   // wheat to bake, cows to lead in or breed.
   Object.assign(options, homeChores(bot, goal));
+  // The chest beside the bed slept in, where no home's stands (note 2029).
+  Object.assign(options, require('./bed-kit').bedKitChores(bot, goal));
   // Exploring: the nearest unexplored area around home, and what is there.
   // Villages and ruined portals are worth knowing before they are needed.
   if (bot.game?.dimension === 'overworld' || /overworld/.test(String(bot.game?.dimension || ''))) {

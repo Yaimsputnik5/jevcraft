@@ -11654,7 +11654,7 @@ class Survival {
       // twenty times a second through a whole evening, and nobody could
       // see why.
       const attempts = attemptsFor(this);
-      const chores = Object.fromEntries(Object.entries(homeChores(bot, goal)).filter(([key]) => !attempts.resting('chore', key)));
+      const chores = Object.fromEntries(Object.entries({ ...homeChores(bot, goal), ...require('./bed-kit').bedKitChores(bot, goal) }).filter(([key]) => !attempts.resting('chore', key)));
       const home = homeOf(bot, goal);
       // Which chore, or none, is Jev's.
       // A chore whose walk runs past dark says so (the decision audit,

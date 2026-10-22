@@ -134,6 +134,9 @@ define({
   source: 'src/survival.js (step), src/home-base.js (homeChores), src/home-stash.js (stashChores)',
   options: [
     { key: 'stock_stash', label: 'put spares in the chest', when: 'spares are carried', level: 'root' },
+    { key: 'kit_by_bed', label: 'put a chest beside the bed slept in and leave the spare kit and armour in it', when: 'no home base chest by the bed slept in, spares or spare armour carried and wood for a chest (note 2029)', level: 'root' },
+    { key: 'stock_bed_kit', label: 'put spares in the chest beside the bed slept in', when: 'that chest stands, spares or spare armour carried (note 2029)', level: 'root' },
+    { key: 'take_bed_kit', label: 'take the kit out of the chest beside the bed slept in', when: 'that chest holds kit the pockets lack (note 2029)', level: 'root' },
     { key: 'harvest_and_bake', label: 'harvest the ripe wheat and bake bread', when: 'enough ripe or carried wheat for a loaf', level: 'root' },
     { key: 'tend_farm', label: 'till, harvest or plant the plot', when: 'the plot needs work', level: 'root' },
     { key: 'breed_cows', label: 'breed the cows in the pen', when: 'two adults, two wheat, and the cooldown past', level: 'root' },
