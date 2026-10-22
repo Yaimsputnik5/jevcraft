@@ -45,3 +45,21 @@ test('beside the bed slept in, with spare armour and no home chest there, a ches
   bedKitHome(bot, goal);
   assert.equal(goal.bedKit, undefined);
 });
+
+// full-1 (2026-10-22 11:02:50Z): acquireStep is a step a call; one call left no chest, 'Need more chest' (note 2030).
+test('the chest beside the bed is made over as many steps as its plan takes, then placed', async () => {
+  const { bedKitChores } = require('../src/bed-kit');
+  const { bot, blocks, goal } = fixture();
+  const items = bot.inventory.items();
+  let calls = 0;
+  const actions = {
+    acquireStep: async () => { calls++; if (calls === 3) items.push({ name: 'chest', count: 1 }); return calls === 3; },
+    navigate: async () => {}, place: async (b, t, cell) => { blocks[`${cell.x},${cell.y},${cell.z}`] = { name: 'chest', boundingBox: 'block' }; },
+  };
+  const task = { check: () => {} };
+  // The stocking after the placing is the home stash's; only the placing is checked here.
+  require('../src/home-stash').stockStash = async () => [];
+  await bedKitChores(bot, goal).kit_by_bed.run(bot, task, goal, () => {}, actions);
+  assert.equal(calls, 3);
+  assert.ok(goal.bedKit?.position, 'placed and remembered');
+});

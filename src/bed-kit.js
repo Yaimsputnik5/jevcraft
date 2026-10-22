@@ -57,7 +57,12 @@ async function placeBedChest(bot, task, goal, save, home, actions) {
   const sb = bot._survivalState?.spawnBed;
   const cell = chestCell(bot, sb.foot, sb.head);
   if (!cell) throw new Error('no open cell on solid ground beside the bed for a chest');
-  if (countOf(bot, 'chest') < 1) await actions.acquireStep(bot, task, 'chest', 1, goal, save);
+  // A step a call (work.js acquireStep): the planks, the table, the chest
+  // each its own (note 2030). Called once, full-1 (2026-10-22 11:02:50Z)
+  // chose kit_by_bed at 0.42, made the planks, and the placing found 'Need
+  // more chest'.
+  for (let i = 0; i < 8 && countOf(bot, 'chest') < 1; i++) { task.check(); if (await actions.acquireStep(bot, task, 'chest', 1, goal, save) === true) break; }
+  if (countOf(bot, 'chest') < 1) throw new Error('the chest for beside the bed was not made');
   goal.step = { action: 'bed_kit_chest', at: plain(cell) }; save();
   await actions.navigate(bot, task, new goals.GoalNear(cell.x, cell.y, cell.z, 3), { timeoutMs: 30000, stallMs: 8000 });
   if (bot.blockAt(cell)?.name !== 'chest') await actions.place(bot, task, cell, 'chest');
