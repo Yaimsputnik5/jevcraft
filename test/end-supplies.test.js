@@ -143,3 +143,13 @@ test('standing by the bed slept in last, making the portal home takes it up and 
   assert.match(text, /a death on the way comes back at the world spawn, \d+ blocks from the portal/);
   assert.ok(dug, 'the bed was dug');
 });
+
+// full-2 (2026-10-22 02:40:56Z): one chestplate at 0.06, its eight ingots' ore unsaid (note 2022).
+test('a piece to make says the iron ore within reach and what making from no iron has taken', () => {
+  const { ironNearSays } = require('../src/mob-hunt');
+  const { Vec3 } = require('vec3');
+  const bot = { registry, entity: { position: new Vec3(0, 40, 0) }, findBlocks: () => [new Vec3(10, 30, 0), new Vec3(20, 30, 0)] };
+  assert.match(ironNearSays(bot, 8), /^ 2 iron ore within 48 blocks in what is loaded, the nearest 14 off \(a block of ore smelts to an ingot\), 8 wanted; in the record a piece begun with no iron carried was worn 34 minutes later, the one time\.$/);
+  assert.match(ironNearSays({ ...bot, findBlocks: () => [] }, 8), /No iron ore within 48 blocks in what is loaded: the 8 ingots' ore is looked for first/);
+  assert.equal(ironNearSays(bot, 0), '');
+});

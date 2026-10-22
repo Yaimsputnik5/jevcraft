@@ -217,6 +217,26 @@ async function swordFromPack(bot, task, goal, save, actions = {}) {
 const words = s => String(s || '').replaceAll('_', ' ');
 const Dimension = d => d ? `${d[0].toUpperCase()}${d.slice(1)}` : d;
 const listed = items => items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items.at(-1)}` : items[0] || '';
+// The iron ore within reach of the loaded world, and what making from no
+// iron has taken (note 2022): the pieces' plans named the ore to mine and
+// not where it is. full-2 (2026-10-22 02:40:56Z), nothing worn and no iron,
+// answered fight_with_carried at 0.54 over one chestplate at 0.06, its
+// eight ingots' ore unsaid; in the flight records of 2026-10 a piece chosen
+// with no iron carried was worn 34 minutes later, the one time.
+const IRON_ORES = ['iron_ore', 'deepslate_iron_ore'];
+function ironNearSays(bot, ingots) {
+  if (!(ingots > 0)) return '';
+  let found = [];
+  try {
+    const ids = IRON_ORES.map(n => bot.registry?.blocksByName?.[n]?.id).filter(id => id != null);
+    if (ids.length && typeof bot.findBlocks === 'function') found = bot.findBlocks({ matching: ids, maxDistance: 48, count: 64 });
+  } catch (_) { found = []; }
+  const here = bot.entity?.position;
+  const near = found.length && here ? Math.round(Math.min(...found.map(p => here.distanceTo(p)))) : null;
+  const ore = found.length ? ` ${found.length} iron ore within 48 blocks in what is loaded, the nearest ${near} off (a block of ore smelts to an ingot), ${ingots} wanted` : ` No iron ore within 48 blocks in what is loaded: the ${ingots} ingots' ore is looked for first`;
+  return `${ore}; in the record a piece begun with no iron carried was worn 34 minutes later, the one time.`;
+}
+
 // One fight with what is carried, against the mob hunted: the estimate the
 // hunt's own question gives (combat-estimate.js).
 function carriedFightSays(bot, mob) {
@@ -297,7 +317,7 @@ async function kitChoice(bot, task, goal, save, actions, missing, { client, mob,
     const tree = {
       fight_with_carried: { description: `Go on with what is carried: ${carriedFightSays(bot, mob)} Without ${listed(all)} ${mob ? 'for this fight' : 'for now'}; the pieces are back on the ladder in five minutes.` },
     };
-    if (here.length) tree.make_kit_here = { description: `Make ${listed(here.map(p => words(p.item)))} here first${k.hereIron ? `: ${k.hereIron} iron ingots, ${carriedIron} carried` : ''}. It takes: ${k.hereSteps.map(s => `${words(s.action)} ${s.count || 1} ${words(s.item || s.block || s.entity)}`).join(', ')}.${away.length ? ` The rest (${listed(away.map(p => words(p.item)))}) cannot be made in the ${Dimension(dimension(bot))}.` : ''}` };
+    if (here.length) tree.make_kit_here = { description: `Make ${listed(here.map(p => words(p.item)))} here first${k.hereIron ? `: ${k.hereIron} iron ingots, ${carriedIron} carried` : ''}.${k.hereIron ? ironNearSays(bot, k.hereIron - carriedIron) : ''} It takes: ${k.hereSteps.map(s => `${words(s.action)} ${s.count || 1} ${words(s.item || s.block || s.entity)}`).join(', ')}.${away.length ? ` The rest (${listed(away.map(p => words(p.item)))}) cannot be made in the ${Dimension(dimension(bot))}.` : ''}` };
     // One iron piece alone, the most armour for its iron, beside the whole
     // kit (note 1372): the record said with this question is of deaths with
     // nothing worn against any piece on (0.99 against 0.42 a bot-hour in the
@@ -309,7 +329,7 @@ async function kitChoice(bot, task, goal, save, actions, missing, { client, mob,
     if (one) {
       const ce = require('./combat-estimate'), worn = [5, 6, 7, 8].map(i => bot.inventory?.slots?.[i]?.name).filter(Boolean);
       const before = ce.armourOf(worn).points, after = ce.armourOf([...worn, one.item]).points;
-      tree.make_one_here = { description: `Make ${words(one.item)} alone here first and wear it: ${ONE_IRON[one.item]} iron ingots (${carriedIron} carried), armour points ${before} to ${after}, the most armour for its iron of the pieces short. The other pieces are left for half an hour, then offered again.` };
+      tree.make_one_here = { description: `Make ${words(one.item)} alone here first and wear it: ${ONE_IRON[one.item]} iron ingots (${carriedIron} carried), armour points ${before} to ${after}, the most armour for its iron of the pieces short.${ironNearSays(bot, ONE_IRON[one.item] - carriedIron)} The other pieces are left for half an hour, then offered again.` };
     }
     const leather = leatherPieces(bot, missing);
     if (leather.length) {
@@ -5375,4 +5395,4 @@ function claim(bot, goal = {}) {
     ...(walled ? { walledIn: `${walled.own} of the ${walled.of} blocks round it its own` } : {}), ...(cage ? { cage: true } : {}) } };
 }
 
-module.exports = { leatherPieces, endFightGearSays, swordFromPack, huntLeft, slotMissSays, pearlsNow, roomForDrop, rodBlazesSays, goldForPiglins, openWallOption, keepClaim, noWayAt, noWayFromHere, blazeSpots, spawnersKnown, wayLeft, BLAZES_AT, knownFortressOutOfView, backFailedHere, triedSays, backToGround, tripHomeClosed, fortressAnchor, seedFortressAt, sameFortress, linkedTo, climbWays, climbOffers, fortressOverhead, CLIMB_REACH, noWaySays, onFortressFloors, onFortressFloor, bestMakeable, makePickaxe, crossingFor, crossingOptions, unwalkedParts, claim, stakeHunt, prepareCombatGear, combatMovement, canBegin, fitness, fitnessSays, isolated, fightForDrop, huntObserved, prepareMobHunt, findFortressStep, fortressLegTarget, turnSweep, chooseLeg, FORTRESS_Y, HEADING_NAMES, rememberSighting, rememberedSpot, approaches, combatRoute, FORTRESS_LEG, fortressFloors, approachFortress, fortressApproaches, bridgeFirstOrder, pickaxeFirst, fortressInView, portalBack, portalTripStart, returnForKitSays, exposedBrick, exposedBricks, blazesAbout, blazesAboutSays, routeSurvey };
+module.exports = { ironNearSays, leatherPieces, endFightGearSays, swordFromPack, huntLeft, slotMissSays, pearlsNow, roomForDrop, rodBlazesSays, goldForPiglins, openWallOption, keepClaim, noWayAt, noWayFromHere, blazeSpots, spawnersKnown, wayLeft, BLAZES_AT, knownFortressOutOfView, backFailedHere, triedSays, backToGround, tripHomeClosed, fortressAnchor, seedFortressAt, sameFortress, linkedTo, climbWays, climbOffers, fortressOverhead, CLIMB_REACH, noWaySays, onFortressFloors, onFortressFloor, bestMakeable, makePickaxe, crossingFor, crossingOptions, unwalkedParts, claim, stakeHunt, prepareCombatGear, combatMovement, canBegin, fitness, fitnessSays, isolated, fightForDrop, huntObserved, prepareMobHunt, findFortressStep, fortressLegTarget, turnSweep, chooseLeg, FORTRESS_Y, HEADING_NAMES, rememberSighting, rememberedSpot, approaches, combatRoute, FORTRESS_LEG, fortressFloors, approachFortress, fortressApproaches, bridgeFirstOrder, pickaxeFirst, fortressInView, portalBack, portalTripStart, returnForKitSays, exposedBrick, exposedBricks, blazesAbout, blazesAboutSays, routeSurvey };
