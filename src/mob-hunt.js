@@ -217,6 +217,18 @@ async function swordFromPack(bot, task, goal, save, actions = {}) {
 const words = s => String(s || '').replaceAll('_', ' ');
 const Dimension = d => d ? `${d[0].toUpperCase()}${d.slice(1)}` : d;
 const listed = items => items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items.at(-1)}` : items[0] || '';
+// The bot's own deaths about a web site (note 2024): its spawner's cave
+// spiders and the dark of its corridors, said on the way there. full-2
+// (2026-10-22 02:16 to 07:41Z) chose its mineshaft's webs four times and died
+// there three times, the last bunkered among 17 cave spiders at 7 health.
+const SITE_DEATHS_WITHIN = 48;
+function siteDeathsSays(bot, site) {
+  const deaths = (bot._survivalState?.deaths || []).filter(d => d.position && (!d.dimension || /overworld/.test(d.dimension)) && Math.hypot(d.position.x - site.x, d.position.z - site.z) <= SITE_DEATHS_WITHIN);
+  if (!deaths.length) return '';
+  const ago = d => Math.max(1, Math.round((Date.now() - Date.parse(d.at)) / 60000));
+  return `The bot has died within ${SITE_DEATHS_WITHIN} blocks of this site ${deaths.length} time${deaths.length === 1 ? '' : 's'} of its last ${(bot._survivalState?.deaths || []).length} deaths: ${deaths.map(d => `${String(d.cause || 'killed').replace(/^was /, '')} ${ago(d)} minutes ago`).join('; ')}. `;
+}
+
 // The iron ore within reach of the loaded world, and what making from no
 // iron has taken (note 2022): the pieces' plans named the ore to mine and
 // not where it is. full-2 (2026-10-22 02:40:56Z), nothing worn and no iron,
@@ -2077,7 +2089,7 @@ async function prepareMobHunt(bot, task, step, goal, save, actions) {
         const rec = HUNT_RECORD.spider;
         const tree = {};
         if (inView.length) tree.webs_here = { description: `Cut the ${inView.length} cobweb${inView.length === 1 ? '' : 's'} in view within 32 blocks with the sword: a string a web, no fight, ${wanted} wanted.${swordFirst || ''}` };
-        for (const c of choices) tree[KEY[c.kind]] = { description: `Walk to the ${SITES[c.kind]} seen ${c.d} blocks off at (${c.x}, ${c.y}, ${c.z}), about ${Math.round(c.d / 3.4)} seconds at the bot's walking pace, and cut its cobwebs with the sword, a string a web and no fight: ${c.kind === 'mineshaft' ? "a mineshaft's corridors are hung with them, and often a cave spider's spawner sits among them (its spiders poison)" : "the trial chambers' halls are hung with them, and their trial spawners send waves of mobs at a player who comes near"}.${swordFirst || ''}` };
+        for (const c of choices) tree[KEY[c.kind]] = { description: `${siteDeathsSays(bot, c)}Walk to the ${SITES[c.kind]} seen ${c.d} blocks off at (${c.x}, ${c.y}, ${c.z}), about ${Math.round(c.d / 3.4)} seconds at the bot's walking pace, and cut its cobwebs with the sword, a string a web and no fight: ${c.kind === 'mineshaft' ? "a mineshaft's corridors are hung with them, and often a cave spider's spawner sits among them (its spiders poison)" : "the trial chambers' halls are hung with them, and their trial spawners send waves of mobs at a player who comes near"}.${swordFirst || ''}` };
         tree.search_spiders = { description: `Go on looking for spiders here, rings of 24 blocks about; they come out at night. ${STRING_HUNT_YIELD} The record (${HUNT_RECORD.when}): of the bot's ${rec.n} spider hunts, ${rec.died5} were followed by a death within five minutes.` };
         const d = await require('./decisions').decide('string_way', { client: task.opportunityClient, bot, task, goal, save, tree, state: { wanted, websInView: inView.length, sites: choices.map(c => ({ kind: c.kind, distance: c.d })) } });
         if (d.stale) return;
@@ -5395,4 +5407,4 @@ function claim(bot, goal = {}) {
     ...(walled ? { walledIn: `${walled.own} of the ${walled.of} blocks round it its own` } : {}), ...(cage ? { cage: true } : {}) } };
 }
 
-module.exports = { ironNearSays, leatherPieces, endFightGearSays, swordFromPack, huntLeft, slotMissSays, pearlsNow, roomForDrop, rodBlazesSays, goldForPiglins, openWallOption, keepClaim, noWayAt, noWayFromHere, blazeSpots, spawnersKnown, wayLeft, BLAZES_AT, knownFortressOutOfView, backFailedHere, triedSays, backToGround, tripHomeClosed, fortressAnchor, seedFortressAt, sameFortress, linkedTo, climbWays, climbOffers, fortressOverhead, CLIMB_REACH, noWaySays, onFortressFloors, onFortressFloor, bestMakeable, makePickaxe, crossingFor, crossingOptions, unwalkedParts, claim, stakeHunt, prepareCombatGear, combatMovement, canBegin, fitness, fitnessSays, isolated, fightForDrop, huntObserved, prepareMobHunt, findFortressStep, fortressLegTarget, turnSweep, chooseLeg, FORTRESS_Y, HEADING_NAMES, rememberSighting, rememberedSpot, approaches, combatRoute, FORTRESS_LEG, fortressFloors, approachFortress, fortressApproaches, bridgeFirstOrder, pickaxeFirst, fortressInView, portalBack, portalTripStart, returnForKitSays, exposedBrick, exposedBricks, blazesAbout, blazesAboutSays, routeSurvey };
+module.exports = { siteDeathsSays, ironNearSays, leatherPieces, endFightGearSays, swordFromPack, huntLeft, slotMissSays, pearlsNow, roomForDrop, rodBlazesSays, goldForPiglins, openWallOption, keepClaim, noWayAt, noWayFromHere, blazeSpots, spawnersKnown, wayLeft, BLAZES_AT, knownFortressOutOfView, backFailedHere, triedSays, backToGround, tripHomeClosed, fortressAnchor, seedFortressAt, sameFortress, linkedTo, climbWays, climbOffers, fortressOverhead, CLIMB_REACH, noWaySays, onFortressFloors, onFortressFloor, bestMakeable, makePickaxe, crossingFor, crossingOptions, unwalkedParts, claim, stakeHunt, prepareCombatGear, combatMovement, canBegin, fitness, fitnessSays, isolated, fightForDrop, huntObserved, prepareMobHunt, findFortressStep, fortressLegTarget, turnSweep, chooseLeg, FORTRESS_Y, HEADING_NAMES, rememberSighting, rememberedSpot, approaches, combatRoute, FORTRESS_LEG, fortressFloors, approachFortress, fortressApproaches, bridgeFirstOrder, pickaxeFirst, fortressInView, portalBack, portalTripStart, returnForKitSays, exposedBrick, exposedBricks, blazesAbout, blazesAboutSays, routeSurvey };

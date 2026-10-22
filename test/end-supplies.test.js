@@ -153,3 +153,17 @@ test('a piece to make says the iron ore within reach and what making from no iro
   assert.match(ironNearSays({ ...bot, findBlocks: () => [] }, 8), /No iron ore within 48 blocks in what is loaded: the 8 ingots' ore is looked for first/);
   assert.equal(ironNearSays(bot, 0), '');
 });
+
+// full-2 (2026-10-22 02:16 to 07:41Z): its mineshaft's webs chosen four times, three deaths there unsaid (note 2024).
+test("a web site's option says the bot's own deaths about it", () => {
+  const { siteDeathsSays } = require('../src/mob-hunt');
+  const now = Date.now();
+  const bot = { _survivalState: { deaths: [
+    { at: new Date(now - 300 * 60000).toISOString(), cause: 'was blown up by Creeper', position: { x: -336, y: -22, z: -527 }, dimension: 'overworld' },
+    { at: new Date(now - 125 * 60000).toISOString(), cause: 'was blown up by Creeper', position: { x: -383, y: 27, z: -594 }, dimension: 'overworld' },
+    { at: new Date(now - 2 * 60000).toISOString(), cause: 'was slain by Cave Spider', position: { x: -379, y: 22, z: -627 }, dimension: 'overworld' },
+    { at: new Date(now - 60 * 60000).toISOString(), cause: 'was slain by Zombie', position: { x: -729, y: 68, z: -1505 }, dimension: 'overworld' } ] } };
+  const says = siteDeathsSays(bot, { x: -370, y: 20, z: -600 });
+  assert.match(says, /^The bot has died within 48 blocks of this site 2 times of its last 4 deaths: blown up by Creeper 125 minutes ago; slain by Cave Spider 2 minutes ago\. $/);
+  assert.equal(siteDeathsSays(bot, { x: 500, y: 20, z: 500 }), '');
+});
