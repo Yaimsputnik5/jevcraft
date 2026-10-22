@@ -431,6 +431,7 @@ define({
   options: [
     { key: 'go_back', trip: 'the drops', label: 'go back for the drops', when: 'always', level: 'root' },
     { key: 'leave_them', label: 'leave them and go on', when: 'always', level: 'root' },
+    { key: 'kit_first', label: 'take the kit out of the chest beside the bed first, then go back for them', when: 'a chest beside the bed slept in holds kit the pockets lack, within 16 blocks (bed-kit.js, note 2032)', level: 'root' },
     { key: 'food_first', label: 'get food for the walk first, then go back for them', when: 'a walk of 300 blocks or more with less food carried than the walk costs sprinted (to 30 points); twenty minutes at most on the food', level: 'root' },
     { key: 'through_nether', label: 'go back for them through the Nether', when: 'the drop in the Overworld 400 blocks or more off, a known Overworld portal within 600 blocks of the bot and another within 600 of the drop; said with the walks to each portal and the blocks across the Nether (note 1393)', level: 'root' },
     { key: 'wait_for_day', label: 'go back for them when it is day', when: 'by night in the Overworld, the drops not ageing (the bot not within 128 blocks of them since)', level: 'root' },

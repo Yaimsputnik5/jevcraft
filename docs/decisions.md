@@ -247,6 +247,7 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | --- | --- | --- | --- |
 | `go_back` (trip: the drops) | root | go back for the drops | always |
 | `leave_them` | root | leave them and go on | always |
+| `kit_first` | root | take the kit out of the chest beside the bed first, then go back for them | a chest beside the bed slept in holds kit the pockets lack, within 16 blocks (bed-kit.js, note 2032) |
 | `food_first` | root | get food for the walk first, then go back for them | a walk of 300 blocks or more with less food carried than the walk costs sprinted (to 30 points); twenty minutes at most on the food |
 | `through_nether` | root | go back for them through the Nether | the drop in the Overworld 400 blocks or more off, a known Overworld portal within 600 blocks of the bot and another within 600 of the drop; said with the walks to each portal and the blocks across the Nether (note 1393) |
 | `wait_for_day` | root | go back for them when it is day | by night in the Overworld, the drops not ageing (the bot not within 128 blocks of them since) |

@@ -289,7 +289,17 @@ async function kitTrip(bot, task, goal, save, now = Date.now()) {
   return true;
 }
 
-async function corpseRunStep(bot, task, goal, save, { move = navigate, collect = collectNearbyDrops, surface = null, room = null, gatherFood = null } = {}) {
+// The deaths that came hard on the one before (note 2032): back bare, the
+// bot set out at once and died again within ten minutes. full-2 (2026-10-22
+// 15:47:27 and 15:49:57Z) came back to life at its bed and was blown up 60
+// blocks from it two and a half minutes later, nothing worn either time.
+function quickDeathsSays(bot) {
+  const t = (bot._survivalState?.deaths || []).map(d => Date.parse(d.at)).filter(Number.isFinite).sort((a, b) => a - b);
+  if (t.length < 3) return '';
+  const quick = t.slice(1).filter((x, i) => x - t[i] <= 10 * 60000).length;
+  return quick ? ` Of this run's last ${t.length} deaths, ${quick} came within ten minutes of the one before, the bot back with what it carries now.` : '';
+}
+async function corpseRunStep(bot, task, goal, save, { move = navigate, collect = collectNearbyDrops, surface = null, room = null, gatherFood = null, kitActions = null } = {}) {
   const run = corpseRun(bot, goal);
   if (!run && await kitTrip(bot, task, goal, save)) return false;
   if (!run) { save(); return false; }
@@ -371,10 +381,15 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
     const carriesWeapon = (bot.inventory?.items?.() || []).filter(i => /_(sword|axe)$/.test(i.name)).map(i => i.name.replaceAll('_', ' '))[0] || null;
     const underSays = under ? ` The place is under the ground (y ${Math.round(spot.y)}, ${Math.round(Math.abs(dy))} blocks ${dy < 0 ? 'down' : 'up'} from here): the hour does not reach it, and what was about it at the death does not burn at dawn; the bot goes there with ${carriesWeapon ? `a ${carriesWeapon}` : 'no sword or axe'} and ${wornNow.length ? wornNow.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'}.` : '';
     run.told = TOLD;
+    const quick = quickDeathsSays(bot);
+    // The kit in the chest beside the bed first (bed-kit.js, note 2032).
+    let bedKit = null; try { bedKit = kitActions ? require('./bed-kit').bedKitChores(bot, goal).take_bed_kit : null; } catch (_) { bedKit = null; }
     const tree = {
       go_back: { description: `Go back for ${listed(run.items)}: ${far} blocks off${far >= 100 ? `, about ${minutes} minute${minutes > 1 ? 's' : ''}' ${climbSeconds ? 'walk and climb' : 'walk'}${rec?.walkBlocksAMinute ? ` at the ${rec.walkBlocksAMinute} blocks a minute the bot's walks have made, stalls and detours counted` : ''}` : ''}${Math.abs(spot.y - bot.entity.position.y) > 4 ? `, at y ${Math.round(spot.y)}` : ''}. ${left === null ? 'They last until the bot comes within 128 blocks, then five minutes.' : `About ${left} seconds before they vanish.`} ${death.cause ? `The bot ${death.cause} there; when it died, ` : 'When the bot died there, '}${about ? `about it were ${about}` : 'nothing hostile was in view'}; it wore ${death.worn?.length ? death.worn.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} then and wears ${wornNow.length ? wornNow.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} now. ${hour}${underSays}${stalled}${earlier}${eyesSay}${ringSays}${walkFoodSays}${alsoLying}` },
       leave_them: { description: `Leave them and go on with what is carried: ${listed(worth(Object.fromEntries(bot.inventory.items().map(i => [i.name, i.count])))) || 'nothing worth listing'}. What was dropped is made again, or found, later${again ? `: ${again}` : ''}.${took}${keptSays}` },
     };
+    if (quick) for (const k of Object.keys(tree)) tree[k].description += quick;
+    if (bedKit) tree.kit_first = { description: `${bedKit.description} Then back for them as go back says.${quick}` };
     // By night, and the drops not ageing (the bot not within 128 blocks of
     // them): going when it is day is a choice of its own, not leaving them.
     // By day too, when the walk is longer than the day that is left.
@@ -405,6 +420,11 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
     const decision = await require('./decisions').decide('corpse_run', { client, bot, task, goal, save, tree,
       state: { distance: far, secondsLeft: left, aboutAtDeath: death.about || [], wornAtDeath: death.worn || [], wornNow, night, ...(until !== null ? { [night ? 'minutesToDawn' : 'minutesToNight']: until } : {}), ...(run.stalled ? { walksThatGotNoNearer: run.stalled } : {}), ...(kept ? { inAChest: kept } : {}) } });
     if (decision.stale) return false;
+    if (decision.path.at(-1) === 'kit_first' && bedKit) {
+      try { await bedKit.run(bot, task, goal, save, kitActions); }
+      catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; console.log(`[corpse run] the kit by the bed was not taken: ${String(err.message || err).slice(0, 160)}`); }
+      run.choice = 'go_back'; save(); return false;
+    }
     if (decision.path.at(-1) === 'food_first') { run.choice = 'go_back'; run.foodFirst = { at: Date.now(), want: foodWant }; save(); }
     else if (decision.path.at(-1) === 'wait_for_day') { run.waitUntil = Date.now() + toDawn * 60000; save(); return false; }
     if (decision.path.at(-1) === 'through_nether') {
@@ -574,4 +594,4 @@ function underWay(bot, goal, now = Date.now()) {
     secondsLeft: run.loadedAt ? Math.max(0, Math.round((DESPAWN_MS - (now - Date.parse(run.loadedAt))) / 1000)) : null };
 }
 
-module.exports = { TOLD, tripCameToNothing, KIT_ERRAND, kitTrip, corpseRun, corpseRunStep, worth, madeAgain, underWay };
+module.exports = { quickDeathsSays, TOLD, tripCameToNothing, KIT_ERRAND, kitTrip, corpseRun, corpseRunStep, worth, madeAgain, underWay };

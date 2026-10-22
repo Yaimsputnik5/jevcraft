@@ -559,3 +559,12 @@ test('eyes left by no answer that listed them are asked of again, and an earlier
   assert.equal(corpseRun(bot, g2, now), null);
   assert.equal(g2.corpseRunsEarlier.length, 1);
 });
+
+// full-2 (2026-10-22 15:47:27 and 15:49:57Z): back bare and dead again 150 seconds later (note 2032).
+test('the corpse run says the deaths that came within ten minutes of the one before', () => {
+  const { quickDeathsSays } = require('../src/corpse-run');
+  const at = s => new Date(Date.parse('2026-10-22T15:00:00Z') + s * 1000).toISOString();
+  const bot = { _survivalState: { deaths: [{ at: at(0) }, { at: at(1500) }, { at: at(2847) }, { at: at(2997) }] } };
+  assert.equal(quickDeathsSays(bot), " Of this run's last 4 deaths, 1 came within ten minutes of the one before, the bot back with what it carries now.");
+  assert.equal(quickDeathsSays({ _survivalState: { deaths: [{ at: at(0) }] } }), '');
+});
