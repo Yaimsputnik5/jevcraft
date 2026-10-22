@@ -41,7 +41,7 @@ const HOLD_MS = 15 * 60000, ARROW_STEP = 32, FILL_HOLD_MS = 30 * 60000;
 // spawn bed 1,800 blocks off at (700, 103, 293), died nine times, each 1,365
 // to 1,771 blocks from the portal, came back bare to the old bed, and gained
 // not one item of the kit in five and a half hours.
-const HOME_FAR = 300, HOME_NEAR = 24, HOME_LEG = 64;
+const HOME_FAR = 300, HOME_NEAR = 24, HOME_LEG = 64, BED_AT_HAND = 16, WALK_PACE = 3.4;
 const bedtimeSays = bot => { const t = bot.time?.timeOfDay; if (!Number.isFinite(t)) return ''; const left = t >= 12542 && t < 23460 ? 0 : Math.round(((12542 - t + 24000) % 24000) / 20 / 60); return left ? ` (in about ${left} real minutes)` : ' (now)'; };
 const spawnBedOf = bot => bot._survivalState?.spawnBed?.foot || null;
 function homeByPortal(bot, goal) {
@@ -56,7 +56,17 @@ function homeByPortal(bot, goal) {
   const deaths = litAt ? (bot._survivalState?.deaths || []).filter(d => Date.parse(d.at) > litAt) : [];
   const far = deaths.map(d => d.position).filter(p => p && Number.isFinite(p.x)).map(p => Math.round(Math.hypot(p.x - ep.center.x, p.z - ep.center.z)));
   const spent = Object.values(goal.endKit?.spent || {}).reduce((n, sp) => n + (sp.ms || 0), 0);
-  return { bedOff, off: Math.round(Math.hypot(here.x - ep.center.x, here.z - ep.center.z)), beds: bedsOf(bot), center: ep.center, litAt, deaths: deaths.length, far, spentMin: Math.round(spent / 60000) };
+  // The bed slept in last, standing within reach: taken up and carried
+  // (the user, 2026-10-22, note 2019), no wool or planks wanted.
+  let atBed = null;
+  try {
+    if (sb && Math.hypot(sb.x - here.x, sb.y - here.y, sb.z - here.z) <= BED_AT_HAND) {
+      const b = bot.blockAt?.(new (require('vec3').Vec3)(sb.x, sb.y, sb.z));
+      if (b && /_bed$/.test(b.name)) atBed = { foot: sb, name: b.name, d: Math.round(Math.hypot(sb.x - here.x, sb.z - here.z)) };
+    }
+  } catch (_) { atBed = null; }
+  const ws = bot.spawnPoint && Number.isFinite(bot.spawnPoint.x) ? Math.round(Math.hypot(bot.spawnPoint.x - ep.center.x, bot.spawnPoint.z - ep.center.z)) : null;
+  return { bedOff, off: Math.round(Math.hypot(here.x - ep.center.x, here.z - ep.center.z)), beds: bedsOf(bot), center: ep.center, litAt, deaths: deaths.length, far, spentMin: Math.round(spent / 60000), atBed, worldSpawnOff: ws };
 }
 const sinceLitSays = home => {
   if (!home.litAt) return '';
@@ -292,7 +302,7 @@ async function prepareEndSupplies(bot, task, goal, save, actions, client = task.
     }
     const home = homeByPortal(bot, goal);
     if (home && home.beds && home.off <= HOME_NEAR) tree.home_by_portal = { description: `Stay by the portal's ring (${home.off} blocks off) until bedtime${bedtimeSays(bot)} and sleep in the carried bed here; the bed slept in stays the respawn. ${home.bedOff != null ? `The bed slept in last is ${home.bedOff} blocks from the portal, and a death before then comes back there.` : 'No bed has been slept in yet.'} Nothing else is done meanwhile.` };
-    else if (home) tree.home_by_portal = { description: `Make the portal home first: ${home.beds ? `carry the bed${home.beds === 1 ? '' : 's'} carried` : 'make a bed (three wool, three planks) and carry it'} to the portal's ring, ${home.off} blocks off, and sleep in it there the next night; the bed slept in stays the respawn. ${home.bedOff != null ? `The bed slept in last is ${home.bedOff} blocks from the portal: a death now comes back there, everything carried left where it fell, and the walk back to the ring is the ${home.bedOff} blocks again.` : 'No bed has been slept in yet: a death now comes back at the world spawn.'} Beside the ring a death comes back within reach of the portal and its chest, and the kit's errands go out from there.${sinceLitSays(home)}` };
+    else if (home) tree.home_by_portal = { description: `Make the portal home first: ${home.beds ? `carry the bed${home.beds === 1 ? '' : 's'} carried` : home.atBed ? `take up the bed slept in last, ${home.atBed.d} blocks off here, and carry it` : 'make a bed (three wool, three planks) and carry it'} to the portal's ring, ${home.off} blocks off (about ${Math.max(1, Math.round(home.off / WALK_PACE / 60))} real minutes at the bot's walking pace of ${WALK_PACE} blocks a second, nights apart), and sleep in it there the next night; the bed slept in stays the respawn.${!home.beds && home.atBed ? ` Taken up, no bed stands for the respawn until that night: a death on the way comes back at the world spawn${home.worldSpawnOff != null ? `, ${home.worldSpawnOff} blocks from the portal` : ''}.` : ''} ${home.bedOff != null ? `The bed slept in last is ${home.bedOff} blocks from the portal: a death now comes back there, everything carried left where it fell, and the walk back to the ring is the ${home.bedOff} blocks again.` : 'No bed has been slept in yet: a death now comes back at the world spawn.'} Beside the ring a death comes back within reach of the portal and its chest, and the kit's errands go out from there.${sinceLitSays(home)}` };
     // The old order, for the tests' stand-in only (note 707).
     const oldOrder = `top_up_${(short.find(i => !['food', 'health'].includes(i.key)) || short[0]).key}`;
     const decision = await decide('end_kit', { client, bot, task, goal, save, tree, context: { oldOrder },
@@ -306,6 +316,18 @@ async function prepareEndSupplies(bot, task, goal, save, actions, client = task.
   if (pick === 'home_by_portal') {
     const home = homeByPortal(bot, goal);
     if (!home) { delete kit.choice; save(); return false; }
+    if (!home.beds && home.atBed) {
+      const { Vec3 } = require('vec3'), { goals } = require('mineflayer-pathfinder');
+      const foot = new Vec3(home.atBed.foot.x, home.atBed.foot.y, home.atBed.foot.z);
+      goal.step = { action: 'prepare_end_supplies', item: 'home_by_portal', taking: 'the bed slept in last', at: home.atBed.foot }; save();
+      await actions.navigate(bot, task, new goals.GoalNear(foot.x, foot.y, foot.z, 2), { timeoutMs: 30000, stallMs: 8000 });
+      const b = bot.blockAt(foot);
+      if (b && /_bed$/.test(b.name)) { await bot.dig(b); task.check(); }
+      await actions.navigate(bot, task, new goals.GoalNear(foot.x, foot.y, foot.z, 0), { timeoutMs: 8000, stallMs: 4000 }).catch(() => {});
+      await new Promise(resolve => setTimeout(resolve, 800));
+      console.log(`[home_by_portal] took up the bed at (${foot.x}, ${foot.y}, ${foot.z}): ${bedsOf(bot)} carried now`);
+      return false;
+    }
     if (!home.beds) { await topUp(bot, task, goal, save, actions, { key: 'beds', item: 'bed', carried: 0, wants: 1, short: true }); return false; }
     if (home.off <= HOME_NEAR) {
       // By the ring with a bed: the night's sleep is the survival layer's

@@ -123,3 +123,23 @@ test('with the portal lit and the bed slept in last far from it, making the port
   bot._survivalState.spawnBed.foot = { x: 2040, y: 42, z: 1500 };
   assert.equal(homeByPortal(bot, goal), null);
 });
+
+// The user (2026-10-22): the spawn bed may be taken up and carried to the portal (note 2019).
+test('standing by the bed slept in last, making the portal home takes it up and carries it, the walk and the world spawn said', async () => {
+  const { bot, items, goal, task } = fixture();
+  items.find(i => i.name === 'bow').durabilityUsed = registry.itemsByName.bow.maxDurability - 1;
+  const bed = items.findIndex(i => i.name === 'white_bed'); items.splice(bed, 1);
+  bot.game = { dimension: 'overworld' }; bot.entity = { position: new (require('vec3').Vec3)(701.5, 103, 294.5) };
+  bot.spawnPoint = { x: 0, y: 64, z: 0 };
+  bot._survivalState = { spawnBed: { foot: { x: 700, y: 103, z: 293 } } };
+  let dug = null;
+  bot.blockAt = p => (p.x === 700 && p.y === 103 && p.z === 293 && !dug ? { name: 'black_bed', position: p } : { name: 'air', position: p });
+  bot.dig = async b => { dug = b; items.push({ name: 'black_bed', count: 1 }); };
+  goal.endPortal = { center: { x: 2052, y: 42, z: 1511 }, neededEyes: 0 };
+  let text = '';
+  task.opportunityClient = { systemOne: async ({ questions }) => { text = JSON.stringify(Object.values(questions)[0]); return { answers: Object.fromEntries(Object.keys(questions).map(k => [k, { choice: 'home_by_portal', confidence: 0.6 }])) }; } };
+  await prepareEndSupplies(bot, task, goal, () => {}, { acquireStep: async () => assert.fail('no bed made: the one here is taken'), navigate: async () => {} });
+  assert.match(text, /take up the bed slept in last, 2 blocks off here, and carry it to the portal's ring, \d+ blocks off \(about 9 real minutes at the bot's walking pace of 3\.4 blocks a second, nights apart\)/);
+  assert.match(text, /a death on the way comes back at the world spawn, \d+ blocks from the portal/);
+  assert.ok(dug, 'the bed was dug');
+});
