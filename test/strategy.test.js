@@ -552,3 +552,13 @@ test('the trip chosen for the kit a death left in the Nether is the step: no run
   await strategyStep(bot, task, goal, () => {}, stage, { decide, now: () => 1e12 });
   assert.equal(asked.length, 1, 'with the run closed the errand is a stage among the rungs again');
 });
+
+// The four full runs (2026-10-22 10:00Z): 8, 7, 5 and 4 of their last ten deaths bare, no chest by any bed (note 2028).
+test("the home's offer says the run's bare deaths", () => {
+  const { bareDeathsSays } = require('../src/strategy');
+  const now = Date.now();
+  const bot = { _survivalState: { deaths: [{ at: new Date(now - 90 * 60000).toISOString(), worn: [] }, { at: new Date(now - 60 * 60000).toISOString(), worn: ['shield'] },
+    { at: new Date(now - 20 * 60000).toISOString(), worn: ['iron_chestplate'] }, { at: new Date(now).toISOString(), worn: [] }] } };
+  assert.match(bareDeathsSays(bot), /^ This run's last 4 deaths: 3 in no armour at all, a median 30 minutes apart;/);
+  assert.equal(bareDeathsSays({ _survivalState: { deaths: [] } }), '');
+});

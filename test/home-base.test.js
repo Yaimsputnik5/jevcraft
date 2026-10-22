@@ -200,7 +200,7 @@ test('the home base is a side trip beside the armour, not a rung ahead of it; ch
   assert.equal(offered.home_base.trip, true, 'under the side trip');
   assert.match(offered.home_base.description, /none yet; its steps, in order: a site by water on flat ground; the ground levelled; a chest/);
   assert.match(offered.home_base.description, /keeps the spawn point .* a death respawns by the chest/);
-  assert.match(offered.home_base.description, /None of it is needed for the Nether, blaze rods or ender pearls/);
+  assert.match(offered.home_base.description, /No rung on the way to the dragon needs it\./);
   assert.match(offered.home_base.description, /The bed carried becomes the base's/);
   const ran = [];
   await gameStep(bot, new Task('win'), goal, () => {}, { home: async (b, t, g, s, stage) => { ran.push(stage.action); }, acquireSetStep: async () => assert.fail('Jev chose the base'),

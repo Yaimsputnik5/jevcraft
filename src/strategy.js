@@ -335,6 +335,20 @@ const HOME_STEPS = {
   home_stash: 'a chest by the bed (eight planks)', home_bed: 'the bed placed there and slept in (three wool and three planks, or the one carried)',
   home_water: 'a pond poured for the plot (a water bucket)', home_plot: 'a wheat plot tilled and sown (a hoe and seeds)', home_pen: 'a fenced pen for cows (fences and a gate)',
 };
+// What the run's deaths have been, said on the home's offer (note 2028):
+// the offer said 'None of it is needed for the Nether, blaze rods or ender
+// pearls', and no run had a chest by its bed. Of the four full runs' last
+// ten deaths each (2026-10-22 10:00Z), 8, 7, 5 and 4 were in no armour, most
+// minutes after coming back to life bare; a chest by the bed slept in holds
+// a spare kit and spare armour (home-stash.js, note 1254) for the next.
+function bareDeathsSays(bot) {
+  const deaths = (bot._survivalState?.deaths || []).filter(d => d.at);
+  if (deaths.length < 3) return '';
+  const bare = deaths.filter(d => Array.isArray(d.worn) && !d.worn.some(w => /_(helmet|chestplate|leggings|boots)$/.test(w))).length;
+  const t = deaths.map(d => Date.parse(d.at)).sort((a, b) => a - b), gaps = t.slice(1).map((x, i) => (x - t[i]) / 60000).sort((a, b) => a - b);
+  const median = gaps.length ? Math.round(gaps[Math.floor(gaps.length / 2)]) : null;
+  return ` This run's last ${deaths.length} deaths: ${bare} in no armour at all${median != null ? `, a median ${median} minutes apart` : ''}; each came back to life at the bed slept in with nothing, and the chest here is where a spare kit and spare armour wait for that.`;
+}
 function homeOption(bot, goal, planFor = null) {
   let step;
   try { step = homeStage(bot, goal); } catch (_) { step = null; }
@@ -350,7 +364,7 @@ function homeOption(bot, goal, planFor = null) {
   const bed = bedCarried(bot) && !done.home_bed ? ' The bed carried becomes the base\'s: nights away from it are spent without one until a second is made.' : '';
   const at = home?.origin ? `the base at ${home.origin.x}, ${home.origin.z}, begun; left, in order: ` : 'none yet; its steps, in order: ';
   return {
-    description: `Work on a home base: ${at}${left.join('; ')}. What it buys: the bed there keeps the spawn point while the bot sleeps nowhere else, so a death respawns by the chest and not at the world spawn; what is left in the chest does not drop on a death; the plot is bread and the pen steak and leather, a known walk away. None of it is needed for the Nether, blaze rods or ender pearls.${bed} The step at hand: ${HOME_STEPS[step.phase] || label(step.phase)}.${searchSoFar(bot, goal, rung)}${homeWhere(bot, goal, rung)}${rungTakes(bot, goal, rung, planFor)} ${spent >= 60000 ? `Worked on for ${Math.round(spent / 60000)} minutes so far.` : 'Not worked on yet.'}`,
+    description: `Work on a home base: ${at}${left.join('; ')}. What it buys: the bed there keeps the spawn point while the bot sleeps nowhere else, so a death respawns by the chest and not at the world spawn; what is left in the chest does not drop on a death; the plot is bread and the pen steak and leather, a known walk away. No rung on the way to the dragon needs it.${bareDeathsSays(bot)}${bed} The step at hand: ${HOME_STEPS[step.phase] || label(step.phase)}.${searchSoFar(bot, goal, rung)}${homeWhere(bot, goal, rung)}${rungTakes(bot, goal, rung, planFor)} ${spent >= 60000 ? `Worked on for ${Math.round(spent / 60000)} minutes so far.` : 'Not worked on yet.'}`,
     says: home ? 'I\'ll work on the base' : 'I\'ll make a home base', rung, trip: true,
   };
 }
@@ -904,4 +918,4 @@ async function strategyStep(bot, task, goal, save, stage, { client, decide, side
   return { ran: true };
 }
 
-module.exports = { cameOutSays, errandUnderWay, woolTrip, WOOL_HUNTS, oreFacts, carryBedOption, homeOption, strategyTree, pickaxeLeft, planSpends, HAND_BLOCKS_PER_MINUTE, rungTakes, WITHOUT, RUNG_WHY, rungOption, strategyOptions, strategyStep, HOLD_MS, SIDE_REST_MS, SIDE_FAIL_MS, rungStatus, lastStrategyFact };
+module.exports = { bareDeathsSays, cameOutSays, errandUnderWay, woolTrip, WOOL_HUNTS, oreFacts, carryBedOption, homeOption, strategyTree, pickaxeLeft, planSpends, HAND_BLOCKS_PER_MINUTE, rungTakes, WITHOUT, RUNG_WHY, rungOption, strategyOptions, strategyStep, HOLD_MS, SIDE_REST_MS, SIDE_FAIL_MS, rungStatus, lastStrategyFact };
