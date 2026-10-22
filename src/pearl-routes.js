@@ -149,6 +149,12 @@ function pearlRoutes(bot, goal, { now = Date.now(), save = () => {}, actions = {
 // found no warped forest, 73 minutes of play on the sweeps and none on the
 // Overworld's endermen in the run, and came back each time with no pearl.
 const SWEEP_ASK_MIN = 10;
+// The four full runs' pearls by way (note 2025), from their play clocks at
+// 2026-10-22 08:10Z: the two whose End portals were lit had hunted endermen
+// where they met them (stalking and fighting) 39 and 86 minutes and swept
+// for a warped forest 1 and 0; the two holding no pearl had swept 81 and 33
+// minutes and hunted 6 and 2.
+const ROUTE_RECORD = ' In the four full runs (to 2026-10-22 08:10Z), the two that made their twelve eyes and lit their portals had hunted endermen where they met them for 39 and 86 minutes and swept for a warped forest 1 and 0; the two holding no pearl had swept 81 and 33 minutes and hunted endermen 6 and 2.';
 const clockMin = (goal, key) => Math.round((goal.gameProgress?.clock?.byDoing?.[key] || 0) / 60000);
 const routeAsked = goal => clockMin(goal, 'obtain_ender_pearls: warped_search') >= SWEEP_ASK_MIN;
 function routeTree(bot, goal) {
@@ -159,8 +165,8 @@ function routeTree(bot, goal) {
   const { portalTrip } = require('./game-progress');
   let trip = ''; try { trip = ` ${portalTrip(bot, goal)}`; } catch (_) { trip = ''; }
   return {
-    warped_forest: { description: `Cross into the Nether and sweep for a warped forest, where endermen spawn by day and night alike, eight legs of 64 blocks; a sweep that finds none rests half an hour.${trip}${record}` },
-    overworld_hunt: { description: `Hunt the Overworld's endermen: they spawn in the dark on the surface, in ones and twos, each dropping a pearl about half the time, tall and slow to turn on a player who does not look at them.${overworldHourSays(bot)}${endermenHereSays(bot)} The crossing is not made; held half an hour.${record}` },
+    warped_forest: { description: `Cross into the Nether and sweep for a warped forest, where endermen spawn by day and night alike, eight legs of 64 blocks; a sweep that finds none rests half an hour.${trip}${record}${ROUTE_RECORD}` },
+    overworld_hunt: { description: `Hunt the Overworld's endermen: they spawn in the dark on the surface, in ones and twos, each dropping a pearl about half the time, tall and slow to turn on a player who does not look at them.${overworldHourSays(bot)}${endermenHereSays(bot)} The crossing is not made; held half an hour.${record}${ROUTE_RECORD}` },
   };
 }
 async function askRoute(bot, task, goal, save, actions = {}) {
