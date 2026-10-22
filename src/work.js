@@ -9294,7 +9294,16 @@ function gameHandlers(bot, decisionClient) {
         // Pearls from the warped forest (warped-pearls.js).
         warped_pearls: (bot, task, goal, save, stage) => require('./warped-pearls').warpedPearls(bot, task, goal, save,
           { navigate, acquireStep, notice: (b2, g2, sv2) => noticeLandmarks(b2, g2, sv2, { force: true }),
-            tunnel: (b2, t2, g2, sv2, target, opts = {}) => tunnelStep(b2, t2, g2, sv2, target, { dig, navigate, within: opts.within || null }) }, stage || goal.step),
+            tunnel: (b2, t2, g2, sv2, target, opts = {}) => tunnelStep(b2, t2, g2, sv2, target, { dig, navigate, within: opts.within || null }),
+            // A span laid toward the leg where no walk or staircase leads off (note 2023): the crossing's own survey and price.
+            cross: async (b2, t2, g2, sv2, target) => {
+              const nt = require('./nether-travel'), t = new Vec3(Math.floor(target.x), Math.floor(b2.entity.position.y), Math.floor(target.z));
+              if (nt.crossingResting(b2, g2, t)) return 'the crossing toward it rests';
+              const survey = require('./bridging').surveyCrossing(b2, t, { cells: nt.CROSS_STRETCH });
+              if (!survey.cells || survey.gain < 1) return 'no span gains ground toward it';
+              await nt.crossToward(b2, t2, g2, sv2, t, { what: 'the warped sweep\'s leg', anywhere: true });
+              return null;
+            } }, stage || goal.step),
         // Wolves sit before a crossing and stand again after (wolves.js).
         wolves: (bot, task, goal, save, sit) => require('./wolves').commandWolves(bot, task, goal, save, sit),
         // Back for a death's drops (corpse-run.js).

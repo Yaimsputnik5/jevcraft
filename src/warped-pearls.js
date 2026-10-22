@@ -219,7 +219,18 @@ async function warpedPearls(bot, task, goal, save, actions, stage, { now = Date.
     try { await actions.tunnel(bot, task, goal, save, leg, { within: goal.step }); }
     catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; stairWhy = String(err.message || err).slice(0, 160); }
   }
-  search.lastError = `the walk ${walkWhy ? `failed (${walkWhy})` : bot.entity.position.distanceTo(start) < 2 ? 'came no nearer' : 'went on'}${actions.tunnel ? `, the staircase ${stairWhy ? `failed (${stairWhy})` : 'came no nearer'}` : ''}`;
+  // Nor by a staircase, on a ledge whose every side drops to lava: a span
+  // laid toward the leg (note 2023). full-1 (2026-10-22 02:32 and 04:43Z),
+  // twice on a Nether ledge at (114, 90, 28) and (137, 51, 8), found every
+  // heading's walk without a route past a deadly drop and every staircase
+  // with no safe step, rested the sweep within a minute each time, and went
+  // back through the portal with no pearl: five crossings in five hours.
+  let crossWhy = null;
+  if (bot.entity.position.distanceTo(start) < 2 && actions.cross && !toWalk()) {
+    try { crossWhy = await actions.cross(bot, task, goal, save, leg); }
+    catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; crossWhy = String(err.message || err).slice(0, 160); }
+  }
+  search.lastError = `the walk ${walkWhy ? `failed (${walkWhy})` : bot.entity.position.distanceTo(start) < 2 ? 'came no nearer' : 'went on'}${actions.tunnel ? `, the staircase ${stairWhy ? `failed (${stairWhy})` : 'came no nearer'}` : ''}${actions.cross && crossWhy ? `, the span ${crossWhy}` : ''}`;
   const after = Math.hypot(leg.x - bot.entity.position.x, leg.z - bot.entity.position.z);
   search.tries = (search.tries || 0) + 1;
   if (after < before - 16 || toWalk()) { search.legs++; search.fails = 0; delete search.spent; }

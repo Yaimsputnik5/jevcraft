@@ -224,3 +224,18 @@ test('a forest whose walk rests is walked at again once the sweep has brought th
   assert.equal(await warped.warpedPearls(bot, new Task('pearls'), goal, () => {}, actions, { count: 12 }), true);
   assert.equal(require('../src/progress').isSetAside(goal, 'landmark_trip', 'warped_forest:-82,13'), false, 'asked again from nearer');
 });
+
+// full-1 (2026-10-22 02:32 and 04:43Z): on a Nether ledge every walk and staircase refused past a deadly drop; the
+// sweep rested within a minute each time (note 2023).
+test('where neither walk nor staircase leads off, the sweep lays a span toward its leg, and the span that gains ground keeps the sweep going', async () => {
+  const { bot, goal } = fixture('the_nether');
+  bot.entity.position = new Vec3(137.5, 51, 8.5);
+  const crossed = [];
+  const actions = { navigate: async () => { throw new Error('No route from here (noPath): the way passes along a drop that would kill'); }, acquireStep: async () => assert.fail('no hunt'), notice: () => {},
+    tunnel: async () => { throw new Error('The staircase toward it is set aside (no safe step toward it)'); },
+    cross: async (b, t, g, sv, target) => { crossed.push(target); b.entity.position = b.entity.position.offset(Math.sign(target.x - b.entity.position.x) * 12, 0, Math.sign(target.z - b.entity.position.z) * 12); return null; } };
+  for (let i = 0; i < 4; i++) await warped.warpedPearls(bot, new Task('pearls'), goal, () => {}, actions, { count: 16 });
+  assert.ok(crossed.length >= 4, `spans laid: ${crossed.length}`);
+  assert.ok(warped.warpedOpen(goal), 'the sweep goes on');
+  assert.equal(goal.warpedSearch.fails, 0);
+});
