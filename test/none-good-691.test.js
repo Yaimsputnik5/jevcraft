@@ -66,3 +66,18 @@ test('decide: none_good at the recorded weights and health takes the least-harm 
     if (env.LOG === undefined) delete process.env.JEV_MISSING_OPTIONS; else process.env.JEV_MISSING_OPTIONS = env.LOG;
   }
 });
+
+// full-4 (2026-10-22 03:45:53Z): the pillar priced 23.6 without its fall into the lava a block off (note 2021).
+test('none good: a way with a deadly fall beside it counts as taking all the health, whatever its own figure', () => {
+  const { pickWhenNoneGood } = require('../src/decisions');
+  const listed = {
+    pillar: { expects: { damage: 23.6, seconds: 15, pushOver: { deadly: true, by: 'blaze' } } },
+    take_cover: { expects: { damage: 31, seconds: 15 } },
+    retreat: {},
+    none_good: {},
+  };
+  const weights = { pillar: 0.12, take_cover: 0.18, retreat: 0.08, none_good: 0.34 };
+  assert.equal(pickWhenNoneGood(listed, weights, 14.9).key, 'take_cover');
+  const safe = { ...listed, pillar: { expects: { damage: 23.6, seconds: 15 } } };
+  assert.equal(pickWhenNoneGood(safe, weights, 14.9).key, 'pillar', 'without the fall the least by figures stands');
+});

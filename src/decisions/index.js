@@ -312,7 +312,14 @@ function pickWhenNoneGood(listed, weights, health, failed = []) {
   const byWeight = keys.slice().sort((a, b) => (weights[b] || 0) - (weights[a] || 0));
   const priced = keys.filter(k => Number.isFinite(listed[k]?.expects?.damage) && Number.isFinite(listed[k]?.expects?.seconds));
   if (!Number.isFinite(health) || !priced.length) return { key: byWeight[0], why: null };
-  const takes = k => listed[k].expects.damage;
+  // A way priced with a deadly fall beside it (expects.pushOver.deadly) takes
+  // all the health there is, whatever its own figure (note 2021): the
+  // pillar's figure counts the hit and not the fall. full-4 (2026-10-22
+  // 03:45:53Z), on a Nether ledge with a blaze 7 blocks off and lava 31
+  // below, answered none good at 0.34 over take_cover at 0.18; the least by
+  // figures was the pillar at 23.6, taken, and the next fireball knocked it
+  // off its top into the lava.
+  const takes = k => listed[k].expects.pushOver?.deadly ? Infinity : listed[k].expects.damage;
   const soon = k => takes(k) * EXPOSED_S / Math.max(1, listed[k].expects.seconds);
   // The next by weight stands unless its own figures take the health.
   if (!priced.includes(byWeight[0]) || takes(byWeight[0]) < health) return { key: byWeight[0], why: null };
