@@ -37,6 +37,7 @@ const IDLE_OPTIONS = [
   { key: 'stock_stash', label: 'put spares in the stash chest', when: 'the stash chest is within reach and spares are carried' },
   { key: 'kit_by_bed', label: 'put a chest beside the bed slept in and leave the spare kit and armour in it', when: 'no home base chest by the bed slept in, within 16 blocks of it, spares or spare armour carried and wood for a chest (note 2029)' },
   { key: 'stock_bed_kit', label: 'put spares in the chest beside the bed slept in', when: 'that chest stands, within 16 blocks, spares or spare armour carried (note 2029)' },
+  { key: 'spare_armour_by_bed', label: 'make a spare armour piece and leave it in the chest beside the bed slept in', when: 'that chest stands within 16 blocks, the iron ingots for a piece it lacks carried (note 2034)' },
   { key: 'take_bed_kit', label: 'take the kit out of the chest beside the bed slept in', when: 'that chest holds kit the pockets lack, within 16 blocks (note 2029)' },
   { key: 'light_home', label: 'put torches where monsters could spawn around home', when: 'the bed and the chest are down, ground around home is dark, and torches are carried or can be made' },
   { key: 'wall_home', label: 'build a wall two blocks high round home, with a door by the bed', when: 'the bed and the chest are down and home is not walled yet' },

@@ -63,3 +63,21 @@ test('the chest beside the bed is made over as many steps as its plan takes, the
   assert.equal(calls, 3);
   assert.ok(goal.bedKit?.position, 'placed and remembered');
 });
+
+// full-1 and full-4 (2026-10-22 17:54 to 18:32Z): iron lost at a death, bare at the next; the chest held only a piece
+// carried twice (note 2034).
+test('a spare armour piece for the chest beside the bed is offered where the ingots are carried and the place is worn', () => {
+  const { spareToMake, bedKitChores } = require('../src/bed-kit');
+  const { bot, blocks, goal } = fixture();
+  const its = bot.inventory.items(); its.splice(its.findIndex(i => i.name === 'iron_chestplate'), 1); its.push({ name: 'iron_ingot', count: 9 });
+  goal.bedKit = { position: { x: 699, y: 103, z: 293 }, bedFoot: { x: 700, y: 103, z: 293 }, contents: {} };
+  blocks['699,103,293'] = { name: 'chest', boundingBox: 'block' };
+  // The chestplate is worn (slot 6): a spare one is the most armour for its iron.
+  assert.equal(spareToMake(bot, { stash: goal.bedKit })[0], 'iron_chestplate');
+  assert.ok(bedKitChores(bot, goal).spare_armour_by_bed);
+  // One already in the chest: the next place worn, or none.
+  goal.bedKit.contents = { iron_chestplate: 1 };
+  assert.equal(spareToMake(bot, { stash: goal.bedKit }), null, 'only the chestplate is worn');
+  bot.inventory.slots[5] = { name: 'iron_helmet', count: 1 };
+  assert.equal(spareToMake(bot, { stash: goal.bedKit })[0], 'iron_helmet');
+});

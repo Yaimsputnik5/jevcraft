@@ -79,6 +79,19 @@ function depositsOf(bot, goal, home) {
   return { moves, armour };
 }
 
+// A spare armour piece made for the chest (note 2034): the chest held only
+// a piece carried twice, and no bot carries one twice; each death took what
+// was worn, and the next came bare. full-1 (2026-10-22 18:02Z) lost its iron
+// in the Nether's lava and died bare 30 minutes later; full-4 (17:54 and
+// 18:21Z) the same. Made where the ingots are carried and the chest has no
+// piece for that place, the most armour for its iron first.
+const SPARE_PIECES = Object.freeze([['iron_chestplate', 8, 6], ['iron_leggings', 7, 5], ['iron_helmet', 5, 2], ['iron_boots', 4, 2]]);
+function spareToMake(bot, home) {
+  const ingots = countOf(bot, 'iron_ingot'), held = home?.stash?.contents || {};
+  const SLOT = { iron_helmet: 5, iron_chestplate: 6, iron_leggings: 7, iron_boots: 8 };
+  // A spare for a place already worn: a bare place takes the piece on the body.
+  return SPARE_PIECES.find(([name, cost]) => ingots >= cost && !(held[name] > 0) && countOf(bot, name) < 1 && !!bot.inventory?.slots?.[SLOT[name]]) || null;
+}
 // The options at idle and at bedtime: put the chest down and stock it, stock
 // it, or take the kit out of it.
 function bedKitChores(bot, goal, { now = Date.now() } = {}) {
@@ -102,10 +115,17 @@ function bedKitChores(bot, goal, { now = Date.now() } = {}) {
   const holds = s.describeContents(home.stash.contents || {}) || 'nothing yet';
   if (moves.length || armour.length) out.stock_bed_kit = { description: `Put spares in the chest beside the bed slept in (${d} blocks off): ${what}. It holds ${holds}.${bare}`,
     run: (b, t, g, sv, a) => s.stockStash(b, t, g, sv, home, a, { only: m => !!m.slot, extra: depositsOf(b, g, home).armour }) };
+  const piece = spareToMake(bot, home);
+  if (piece) out.spare_armour_by_bed = { description: `Make a spare ${piece[0].replaceAll('_', ' ')} (${piece[1]} of the ${countOf(bot, 'iron_ingot')} iron ingots carried, ${piece[2]} armour points) and leave it in the chest beside the bed slept in (${d} blocks off), for coming back to life: a death drops what is worn, and the chest's piece is put on at the bed. It holds ${holds}.${bare}`,
+    run: async (b, t, g, sv, a) => {
+      for (let i = 0; i < 6 && countOf(b, piece[0]) < 1; i++) { t.check(); if (await a.acquireStep(b, t, piece[0], 1, g, sv) === true) break; }
+      if (countOf(b, piece[0]) < 1) throw new Error(`the spare ${piece[0].replaceAll('_', ' ')} was not made`);
+      return s.stockStash(b, t, g, sv, home, a, { only: () => false, extra: [{ item: piece[0], count: 1, slot: 'armour' }] });
+    } };
   const takes = s.stashWithdrawals(bot, home, []);
   if (takes.length) out.take_bed_kit = { description: `Take ${s.describeMoves(takes)} out of the chest beside the bed slept in (${d} blocks off): the kit left there for coming back to life bare. It holds ${holds}.`,
     run: (b, t, g, sv, a) => s.restockFromStash(b, t, g, sv, home, a, []) };
   return out;
 }
 
-module.exports = { bedKitHome, bedKitChores, chestCell, NEAR_BED };
+module.exports = { bedKitHome, bedKitChores, chestCell, spareToMake, NEAR_BED };

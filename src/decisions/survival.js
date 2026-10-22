@@ -136,6 +136,7 @@ define({
     { key: 'stock_stash', label: 'put spares in the chest', when: 'spares are carried', level: 'root' },
     { key: 'kit_by_bed', label: 'put a chest beside the bed slept in and leave the spare kit and armour in it', when: 'no home base chest by the bed slept in, spares or spare armour carried and wood for a chest (note 2029)', level: 'root' },
     { key: 'stock_bed_kit', label: 'put spares in the chest beside the bed slept in', when: 'that chest stands, spares or spare armour carried (note 2029)', level: 'root' },
+    { key: 'spare_armour_by_bed', label: 'make a spare armour piece and leave it in the chest beside the bed slept in', when: 'that chest stands, the iron ingots for a piece it lacks carried (note 2034)', level: 'root' },
     { key: 'take_bed_kit', label: 'take the kit out of the chest beside the bed slept in', when: 'that chest holds kit the pockets lack (note 2029)', level: 'root' },
     { key: 'harvest_and_bake', label: 'harvest the ripe wheat and bake bread', when: 'enough ripe or carried wheat for a loaf', level: 'root' },
     { key: 'tend_farm', label: 'till, harvest or plant the plot', when: 'the plot needs work', level: 'root' },

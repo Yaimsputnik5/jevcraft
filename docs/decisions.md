@@ -163,6 +163,7 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | `stock_stash` | root | put spares in the chest | spares are carried |
 | `kit_by_bed` | root | put a chest beside the bed slept in and leave the spare kit and armour in it | no home base chest by the bed slept in, spares or spare armour carried and wood for a chest (note 2029) |
 | `stock_bed_kit` | root | put spares in the chest beside the bed slept in | that chest stands, spares or spare armour carried (note 2029) |
+| `spare_armour_by_bed` | root | make a spare armour piece and leave it in the chest beside the bed slept in | that chest stands, the iron ingots for a piece it lacks carried (note 2034) |
 | `take_bed_kit` | root | take the kit out of the chest beside the bed slept in | that chest holds kit the pockets lack (note 2029) |
 | `harvest_and_bake` | root | harvest the ripe wheat and bake bread | enough ripe or carried wheat for a loaf |
 | `tend_farm` | root | till, harvest or plant the plot | the plot needs work |
@@ -793,6 +794,7 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | `stock_stash` | root | put spares in the stash chest | by day in the Overworld, and the stash chest is within reach and spares are carried |
 | `kit_by_bed` | root | put a chest beside the bed slept in and leave the spare kit and armour in it | by day in the Overworld, and no home base chest by the bed slept in, within 16 blocks of it, spares or spare armour carried and wood for a chest (note 2029) |
 | `stock_bed_kit` | root | put spares in the chest beside the bed slept in | by day in the Overworld, and that chest stands, within 16 blocks, spares or spare armour carried (note 2029) |
+| `spare_armour_by_bed` | root | make a spare armour piece and leave it in the chest beside the bed slept in | by day in the Overworld, and that chest stands within 16 blocks, the iron ingots for a piece it lacks carried (note 2034) |
 | `take_bed_kit` | root | take the kit out of the chest beside the bed slept in | by day in the Overworld, and that chest holds kit the pockets lack, within 16 blocks (note 2029) |
 | `light_home` | root | put torches where monsters could spawn around home | by day in the Overworld, and the bed and the chest are down, ground around home is dark, and torches are carried or can be made |
 | `wall_home` | root | build a wall two blocks high round home, with a door by the bed | by day in the Overworld, and the bed and the chest are down and home is not walled yet |
@@ -1492,6 +1494,7 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | `stock_stash` | root | put spares in the stash chest | the stash chest is within reach and spares are carried |
 | `kit_by_bed` | root | put a chest beside the bed slept in and leave the spare kit and armour in it | no home base chest by the bed slept in, within 16 blocks of it, spares or spare armour carried and wood for a chest (note 2029) |
 | `stock_bed_kit` | root | put spares in the chest beside the bed slept in | that chest stands, within 16 blocks, spares or spare armour carried (note 2029) |
+| `spare_armour_by_bed` | root | make a spare armour piece and leave it in the chest beside the bed slept in | that chest stands within 16 blocks, the iron ingots for a piece it lacks carried (note 2034) |
 | `take_bed_kit` | root | take the kit out of the chest beside the bed slept in | that chest holds kit the pockets lack, within 16 blocks (note 2029) |
 | `light_home` | root | put torches where monsters could spawn around home | the bed and the chest are down, ground around home is dark, and torches are carried or can be made |
 | `wall_home` | root | build a wall two blocks high round home, with a door by the bed | the bed and the chest are down and home is not walled yet |
@@ -1573,6 +1576,7 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | `stock_stash` | root | put spares in the stash chest | by day in the Overworld, and the stash chest is within reach and spares are carried |
 | `kit_by_bed` | root | put a chest beside the bed slept in and leave the spare kit and armour in it | by day in the Overworld, and no home base chest by the bed slept in, within 16 blocks of it, spares or spare armour carried and wood for a chest (note 2029) |
 | `stock_bed_kit` | root | put spares in the chest beside the bed slept in | by day in the Overworld, and that chest stands, within 16 blocks, spares or spare armour carried (note 2029) |
+| `spare_armour_by_bed` | root | make a spare armour piece and leave it in the chest beside the bed slept in | by day in the Overworld, and that chest stands within 16 blocks, the iron ingots for a piece it lacks carried (note 2034) |
 | `take_bed_kit` | root | take the kit out of the chest beside the bed slept in | by day in the Overworld, and that chest holds kit the pockets lack, within 16 blocks (note 2029) |
 | `light_home` | root | put torches where monsters could spawn around home | by day in the Overworld, and the bed and the chest are down, ground around home is dark, and torches are carried or can be made |
 | `wall_home` | root | build a wall two blocks high round home, with a door by the bed | by day in the Overworld, and the bed and the chest are down and home is not walled yet |
