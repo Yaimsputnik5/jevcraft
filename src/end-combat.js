@@ -52,6 +52,14 @@ const { canStrike, defendNearby, raiseShield, lowerShield } = require('./combat'
 const { durable, carriedEquipment } = require('./mob-policy');
 const { fallDanger, recoverFall } = require('./fall-recovery');
 const { cloudRadius, hazardDistance, endEmergency, checkEndEmergency, evadeDragon, dragonThreat, breathThreat } = require('./end-safety');
+// A breath cloud over the body's column within its reach and a block and a
+// half beside, from half a block under the feet to four and a half over
+// (note 2033): the climb out of a hole at a pillar's foot rises into it.
+function cloudOverClimb(bot) {
+  const p = bot.entity?.position;
+  if (!p) return null;
+  return Object.values(bot.entities || {}).find(e => e.name === 'area_effect_cloud' && e.isValid !== false && e.position && e.position.y - p.y >= -0.5 && e.position.y - p.y <= 4.5 && Math.hypot(p.x - e.position.x, p.z - e.position.z) <= cloudRadius(bot, e) + 1.5) || null;
+}
 const { endDecisionState, dragonNow } = require('./decisions/end-state');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const blocked = message => Object.assign(new Error(message), { name: 'Blocked' });
@@ -3394,6 +3402,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           const c = Object.values(bot.entities).find(e => e.name === 'end_crystal' && e.id === Number(m[1]) && e.isValid !== false);
           if (!c) { console.log(`[end combat] tunnel_and_climb_${m[1]}: the tunnel done, the crystal gone`); return r; }
           if (bot.health < 8) { console.log(`[end combat] tunnel_and_climb_${m[1]}: the tunnel done at ${bot.health.toFixed(1)} health; the climb left to the next question`); return r; }
+          // Not up into the breath (note 2033), as the way out of a hole is not
+          // (note 1836): a cloud over the hole at the pillar's foot, within its
+          // reach, and the climb's first block puts the body in its slab.
+          // full-3 (2026-10-22 17:39Z), in full iron, its tunnel done at
+          // (-9, 60, -36), began the climb with a cloud 7.7 wide 1.6 off and 3
+          // over the feet, was cut by it at once, found no stub, no run and
+          // no way up out of it, and died in the pit, 20 to nothing.
+          { const p = bot.entity.position, over = cloudOverClimb(bot);
+            if (over) { console.log(`[end combat] tunnel_and_climb_${m[1]}: the tunnel done at ${p.floored()}; the breath's cloud ${Math.round((over.position.y - p.y) * 10) / 10} over the feet, ${Math.round(cloudRadius(bot, over) * 10) / 10} wide, ${Math.round(Math.hypot(p.x - over.position.x, p.z - over.position.z) * 10) / 10} off: the climb left to the next question, in the hole under it`); return r; } }
           console.log(`[end combat] tunnel_and_climb_${m[1]}: the tunnel done at ${bot.entity.position.floored()}, the climb begun`);
           return climb.run();
         } };
@@ -4393,4 +4410,4 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   }
 }
 
-module.exports = { runOffSides, spanSteps, PUNCH_RECORD, punchRecordSays, dragonNearRoute, enclosed, dropOffs, leaveHighGround, voidEdge, endermenNearRoute, metadata, perched, perchedHead, repeatedCrystalMiss, observeArena, endHazards, safeEndPoint, arenaMovement, arenaRoutes, fightEndStep };
+module.exports = { cloudOverClimb, runOffSides, spanSteps, PUNCH_RECORD, punchRecordSays, dragonNearRoute, enclosed, dropOffs, leaveHighGround, voidEdge, endermenNearRoute, metadata, perched, perchedHead, repeatedCrystalMiss, observeArena, endHazards, safeEndPoint, arenaMovement, arenaRoutes, fightEndStep };
