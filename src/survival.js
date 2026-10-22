@@ -1315,6 +1315,23 @@ function blockRecord(distance, seen) {
   const band = !r.seen ? 'at any distance' : r.within === 2 ? 'within 2 blocks' : r.within === 3.5 ? '2 to 3.5 blocks off' : 'more than 3.5 blocks off';
   return { ...r, band };
 }
+// What each stance came to with a deadly drop beside it (note 2026): in
+// the flight records of 2026-10 (scratchpad pushover.py), the encounter
+// stances answered with the option's own push-over said deadly, and how
+// many were followed within 20 seconds by lava or a fall. Priced at the
+// figure the option had, the fall unpriced: full-1 (2026-10-22 08:59:48Z),
+// in iron with two blazes and a wither skeleton about, chose the pillar at
+// 0.30 priced 8.5, and a fireball put it in the lava 16 seconds later; four
+// of the falls into lava in the last day began so.
+const PUSH_RECORD = Object.freeze({ pillar: [11, 4], run_from: [12, 3], fight: [32, 3], retreat: [65, 5], take_cover: [88, 1], out_of_sight: [72, 0], leave_and_heal: [99, 0],
+  shield_guard: [21, 0], await_in_reach: [13, 1], return_fireball: [16, 0], fight_from_footing: [6, 1], box_here: [6, 0], back_to_wall: [6, 0], keep_working: [6, 0], hold_on_span: [5, 0], nook: [5, 0] });
+function pushRecordOn(bot, key, o) {
+  const r = PUSH_RECORD[key];
+  if (!r) return;
+  const [n, fell] = r;
+  o.description += ` In the record (the flight records of 2026-10), this way chosen with a deadly drop beside it: ${n} times, the bot in the lava or fallen within 20 seconds ${fell === 0 ? 'none of them' : `${fell}`}.`;
+  if (fell > 0 && o.expects && Number.isFinite(o.expects.damage)) o.expects.damage = Math.round((o.expects.damage + fell / n * (bot.health ?? 20)) * 10) / 10;
+}
 function pricedRunCell(here, from, blocks) {
   const dx = here.x - from.x, dz = here.z - from.z, len = Math.hypot(dx, dz) || 1;
   return { x: Math.round(here.x + dx / len * blocks), z: Math.round(here.z + dz / len * blocks) };
@@ -5784,6 +5801,7 @@ class Survival {
       o.description += over.says + (k === 'keep_working' ? ' The work does not stop in time: the hit that would stop it is the one that throws the bot over.' : '');
       // The push carried on the price too (note 1922), for the quiet scene that reads the figure alone: full-1 (2026-10-19 21:12:14Z) was told 'a fireball that lands here is priced by that fall: the bot's death' on a ledge one block from lava 19 down, its figure 'about 0 damage'; the scene read quiet, gave the turn to the work, and a fireball put the bot in the lava at 21:12:20.
       o.expects = { ...(o.expects || {}), pushOver: { deadly: !!over.deadly, by: over.pusher?.name } };
+      if (over.deadly) pushRecordOn(bot, k, o);
       // Where the push cannot carry it over, said beside it (note 612).
       if (blastOver && k !== 'fight_from_footing') o.description += blastOver.footing ? ` Footing a push from the ${blastOver.pusher.name.replaceAll('_', ' ')} cannot carry the bot over stands ${blastOver.footing.steps} step${blastOver.footing.steps === 1 ? '' : 's'} off at (${blastOver.footing.cell.x}, ${blastOver.footing.cell.y}, ${blastOver.footing.cell.z}).` : ` No footing a push from the ${blastOver.pusher.name.replaceAll('_', ' ')} cannot carry the bot over is within ${FOOTING_STEPS} steps of walking.`;
     }
@@ -5794,6 +5812,7 @@ class Survival {
       if (CLOSES_THE_DROP.has(k) || k === 'out_of_the_push') continue;
       o.description += blastOver.says + (k === 'keep_working' ? ' The work does not stop in time: the hit that would stop it is the one that throws the bot over.' : '');
       o.expects = { ...(o.expects || {}), pushOver: { deadly: !!blastOver.deadly, by: blastOver.pusher?.name } };
+      if (blastOver.deadly) pushRecordOn(bot, k, o);
     }
     // A spear holder's knock over the drop, on every stance but the fight
     // (which says its jabs to the drop) and those that close the drop.
@@ -12704,4 +12723,4 @@ function claim(bot, goal = {}, survival = null) {
   return made;
 }
 
-module.exports = { blockRecord, BLOCK_RECORD, bedClimbable, BED_CLIMB, pricedRunCell, runFromRecord, RUN_FROM_RECORD, spawnBedNear, homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
+module.exports = { PUSH_RECORD, pushRecordOn, blockRecord, BLOCK_RECORD, bedClimbable, BED_CLIMB, pricedRunCell, runFromRecord, RUN_FROM_RECORD, spawnBedNear, homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };

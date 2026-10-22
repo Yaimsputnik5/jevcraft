@@ -6445,3 +6445,16 @@ test("block_creeper's record by the creeper's distance and sight", () => {
   assert.equal(blockRecord(6, true).blasts, 42);
   assert.equal(blockRecord(1.7, false).band, 'at any distance');
 });
+
+// full-1 (2026-10-22 08:59:48Z): the pillar at 0.30 priced 8.5 beside lava with blazes about, fell 16 s later (note 2026).
+test("a stance with a deadly drop beside it says its own record of falls and is priced with it", () => {
+  const { pushRecordOn } = require('../src/survival');
+  const o = { description: 'Go two blocks up.', expects: { damage: 8.5, seconds: 15 } };
+  pushRecordOn({ health: 18.3 }, 'pillar', o);
+  assert.match(o.description, /this way chosen with a deadly drop beside it: 11 times, the bot in the lava or fallen within 20 seconds 4\.$/);
+  assert.equal(o.expects.damage, 15.2);
+  const c = { description: 'Out of sight.', expects: { damage: 3, seconds: 15 } };
+  pushRecordOn({ health: 18.3 }, 'out_of_sight', c);
+  assert.match(c.description, /72 times, the bot in the lava or fallen within 20 seconds none of them\.$/);
+  assert.equal(c.expects.damage, 3);
+});
