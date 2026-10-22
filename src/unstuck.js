@@ -571,6 +571,12 @@ function localMoves(view, feet, { goal = 'sky', visits = {}, target = null, from
     // 25583's step north onto such a cell was said as "ends on dry ground"
     // only (note 655).
     if (!inWater && lavaBeside(view, p)) facts.lavaBeside = true;
+    // A stalagmite's tip under the cell it ends on (note 2031): the jump
+    // onto it lands on the point. full-4 (2026-10-22 15:35:54Z), in full
+    // iron, took 'Jump up onto the block north ... ends on dry ground' with
+    // that block pointed dripstone, said only on the dig beside it, and was
+    // impaled.
+    if (view.name(p.plus(DOWN)) === 'pointed_dripstone') facts.onDripstone = true;
     if (target) facts.blocksToTarget = Math.round(p.distanceTo(target));
     if (from) facts.blocksFromStart = Math.round(offStuck(p, from, stuckAt));
     return facts;
@@ -892,7 +898,8 @@ function describeMove(m, { offWorld = false } = {}) {
   if (m.effects?.length) facts.push(m.effects.join('; '));
   if (m.to) {
     facts.push(m.rises > 0 ? `rises ${m.rises}` : m.rises < 0 ? `goes down ${-m.rises}` : 'same level');
-    if (m.dryFooting) facts.push('ends on dry ground');
+    if (m.onDripstone) facts.push('ends on the point of a pointed dripstone: landing on a stalagmite hurts as a fall does and more, two health a block fallen on top of the fall, and the jump onto it is a fall onto the point');
+    else if (m.dryFooting) facts.push('ends on dry ground');
     if (m.lavaBeside) facts.push('lava beside the cell it ends on (level with the feet or the floor, a block to the side or corner to corner): a misstep or a push there is into the lava');
     if (m.breathes === true) facts.push('the head comes out into air there');
     else if (m.breathes === false) facts.push('the head is still under water there');

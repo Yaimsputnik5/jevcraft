@@ -173,3 +173,15 @@ test('a dig into a sealed lake says how far its air is, and is not offered where
   assert.equal(lake(true, 5), undefined, 'not with five seconds of breath');
   assert.equal(lake(false, 13), undefined, 'not with no air within the swim');
 });
+
+// full-4 (2026-10-22 15:35:54Z): 'Jump up onto the block north ... ends on dry ground', the block a stalagmite (note 2031).
+test('a climb onto pointed dripstone says it ends on the point, not on dry ground', () => {
+  // Standing at y 71 in a pocket of air; north a pointed dripstone at the feet, air over it.
+  const cells = { '0,71,0': 'air', '0,72,0': 'air', '0,73,0': 'air', '0,71,-1': 'pointed_dripstone', '0,72,-1': 'air', '0,73,-1': 'air' };
+  const moves = localMoves(view(cells), new Vec3(0, 71, 0)).moves;
+  const climb = moves.find(m => m.key === 'climb_north');
+  assert.ok(climb, `moves: ${moves.map(m => m.key)}`);
+  const said = describeMove(climb);
+  assert.match(said, /ends on the point of a pointed dripstone/);
+  assert.doesNotMatch(said, /ends on dry ground/);
+});
