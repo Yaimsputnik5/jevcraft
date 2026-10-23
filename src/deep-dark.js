@@ -23,6 +23,17 @@ const { setAside, isSetAside } = require('./progress');
 // Three minutes a turn: the main loop's eating, air and night checks run
 // between turns, not inside one.
 const LEG = 48, TRIP_MS = 3 * 60 * 1000, WARDEN_REST_MS = 30 * 60 * 1000;
+// The quiet way through an ancient city (note 2036, the user 2026-10-23:
+// 'Jev should take advantage of finding one of these'): crouched, digging
+// and laying nothing near the city, and out at the second shriek. A
+// shrieker shrieks at a vibration a sensor beside it hears (a step not
+// crouched, a block dug or laid, a chest opened) or at a step on it, and
+// puts Darkness on the player; each shriek raises the player's warning by
+// one, the fourth summons a warden, and the warning falls by one every ten
+// minutes. Offered 454 times in the four full runs to 2026-10-23 02:00Z and
+// taken none (0.007 on the mean), with no way through but walking and
+// digging and 'never fight one, leave if one shows'.
+const SHRIEKS_OUT = 2;
 const EXPEDITIONS = Object.freeze({
   deep_dark: { depth: -52, landmark: 'ancient_city', reach: 80, label: 'the deep dark', site: 'ancient city', warden: true },
   trial_chambers: { depth: -30, landmark: 'trial_chambers', reach: 48, label: 'the trial chambers', site: 'trial chambers', vaults: true },
@@ -34,6 +45,7 @@ const overworld = bot => /overworld/.test(String(bot.game?.dimension || 'overwor
 const pickaxeTier = bot => Math.max(0, ...bot.inventory.items().map(i => /^(\w+)_pickaxe$/.exec(i.name)).filter(Boolean).map(m => TIERS.indexOf(m[1]) + 1));
 const wardenNear = (bot, r = 48) => Object.values(bot.entities || {}).some(e => e.name === 'warden' && e.isValid !== false && e.position && e.position.distanceTo(bot.entity.position) <= r);
 const flat = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+const darknessOn = bot => { try { const id = bot.registry?.effectsByName?.darkness?.id ?? bot.registry?.effectsByName?.Darkness?.id; return id != null && !!bot.entity?.effects?.[id]; } catch (_) { return false; } };
 const stateOf = (goal, kind) => kind === 'deep_dark' ? (goal.deepDark ||= fresh()) : ((goal.expeditions ||= {})[kind] ||= fresh());
 const fresh = () => ({ startedAt: new Date().toISOString(), heading: Math.floor(Math.random() * 4), legs: 0, legFails: 0 });
 const peek = (goal, kind) => kind === 'deep_dark' ? goal.deepDark : goal.expeditions?.[kind];
@@ -74,7 +86,10 @@ function describe(goal, kind = 'deep_dark', bot = null) {
       facts += ` A death there drops what is carried then${listed.length ? ` (now: ${listed.slice(0, 8).join(', ')}${listed.length > 8 ? ', and more' : ''})` : ''}, ${cost.walkBackBlocks != null ? `${cost.walkBackBlocks} blocks and more from where the bot would respawn` : 'far from where the bot would respawn'}; the kit is packed light before the trip starts.`;
     } catch (_) { /* no inventory to read */ }
   }
-  const risk = (x.warden ? 'Wardens live there: never fight one, leave if one shows.' : 'The waves are real fights.') + facts;
+  const quietSays = x.warden ? ' Through the city the bot goes crouched, digging and laying nothing: a crouched step makes no vibration for its sculk sensors and shriekers to hear. A chest opened is one all the same, and each shriek puts Darkness on the bot and raises its warning by one; the fourth summons a warden, and the trip leaves at the second. The warning falls by one every ten minutes.' : '';
+  const endSays = x.warden ? ' For the End: an enchanted golden apple heals and shields through the dragon\'s breath and its blows, Protection on the armour takes a share off every hit, and Feather Falling off the falls from the pillars.' : '';
+  const record = x.warden ? ` Its record in this run: ${s?.chests || 0} chests opened, ${s?.wardenAt ? 'a warden met' : 'no warden met'}.` : '';
+  const risk = (x.warden ? 'Wardens live there: never fight one, leave if one shows.' : 'The waves are real fights.') + quietSays + endSays + record + facts;
   if (site) return `The ${x.site} is known at ${site.x}, ${site.y}, ${site.z}: go back down and through it. ${LOOT_LINES[kind]} ${risk}`;
   if (s?.legs) return `Go on with the expedition to ${x.label}: ${s.legs} legs swept at depth so far, no ${x.site} yet. ${LOOT_LINES[kind]} ${risk}`;
   return `Expedition to ${x.label}: pack light, dig a staircase down to y ${x.depth} and sweep for the ${x.site}. ${LOOT_LINES[kind]} ${risk}`;
@@ -111,6 +126,18 @@ async function pickUpKey(bot, task, goal, save, actions) {
 async function expeditionStep(bot, task, goal, save, actions, kind = 'deep_dark') {
   const x = EXPEDITIONS[kind];
   const state = stateOf(goal, kind);
+  // The shrieks, each a Darkness come on (note 2036).
+  if (x.warden) {
+    const dark = darknessOn(bot);
+    if (dark && !state.darkOn) { state.shrieks = (state.shrieks || 0) + 1; state.lastShriekAt = new Date().toISOString(); }
+    state.darkOn = dark;
+    if ((state.shrieks || 0) >= SHRIEKS_OUT) {
+      setAside(goal, kind, 'trip', `${state.shrieks} shrieks: the warning a step from a warden`, WARDEN_REST_MS);
+      state.shrieks = 0; delete state.darkOn; save();
+      bot.chat?.('The shriekers have heard me twice. Out of the deep dark before a warden comes.');
+      return 'warden';
+    }
+  }
   if (x.warden && wardenNear(bot)) {
     setAside(goal, kind, 'trip', 'a warden in sight', WARDEN_REST_MS);
     state.wardenAt = new Date().toISOString(); save();
@@ -141,7 +168,8 @@ async function expeditionStep(bot, task, goal, save, actions, kind = 'deep_dark'
       return 'done';
     }
     goal.step = { action: kind, phase: 'site', target: { x: target.x, y: target.y, z: target.z } }; save();
-    const got = await approach(bot, task, state, save, target, actions, next ? 2 : 6);
+    // Crouched within the city's reach and a margin, not the long walk to it.
+    const got = await approach(bot, task, state, save, target, actions, next ? 2 : 6, { quiet: !!x.warden && flat(here, site) <= x.reach + 16 });
     // A container that cannot be got to rests after two tries, and the next
     // one is taken: trial 39 walked at a barrel built into a trial chamber's
     // wall of tuff bricks and copper, no path in, for as long as the audit
@@ -180,7 +208,7 @@ const deepDarkStep = (bot, task, goal, save, actions) => expeditionStep(bot, tas
 
 // Toward a point: the pathfinder, then a staircase step. True when it got
 // six blocks closer or arrived.
-async function approach(bot, task, state, save, target, actions, range) {
+async function approach(bot, task, state, save, target, actions, range, { quiet = false } = {}) {
   const { valuableInPassing, mineValuableInPassing } = require('./opportunistic-mining');
   // A diamond within four blocks of the way is dug first.
   if (actions.goal && await mineValuableInPassing(bot, task, actions.goal, save, actions)) return true;
@@ -188,9 +216,11 @@ async function approach(bot, task, state, save, target, actions, range) {
   const gap = () => bot.entity.position.distanceTo(target);
   const start = gap();
   const stopWhen = actions.goal ? () => valuableInPassing(bot, actions.goal) : undefined;
-  try { await actions.navigate(bot, task, new goals.GoalNear(target.x, target.y, target.z, range), { timeoutMs: 30000, stallMs: 8000, stopWhen }); }
+  try { await actions.navigate(bot, task, new goals.GoalNear(target.x, target.y, target.z, range), { timeoutMs: 30000, stallMs: 8000, stopWhen, ...(quiet ? { quiet: true } : {}) }); }
   catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
   if (gap() <= range + 1 || gap() < start - 6) return true;
+  // In the city no staircase: a block dug is a vibration (note 2036).
+  if (quiet) return gap() < start - 1;
   try { await actions.tunnel(bot, task, state, save, target, { dig: actions.dig, navigate: actions.navigate }); }
   catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; state.lastError = err.message; }
   return bot.entity.position.distanceTo(from) > 1 && gap() < start - 1;
@@ -212,4 +242,4 @@ async function expeditionTrip(bot, task, goal, save, actions, kind = 'deep_dark'
 }
 const deepDarkTrip = (bot, task, goal, save, actions, options) => expeditionTrip(bot, task, goal, save, actions, 'deep_dark', options);
 
-module.exports = { EXPEDITIONS, DEPTH, LEG, expeditionReady, expeditionStep, expeditionTrip, deepDarkReady, deepDarkStep, deepDarkTrip, describe, wardenNear, openVault };
+module.exports = { darknessOn, SHRIEKS_OUT, EXPEDITIONS, DEPTH, LEG, expeditionReady, expeditionStep, expeditionTrip, deepDarkReady, deepDarkStep, deepDarkTrip, describe, wardenNear, openVault };

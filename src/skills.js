@@ -523,7 +523,11 @@ async function navigate(bot, task, goal, options = {}) {
   try { return await navigateOnce(bot, task, goal, options); }
   finally { if (!options.shore && bot._heading && bot._heading.x === goal?.x && bot._heading.z === goal?.z) bot._heading.at = Date.now(); }
 }
-async function navigateOnce(bot, task, goal, { timeoutMs = 90000, stallMs = 15000, stopWhen, sprint = false, shore = false, besideLava, edgeTaken, onFoot = false, passing = false } = {}) {
+// `quiet`: crouched the whole way, digging and laying nothing, no sprint
+// (note 2036): a crouched step makes no vibration for a sculk sensor or
+// shrieker to hear, in the deep dark's cities.
+async function navigateOnce(bot, task, goal, { timeoutMs = 90000, stallMs = 15000, stopWhen, sprint = false, shore = false, besideLava, edgeTaken, onFoot = false, passing = false, quiet = false } = {}) {
+  if (quiet) { onFoot = true; sprint = false; passing = false; }
   task.check();
   watchHazards(bot);
   const look = passing && bot._goal && bot.pathfinder?.movements ? passingLook(bot, task) : null;
@@ -554,9 +558,10 @@ async function navigateOnce(bot, task, goal, { timeoutMs = 90000, stallMs = 1500
   pace.unref?.();
   const ended = (kind, why = null) => { clearInterval(pace); const p = bot.entity?.position; if (p) blocks += Math.min(10, Math.hypot(p.x - last.x, p.y - last.y, p.z - last.z)); fp.noteWalk(bot, { kind, goal: there, from, startedAt, blocks, why, walk }); };
   // A held sneak let go before the walk (note 1845): the End's holds, digs and pockets crouch the body and a cut step can leave the key down; crouched, the pathfinder's walk cannot step off any edge, and 25588's dragon-194, 200 and 206 (2026-10-18) stood on stubs and rims with hundreds of walks 'timed out without reaching new ground' and 'No route from here'. Said when it happens, so the leak's source can be found.
-  if (bot.controlState?.sneak) { console.log(`[walks] the sneak key was held at the walk's start at ${bot.entity?.position?.floored?.() || '?'}: let go (step ${bot._goal?.step?.action || '-'})`); try { bot.setControlState('sneak', false); } catch (_) { /* no controls */ } }
+  if (!quiet && bot.controlState?.sneak) { console.log(`[walks] the sneak key was held at the walk's start at ${bot.entity?.position?.floored?.() || '?'}: let go (step ${bot._goal?.step?.action || '-'})`); try { bot.setControlState('sneak', false); } catch (_) { /* no controls */ } }
   try {
-    const result = await walkTo(bot, task, goal, { timeoutMs, stallMs, stopWhen, sprint, besideLava, edgeTaken, onFoot, walk, from });
+    if (quiet) { try { bot.setControlState('sneak', true); } catch (_) { /* no controls in a test */ } }
+    const result = await walkTo(bot, task, goal, { timeoutMs, stallMs, stopWhen, sprint, besideLava, edgeTaken, onFoot, walk, from }).finally(() => { if (quiet) { try { bot.setControlState('sneak', false); } catch (_) { /* none */ } } });
     ended('arrived');
     return result;
   } catch (err) {

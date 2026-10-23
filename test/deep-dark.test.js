@@ -100,3 +100,24 @@ test('a barrel of a trial chamber that cannot be got to rests after two tries, a
   for (let n = 0; n < 3; n++) await dd.expeditionStep(b, new Task('tc'), goal, () => {}, actions, 'trial_chambers');
   assert.deepEqual(went, ['20,1', '20,1', '24,6'], 'twice at the walled barrel, then the other');
 });
+
+// The user (2026-10-23): Jev should take advantage of an ancient city found; through it quiet (note 2036).
+test('in an ancient city the walk is crouched and digs nothing, and the second shriek ends the trip', async () => {
+  const b = bot({ y: -52 });
+  b.entity.position = new Vec3(10.5, -52, 0.5);
+  const goal = { deepDark: { heading: 0, legs: 0, legFails: 0 }, landmarks: [{ kind: 'ancient_city', x: 30, y: -52, z: 0 }] };
+  const walks = [], tunnels = [];
+  const actions = { navigate: async (bb, t, g, opts) => { walks.push(opts); }, tunnel: async () => { tunnels.push(1); }, dig: async () => {}, loot: async () => false };
+  await dd.deepDarkStep(b, new Task('dd'), goal, () => {}, actions);
+  assert.equal(walks[0]?.quiet, true, 'crouched in the city');
+  assert.equal(tunnels.length, 0, 'no staircase dug in the city');
+  // Darkness comes on twice: out.
+  const dark = registry.effectsByName.darkness?.id ?? registry.effectsByName.Darkness?.id;
+  b.entity.effects = { [dark]: { amplifier: 0 } };
+  assert.notEqual(await dd.deepDarkStep(b, new Task('dd'), goal, () => {}, actions), 'warden', 'one shriek: on');
+  b.entity.effects = {};
+  await dd.deepDarkStep(b, new Task('dd'), goal, () => {}, actions);
+  b.entity.effects = { [dark]: { amplifier: 0 } };
+  assert.equal(await dd.deepDarkStep(b, new Task('dd'), goal, () => {}, actions), 'warden', 'the second: out');
+  assert.match(dd.describe(goal, 'deep_dark', b), /crouched, digging and laying nothing.*the trip leaves at the second.*enchanted golden apple/);
+});
