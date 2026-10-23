@@ -55,10 +55,12 @@ const { cloudRadius, hazardDistance, endEmergency, checkEndEmergency, evadeDrago
 // A breath cloud over the body's column within its reach and a block and a
 // half beside, from half a block under the feet to four and a half over
 // (note 2033): the climb out of a hole at a pillar's foot rises into it.
-function cloudOverClimb(bot) {
+// Higher for a longer climb (note 2040): the dig to the sky goes up through
+// all the rock over the head.
+function cloudOverClimb(bot, up = 4.5) {
   const p = bot.entity?.position;
   if (!p) return null;
-  return Object.values(bot.entities || {}).find(e => e.name === 'area_effect_cloud' && e.isValid !== false && e.position && e.position.y - p.y >= -0.5 && e.position.y - p.y <= 4.5 && Math.hypot(p.x - e.position.x, p.z - e.position.z) <= cloudRadius(bot, e) + 1.5) || null;
+  return Object.values(bot.entities || {}).filter(e => e.name === 'area_effect_cloud' && e.isValid !== false && e.position && e.position.y - p.y >= -0.5 && e.position.y - p.y <= up && Math.hypot(p.x - e.position.x, p.z - e.position.z) <= cloudRadius(bot, e) + 1.5).sort((a, b) => a.position.y - b.position.y)[0] || null;
 }
 const { endDecisionState, dragonNow } = require('./decisions/end-state');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -3934,9 +3936,13 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       const columnAbove = feet.y + rock + 1 > 72;
       if (rock >= 2 && solidAbove >= 3 && !onOwnPillar() && !onObsidianTop() && !ownColumnAbove && !columnAbove && pick && actions.dig && blocksCarried(bot) >= 1) {
         const skyY = feet.y + rock + 1;
-        tree.dig_to_sky = { description: { action: `The bot stands under the island's rock, ${rock} blocks of it over its head to the open sky at ${skyY}: dig up to the sky, the blocks over the head dug with the ${pick.name.replace('_', ' ')} and the column laid under the feet from the ${blocksCarried(bot)} blocks carried. No pillar's foot is walked to from down here.`,
+        // The breath's cloud over the column said, and the climb held under it (note 2040, as note 2033 for the climb at a pillar's foot): the cloud hurts only what its half-block box touches (note 1889's drill), so the body under the rock is out of it and the dig up rises into it. full-2 (2026-10-23 04:14Z, dragon 197, six crystals standing) in its hole at (15, 61, 9) under a cloud at 63, 6.4 wide, took dig_to_sky at 8.9 health with nothing said of the cloud, and died climbing into it.
+        const cloudSays = c => `the breath's cloud lies ${Math.round((c.position.y - bot.entity.position.y) * 10) / 10} over the feet above this column, ${Math.round(cloudRadius(bot, c) * 20) / 10} wide: its reach is a slab half a block high, so the body down here under the rock is out of it, and the dig up rises into it at about six health a second; a cloud lasts about thirty seconds from its burst`;
+        const over = cloudOverClimb(bot, rock + 2);
+        tree.dig_to_sky = { description: { action: `The bot stands under the island's rock, ${rock} blocks of it over its head to the open sky at ${skyY}: dig up to the sky, the blocks over the head dug with the ${pick.name.replace('_', ' ')} and the column laid under the feet from the ${blocksCarried(bot)} blocks carried. No pillar's foot is walked to from down here.${over ? ` Now ${cloudSays(over)}; the climb waits under the rock while it lies there.` : ''}`,
           rockOverhead: rock, blocksCarried: blocksCarried(bot), health: bot.health },
           run: async () => {
+            { const c = cloudOverClimb(bot, rock + 2); if (c) { console.log(`[end combat] dig_to_sky held at ${bot.entity.position.floored()}: ${cloudSays(c)}; the climb left to the next question`); return; } }
             const pr = require('./pillar-recovery');
             goal.step = { action: 'dig_to_sky', from: { ...bot.entity.position }, to: skyY }; save();
             await pr.pillarUp(bot, task, skyY, { dig: actions.dig, maxBlocks: rock + 2, threats: false, canDig: b => !!b && b.diggable && b.name !== 'bedrock' && b.name !== 'obsidian' });
