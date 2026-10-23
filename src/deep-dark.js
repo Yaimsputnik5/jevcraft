@@ -59,7 +59,9 @@ function expeditionReady(bot, goal, kind = 'deep_dark', now = Date.now()) {
 const deepDarkReady = (bot, goal, now) => expeditionReady(bot, goal, 'deep_dark', now);
 
 const LOOT_LINES = {
-  deep_dark: 'Its chests hold enchanted books, diamond gear, echo shards and enchanted golden apples, worth a lot for the End fight.',
+  // Odds per chest from the server's own chests/ancient_city.json (26.1.2:
+  // 5-10 rolls over a weight of 84), not a guess at 'worth a lot'.
+  deep_dark: 'Its chests hold enchanted books, diamond gear, echo shards and enchanted golden apples. Each chest, by the game\'s loot table: an enchanted golden apple about 1 in 11, Regeneration II potions about 1 in 3, an enchanted book about 1 in 3, enchanted iron leggings about 1 in 4, bottles o\' enchanting about 1 in 4, enchanted diamond leggings about 1 in 6; five chests hold an enchanted golden apple about 2 times in 5.',
   trial_chambers: 'Trial spawners send waves of mobs; beating a wave drops a trial key, and a key opens a vault of loot (diamonds, enchanted books, a heavy core); the corridors have chests too.',
 };
 function describe(goal, kind = 'deep_dark', bot = null) {
@@ -72,6 +74,10 @@ function describe(goal, kind = 'deep_dark', bot = null) {
   let facts = '';
   if (bot?.entity?.position) {
     const y = Math.floor(bot.entity.position.y), down = y - (site?.y ?? x.depth);
+    if (site) {
+      const across = Math.round(Math.hypot(site.x - bot.entity.position.x, site.z - bot.entity.position.z));
+      if (across > 16) facts += ` It is ${across} blocks across from here, about ${Math.round(across / 3.4 / 60)} minutes' walk.`;
+    }
     const { climbMinutes, climbStraightMinutes } = require('./surface');
     if (down > 0) facts += ` Y ${site?.y ?? x.depth} is ${down} blocks below here: roughly ${climbMinutes(down)} minutes of staircase down and as long back up, or about ${Math.round(down / 2)} minutes up by hand if the pickaxe gives out (about ${climbStraightMinutes(down)} by hand straight up, where the column overhead is open).`;
     if (x.warden) {

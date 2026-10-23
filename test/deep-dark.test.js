@@ -68,6 +68,10 @@ test('while the ladder walks about after endermen, Jev is offered the deep dark 
   assert.match(d, /A warden's hit takes about \d+ health after the armour worn, from 20/);
   assert.match(d, /A death there drops what is carried then \(now: .*diamond pickaxe/);
   assert.doesNotMatch(d, /dying costs little/);
+  // Note 2038: the loot as the loot table has it, and the walk to a known city.
+  assert.match(d, /an enchanted golden apple about 1 in 11.*five chests hold an enchanted golden apple about 2 times in 5/);
+  const known = { landmarks: [{ kind: 'ancient_city', x: 700, y: -40, z: 0, dimension: 'overworld' }] };
+  assert.match(dd.describe(known, 'deep_dark', b), /It is 700 blocks across from here, about 3 minutes' walk\./);
 });
 
 test('trial chambers: a trial spawner or vault marks them, a dropped key is picked up, and a key opens a vault', async () => {
