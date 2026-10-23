@@ -559,7 +559,12 @@ function strategyOptions(bot, goal, stage, sides = {}, planFor = null) {
     // ten hours of 2026-10-05, with the bones carried in a fifth of the
     // packs and two thirds of the deaths with no armour on, the zombies and
     // skeletons a tamed wolf goes for.
-    if (side && !isSetAside(goal, 'strategy_side', key)) options[key] = { description: side.description, says: side.says, run: side.run, side: true, trip: !(key === 'tame_wolf' && side.inView) };
+    // An ancient city found, its own choice at the top too (note 2037, the
+    // user 2026-10-23: 'Jev should take advantage of finding one of these'):
+    // under the side trip the expedition was answered at 0.02 for the whole
+    // branch, its own words never weighed.
+    const cityFound = key === 'deep_dark' && (goal.landmarks || []).some(l => l.kind === 'ancient_city' && !l.lootedAt && /overworld/.test(String(l.dimension || 'overworld')));
+    if (side && !isSetAside(goal, 'strategy_side', key)) options[key] = { description: side.description, says: side.says, run: side.run, side: true, trip: !((key === 'tame_wolf' && side.inView) || cityFound) };
   }
   // Work that needs no walk or daylight (smelting the ore carried) is on
   // offer at any hour while nothing is on the bot.

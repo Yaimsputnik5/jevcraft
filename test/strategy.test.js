@@ -562,3 +562,12 @@ test("the home's offer says the run's bare deaths", () => {
   assert.match(bareDeathsSays(bot), /^ This run's last 4 deaths: 3 in no armour at all, a median 30 minutes apart;/);
   assert.equal(bareDeathsSays({ _survivalState: { deaths: [] } }), '');
 });
+
+// The user (2026-10-23): take advantage of an ancient city found; under the side trip it was answered at 0.02 (note 2037).
+test('an ancient city found is its own choice at the top of the strategy question, not one of the side trips', () => {
+  const { strategyTree } = require('../src/strategy');
+  const tree = strategyTree({ rung_bed: { description: 'the bed' }, deep_dark: { description: 'The ancient city is known.', trip: false }, explore: { description: 'explore', trip: true } });
+  assert.ok(tree.deep_dark, `top: ${Object.keys(tree)}`);
+  assert.ok(tree.side_trip?.children?.explore);
+  assert.equal(tree.side_trip.children.deep_dark, undefined);
+});
