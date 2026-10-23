@@ -27,3 +27,18 @@ test('a spare iron chestplate for the chest by the bed is offered with its iron,
   assert.equal(spareArmourOption(bot({ worn: {} }), {}), null, 'nothing worn: the armour rung is that');
   assert.equal(spareArmourOption(bot({ items: [['stone_pickaxe', 1]] }), {}), null, 'no iron pickaxe');
 });
+
+// full-3 (2026-10-23): in iron at 06:55Z, then bare at 07:29, 07:44 and 08:05Z (note 2043).
+test('the spare says what followed each death in armour: the bare deaths before armour again', () => {
+  const { bareChainSays, spareArmourOption } = require('../src/strategy');
+  const iron = ['iron_helmet', 'iron_chestplate', 'iron_leggings', 'golden_boots', 'shield'];
+  const b = bot();
+  b._survivalState.deaths = [
+    { at: '2026-10-23T04:54:05Z', worn: iron }, { at: '2026-10-23T06:55:28Z', worn: iron },
+    { at: '2026-10-23T07:29:15Z', worn: [] }, { at: '2026-10-23T07:44:24Z', worn: ['shield'] }, { at: '2026-10-23T08:05:57Z', worn: [] },
+  ];
+  assert.equal(bareChainSays(b), " After this run's 2 deaths in armour (of its last 5), 3 deaths came in no armour before any in armour again; the most, 3 in 70 minutes after the one at 06:55Z, each back for iron with nothing on.");
+  assert.match(spareArmourOption(b, {}).description, /3 in 70 minutes after the one at 06:55Z/);
+  b._survivalState.deaths = [{ at: '2026-10-23T04:54:05Z', worn: iron }, { at: '2026-10-23T06:55:28Z', worn: iron }];
+  assert.equal(bareChainSays(b), '', 'no bare death after one in armour: nothing said');
+});

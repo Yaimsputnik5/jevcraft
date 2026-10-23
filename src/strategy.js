@@ -355,6 +355,25 @@ function bareDeathsSays(bot) {
 // what is worn. full-3 (2026-10-23 04:05Z) put its chest by the bed and left a
 // crafting table in it; no spare was offered after, and it died at 04:54.
 const SPARE_ORDER = Object.freeze([['iron_chestplate', 8, 6, 6], ['iron_leggings', 7, 5, 7], ['iron_helmet', 5, 2, 5], ['iron_boots', 4, 2, 8]]);
+// What followed each death in armour (note 2043): the deaths after it in no
+// armour, before any in armour again, and the minutes they took. full-3
+// (2026-10-23) died in iron at 06:55Z and three times bare after it by 08:05Z,
+// each time back underground for iron in a cave; spare_armour was offered at
+// 0.01 to 0.11 with only the count of bare deaths said.
+function bareChainSays(bot) {
+  const armoured = d => Array.isArray(d.worn) && d.worn.some(w => /_(helmet|chestplate|leggings|boots)$/.test(w));
+  const deaths = (bot._survivalState?.deaths || []).filter(d => d.at && Array.isArray(d.worn)).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  const chains = [];
+  deaths.forEach((d, i) => {
+    if (!armoured(d)) return;
+    let n = 0, last = d;
+    for (let j = i + 1; j < deaths.length && !armoured(deaths[j]); j++) { n++; last = deaths[j]; }
+    chains.push({ n, minutes: Math.round((Date.parse(last.at) - Date.parse(d.at)) / 60000), at: d.at });
+  });
+  if (!chains.length || !chains.some(c => c.n)) return '';
+  const bare = chains.reduce((k, c) => k + c.n, 0), worst = chains.slice().sort((a, b) => b.n - a.n)[0];
+  return ` After this run's ${chains.length} death${chains.length === 1 ? '' : 's'} in armour (of its last ${deaths.length}), ${bare} death${bare === 1 ? '' : 's'} came in no armour before any in armour again; the most, ${worst.n} in ${worst.minutes} minutes after the one at ${worst.at.slice(11, 16)}Z, each back for iron with nothing on.`;
+}
 function spareArmourOption(bot, goal) {
   if (bot.game?.gameMode && bot.game.gameMode !== 'survival') return null;
   if (!/overworld/.test(String(bot.game?.dimension || ''))) return null;
@@ -369,7 +388,7 @@ function spareArmourOption(bot, goal) {
   const off = Math.round(bot.entity.position.distanceTo(new Vec3(bed.x + 0.5, bed.y, bed.z + 0.5)));
   const chest = goal.bedKit?.position ? 'the chest beside the bed slept in' : 'a chest put beside the bed slept in (eight planks)';
   return {
-    description: `Make a spare ${name.replaceAll('_', ' ')} (${iron} iron ingots, ${points} armour points; ${ingots} ingots and ${raw} raw iron carried, the rest mined and smelted) and leave it in ${chest}, ${off} blocks off: a death drops what is worn, and the chest's piece is put on at that bed when the bot comes back to life there. It is the ${name === 'iron_chestplate' ? 'most armour for its iron' : 'most armour for its iron of the places worn and not yet spared'}.${bareDeathsSays(bot)}`,
+    description: `Make a spare ${name.replaceAll('_', ' ')} (${iron} iron ingots, ${points} armour points; ${ingots} ingots and ${raw} raw iron carried, the rest mined and smelted) and leave it in ${chest}, ${off} blocks off: a death drops what is worn, and the chest's piece is put on at that bed when the bot comes back to life there. It is the ${name === 'iron_chestplate' ? 'most armour for its iron' : 'most armour for its iron of the places worn and not yet spared'}.${bareDeathsSays(bot)}${bareChainSays(bot)}`,
     says: `I'll make a spare ${name.replaceAll('_', ' ')} for the chest by my bed`,
     rung: { phase: 'spare_armour', action: 'acquire', item: name, count: 1 },
   };
@@ -951,4 +970,4 @@ async function strategyStep(bot, task, goal, save, stage, { client, decide, side
   return { ran: true };
 }
 
-module.exports = { spareArmourOption, SPARE_ORDER, bareDeathsSays, cameOutSays, errandUnderWay, woolTrip, WOOL_HUNTS, oreFacts, carryBedOption, homeOption, strategyTree, pickaxeLeft, planSpends, HAND_BLOCKS_PER_MINUTE, rungTakes, WITHOUT, RUNG_WHY, rungOption, strategyOptions, strategyStep, HOLD_MS, SIDE_REST_MS, SIDE_FAIL_MS, rungStatus, lastStrategyFact };
+module.exports = { bareChainSays, spareArmourOption, SPARE_ORDER, bareDeathsSays, cameOutSays, errandUnderWay, woolTrip, WOOL_HUNTS, oreFacts, carryBedOption, homeOption, strategyTree, pickaxeLeft, planSpends, HAND_BLOCKS_PER_MINUTE, rungTakes, WITHOUT, RUNG_WHY, rungOption, strategyOptions, strategyStep, HOLD_MS, SIDE_REST_MS, SIDE_FAIL_MS, rungStatus, lastStrategyFact };
