@@ -81,3 +81,17 @@ test('a spare armour piece for the chest beside the bed is offered where the ing
   bot.inventory.slots[5] = { name: 'iron_helmet', count: 1 };
   assert.equal(spareToMake(bot, { stash: goal.bedKit })[0], 'iron_helmet');
 });
+
+// The four full runs to 2026-10-23 04:00Z: no bed chest stood, so the spare piece of note 2034 was offered none
+// of the time; the piece is offered with the chest (note 2039).
+test('with no chest beside the bed yet, the chest is offered with a spare armour piece made first, from the ingots carried', () => {
+  const { bedKitChores } = require('../src/bed-kit');
+  const { bot, goal } = fixture();
+  const its = bot.inventory.items();
+  for (const n of ['iron_chestplate', 'stone_sword']) its.splice(its.findIndex(i => i.name === n), 1);
+  its.push({ name: 'iron_ingot', count: 9 });
+  const chores = bedKitChores(bot, goal);
+  assert.ok(chores.kit_by_bed, `offered: ${Object.keys(chores)}`);
+  assert.match(chores.kit_by_bed.description, /a spare iron chestplate made first \(8 of the 9 iron ingots carried, 6 armour points\)/);
+  assert.equal(chores.spare_armour_by_bed, undefined, 'the chest comes first');
+});

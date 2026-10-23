@@ -105,9 +105,17 @@ function bedKitChores(bot, goal, { now = Date.now() } = {}) {
   const { moves, armour } = depositsOf(bot, goal, home);
   const what = s.describeMoves([...moves, ...armour]);
   if (!home.stash?.position) {
-    if ((moves.length || armour.length) && woodFor(bot)) out.kit_by_bed = { description: `Put a chest (eight planks) beside the bed slept in, ${d} blocks off, and leave in it ${what}: a death comes back to life at that bed, and the kit is taken out of the chest there first.${bare}`,
+    // Note 2039: the spare piece is offered with the chest, not only once a
+    // chest stands: no run had one, so a spare was never offered.
+    const first = spareToMake(bot, home);
+    const firstSays = first ? `${what ? ', and ' : ''}a spare ${first[0].replaceAll('_', ' ')} made first (${first[1]} of the ${countOf(bot, 'iron_ingot')} iron ingots carried, ${first[2]} armour points)` : '';
+    if ((moves.length || armour.length || first) && woodFor(bot)) out.kit_by_bed = { description: `Put a chest (eight planks) beside the bed slept in, ${d} blocks off, and leave in it ${what}${firstSays}: a death comes back to life at that bed, and the kit is taken out of the chest there first.${bare}`,
       run: async (b, t, g, sv, a) => {
-        try { await placeBedChest(b, t, g, sv, home, a); await s.stockStash(b, t, g, sv, home, a, { only: m => !!m.slot, extra: depositsOf(b, g, home).armour }); }
+        try {
+          if (first) for (let i = 0; i < 6 && countOf(b, first[0]) < 1; i++) { t.check(); if (await a.acquireStep(b, t, first[0], 1, g, sv) === true) break; }
+          const spare = first && countOf(b, first[0]) >= 1 ? [{ item: first[0], count: 1, slot: 'armour' }] : [];
+          await placeBedChest(b, t, g, sv, home, a); await s.stockStash(b, t, g, sv, home, a, { only: m => !!m.slot, extra: [...depositsOf(b, g, home).armour, ...spare] });
+        }
         catch (err) { t.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; setAside(g, 'bed_kit', 'chest', String(err.message || err).slice(0, 160), 10 * 60000); sv(); }
       } };
     return out;
