@@ -42,3 +42,15 @@ test('the spare says what followed each death in armour: the bare deaths before 
   b._survivalState.deaths = [{ at: '2026-10-23T04:54:05Z', worn: iron }, { at: '2026-10-23T06:55:28Z', worn: iron }];
   assert.equal(bareChainSays(b), '', 'no bare death after one in armour: nothing said');
 });
+
+// full-3 and full-4 (2026-10-23) went back underground bare for iron after each death (note 2048).
+test('a mining rung offered with nothing worn says the caves are gone into bare, and what followed the deaths in armour', () => {
+  const { rungOption } = require('../src/strategy');
+  const iron = ['iron_helmet', 'iron_chestplate', 'iron_leggings', 'golden_boots', 'shield'];
+  const b = bot({ worn: {} });
+  b._survivalState.deaths = [{ at: '2026-10-23T12:40:56Z', worn: iron }, { at: '2026-10-23T13:03:45Z', worn: [] }, { at: '2026-10-23T13:46:36Z', worn: ['shield'] }];
+  const o = rungOption({ phase: 'iron_pickaxe', action: 'acquire', item: 'iron_pickaxe', count: 1 }, true, b, {});
+  assert.match(o.description, /Nothing is worn now: its ore is mined below, in the caves, with no armour on\. After this run's 1 death in armour \(of its last 3\), 2 deaths came in no armour/);
+  const worn = rungOption({ phase: 'iron_pickaxe', action: 'acquire', item: 'iron_pickaxe', count: 1 }, true, bot(), {});
+  assert.doesNotMatch(worn.description, /Nothing is worn now/);
+});

@@ -266,6 +266,12 @@ function rungOption(rung, first, bot, goal, planFor = null) {
   const without = WITHOUT[piece] ? ` Until it is done, ${WITHOUT[piece]}.` : '';
   // An armour rung with nothing worn: the day's deaths with none on and with some (note 1359).
   const bareRate = bot && /^(iron_armour|leather_armour|iron_(helmet|chestplate|leggings|boots))$/.test(rung.phase) && ![5, 6, 7, 8].some(i => bot.inventory?.slots?.[i]) ? (() => { try { return ' ' + require('./kit-record').bareSays(bot.game?.dimension); } catch (_) { return ''; } })() : '';
+  // A rung whose ore is mined below, with nothing worn (note 2048): the trip is in the caves with no armour on, said with
+  // what followed this run's deaths in armour. full-3 (2026-10-23 06:55 to 08:05Z) and full-4 (12:40 to 16:44Z) went
+  // back underground bare for iron after each death, five and six deaths in a row, and the iron pickaxe's offer said
+  // nothing of it (the advice check-in of 2026-10-23).
+  const bareBelow = bot && !bareRate && /^(iron_|diamond_|golden_|bucket$|shield$)/.test(rung.phase) && ![5, 6, 7, 8].some(i => bot.inventory?.slots?.[i])
+    ? ` Nothing is worn now: its ore is mined below, in the caves, with no armour on.${bareChainSays(bot)}` : '';
   // Said alike whichever rung is first: "the ladder's next step" beside
   // "ahead of the ladder's order" was a thumb on the scale (the critical
   // review, 2026-09-26). The first is marked the ladder's next (ladderNext).
@@ -283,7 +289,7 @@ function rungOption(rung, first, bot, goal, planFor = null) {
   // came to, the same facts the Nether now says of going without it.
   const level = bot && goal ? require('./levels').rungLevelSays(bot, goal, rung.phase) : '';
   const record = require('./kit-record').rungRecordSays(rung.phase, bot?.entity?.position?.y);
-  return { description: `Get ${what}${why ? ` (${why})` : ''}.${kit}${rung.kit ? '' : spareSays(bot, goal, rung)}${bot && goal ? searchSoFar(bot, goal, rung) : ''}${bot && goal ? woolTrip(bot, goal, rung) : ''}${homeWhere(bot, goal, rung)}${rungTakes(bot, goal, rung, planFor)}${spent}${without}${bareRate}${level}${record}${netherCost}`, rung, ladderNext: first };
+  return { description: `Get ${what}${why ? ` (${why})` : ''}.${kit}${rung.kit ? '' : spareSays(bot, goal, rung)}${bot && goal ? searchSoFar(bot, goal, rung) : ''}${bot && goal ? woolTrip(bot, goal, rung) : ''}${homeWhere(bot, goal, rung)}${rungTakes(bot, goal, rung, planFor)}${spent}${without}${bareRate}${bareBelow}${level}${record}${netherCost}`, rung, ladderNext: first };
 }
 // A pickaxe rung with a pickaxe still carried is a spare: the ladder counts
 // one under a fifth of its uses (or sixty-four) as worn, and said only
