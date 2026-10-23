@@ -445,6 +445,10 @@ function strategyOptions(bot, goal, stage, sides = {}, planFor = null) {
   // (2026-09-26). Taken, the steps left are set aside for half an hour.
   const { DEFERRABLE, asideRungs, GOING_WITHOUT } = require('./game-progress');
   const netherFirst = all => {
+    // Not once the portal wants no more eyes (note 2046): the Nether holds nothing more for the goal, and the hold took
+    // the bot through the portal, where the ladder's step was the way home at once. full-2 (2026-10-23 12:38 and
+    // 13:1xZ), its End portal lit and fought in twice, chose 'go for the Nether now' and crossed in and straight back.
+    if (require('./eye-need').eyeTarget(goal) === 0) return null;
     // What is already set aside to go without is not set aside again: an
     // option that would change nothing is not offered (mid-242-x, note 498).
     const resting = attemptsFor(goal).of('rung');

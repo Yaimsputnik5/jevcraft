@@ -571,3 +571,14 @@ test('an ancient city found is its own choice at the top of the strategy questio
   assert.ok(tree.side_trip?.children?.explore);
   assert.equal(tree.side_trip.children.deep_dark, undefined);
 });
+
+// full-2 (2026-10-23 12:38 and 13:1xZ): its End portal lit, 'go for the Nether now' taken, in and straight back (note 2046).
+test('with the portal wanting no more eyes, the Nether now is not offered: it holds nothing more for the goal', () => {
+  const { strategyOptions } = require('../src/strategy');
+  const { bot, goal } = fixture(['golden_boots']);
+  const stage = { phase: 'golden_boots', action: 'acquire', item: 'golden_boots', count: 1 };
+  assert.ok(strategyOptions(bot, goal, stage, {}).nether_first, 'eyes still wanted: on offer');
+  goal.gameProgress = { ...(goal.gameProgress || {}), milestones: { ...(goal.gameProgress?.milestones || {}), stronghold_located: { at: 1 } } };
+  goal.endPortal = { neededEyes: 0 };
+  assert.equal(strategyOptions(bot, goal, stage, {})?.nether_first, undefined, "the rung alone, or nothing to ask");
+});
