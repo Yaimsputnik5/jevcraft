@@ -670,6 +670,7 @@ async function arbitrate(bot, claims, ctx = {}) {
     // 25593 (2026-10-06 03:40Z) gave its turns to a night pocket six blocks from
     // its frames with all twelve eyes, the work's fill unsaid here.
     if (tree.work && typeof tree.work.description?.does === 'string') tree.work.description.does += require('./end-portal').endPortalNearSays(bot, ctx.goal);
+    if (tree.work && typeof tree.work.description?.does === 'string') tree.work.description.does += require('./corpse-run').dropsWaitSays(bot, ctx.goal);
     let setAside = false;
     const askedAt = Date.now();
     // The alerts this question is out about (watchOnce leaves them be).

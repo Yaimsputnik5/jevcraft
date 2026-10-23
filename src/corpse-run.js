@@ -594,4 +594,19 @@ function underWay(bot, goal, now = Date.now()) {
     secondsLeft: run.loadedAt ? Math.max(0, Math.round((DESPAWN_MS - (now - Date.parse(run.loadedAt))) / 1000)) : null };
 }
 
-module.exports = { quickDeathsSays, TOLD, tripCameToNothing, KIT_ERRAND, kitTrip, corpseRun, corpseRunStep, worth, madeAgain, underWay };
+// The drops of the last death and their clock, said on the work's turn (note 2047): the run is a work step and waits for
+// work to have the turn, and the survival layer held it for shelter and food with the drops unsaid. Near the bot their
+// chunk is loaded and they vanish five minutes after the death; full-2 (2026-10-23 07:54Z), full-3 (11:05Z) and full-4
+// (13:46Z) had the turn to work 457, 506 and 670 seconds after their deaths.
+function dropsWaitSays(bot, goal, now = Date.now()) {
+  const run = goal?.corpseRun;
+  if (!run || run.status !== 'open' || !Object.keys(run.items || {}).length || !run.position || !bot?.entity?.position) return '';
+  if (dim(bot.game?.dimension) !== run.dimension) return '';
+  const off = Math.round(Math.hypot(run.position.x - bot.entity.position.x, run.position.z - bot.entity.position.z));
+  const left = DESPAWN_MS - (now - Date.parse(run.loadedAt || run.deathAt));
+  const what = Object.entries(run.items).map(([n, c]) => `${c > 1 ? `${c} ` : ''}${n.replaceAll('_', ' ')}`).join(', ');
+  if (off <= TICKING && left > 0) return ` Given the turn, the work asks first about going back for what the last death dropped, ${off} blocks off: ${what}. That ground is loaded about the bot, so they vanish five minutes after the death, about ${Math.round(left / 1000)} seconds from now.`;
+  if (off > TICKING) return ` Given the turn, the work asks first about going back for what the last death dropped, ${off} blocks off: ${what}. Drops age only while their ground is loaded, so they keep until the bot comes near.`;
+  return '';
+}
+module.exports = { dropsWaitSays, quickDeathsSays, TOLD, tripCameToNothing, KIT_ERRAND, kitTrip, corpseRun, corpseRunStep, worth, madeAgain, underWay };
