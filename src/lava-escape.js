@@ -230,6 +230,18 @@ async function settleAfterJoin(bot, survival, { log = console.log, task = null }
   facts.acted = acted;
   log(`[join] the ground read again before resuming: at (${facts.position.x}, ${facts.position.y}, ${facts.position.z}) in ${facts.feet}${facts.inWater ? `${facts.waterFlowing ? ' (flowing)' : ''}` : ''}, floor ${facts.floor}, ${facts.inLava ? 'in lava' : facts.lavaNear ? `lava ${facts.lavaNear.distance} blocks off at (${facts.lavaNear.cell.x}, ${facts.lavaNear.cell.y}, ${facts.lavaNear.cell.z})` : 'no lava within 2 blocks'}${facts.mobs ? `; health ${Math.round((facts.health ?? 0) * 10) / 10}, ${facts.mobs.length ? `mobs within 24: ${facts.mobs.map(m => `${m.name} ${m.distance}${m.seen ? '' : ' unseen'}`).join(', ')}` : 'no mobs within 24'}` : ''}; ${acted ? `${acted}: ${facts.out ? 'done' : 'not done'}${facts.error ? ` (${facts.error})` : ''}` : 'nothing to do first'}`);
   if (survival?.state) survival.state.joinSurvey = facts;
+  // Back to life away from the bed slept in: the game's word that the bed is gone or blocked, and the respawn is the
+  // world spawn now (note 2045). The bed read where it stands (note 1944) needs its chunk loaded, and full-3
+  // (2026-10-23 11:27Z), its cave bed taken by a creeper, came back to life 1500 blocks off at the world spawn with the
+  // bed still on its record: the bed chest, the spare armour and every respawn said went on reading a bed not there.
+  const sb = survival?.state?.spawnBed?.foot;
+  if (sb && survival.state.recovery?.status === 'pending' && /overworld/.test(String(bot.game?.dimension || '')) && Math.hypot(bot.entity.position.x - (sb.x + 0.5), bot.entity.position.z - (sb.z + 0.5)) > 16) {
+    const off = Math.round(Math.hypot(bot.entity.position.x - (sb.x + 0.5), bot.entity.position.z - (sb.z + 0.5)));
+    log(`[join] back to life ${off} blocks from the bed slept in at (${sb.x}, ${sb.y}, ${sb.z}): the bed is gone or blocked, and the respawn is the world spawn now`);
+    delete survival.state.spawnBed;
+    if (survival.state.respawn && survival.state.respawn.x === sb.x && survival.state.respawn.z === sb.z) survival.state.respawn = null;
+    facts.spawnBedGone = { at: { ...sb }, off };
+  }
   try { bot.emit?.('join_survey', facts); } catch (_) { /* the record is not the step */ }
   return facts;
 }
