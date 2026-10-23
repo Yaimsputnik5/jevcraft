@@ -770,6 +770,12 @@ function createSession(config, client, { stateDirectory = path.join(__dirname, '
     observation?.detach(String(reason || 'connection closed'));
     ready = false; clearInterval(idleTimer); invalidateRequests();
     if (active && !active.task.cancelled) stop('running').catch(console.error);
+    // This connection's saves on disk before a replacement reads state (note 2042): the survival store's save waits up to
+    // 1.5 s, the rejoin read the file without the death just recorded, and its own saves then wrote over it. full-2's death
+    // of 2026-10-23 06:38:10Z ('the death event came again 1.4 s after the one recorded') and full-3's in the End at
+    // 06:0xZ were never on disk; the survival file's last death stayed 04:55 and 04:54, and every question's recent deaths
+    // and the bed kit's bare-death count with it.
+    for (const s of [store, survivalStore, idleStore]) { try { s.flushSync(); } catch (err) { console.error(`[bug] a store was not flushed at close: ${err.message}`); } }
     // Fence late saves from this connection before a replacement reads state.
     ended = true;
     memory.flush();
