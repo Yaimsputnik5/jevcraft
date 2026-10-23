@@ -6473,3 +6473,12 @@ test("a warden in its boom's reach is priced on every stance that stays there, t
   for (const [k, o] of priced) assert.ok(o.expects.damage >= 10, `${k} priced ${o.expects.damage}`);
   assert.match(Object.values(options)[0].description, /sonic boom that passes through blocks and armour.*counted on every way that stays in its reach/);
 });
+
+test('a carried bed put down under rock is said as the respawn it makes: dark at every hour, monsters beside it day and night (note 2044)', () => {
+  // full-3 (2026-10-23 09:14Z) slept at (1353, -8, 1169) under rock; seven deaths after, three in 35 seconds at the bed.
+  const { caveBedSaysFor } = require('../src/survival');
+  const at = rock => ({ game: { dimension: 'overworld' }, entity: { position: new Vec3(0.5, -8, 0.5) }, registry: require('minecraft-data')('26.1'),
+    blockAt: p => { const solid = p.y < -8 || (rock && p.y >= -5); return { name: solid ? 'stone' : 'air', boundingBox: solid ? 'block' : 'empty', position: p }; } });
+  assert.match(caveBedSaysFor(at(true)), /^ Here is under rock, no sky over it, at y -8: dark at every hour, so monsters spawn beside the bed by day as by night/);
+  assert.equal(caveBedSaysFor(at(false)), '', 'open sky over it: nothing said');
+});
