@@ -211,3 +211,16 @@ test('rotten flesh is counted beside the reserve, its points and its Hunger said
   assert.match(last.says, /^5 rotten flesh, 4 hunger each; each eaten has a 80% chance of Hunger for 30 seconds, which spends about 0\.75 of a hunger point/);
   assert.equal(lastResortSupply(fixture([{ name: 'bread', count: 2 }])).points, 0);
 });
+
+// full-1 (2026-10-23 17:18 to 17:33Z) starved on an ocean shore with 14 wheat and a crafting table carried (note 2049).
+test('wheat carried is offered baked into bread: a loaf for three, five points each', async () => {
+  const bot = fixture([{ name: 'wheat', count: 14 }, { name: 'crafting_table', count: 1 }, { name: 'iron_sword', count: 1 }]);
+  bot.time = { timeOfDay: 6000 }; bot.food = 3;
+  const choices = await forageChoices(bot, new Task('food'), {}, () => {}, {}, {});
+  assert.ok(choices.bake_bread, Object.keys(choices).join(','));
+  assert.match(choices.bake_bread.description.action, /three wheat a loaf at the crafting table carried/);
+  assert.equal(choices.bake_bread.description.wheat, 14);
+  assert.ok(choices.bake_bread.description.loaves >= 1 && choices.bake_bread.description.loaves <= 4);
+  const none = await forageChoices(fixture([{ name: 'wheat', count: 2 }]), new Task('food'), {}, () => {}, {}, {});
+  assert.equal(none.bake_bread, undefined, 'two wheat bake nothing');
+});

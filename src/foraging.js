@@ -159,6 +159,23 @@ async function forageChoices(bot, task, goal, save, actions, state, { target = 1
       finally { task.interruptCheck = outerCheck; }
     } };
   }
+  // Bread from the wheat carried (note 2049): three wheat a loaf at a crafting table, five points each, no furnace or
+  // fuel. full-1 (2026-10-23 17:18 to 17:33Z), out on the ocean shore at x 5195 with no animal found, starved from 15
+  // to 0 and died with 14 wheat and a crafting table carried; only cooking and the hunts were offered.
+  const loaves = Math.floor(count(bot, 'wheat') / 3);
+  if (loaves > 0 && bot.registry.itemsByName.bread) {
+    const amount = Math.min(loaves, Math.max(1, Math.ceil((target - foodSupply(bot)) / 5)));
+    const table = count(bot, 'crafting_table') > 0 ? 'the crafting table carried' : 'a crafting table (one is made or found if none is carried)';
+    choices.bake_bread = { description: { action: `Bake bread from the wheat carried: three wheat a loaf at ${table}, no furnace or fuel, a few seconds.`,
+      wheat: count(bot, 'wheat'), loaves: amount, pointsAdded: amount * 5 },
+      valid: () => count(bot, 'wheat') >= amount * 3,
+      run: async () => {
+        goal.survivalAction = { action: 'bake_bread', amount, at: new Date().toISOString() }; save();
+        const outerCheck = task.interruptCheck; task.interruptCheck = () => checkThreats(bot);
+        try { await actions.acquireStep(bot, task, 'bread', count(bot, 'bread') + amount, goal, save); }
+        finally { task.interruptCheck = outerCheck; }
+      } };
+  }
   const landPreyInView = await candidates(bot, task, state);
   // Cod and salmon in open water beside them (fishing.js, note 1203): on
   // 25588's map of ocean and shore (2026-10-04 07:29 to 08:27Z) no land

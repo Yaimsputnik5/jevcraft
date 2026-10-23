@@ -246,9 +246,9 @@ test('when the base can feed the bot and is within reach, walking home replaces 
   // A cow in view is still a choice; beyond reach the base is not one.
   bot.entities[9] = { id: 9, name: 'cow', position: bot.entity.position.offset(3, 0, 0), isValid: true, metadata: [] };
   for (const p of layout.plot) w.set(new Vec3(p.x, p.y + 1, p.z), 'wheat', { age: 7 });
-  assert.deepEqual(Object.keys(await forageChoices(bot, task, goal, save, actions, {})).sort(), ['go_home_for_food', 'hunt_9', 'search_food']);
+  assert.deepEqual(Object.keys(await forageChoices(bot, task, goal, save, actions, {})).sort(), ['bake_bread', 'go_home_for_food', 'hunt_9', 'search_food'], 'the wheat carried is bread too (note 2049)');
   bot.entity.position = new Vec3(300.5, LEVEL + 1, 0.5); delete bot.entities[9];
-  assert.deepEqual(Object.keys(await forageChoices(bot, task, goal, save, actions, {})), ['search_food', 'rod_first']);
+  assert.deepEqual(Object.keys(await forageChoices(bot, task, goal, save, actions, {})), ['bake_bread', 'search_food', 'rod_first']);
 });
 
 test('wheat seeds are kept for the plot, and the new phases each have one line', () => {
