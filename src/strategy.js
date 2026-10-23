@@ -349,6 +349,32 @@ function bareDeathsSays(bot) {
   const median = gaps.length ? Math.round(gaps[Math.floor(gaps.length / 2)]) : null;
   return ` This run's last ${deaths.length} deaths: ${bare} in no armour at all${median != null ? `, a median ${median} minutes apart` : ''}; each came back to life at the bed slept in with nothing, and the chest here is where a spare kit and spare armour wait for that.`;
 }
+// A spare armour piece for the chest beside the bed slept in, its iron mined
+// and smelted for it (note 2041): the chores beside the bed offered a spare
+// only from ingots carried there (notes 2034, 2039), and the iron is spent on
+// what is worn. full-3 (2026-10-23 04:05Z) put its chest by the bed and left a
+// crafting table in it; no spare was offered after, and it died at 04:54.
+const SPARE_ORDER = Object.freeze([['iron_chestplate', 8, 6, 6], ['iron_leggings', 7, 5, 7], ['iron_helmet', 5, 2, 5], ['iron_boots', 4, 2, 8]]);
+function spareArmourOption(bot, goal) {
+  if (bot.game?.gameMode && bot.game.gameMode !== 'survival') return null;
+  if (!/overworld/.test(String(bot.game?.dimension || ''))) return null;
+  const bed = bot._survivalState?.spawnBed?.foot;
+  if (!bed || !Number.isFinite(bed.x) || !bot.entity?.position) return null;
+  const items = bot.inventory?.items?.() || [], has = n => items.filter(i => i.name === n).reduce((k, i) => k + i.count, 0);
+  if (!items.some(i => /^(iron|diamond|netherite)_pickaxe$/.test(i.name))) return null;
+  const held = goal.bedKit?.contents || {};
+  const piece = SPARE_ORDER.find(([name, , , slot]) => bot.inventory?.slots?.[slot]?.name === name && !(held[name] > 0) && has(name) < 1);
+  if (!piece) return null;
+  const [name, iron, points] = piece, ingots = has('iron_ingot'), raw = has('raw_iron');
+  const off = Math.round(bot.entity.position.distanceTo(new Vec3(bed.x + 0.5, bed.y, bed.z + 0.5)));
+  const chest = goal.bedKit?.position ? 'the chest beside the bed slept in' : 'a chest put beside the bed slept in (eight planks)';
+  return {
+    description: `Make a spare ${name.replaceAll('_', ' ')} (${iron} iron ingots, ${points} armour points; ${ingots} ingots and ${raw} raw iron carried, the rest mined and smelted) and leave it in ${chest}, ${off} blocks off: a death drops what is worn, and the chest's piece is put on at that bed when the bot comes back to life there. It is the ${name === 'iron_chestplate' ? 'most armour for its iron' : 'most armour for its iron of the places worn and not yet spared'}.${bareDeathsSays(bot)}`,
+    says: `I'll make a spare ${name.replaceAll('_', ' ')} for the chest by my bed`,
+    rung: { phase: 'spare_armour', action: 'acquire', item: name, count: 1 },
+  };
+}
+
 function homeOption(bot, goal, planFor = null) {
   let step;
   try { step = homeStage(bot, goal); } catch (_) { step = null; }
@@ -553,6 +579,8 @@ function strategyOptions(bot, goal, stage, sides = {}, planFor = null) {
   // ladder: a hurt bot is the one a bed and a chest would serve.
   const home = !toolless && homeOption(bot, goal, planFor);
   if (home) options.home_base = home;
+  const spare = !toolless && spareArmourOption(bot, goal);
+  if (spare) options.spare_armour = spare;
   if (fit && !toolless) for (const [key, side] of Object.entries(sides)) {
     // A wild wolf in view with bones carried is its own choice at the top,
     // not one of the side trips under one (note 1329): offered there once in
@@ -923,4 +951,4 @@ async function strategyStep(bot, task, goal, save, stage, { client, decide, side
   return { ran: true };
 }
 
-module.exports = { bareDeathsSays, cameOutSays, errandUnderWay, woolTrip, WOOL_HUNTS, oreFacts, carryBedOption, homeOption, strategyTree, pickaxeLeft, planSpends, HAND_BLOCKS_PER_MINUTE, rungTakes, WITHOUT, RUNG_WHY, rungOption, strategyOptions, strategyStep, HOLD_MS, SIDE_REST_MS, SIDE_FAIL_MS, rungStatus, lastStrategyFact };
+module.exports = { spareArmourOption, SPARE_ORDER, bareDeathsSays, cameOutSays, errandUnderWay, woolTrip, WOOL_HUNTS, oreFacts, carryBedOption, homeOption, strategyTree, pickaxeLeft, planSpends, HAND_BLOCKS_PER_MINUTE, rungTakes, WITHOUT, RUNG_WHY, rungOption, strategyOptions, strategyStep, HOLD_MS, SIDE_REST_MS, SIDE_FAIL_MS, rungStatus, lastStrategyFact };
