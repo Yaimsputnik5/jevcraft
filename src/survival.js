@@ -2233,6 +2233,18 @@ function nightEnds(bot) {
   } catch (_) { return ''; }
 }
 
+// The warden in its boom's reach, or booms in the last minute: what each
+// costs and the facts said with it (note 2035).
+const LEAVES_THE_BOOM = new Set(['retreat', 'run_from', 'tunnel_from_warden']);
+function wardenBoom(bot) {
+  const warden = threats(bot, 32).filter(t => t.entity.name === 'warden').sort((a, b) => a.distance - b.distance)[0];
+  const booms = (bot._sonicBooms || []).filter(t => Date.now() - t < 60000).length;
+  if (!warden && !booms) return null;
+  const p = bot.entity.position, w = warden?.entity.position;
+  const inReach = (w && Math.hypot(w.x - p.x, w.z - p.z) <= BOOM_ACROSS && Math.abs(w.y - p.y) <= BOOM_UP) || booms > 0;
+  if (!inReach) return null;
+  return { damage: BOOM_DAMAGE[bot.game?.difficulty] || BOOM_DAMAGE.normal, says: wardenSays(bot) + ' The boom is counted on every way that stays in its reach, about one every five seconds, through the shield, the armour and any wall.' };
+}
 function wardenSays(bot) {
   const warden = threats(bot, 32).filter(t => t.entity.name === 'warden').sort((a, b) => a.distance - b.distance)[0];
   const booms = (bot._sonicBooms || []).filter(t => Date.now() - t < 60000).length;
@@ -5789,6 +5801,22 @@ class Survival {
     // between the work, the fight and "none of these"; with the walled
     // price beside it, rail_and_fight 10 of 10 (replay case
     // span-ghast-hidden-keep-working).
+    // The warden's sonic boom on every stance that stays in its reach (note
+    // 2035): through the shield, the armour and the rock, about every five
+    // seconds once it is angry at a player it cannot reach, said and priced.
+    // The stances priced it at nothing: full-4 (2026-10-23 01:50:49Z), in
+    // iron by its rod chest with a warden 7 blocks off, was told shield_guard
+    // was 'about 0 damage over about 15 seconds', took it at 0.70, and three
+    // booms in eleven seconds took it from 20 to nothing through the shield
+    // and the wall it then put up.
+    {
+      const boom = wardenBoom(bot);
+      if (boom) for (const [k, o] of Object.entries(options)) {
+        o.description += boom.says;
+        if (LEAVES_THE_BOOM.has(k)) continue;
+        if (o.expects && Number.isFinite(o.expects.damage)) o.expects.damage = Math.round((o.expects.damage + boom.damage * Math.max(1, Math.ceil((o.expects.seconds || 15) / 5))) * 10) / 10;
+      }
+    }
     const over = overEdge;
     if (edgeNow?.walledNow) for (const [k, o] of Object.entries(options)) o.description += edgeNow.says + (k === 'keep_working' ? edgeNow.leaving : '');
     if (over) for (const [k, o] of Object.entries(options)) {
@@ -12723,4 +12751,4 @@ function claim(bot, goal = {}, survival = null) {
   return made;
 }
 
-module.exports = { PUSH_RECORD, pushRecordOn, blockRecord, BLOCK_RECORD, bedClimbable, BED_CLIMB, pricedRunCell, runFromRecord, RUN_FROM_RECORD, spawnBedNear, homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
+module.exports = { wardenBoom, LEAVES_THE_BOOM, PUSH_RECORD, pushRecordOn, blockRecord, BLOCK_RECORD, bedClimbable, BED_CLIMB, pricedRunCell, runFromRecord, RUN_FROM_RECORD, spawnBedNear, homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };

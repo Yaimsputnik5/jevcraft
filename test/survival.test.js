@@ -6458,3 +6458,18 @@ test("a stance with a deadly drop beside it says its own record of falls and is 
   assert.match(c.description, /72 times, the bot in the lava or fallen within 20 seconds none of them\.$/);
   assert.equal(c.expects.damage, 3);
 });
+
+// full-4 (2026-10-23 01:50:49Z): shield_guard against a warden 7 blocks off priced 'about 0 damage', three booms
+// through the shield and the wall in eleven seconds (note 2035).
+test("a warden in its boom's reach is priced on every stance that stays there, the shield and the wall no cover", () => {
+  const bot = creeperBot({ wall: false, creeper: null, weapon: 'iron_sword', health: 20 });
+  bot.inventory.slots[45] = { name: 'shield', count: 1 };
+  const warden = { id: 9, name: 'warden', type: 'hostile', position: new Vec3(7.5, 64, 0.5), height: 2.9, width: 0.9, isValid: true };
+  bot.entities = { 9: warden };
+  const survival = new Survival(bot, { place: async () => {}, dig: async () => {}, navigate: async () => {} }, { state: { shelters: [] } });
+  const options = survival.stanceOptions(new Task('x'), {}, () => {}, [{ entity: warden, distance: 7, visible: true }], false);
+  const priced = Object.entries(options).filter(([k, o]) => o.expects && Number.isFinite(o.expects.damage) && !['retreat', 'run_from'].includes(k));
+  assert.ok(priced.length, `offered: ${Object.keys(options)}`);
+  for (const [k, o] of priced) assert.ok(o.expects.damage >= 10, `${k} priced ${o.expects.damage}`);
+  assert.match(Object.values(options)[0].description, /sonic boom that passes through blocks and armour.*counted on every way that stays in its reach/);
+});
