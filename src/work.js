@@ -117,6 +117,19 @@ function inventory(bot) {
   return bot.inventory.items().reduce((o, i) => { o[i.name] = (o[i.name] || 0) + i.count; return o; }, {});
 }
 
+// A bed the pockets make with crafts alone (note 2059): its colour as woolCarried picks it (mixed wool dyed white
+// with the bones or bone meal carried), planned from what is carried with no gathering step.
+function bedFromPockets(bot) {
+  const wool = require('./home-base').woolCarried(bot);
+  if (!wool || (wool.total || 0) < 3 || wool.count < 3) return null;
+  const item = `${wool.colour}_bed`;
+  if (!bot.registry?.itemsByName?.[item]) return null;
+  let plan; try { plan = planCatalog(bot.registry, item, 1, inventory(bot)); } catch (_) { return null; }
+  const steps = Array.isArray(plan) ? plan : plan?.steps;
+  if (!Array.isArray(steps) || !steps.length || !steps.every(st => st.action === 'craft')) return null;
+  const woolSaid = Object.entries(inventory(bot)).filter(([n]) => /_wool$/.test(n)).map(([n, c]) => `${c} ${n.replace(/_wool$/, '').replaceAll('_', ' ')} wool`).join(', ');
+  return { item, from: `${woolSaid}${wool.dyed ? `, ${wool.dyed} dyed white` : ''}` };
+}
 function planningInventory(bot) {
   const stock = inventory(bot);
   for (const item of bot.inventory.items()) {
@@ -1364,6 +1377,15 @@ async function upkeepOffers(bot, task, goal, save) {
       const foot = hb.layout(home).bed.foot, far = Math.round(new Vec3(foot.x, foot.y, foot.z).distanceTo(bot.entity.position));
       if (far <= NEAR_BED) options.take_bed = { description: `Take the base's bed along now, ${far} blocks away, before going on: then a night on the Overworld passes in seconds wherever it comes, instead of about eleven real minutes in a pocket or a night mine. Sleep is refused with a monster within about eight blocks of the bed, and in the Nether or the End a bed set down explodes. The spawn point goes wherever the bot last slept, and a death drops the bed with everything else.${tripTime(bot, far)}`,
         run: async () => { for (let i = 0; i < 4; i++) if (await hb.takeHomeBed(bot, task, goal, save, { navigate, dig, collectNearbyDrops })) return; } };
+    }
+    // A bed made now from what is carried, crafts alone (note 2059): the bed rung under the strategy's holds stalled
+    // with the makings in the pockets. full-3 (2026-10-24 00:57Z) carried four wool of three colours, four bones and
+    // planks, the bed one dye and two crafts away, and set the bed aside at its rung's question; full-2's run to the
+    // dragon spent 17.1 of its 108.6 hours sealed in awake, most nights with no bed carried.
+    if (!hb.bedCarried(bot) && !options.take_bed) {
+      const bedNow = bedFromPockets(bot);
+      if (bedNow) options.make_bed = { description: `Make a ${bedNow.item.replace(/_bed$/, '').replaceAll('_', ' ')} bed now from what is carried (${bedNow.from}), crafts alone, a few seconds: a night slept in it passes in seconds, where one awake is about eight and a half real minutes; it is carried for the next night wherever it comes.${require('./survival').sealedWaitCostSays ? require('./survival').sealedWaitCostSays(bot, goal).replace(/^ Sealed, the bot waits about \d+ real minutes to dawn and gains nothing meanwhile unless it mines\./, '') : ''}`,
+        run: async () => { goal.step = { action: 'make_bed', item: bedNow.item }; save(); for (let i = 0; i < 6 && countOf(bot, bedNow.item) < 1; i++) { task.check(); if (await acquireStep(bot, task, bedNow.item, 1, goal, save) === true) break; } if (countOf(bot, bedNow.item) < 1) throw new Error(`the ${bedNow.item.replaceAll('_', ' ')} was not made`); } };
     }
     const { foodSupply } = require('./foraging'), { KIT_FOOD_POINTS } = require('./home-stash');
     const carried = foodSupply(bot), t = bot.time?.timeOfDay ?? 0, toDusk = Math.round(Math.max(0, DAY.DUSK - t) / 20);
@@ -9803,4 +9825,4 @@ function constructionObservation(bot, goal) {
   return JSON.stringify(positions.map(p => [p.x, p.y, p.z, bot.blockAt(pos(p))?.stateId ?? bot.blockAt(pos(p))?.name ?? null]));
 }
 
-module.exports = { portalToJudge, capLavaBeside, portalPickaxeFirst, endPortalActions, miningCandidates, portalSurfaceFirst, nightUpSays, oreToTunnel, gatherRests, gatherResting, relightPortalAt, stairPickaxeWanted, pickaxeForStair, siteHoldEnds, exploreLand, exploreLandIds, woodWhileUp, WOOD_UP, wantedItems, keepRoom, tidyMoment, smeltBatch, ladderSmeltWants, foodReservePrice, siteByLava, foodTrips, supportMaterialHere, preparePortalSupports, portalJobs, castSiteCost, castSiteSays, NO_WOOD_DEEP, smeltNeedSays, takeBackPlace, detourWork, restWork, restWorkSays, upkeepOffers, kitFoodStep, foodNearFrame, cookable, FUELS, answerOrPutOff, opensPit, persist, returnFromNether, climbSays, holdForRest, liveTurn, workClaim, methodSoFar, gatherBlocks, sculkStep, opensLava, descentTargets, portalInteriorBlockers, nearestLava, lavaGone, mineAtSource, timed, portalHere, walkToKnownPortal, portalWay, lineSays, buildPortalFrame, ruinSays, portalMethod, portalStep, crossingKitReady, walksFailed, occupant, bodyIn, occupiedSays, waitingThere, settleCraftInventory, tripTime, WOOD_RESERVE, woodUnits, crossingWater, sideTrips, plugLeak, leakResponse, logInView, patrolChoice, upkeepStep, moreOfSource, whileCooking, workstation, noteError, localBatch, takeOutBatch, castUnderWay, leftBatch, batchNoRoute, LEAVE_BATCH_MS, smelt, turnSearch, searchFor, enterPortal, gameHandlers, breakStillness, reachableBlocks, hitboxIntrudes, terrainShortage, runGoal, runIdle, idleWork, idleOptions, createSurvival, acquireStep, inventory, planningInventory, catalogPlan, selectSite, explore, dig, place, waitFor, constructionObservation, Blocked, designedBuildStep, surfaceStep, surfaceTrip, answerStall, looseEnds, breakOut, tunnelToward, stairsOrWay, craft, gatherWood, moveOnFromResource, moveOnHistorySays, pickaxeCraftHistorySays, maintainPickaxe, MOVE_ON_MEMORY_MS, PICKAXE_CRAFT_MEMORY_MS, stationCellOk, droppedFoodNear, planDueNow, planRoutes, lavaKnownFrom, straightToward };
+module.exports = { bedFromPockets, portalToJudge, capLavaBeside, portalPickaxeFirst, endPortalActions, miningCandidates, portalSurfaceFirst, nightUpSays, oreToTunnel, gatherRests, gatherResting, relightPortalAt, stairPickaxeWanted, pickaxeForStair, siteHoldEnds, exploreLand, exploreLandIds, woodWhileUp, WOOD_UP, wantedItems, keepRoom, tidyMoment, smeltBatch, ladderSmeltWants, foodReservePrice, siteByLava, foodTrips, supportMaterialHere, preparePortalSupports, portalJobs, castSiteCost, castSiteSays, NO_WOOD_DEEP, smeltNeedSays, takeBackPlace, detourWork, restWork, restWorkSays, upkeepOffers, kitFoodStep, foodNearFrame, cookable, FUELS, answerOrPutOff, opensPit, persist, returnFromNether, climbSays, holdForRest, liveTurn, workClaim, methodSoFar, gatherBlocks, sculkStep, opensLava, descentTargets, portalInteriorBlockers, nearestLava, lavaGone, mineAtSource, timed, portalHere, walkToKnownPortal, portalWay, lineSays, buildPortalFrame, ruinSays, portalMethod, portalStep, crossingKitReady, walksFailed, occupant, bodyIn, occupiedSays, waitingThere, settleCraftInventory, tripTime, WOOD_RESERVE, woodUnits, crossingWater, sideTrips, plugLeak, leakResponse, logInView, patrolChoice, upkeepStep, moreOfSource, whileCooking, workstation, noteError, localBatch, takeOutBatch, castUnderWay, leftBatch, batchNoRoute, LEAVE_BATCH_MS, smelt, turnSearch, searchFor, enterPortal, gameHandlers, breakStillness, reachableBlocks, hitboxIntrudes, terrainShortage, runGoal, runIdle, idleWork, idleOptions, createSurvival, acquireStep, inventory, planningInventory, catalogPlan, selectSite, explore, dig, place, waitFor, constructionObservation, Blocked, designedBuildStep, surfaceStep, surfaceTrip, answerStall, looseEnds, breakOut, tunnelToward, stairsOrWay, craft, gatherWood, moveOnFromResource, moveOnHistorySays, pickaxeCraftHistorySays, maintainPickaxe, MOVE_ON_MEMORY_MS, PICKAXE_CRAFT_MEMORY_MS, stationCellOk, droppedFoodNear, planDueNow, planRoutes, lavaKnownFrom, straightToward };
