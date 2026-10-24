@@ -228,24 +228,30 @@ class GoalStore {
     const goal = this.pending; if (!goal) return this.writing || Promise.resolve();
     if (this.writing) return this.writing.then(() => this.flush());
     this.pending = null; this.lastWriteAt = Date.now();
-    const text = this.serialize(goal);
+    const text = this.serialize(goal), seq = this.seq = (this.seq || 0) + 1;
     this.writing = (async () => {
       try {
         await fs.promises.mkdir(path.dirname(this.file), { recursive: true });
         await fs.promises.writeFile(`${this.file}.tmp`, text);
-        await fs.promises.rename(`${this.file}.tmp`, this.file);
+        // A save written at once since this one began is newer: this one is dropped, not renamed over it (note 2051).
+        if ((this.syncSeq || 0) > seq) await fs.promises.unlink(`${this.file}.tmp`).catch(() => {});
+        else await fs.promises.rename(`${this.file}.tmp`, this.file);
       } catch (err) { console.error(`[bug] the goal was not saved: ${err.message}`); }
       finally { this.writing = null; }
     })();
     return this.writing;
   }
+  // Through its own temporary file (note 2051): the save at a close (note 2042) wrote the same .tmp as a save already
+  // under way, the two interleaved, and the file renamed into place was one goal with fifteen bytes of the other after
+  // it. full-2's goal (2026-10-23 21:57Z) would not parse, and the bot crashed on every start for two hours.
   flushSync() {
     if (this.timer) { clearTimeout(this.timer); this.timer = null; }
     const goal = this.pending; if (!goal) return;
     this.pending = null; this.lastWriteAt = Date.now();
+    this.syncSeq = this.seq = (this.seq || 0) + 1;
     fs.mkdirSync(path.dirname(this.file), { recursive: true });
-    fs.writeFileSync(`${this.file}.tmp`, this.serialize(goal));
-    fs.renameSync(`${this.file}.tmp`, this.file);
+    fs.writeFileSync(`${this.file}.sync.tmp`, this.serialize(goal));
+    fs.renameSync(`${this.file}.sync.tmp`, this.file);
   }
   serialize(goal) {
     // A value that loops back on itself is dropped and said, not thrown: a
