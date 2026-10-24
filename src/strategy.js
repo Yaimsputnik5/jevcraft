@@ -384,6 +384,31 @@ function bareChainSays(bot) {
 // of ender, its store the player's own, kept through every death and opened the same at any ender chest. Offered
 // where an eye can be spared (the portal wanting fewer than are carried, or lit) and the obsidian is to be had (carried,
 // or made from lava and water with a diamond pickaxe and a water bucket), with a bed slept in to put it beside.
+// Wool for the nights ahead (note 2061; the night review of 2026-10-24): each night slept takes a bed of its own, the
+// bed staying as the respawn (notes 1944, 1948), and the bed rung gathered three wool at a time and opened again after
+// every night slept. Offered with sheep in view and fewer than nine wool carried.
+const WOOL_STOCK = 9;
+function woolStockOption(bot, goal) {
+  if (bot.game?.gameMode && bot.game.gameMode !== 'survival') return null;
+  if (!/overworld/.test(String(bot.game?.dimension || ''))) return null;
+  const here = bot.entity?.position; if (!here) return null;
+  const items = bot.inventory?.items?.() || [], has = re => items.filter(i => re.test(i.name)).reduce((k, i) => k + i.count, 0);
+  const wool = has(/_wool$/), string = has(/^string$/), beds = has(/_bed$/);
+  const asWool = wool + Math.floor(string / 4) + 3 * beds;
+  if (asWool >= WOOL_STOCK) return null;
+  const sheep = Object.values(bot.entities || {}).filter(e => e.name === 'sheep' && e.isValid !== false && e.position?.distanceTo?.(here) < 48);
+  if (!sheep.length) return null;
+  const near = Math.round(Math.min(...sheep.map(e => e.position.distanceTo(here))));
+  const shears = has(/^shears$/) ? 'with the shears carried, one to three wool a sheep and the sheep left for later' : 'killing them, one wool a sheep (shears, two iron ingots, give one to three and leave the sheep)';
+  const c = goal?.gameProgress?.clock, ms = c?.byDoing?.wait_in_shelter || 0;
+  const run = c?.playedMs && ms >= 30 * 60000 ? ` This run so far: ${Math.round(ms / 360000) / 10} of its ${Math.round(c.playedMs / 360000) / 10} hours of play spent sealed in awake.` : '';
+  return {
+    description: `Gather wool to ${WOOL_STOCK} or more while sheep are near: ${sheep.length} in view, the nearest ${near} blocks off, ${shears}. Carried now: ${wool} wool${string ? `, ${string} string (four a wool)` : ''}${beds ? `, ${beds} bed${beds === 1 ? '' : 's'}` : ''}. Each night slept takes a bed of its own, three wool and three planks, the bed staying behind as the respawn point; ${WOOL_STOCK} wool is three nights slept in seconds each, where each night awake is about eight and a half real minutes sealed in.${run}`,
+    says: "I'll gather wool for the nights ahead",
+    rung: { phase: 'wool_stock', action: 'gather_wool', count: WOOL_STOCK - asWool },
+  };
+}
+
 function enderChestOption(bot, goal) {
   if (bot.game?.gameMode && bot.game.gameMode !== 'survival') return null;
   if (!/overworld/.test(String(bot.game?.dimension || ''))) return null;
@@ -641,6 +666,8 @@ function strategyOptions(bot, goal, stage, sides = {}, planFor = null) {
   if (spare) options.spare_armour = spare;
   const ender = !toolless && enderChestOption(bot, goal);
   if (ender) options.ender_chest = ender;
+  const woolStock = !toolless && woolStockOption(bot, goal);
+  if (woolStock) options.wool_stock = woolStock;
   if (fit && !toolless) for (const [key, side] of Object.entries(sides)) {
     // A wild wolf in view with bones carried is its own choice at the top,
     // not one of the side trips under one (note 1329): offered there once in
@@ -1011,4 +1038,4 @@ async function strategyStep(bot, task, goal, save, stage, { client, decide, side
   return { ran: true };
 }
 
-module.exports = { enderChestOption, bareChainSays, spareArmourOption, SPARE_ORDER, bareDeathsSays, cameOutSays, errandUnderWay, woolTrip, WOOL_HUNTS, oreFacts, carryBedOption, homeOption, strategyTree, pickaxeLeft, planSpends, HAND_BLOCKS_PER_MINUTE, rungTakes, WITHOUT, RUNG_WHY, rungOption, strategyOptions, strategyStep, HOLD_MS, SIDE_REST_MS, SIDE_FAIL_MS, rungStatus, lastStrategyFact };
+module.exports = { woolStockOption, WOOL_STOCK, enderChestOption, bareChainSays, spareArmourOption, SPARE_ORDER, bareDeathsSays, cameOutSays, errandUnderWay, woolTrip, WOOL_HUNTS, oreFacts, carryBedOption, homeOption, strategyTree, pickaxeLeft, planSpends, HAND_BLOCKS_PER_MINUTE, rungTakes, WITHOUT, RUNG_WHY, rungOption, strategyOptions, strategyStep, HOLD_MS, SIDE_REST_MS, SIDE_FAIL_MS, rungStatus, lastStrategyFact };

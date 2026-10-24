@@ -121,8 +121,10 @@ function inventory(bot) {
 // with the bones or bone meal carried), planned from what is carried with no gathering step.
 function bedFromPockets(bot) {
   const wool = require('./home-base').woolCarried(bot);
-  if (!wool || (wool.total || 0) < 3 || wool.count < 3) return null;
-  const item = `${wool.colour}_bed`;
+  // Short of wool, the string carried makes white wool, four a wool (note 2061): deaths carried 1 to 4 string beside
+  // two or three wool (full-1 2026-10-23 17:33Z, full-3 2026-10-24 06:59Z).
+  const enough = wool && wool.total >= 3 && wool.count >= 3;
+  const item = enough ? `${wool.colour}_bed` : 'white_bed';
   if (!bot.registry?.itemsByName?.[item]) return null;
   let plan; try { plan = planCatalog(bot.registry, item, 1, inventory(bot)); } catch (_) { return null; }
   const steps = Array.isArray(plan) ? plan : plan?.steps;
