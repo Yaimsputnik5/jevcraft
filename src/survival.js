@@ -12109,7 +12109,12 @@ class Survival {
     const failedNow = this.state.shelterFailed && Date.now() - this.state.shelterFailed.at < 180000 ? this.state.shelterFailed : null;
     const failedSays = failedNow ? ` The shelter tried ${Math.max(1, Math.round((Date.now() - failedNow.at) / 1000))} seconds ago failed: ${failedNow.why}.` : '';
     if (failedNow) state.shelterFailed = failedSays.trim();
-    const sealLead = `${sealWhy.says}${require('./seal-reason').sealCostSays({ minutesToDawn: minutesToDawn(bot), secondsToDawn: underground ? null : secondsToDawn(bot), waiting, log: this.state.sealLog, none: sealWhy.none })} `;
+    // The dark said before it comes (note 2062; the night review of 2026-10-24): the evening's questions begin at
+    // dusk (9500), the surface's mobs spawn from the dark (12000), and 11 of full-2's 37 seals were chosen before
+    // 11500, each about two real minutes of light sealed in on top of the night.
+    const tNow = bot.time?.timeOfDay ?? 0;
+    const darkSays = !underground && tNow >= DAY.DUSK && tNow < DAY.DARK ? ` The dark that spawns the surface's mobs comes at about ${DAY.DARK}, about ${Math.round((DAY.DARK - tNow) / 20)} real seconds off; until then the surface is as by day, and a seal now waits those seconds as well.` : '';
+    const sealLead = `${sealWhy.says}${require('./seal-reason').sealCostSays({ minutesToDawn: minutesToDawn(bot), secondsToDawn: underground ? null : secondsToDawn(bot), waiting, log: this.state.sealLog, none: sealWhy.none })}${darkSays} `;
     // Under the rock with no reason to seal, a pocket gains nothing: not the
     // night (mobs spawn in the dark there at any hour), not the sleep owed
     // (only a bed pays it), and no mob or wound to seal against. Not offered,
