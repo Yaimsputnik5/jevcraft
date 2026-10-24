@@ -46,7 +46,7 @@ bot.once('spawn', async () => {
       let low = h0;
       const watch = () => { low = Math.min(low, bot.health); };
       bot.on('health', watch);
-      await command(`summon area_effect_cloud ${X + .5} ${cloudY} 0.5 {Radius:3.0f,Duration:40,WaitTime:0,ReapplicationDelay:20,potion_contents:{potion:"minecraft:harming"}}`);
+      await command(`summon area_effect_cloud ${X + .5} ${cloudY} 0.5 {Radius:${Number(process.env.CLOUD_RADIUS || 3).toFixed(1)}f,Duration:40,WaitTime:0,ReapplicationDelay:20,potion_contents:{potion:"minecraft:harming"}}`);
       await sleep(400);
       const cloud = Object.values(bot.entities).find(e => e.name === 'area_effect_cloud');
       await sleep(2600);
