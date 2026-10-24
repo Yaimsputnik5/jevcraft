@@ -23,3 +23,12 @@ test('two deaths in half an hour beside the bed slept in, the bot beside it: tak
   assert.equal(bedLoopOf({ ...bot, entity: { position: new Vec3(2100, -13, 1306) } }, state, now), null, 'away from the bed: not offered');
   assert.equal(bedLoopOf(bot, { ...state, deaths: state.deaths.slice(0, 3) }, now), null, 'one death beside it: not a loop');
 });
+
+// full-2's run to the dragon spent 17.1 of 108.6 hours sealed in awake (note 2054).
+test('the sealed wait says its minutes to dawn, that it gains nothing, and the run\'s hours so spent', () => {
+  const { sealedWaitCostSays } = require('../src/survival');
+  const bot = { time: { timeOfDay: 13000 } };
+  const goal = { gameProgress: { clock: { playedMs: 108.6 * 3.6e6, byDoing: { wait_in_shelter: 17.1 * 3.6e6 } } } };
+  assert.match(sealedWaitCostSays(bot, goal), /^ Sealed, the bot waits about \d+ real minutes to dawn and gains nothing meanwhile unless it mines\. This run so far: 17\.1 of its 108\.6 hours of play spent so, sealed in awake\.$/);
+  assert.doesNotMatch(sealedWaitCostSays(bot, {}), /This run so far/);
+});
