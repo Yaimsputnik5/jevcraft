@@ -10563,7 +10563,7 @@ class Survival {
       return !inLava(bot);
     };
     const ways = {};
-    const toCell = (key, c, lead, why) => { ways[key] = { description: said(c, lead), run: async () => { report(key, c); return walk(c, why); } }; };
+    const toCell = (key, c, lead, why) => { ways[key] = { description: said(c, lead), seconds: seconds(c), run: async () => { report(key, c); return walk(c, why); } }; };
     // Only where a swim gets out: a cell over the lava's top is the block's
     // (pillar_out below), not a swim that bobs against it (note 592).
     if (wet && swims(wet)) toCell('to_water', wet, 'Into the water', 'in lava: into the water, which puts the fire out');
@@ -10590,7 +10590,7 @@ class Survival {
       }
       const on = onward ? `standing on it at the lava's top the body is out of the lava, and ${onward.y > stand.y ? 'a step up' : 'a step'} from it is dry ground at (${onward.x}, ${onward.y}, ${onward.z})`
         : `standing on it at the lava's top the body is out of the lava, with no dry ground a step from it${high ? ` (the nearest way out is ${where(high)})` : ''}`;
-      ways.pillar_out = { description: `Press against the ${fill.ref.name.replaceAll('_', ' ')} at (${fill.ref.position.x}, ${fill.ref.position.y}, ${fill.ref.position.z}) holding jump, which lifts the body to the lava's top (the push out of a liquid against a wall), and put a block into the lava under the feet at (${fill.cell.x}, ${fill.cell.y}, ${fill.cell.z}) as they clear it: about ${s} seconds in the lava, ${costs(s)}; ${on}; ${scaffold} scaffold blocks carried.`,
+      ways.pillar_out = { seconds: s, description: `Press against the ${fill.ref.name.replaceAll('_', ' ')} at (${fill.ref.position.x}, ${fill.ref.position.y}, ${fill.ref.position.z}) holding jump, which lifts the body to the lava's top (the push out of a liquid against a wall), and put a block into the lava under the feet at (${fill.cell.x}, ${fill.cell.y}, ${fill.cell.z}) as they clear it: about ${s} seconds in the lava, ${costs(s)}; ${on}; ${scaffold} scaffold blocks carried.`,
         run: async () => {
           report('pillar_out', stand);
           bot._leavingLava = true;
@@ -10611,7 +10611,7 @@ class Survival {
     // in the lava it began in. 25584 (mid-244-gc, 15:21:25Z) took it, told
     // "nothing is under it now ... so it is no footing", and burned from 20
     // to 9.4 (note 754b). Said on swim_up instead, which is offered then.
-    if (last && !floorGone) ways.back_the_way_came = { description: `Back toward the last dry footing stood on, ${far(last)} blocks off ${routed(last) ? 'by the way through' : 'in a straight line, no way through seen'} at (${last.x}, ${last.y}, ${last.z})${floorGone ? `; nothing is under it now (${/lava/.test(lastFloor.name) ? 'lava' : 'open air'} where it stood), so it is no footing` : height(last)}, swimming up as it goes: about ${seconds(last)} seconds at the ${LAVA_BLOCKS_A_SECOND} blocks a second a body swims through lava${lastLava ? `; it is lava now itself (${lavaSpreads(bot)})` : lavaBy(last) ? `; lava beside it (${lavaSpreads(bot)})` : ''}${far(last) > 6 ? '; farther than any cell out seen from here' : ''}; ${costs(seconds(last))}.`,
+    if (last && !floorGone) ways.back_the_way_came = { seconds: seconds(last), description: `Back toward the last dry footing stood on, ${far(last)} blocks off ${routed(last) ? 'by the way through' : 'in a straight line, no way through seen'} at (${last.x}, ${last.y}, ${last.z})${floorGone ? `; nothing is under it now (${/lava/.test(lastFloor.name) ? 'lava' : 'open air'} where it stood), so it is no footing` : height(last)}, swimming up as it goes: about ${seconds(last)} seconds at the ${LAVA_BLOCKS_A_SECOND} blocks a second a body swims through lava${lastLava ? `; it is lava now itself (${lavaSpreads(bot)})` : lavaBy(last) ? `; lava beside it (${lavaSpreads(bot)})` : ''}${far(last) > 6 ? '; farther than any cell out seen from here' : ''}; ${costs(seconds(last))}.`,
       run: async () => { report('back_the_way_came', last); return walk(last, 'in lava with no dry cell in sight: up, and back the way the bot came'); } };
     // Straight up to the lava's own top, said beside back_the_way_came, not
     // only where nothing else is offered at all: with no water, dry cell or
@@ -10628,7 +10628,7 @@ class Survival {
     if (!ways.to_water && !ways.to_dry_ground && !ways.pillar_out) {
       const gone = last && floorGone ? ` The last dry footing stood on, at (${last.x}, ${last.y}, ${last.z}), has nothing under it now (${/lava/.test(lastFloor.name) ? 'lava' : 'open air'} where it stood), so it is no way out.` : '';
       const riseSeconds = Math.max(0.5, round(Math.max(0, reach - bot.entity.position.y) / LAVA_JUMP_RISE));
-      ways.swim_up = { description: `Swim straight up to the lava's own top${top !== null ? ` (y ${top + 1})` : ''}, no cell out a swim reaches within six blocks and no dry footing known there yet: about ${riseSeconds} second${riseSeconds === 1 ? '' : 's'} to reach it; ${costs(riseSeconds)}.${gone}`,
+      ways.swim_up = { seconds: riseSeconds, description: `Swim straight up to the lava's own top${top !== null ? ` (y ${top + 1})` : ''}, no cell out a swim reaches within six blocks and no dry footing known there yet: about ${riseSeconds} second${riseSeconds === 1 ? '' : 's'} to reach it; ${costs(riseSeconds)}.${gone}`,
         run: async () => { report('swim_up', null); return walk(null, "in lava with nothing dry in sight: up to the lava's own top first"); } };
     }
     const apple = bot.inventory.items().find(i => i.name === 'enchanted_golden_apple');
@@ -10637,8 +10637,17 @@ class Survival {
     // A fire resistance potion (note 656): a splash acts sooner than a drink.
     const potionWay = require('./fire-resistance').bodyWay(bot, task, 'the lava and burning do not hurt', () => report('drink_fire_resistance', null));
     if (potionWay) ways.drink_fire_resistance = { ...potionWay, run: async () => { const was = bot._leavingLava; bot._leavingLava = true; try { return await potionWay.run(); } finally { bot._leavingLava = was; } } };
-    const first = ways.to_water ? 'to_water' : ways.to_dry_ground ? 'to_dry_ground' : ways.pillar_out ? 'pillar_out' : ways.back_the_way_came ? 'back_the_way_came' : 'swim_up';
-    return ways[first] ? { [first]: ways[first], ...ways } : ways;
+    // First the way out with the fewest seconds in the lava by its own
+    // count, the old order (water, dry ground, the block, back, up) on a
+    // tie: the safety rule takes the first. full-1 (2026-10-24 22:00:06Z),
+    // 17.8 health in a pool's edge, was taken onto the dry cell 4.4 blocks
+    // off, "about 11 seconds ... death before it is out" by its own words,
+    // with the block under the feet and the way back on offer, and burned
+    // to death in it in 4.4 seconds (note 2073).
+    // Swimming up reaches the lava's top, not out of it: last, as before.
+    const ORDER = ['to_water', 'to_dry_ground', 'pillar_out', 'back_the_way_came'];
+    const first = ORDER.filter(k => ways[k]).sort((a, b) => ((ways[a].seconds ?? Infinity) - (ways[b].seconds ?? Infinity)) || (ORDER.indexOf(a) - ORDER.indexOf(b)))[0] || (ways.swim_up ? 'swim_up' : null);
+    return first ? { [first]: ways[first], ...ways } : ways;
   }
 
   // The block into the lava under the feet (lavaFill): pressed against the

@@ -246,7 +246,11 @@ test('the ways out of lava are worked out in a small part of the time they took 
   const each = (performance.now() - t0) / 5;
   assert(each < 400, `about ${Math.round(each)} ms a working out`);
   const ways = survival.lavaWays(new Task('lava'), {}, () => {});
-  assert.equal(Object.keys(ways)[0], 'to_dry_ground', Object.keys(ways).join(', '));
+  // First the way with the fewest seconds in the lava by its own count
+  // (note 2073): the block under the feet, about 0.6 seconds, before the
+  // swim to the dry cell, about 7.5.
+  assert.equal(Object.keys(ways)[0], 'pillar_out', Object.keys(ways).join(', '));
+  assert.ok(ways.pillar_out.seconds < ways.to_dry_ground.seconds);
   assert.match(ways.to_dry_ground.description, /^Onto the dry cell [\d.]+ blocks off by the way through at \(-145, -54, -516\)/);
 });
 
