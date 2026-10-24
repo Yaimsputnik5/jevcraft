@@ -81,3 +81,17 @@ test('none good: a way with a deadly fall beside it counts as taking all the hea
   const safe = { ...listed, pillar: { expects: { damage: 23.6, seconds: 15 } } };
   assert.equal(pickWhenNoneGood(safe, weights, 14.9).key, 'pillar', 'without the fall the least by figures stands');
 });
+
+// full-4 (2026-10-24 08:20Z): a warden 10 blocks off, every priced stance fatal, retreat unpriced; shield_guard was taken (note 2052).
+test('where one blow ends the bot and every priced way takes all the health, the likeliest unpriced way is taken, not the least fatal', () => {
+  const listed = {
+    fight: { expects: { damage: 890.1, seconds: 85.8, oneHit: 26.4 } }, shield_guard: { expects: { damage: 30, seconds: 15, oneHit: 26.4 } },
+    pillar: { expects: { damage: 103.9, seconds: 15, oneHit: 26.4 } }, keep_working: {}, retreat: {}, none_good: {},
+  };
+  const weights = { fight: 0.01, shield_guard: 0.26, pillar: 0.03, keep_working: 0.08, retreat: 0.15, none_good: 0.45 };
+  const { key, why } = pickWhenNoneGood(listed, weights, 20);
+  assert.equal(key, 'retreat');
+  assert.match(why, /retreat, the likeliest with no figures, is not known to/);
+  const allPriced = { a: { expects: { damage: 30, seconds: 15 } }, b: { expects: { damage: 40, seconds: 15 } }, none_good: {} };
+  assert.equal(pickWhenNoneGood(allPriced, { a: 0.2, b: 0.4 }, 20).key, 'a', 'all priced: the least bad as before');
+});

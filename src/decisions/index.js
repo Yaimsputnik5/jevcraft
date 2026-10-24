@@ -325,6 +325,15 @@ function pickWhenNoneGood(listed, weights, health, failed = []) {
   if (!priced.includes(byWeight[0]) || takes(byWeight[0]) < health) return { key: byWeight[0], why: null };
   const lives = byWeight.filter(k => priced.includes(k) && takes(k) < health);
   if (lives.length) return { key: lives[0], why: `the likelier ${byWeight.slice(0, byWeight.indexOf(lives[0])).filter(k => priced.includes(k)).join(', ')} priced at the health the bot has or more` };
+  // An unpriced way before a priced one that takes all the health (note 2052): its cost is not known, the priced
+  // one's is death. full-4 (2026-10-24 08:20Z), in iron with a warden 10 blocks off, answered none good at 0.45;
+  // every priced stance took 30 or more of its 20 (shield_guard the least, a warden's blow 26 through iron and the
+  // shield nothing to it), retreat (0.15) had no figures, and shield_guard was taken: one blow, dead.
+  // Only where one blow ends the bot (each priced way's own oneHit at the health or more): there no stand within its
+  // reach is a price, and the blazes of note 691, a few health a hit, keep the least bad as before.
+  const unpriced = byWeight.filter(k => !priced.includes(k));
+  const oneBlowKills = priced.every(k => Number.isFinite(listed[k].expects.oneHit) && listed[k].expects.oneHit >= health);
+  if (unpriced.length && oneBlowKills) return { key: unpriced[0], why: `every priced option takes the ${Math.round(health * 10) / 10} health the bot has or more by its own figures; ${unpriced[0]}, the likeliest with no figures, is not known to` };
   const least = priced.slice().sort((a, b) => soon(a) - soon(b) || (weights[b] || 0) - (weights[a] || 0))[0];
   return { key: least, why: `every priced option takes the ${Math.round(health * 10) / 10} health the bot has or more by its own figures; ${least} takes the least in the next ${EXPOSED_S} seconds (about ${Math.round(soon(least) * 10) / 10})` };
 }
