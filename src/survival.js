@@ -5817,6 +5817,19 @@ class Survival {
         if (o.expects && Number.isFinite(o.expects.damage)) o.expects.damage = Math.round((o.expects.damage + boom.damage * Math.max(1, Math.ceil((o.expects.seconds || 15) / 5))) * 10) / 10;
       }
     }
+    // The bed slept in, taken up where deaths repeat beside it (note 2053; the user, 2026-10-24: 'make the bed change'):
+    // each death comes back to life at it with nothing on, among what killed the last. full-3 (2026-10-23 11:27Z and
+    // 2026-10-24 07:03 to 07:42Z) died at its cave bed three times in 35 seconds, then eight times in 40 minutes; the
+    // loops ended only when a creeper took the bed. Offered, never taken for it: the respawn goes to the world spawn.
+    {
+      const loop = bedLoopOf(bot, this.state);
+      if (loop) options.take_up_bed = { description: loop.says, run: async () => {
+        const foot = new Vec3(loop.bed.x, loop.bed.y, loop.bed.z);
+        this.report(goal, save, { action: 'take_up_bed', at: { ...loop.bed }, deaths: loop.deaths });
+        await this.actions.dig(bot, task, foot, { requireDrops: false });
+        if (!isBed(bot.blockAt(foot))) { delete this.state.spawnBed; this.state.respawn = null; save(); }
+      } };
+    }
     const over = overEdge;
     if (edgeNow?.walledNow) for (const [k, o] of Object.entries(options)) o.description += edgeNow.says + (k === 'keep_working' ? edgeNow.leaving : '');
     if (over) for (const [k, o] of Object.entries(options)) {
@@ -12388,6 +12401,18 @@ function caveBedSaysFor(bot) {
   if (!underRock(bot)) return '';
   return ` Here is under rock, no sky over it, at y ${Math.floor(bot.entity.position.y)}: dark at every hour, so monsters spawn beside the bed by day as by night, and as the respawn point each death comes back to life here with nothing on among them; a creeper's blast beside it takes the bed, and the respawn goes to the world spawn.`;
 }
+// Deaths repeating at the bed slept in (note 2053): two or more in the last half hour within sixteen blocks of it, the
+// bot within six of it now.
+const BED_LOOP_MS = 30 * 60000, BED_LOOP_NEAR = 16;
+function bedLoopOf(bot, state, now = Date.now()) {
+  const bed = state?.spawnBed?.foot, p = bot?.entity?.position;
+  if (!bed || !p || !/overworld/.test(String(bot.game?.dimension || ''))) return null;
+  if (Math.hypot(p.x - (bed.x + .5), p.y - bed.y, p.z - (bed.z + .5)) > 6) return null;
+  const near = (state.deaths || []).filter(d => d.at && now - Date.parse(d.at) <= BED_LOOP_MS && d.position && Math.hypot(d.position.x - (bed.x + .5), d.position.z - (bed.z + .5)) <= BED_LOOP_NEAR);
+  if (near.length < 2) return null;
+  const minutes = Math.max(1, Math.round((now - Date.parse(near[0].at)) / 60000));
+  return { bed: { ...bed }, deaths: near.length, says: `Take up the bed slept in, ${Math.round(Math.hypot(p.x - (bed.x + .5), p.z - (bed.z + .5)))} blocks off, a second's dig: ${near.length} deaths within sixteen blocks of it in the last ${minutes} minutes, each back to life here with nothing on. Taken up, the next death comes back to life at the world spawn instead, and the bed is carried for a better place.` };
+}
 function underRock(bot, refuge = null) {
   if (bot.game?.dimension !== 'overworld' || !bot.entity?.position) return false;
   const p = bot.entity.position;
@@ -12761,4 +12786,4 @@ function claim(bot, goal = {}, survival = null) {
   return made;
 }
 
-module.exports = { caveBedSaysFor, wardenBoom, LEAVES_THE_BOOM, PUSH_RECORD, pushRecordOn, blockRecord, BLOCK_RECORD, bedClimbable, BED_CLIMB, pricedRunCell, runFromRecord, RUN_FROM_RECORD, spawnBedNear, homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
+module.exports = { bedLoopOf, caveBedSaysFor, wardenBoom, LEAVES_THE_BOOM, PUSH_RECORD, pushRecordOn, blockRecord, BLOCK_RECORD, bedClimbable, BED_CLIMB, pricedRunCell, runFromRecord, RUN_FROM_RECORD, spawnBedNear, homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
