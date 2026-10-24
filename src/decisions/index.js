@@ -170,7 +170,10 @@ const GAMEPLAY_AREAS = new Set(['combat', 'endgame', 'home', 'idle', 'resources'
 // a death mattered less than a night idled, a thumb on the scale toward the
 // risky answer at low health (the decision review, 2026-09-26). A night is
 // eleven real minutes from dusk to dawn, eight and a half from bedtime.
-const REAL_TIME = 'The player counts real time: a Minecraft day is twenty real minutes, a night about eleven. A death ends this attempt and loses what is carried; after that, minutes spent waiting, hiding or going back are the cost.';
+// The goal said as the player set it (note 2057; the user, 2026-10-24: 'optimize for time to beat the dragon. The bot
+// shouldn't fear death aside from the amount of time it would set it back'): a death is priced in the time it costs.
+const DEATH_TIME = 'The goal is the fastest dragon kill; a death costs only the time it loses.';
+const REAL_TIME = `The player counts real time: a Minecraft day is twenty real minutes, a night about eleven. ${DEATH_TIME} Waiting, hiding, going back cost time too.`;
 const RISK = 'riskNow is how likely a death is now; deathWouldCost, what a death now would lose.';
 const DEATHS = 'recentDeaths are the deaths of the last two hours and what was chosen last before each; the same answer in the same place seldom ends differently.';
 // A sense of pace said as a fact, not a limit: what the minutes played
@@ -214,7 +217,7 @@ const TRAIL = 'recentPositions is where the bot has been these last minutes: the
 // the bot opens it. A Nether pocket at hunger 16 with nothing to eat was
 // asked with the Overworld's "a night is about eleven minutes" and chose to
 // stay (0.48 against going for food 0.25), where health could never come back.
-const elsewhereTime = place => `The player counts real time. In ${place} no day or night comes: no mob burns off or leaves with the light, a wait ends only when the bot ends it, and health comes back only while hunger is eighteen or more. A death ends this attempt and loses what is carried; after that, minutes spent waiting, hiding or going back are the cost.`;
+const elsewhereTime = place => `The player counts real time. In ${place} no day or night comes: no mob burns off or leaves with the light, a wait ends only when the bot ends it, and health comes back only while hunger is eighteen or more. ${DEATH_TIME} Waiting, hiding, going back cost time too.`;
 // The dark's rule for spawning is the Overworld's: most of the Nether's mobs
 // spawn at any light (checkGhastSpawnRules, the zombified piglin's, the
 // piglin's, the hoglin's and the magma cube's own rules look at no light).
