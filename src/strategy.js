@@ -257,6 +257,13 @@ function homeWhere(bot, goal, rung) {
   const made = rung.item ? ` The ${label(rung.item)} is made from the pockets where the bot stands, then carried there.` : '';
   return ` It is done at the base${rung.phase === 'home_stash' ? ', the chest going by the bed' : ''}: ${d} blocks from here${Math.abs(dy) >= 3 ? `, ${Math.abs(dy)} blocks ${dy > 0 ? 'up' : 'down'}` : ''}${flat > 6 ? `, about ${Math.round(flat / 4.3)} seconds at a walk${Math.abs(dy) >= 3 ? ' and the climb besides' : ''}` : ''}.${made}`;
 }
+// The Nether has no night (note 2065): said on the way there when the Overworld's dark is coming.
+function netherNightSays(bot) {
+  const t = bot?.time?.timeOfDay;
+  if (!Number.isFinite(t) || !/overworld/.test(String(bot?.game?.dimension || '')) || t < 6500 || t >= 12000) return '';
+  const m = Math.max(1, Math.round((12000 - t) / 1200));
+  return ` Dark comes on the Overworld in about ${m} real minute${m === 1 ? '' : 's'}; the Nether has no night, and a night spent there is not spent sealed in.`;
+}
 function rungOption(rung, first, bot, goal, planFor = null) {
   const what = rung.kit ? RUNG_WHY[rung.phase] : rung.items?.length > 1 ? `${label(rung.phase)} (${rung.items.map(label).join(', ')})` : rung.item ? `${rung.count > 1 ? `${rung.count} ` : ''}${label(rung.item)}` : label(rung.phase);
   const piece = /^iron_(helmet|chestplate|leggings|boots)$/.test(rung.phase) ? 'iron_armour' : rung.phase;
@@ -270,6 +277,12 @@ function rungOption(rung, first, bot, goal, planFor = null) {
   // what followed this run's deaths in armour. full-3 (2026-10-23 06:55 to 08:05Z) and full-4 (12:40 to 16:44Z) went
   // back underground bare for iron after each death, five and six deaths in a row, and the iron pickaxe's offer said
   // nothing of it (the advice check-in of 2026-10-23).
+  // The dark coming said on a rung whose work is below ground (note 2065; the night review of 2026-10-24): night
+  // mining was taken about half the times offered but came to 1.7 of full-2's 108.6 hours against 17 sealed in; work
+  // below goes on through the night, where the surface's stops at the dark.
+  const tDay = bot?.time?.timeOfDay;
+  const toDark = Number.isFinite(tDay) && /overworld/.test(String(bot?.game?.dimension || '')) && tDay >= 6500 && tDay < 12000 ? Math.max(1, Math.round((12000 - tDay) / 1200)) : null;
+  const belowSays = toDark && /^(iron_|diamond_|golden_|bucket$|shield$|obsidian|redstone|lapis)/.test(rung.phase) ? ` Dark comes in about ${toDark} real minute${toDark === 1 ? '' : 's'}: its ore is mined below ground, where the night changes nothing, and the work goes on through it.` : '';
   const bareBelow = bot && !bareRate && /^(iron_|diamond_|golden_|bucket$|shield$)/.test(rung.phase) && ![5, 6, 7, 8].some(i => bot.inventory?.slots?.[i])
     ? ` Nothing is worn now: its ore is mined below, in the caves, with no armour on.${bareChainSays(bot)}` : '';
   // Said alike whichever rung is first: "the ladder's next step" beside
@@ -289,7 +302,7 @@ function rungOption(rung, first, bot, goal, planFor = null) {
   // came to, the same facts the Nether now says of going without it.
   const level = bot && goal ? require('./levels').rungLevelSays(bot, goal, rung.phase) : '';
   const record = require('./kit-record').rungRecordSays(rung.phase, bot?.entity?.position?.y);
-  return { description: `Get ${what}${why ? ` (${why})` : ''}.${kit}${rung.kit ? '' : spareSays(bot, goal, rung)}${bot && goal ? searchSoFar(bot, goal, rung) : ''}${bot && goal ? woolTrip(bot, goal, rung) : ''}${homeWhere(bot, goal, rung)}${rungTakes(bot, goal, rung, planFor)}${spent}${without}${bareRate}${bareBelow}${level}${record}${netherCost}`, rung, ladderNext: first };
+  return { description: `Get ${what}${why ? ` (${why})` : ''}.${kit}${rung.kit ? '' : spareSays(bot, goal, rung)}${bot && goal ? searchSoFar(bot, goal, rung) : ''}${bot && goal ? woolTrip(bot, goal, rung) : ''}${homeWhere(bot, goal, rung)}${rungTakes(bot, goal, rung, planFor)}${spent}${without}${bareRate}${bareBelow}${belowSays}${level}${record}${netherCost}`, rung, ladderNext: first };
 }
 // A pickaxe rung with a pickaxe still carried is a spare: the ladder counts
 // one under a fifth of its uses (or sixty-four) as worn, and said only
@@ -538,7 +551,7 @@ function strategyOptions(bot, goal, stage, sides = {}, planFor = null) {
       // Entered with the kit carried now, each rung left priced (note 763):
       // what it would take from here (its level, the climb) and what the
       // trials that chose it spent and the stays that had it came to.
-      description: `Leave ${left.map(label).join(', ')} for later and go for the Nether now, with the kit carried now: the portal, and through it for a fortress, blaze rods and ender pearls.${netherAside ? ` ${netherAside}` : ''} ${[...new Set(left.map(p => /^iron_(helmet|chestplate|leggings|boots)$/.test(p) ? 'iron_armour' : p))].map(p => `Without ${label(p)} for now: ${without(p)}.${priced(p)}`).join(' ')}${clock ? ` The ${label(stage.phase)} has been worked on for ${Math.round(clock.activeMs / 60000)} minutes.` : ''} The steps left are set aside for half an hour, then offered again.${require('./crossing-kit').kitSummary(bot, goal)}${cameOutSays(bot, goal)}`,
+      description: `Leave ${left.map(label).join(', ')} for later and go for the Nether now, with the kit carried now: the portal, and through it for a fortress, blaze rods and ender pearls.${netherNightSays(bot)}${netherAside ? ` ${netherAside}` : ''} ${[...new Set(left.map(p => /^iron_(helmet|chestplate|leggings|boots)$/.test(p) ? 'iron_armour' : p))].map(p => `Without ${label(p)} for now: ${without(p)}.${priced(p)}`).join(' ')}${clock ? ` The ${label(stage.phase)} has been worked on for ${Math.round(clock.activeMs / 60000)} minutes.` : ''} The steps left are set aside for half an hour, then offered again.${require('./crossing-kit').kitSummary(bot, goal)}${cameOutSays(bot, goal)}`,
       says: `I'll leave the ${left.map(label).join(' and the ')} for later`,
       // Said whole: "Before the diamond sword, I'll leave the diamond sword
       // for later" named the rung skipped as the one done first (25592

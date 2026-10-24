@@ -54,3 +54,13 @@ test('a mining rung offered with nothing worn says the caves are gone into bare,
   const worn = rungOption({ phase: 'iron_pickaxe', action: 'acquire', item: 'iron_pickaxe', count: 1 }, true, bot(), {});
   assert.doesNotMatch(worn.description, /Nothing is worn now/);
 });
+
+// The night review of 2026-10-24: the dark coming said on work below ground and on the Nether (note 2065).
+test('with dark coming, a mining rung says its work goes on through the night below, and the Nether that it has none', () => {
+  const { rungOption } = require('../src/strategy');
+  const b = bot(); b.time = { timeOfDay: 9600 };
+  const o = rungOption({ phase: 'iron_pickaxe', action: 'acquire', item: 'iron_pickaxe', count: 1 }, true, b, {});
+  assert.match(o.description, /Dark comes in about 2 real minutes: its ore is mined below ground, where the night changes nothing/);
+  b.time = { timeOfDay: 2000 };
+  assert.doesNotMatch(rungOption({ phase: 'iron_pickaxe', action: 'acquire', item: 'iron_pickaxe', count: 1 }, true, b, {}).description, /Dark comes/);
+});
