@@ -5256,8 +5256,20 @@ class Survival {
       const all = stanceCost({ mobs: mobs.filter(m => m.shoots), setup: secs, reaches: m => ids.has(m.id) }).damage;
       return ` The footing is not out of their sight: ${names} ${seen.length === 1 ? 'has' : 'have'} a line to it from where ${seen.length === 1 ? 'it is' : 'they are'} now, and ${seen.length === 1 ? 'its' : 'their'} shots go on there as here: about ${all} damage from the shooters in the next fifteen seconds this way, the run included, from ${Math.round(bot.health * 10) / 10} health${all >= bot.health ? ' (more than the bot has)' : ''}.`;
     };
-    const scout = this.state.retreatScout;
-    const scouted = scout && scout.feet === `${feet}` && Date.now() - scout.at < 2000 ? scout : null;
+    const stored = this.state.retreatScout;
+    // The way scouted up to two seconds ago, walked again against the
+    // creepers as they are now: full-3 (2026-10-24 19:43:08Z), standing
+    // laying blocks between it and a creeper, was told of the retreat the
+    // scout's "the creeper 7 blocks off ... does not light", the creeper by
+    // then 2.8 off and lit, and the blast came as it ran (note 2068).
+    const rewalk = (cells, had) => cells && (runCreepers.length || had) ? require('./creeper-run').wayAgainstCreepers(bot, cells, runCreepers) : had;
+    const heldScout = stored && stored.feet === `${feet}` && Date.now() - stored.at < 2000 ? stored : null;
+    const scout = heldScout && {
+      ...heldScout,
+      ...(heldScout.cells ? { creeper: rewalk(heldScout.cells, heldScout.creeper) } : {}),
+      ...(heldScout.pastReach?.cells ? { pastReach: { ...heldScout.pastReach, creeper: rewalk(heldScout.pastReach.cells, heldScout.pastReach.creeper) } } : {}),
+    };
+    const scouted = scout;
     if (onPillar) footing = ` The bot stands ${onPillar} blocks up on a pillar of its own, and a route drops three blocks at most: from up here there is no way off it to run by.`;
     else if (scouted) {
       // Held no longer than the run: a retreat that reached its footing was
@@ -7536,7 +7548,7 @@ class Survival {
         const creeper = require('./creeper-run').wayAgainstCreepers(bot, back.cells, creepers);
         if (!creeper?.worst.goesOff) {
           return this.state.retreatScout = { at: Date.now(), feet, radius, spots: far.length + near.length, tried: 0, candidates: candidates.length,
-            destination: { ...back.end }, blocks: back.blocks, gain: back.gain, ...(creeper ? { creeper } : {}),
+            destination: { ...back.end }, blocks: back.blocks, gain: back.gain, cells: back.cells.map(c => ({ x: c.x, y: c.y, z: c.z })), ...(creeper ? { creeper } : {}),
             back: { cells: back.cells.map(c => ({ x: c.x, y: c.y, z: c.z })), end: { ...back.end }, blocks: back.blocks, gain: back.gain, secondsAgo: back.secondsAgo, nearest: back.nearest } };
         }
       }
@@ -7552,11 +7564,11 @@ class Survival {
         const reach = found?.candidates.length ? await this.wayAway(task, movements, { about: found.biters.map(t => t.entity), heavy: found.heavy, creepers }, found.candidates, { budgetMs }) : null;
         if (reach?.p) pastReach = { destination: { x: reach.p.x, y: reach.p.y, z: reach.p.z }, blocks: Math.round(reach.route.path.length || reach.p.distanceTo(from)),
           from: found.biters.map(t => ({ id: t.entity.id, name: t.entity.name, blocks: Math.round(t.entity.position.distanceTo(reach.p)), follows: followRange(t.entity.name) })),
-          ...(reach.creeper ? { creeper: reach.creeper } : {}) };
+          cells: reach.route.path.map(c => ({ x: c.x, y: c.y, z: c.z })), ...(reach.creeper ? { creeper: reach.creeper } : {}) };
       }
       return this.state.retreatScout = { at: Date.now(), feet, radius, spots: far.length + near.length, tried: way.tried, candidates: candidates.length, ...(pastReach ? { pastReach } : {}), ...(backWhy && !way.p ? { backWhy } : {}),
         ...(way.p ? { destination: { x: way.p.x, y: way.p.y, z: way.p.z }, blocks: Math.round(way.route.path.length || way.p.distanceTo(from)),
-          gain: Math.round(Math.min(...about.map(e => e.position.distanceTo(way.p))) - Math.min(...about.map(e => e.position.distanceTo(from)))), ...(way.creeper ? { creeper: way.creeper } : {}), ...(way.edge ? { edge: way.edge } : {}) } : {}) };
+          gain: Math.round(Math.min(...about.map(e => e.position.distanceTo(way.p))) - Math.min(...about.map(e => e.position.distanceTo(from)))), cells: way.route.path.map(c => ({ x: c.x, y: c.y, z: c.z })), ...(way.creeper ? { creeper: way.creeper } : {}), ...(way.edge ? { edge: way.edge } : {}) } : {}) };
     } catch (err) { task.check(); if (['NeedsAir', 'Cancelled'].includes(err.name)) throw err; return null; }
     finally { Object.assign(movements, previous); unsteer(); }
   }

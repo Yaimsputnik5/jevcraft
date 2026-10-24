@@ -148,6 +148,30 @@ test('the retreat asked on the bridge takes a way the creeper does not go off on
   assert.ok(retreat.expects.damage >= blast, `priced ${retreat.expects.damage}, the blast ${blast} in it`);
 });
 
+test('a retreat scouted with the creeper far is walked again against it where it is when asked: the blast said, not the scout\'s clear way (note 2068)', async () => {
+  // full-3 (2026-10-24 19:43:08Z) was told of the retreat the scout's "the
+  // creeper 7 blocks off ... does not light" 1.3 seconds after, the creeper
+  // 2.8 off and lit, the bot standing on the same block laying blocks.
+  const first = groundBot(BRIDGE, { at: new Vec3(-39.42, 14, -4.59), health: 8.86, food: 10, held: 'stone_sword', worn: IRON,
+    items: [['stone_sword', 1], ['cobblestone', 64], ['iron_pickaxe', 1]],
+    mobs: [{ id: 4823, name: 'creeper', at: new Vec3(-39.6, 11, -24) }, { id: 4535, name: 'skeleton', at: new Vec3(-39.5, 11, -4.7), height: 1.99 }] });
+  const FIRST = [[-39, 14, -5], [-38, 14, -5], [-37, 14, -5], [-36, 14, -4], [-35, 14, -4], [-34, 11, -4], [-34, 11, -3], [-35, 11, -2], [-36, 11, -1], [-37, 11, 0], [-38, 11, 0], [-39, 11, 0], [-40, 11, 1], [-41, 11, 1], [-42, 12, 1], [-43, 12, 2], [-44, 12, 2], [-44, 13, 3], [-45, 13, 4], [-46, 13, 4], [-47, 14, 4]].map(([x, y, z]) => ({ x, y, z }));
+  first.pathfinder.getPathFromTo = function * () { yield { result: { status: 'success', path: FIRST } }; };
+  const s = new Survival(first, { navigate: async () => {} }, { state: { shelters: [] } });
+  const far = threats(first, 30);
+  s.escapeFootings = () => ({ about: far.map(t => t.entity), footing: [], far: [], near: [new Vec3(-47, 14, 4)], heavy: false, persistent: true, radius: 40 });
+  await s.scoutRetreat(new Task('x'), far, { budgetMs: 5000 });
+  assert.deepEqual(s.state.retreatScout.destination, { x: -47, y: 14, z: 4 });
+  assert.ok(!s.state.retreatScout.creeper?.worst.goesOff, 'scouted with the creeper 20 off: nothing goes off');
+  // The creeper comes in under the bridge before the question.
+  first.entities[4823].position = new Vec3(-39.6, 11, -4);
+  const near = threats(first, 24);
+  const retreat = s.stanceOptions(new Task('x'), {}, () => {}, near, false).retreat;
+  assert.match(retreat.description, /A way is found/);
+  assert.match(retreat.description, /the creeper 3 blocks off lights about [\d.]+ seconds in, and goes off about [\d.]+ seconds in/);
+  assert.ok(retreat.expects.damage > 0);
+});
+
 test('the route search and the run are steered off the cells round a creeper, and the steer is put back after (the saved bridge)', async () => {
   const bot = bridgeBot();
   const moves = [];
