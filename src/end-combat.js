@@ -4351,6 +4351,23 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         description: { action: `Roof the head and wall the four sides at the feet and the head here on the bot's own column (about ten blocks, a second), out of the dragon's sight for its throw`, strafing: says, blocksCarried: blocksCarried(bot), health: bot.health },
         run: async () => { const t0 = Date.now(); let roofed = false; try { roofed = await roofOverhead(); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } let r = { laid: 0, closed: 0 }; try { r = await pocketOnColumn({ allSides: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; } console.log(`[end combat] sealed against the strafe at ${bot.entity.position.floored()}: roof ${roofed ? 'laid' : 'not laid'}, ${r.laid} laid, ${r.closed} of 4 sides closed, ${Date.now() - t0} ms, ${blocksCarried(bot)} blocks left`); if (r.closed >= 4) progress = true; } };
     }
+    // The way out of a hole under a breath cloud said on every way that leaves it (note 2067): the cloud hurts only
+    // what touches its half-block box, a body standing two or more under it is out of it, and a jump puts the head in
+    // it (the arena's drill of 2026-10-24, note 2066). full-2 (2026-10-23 04:14Z and 20:56Z) and full-3 (21:44Z) died in
+    // pits under clouds two to three over their feet, on the ways out that jump.
+    if (holeHere()) {
+      const p = bot.entity.position;
+      const c = Object.values(bot.entities || {}).filter(e => e.name === 'area_effect_cloud' && e.isValid !== false && e.position && e.position.y - p.y >= 1.5 && e.position.y - p.y <= 3.6 && Math.hypot(p.x - e.position.x, p.z - e.position.z) <= cloudRadius(bot, e) + 0.5).sort((a, b) => a.position.y - b.position.y)[0];
+      if (c) {
+        const over = Math.round((c.position.y - p.y) * 10) / 10, wide = Math.round(cloudRadius(bot, c) * 20) / 10;
+        const says = ` The breath's cloud lies ${over} over the feet here, ${wide} wide: standing in the hole the body is out of it, its box half a block high, and a jump or a climb out puts the head in it, about six health a tick while in it; a cloud lasts about thirty seconds from its burst.`;
+        for (const [k, node] of Object.entries(tree)) {
+          if (/^(stay_in_hole|wait_in_hole|observe|eat|strike_head|none_good)$/.test(k)) continue;
+          if (node?.description && typeof node.description.action === 'string') node.description.action += says;
+          else if (typeof node?.description === 'string') node.description += says;
+        }
+      }
+    }
     const decision = await decide('dragon_fight', { client, bot, goal, tree, context: { safe }, interrupt: check, watchMs: 50,
       state: endDecisionState({ request: goal.request, health: bot.health, food: bot.food, arrows: countOf(bot, 'arrow'), headNotSought: crystals.length ? `the head is not offered while a crystal stands: its blows are healed back in seconds by the nearest crystal, and the run to it threw dragon-176, 188, 189 and 191 to their deaths on 2026-10-14 with no lasting damage done; the crystals come first` : undefined,
         position: { ...bot.entity.position }, safe, dragon: state.dragon,
