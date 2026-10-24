@@ -61,13 +61,15 @@ async function placeBedChest(bot, task, goal, save, home, actions) {
   // each its own (note 2030). Called once, full-1 (2026-10-22 11:02:50Z)
   // chose kit_by_bed at 0.42, made the planks, and the placing found 'Need
   // more chest'.
-  for (let i = 0; i < 8 && countOf(bot, 'chest') < 1; i++) { task.check(); if (await actions.acquireStep(bot, task, 'chest', 1, goal, save) === true) break; }
-  if (countOf(bot, 'chest') < 1) throw new Error('the chest for beside the bed was not made');
-  goal.step = { action: 'bed_kit_chest', at: plain(cell) }; save();
+  // An ender chest carried goes there in its place (note 2058): its store is kept through every death.
+  const kind = countOf(bot, 'ender_chest') >= 1 ? 'ender_chest' : 'chest';
+  for (let i = 0; i < 8 && kind === 'chest' && countOf(bot, 'chest') < 1; i++) { task.check(); if (await actions.acquireStep(bot, task, 'chest', 1, goal, save) === true) break; }
+  if (countOf(bot, kind) < 1) throw new Error('the chest for beside the bed was not made');
+  goal.step = { action: 'bed_kit_chest', at: plain(cell), kind }; save();
   await actions.navigate(bot, task, new goals.GoalNear(cell.x, cell.y, cell.z, 3), { timeoutMs: 30000, stallMs: 8000 });
-  if (bot.blockAt(cell)?.name !== 'chest') await actions.place(bot, task, cell, 'chest');
-  if (bot.blockAt(cell)?.name !== 'chest') throw new Error('the chest did not go beside the bed');
-  goal.bedKit = { position: plain(cell), bedFoot: plain(sb.foot), placedAt: new Date().toISOString(), contents: {} };
+  if (bot.blockAt(cell)?.name !== kind) await actions.place(bot, task, cell, kind);
+  if (bot.blockAt(cell)?.name !== kind) throw new Error('the chest did not go beside the bed');
+  goal.bedKit = { position: plain(cell), bedFoot: plain(sb.foot), placedAt: new Date().toISOString(), contents: {}, ...(kind === 'ender_chest' ? { ender: true } : {}) };
   home.stash = goal.bedKit; save();
 }
 
@@ -109,7 +111,8 @@ function bedKitChores(bot, goal, { now = Date.now() } = {}) {
     // chest stands: no run had one, so a spare was never offered.
     const first = spareToMake(bot, home);
     const firstSays = first ? `${what ? ', and ' : ''}a spare ${first[0].replaceAll('_', ' ')} made first (${first[1]} of the ${countOf(bot, 'iron_ingot')} iron ingots carried, ${first[2]} armour points)` : '';
-    if ((moves.length || armour.length || first) && woodFor(bot)) out.kit_by_bed = { description: `Put a chest (eight planks) beside the bed slept in, ${d} blocks off, and leave in it ${what}${firstSays}: a death comes back to life at that bed, and the kit is taken out of the chest there first.${bare}`,
+    const ender = countOf(bot, 'ender_chest') >= 1;
+    if ((moves.length || armour.length || first) && (ender || woodFor(bot))) out.kit_by_bed = { description: `Put ${ender ? 'the ender chest carried (its store kept through every death and opened the same at any ender chest)' : 'a chest (eight planks)'} beside the bed slept in, ${d} blocks off, and leave in it ${what}${firstSays}: a death comes back to life at that bed, and the kit is taken out of the chest there first.${bare}`,
       run: async (b, t, g, sv, a) => {
         try {
           if (first) for (let i = 0; i < 6 && countOf(b, first[0]) < 1; i++) { t.check(); if (await a.acquireStep(b, t, first[0], 1, g, sv) === true) break; }

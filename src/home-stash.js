@@ -29,7 +29,8 @@ const NEAR = 6;
 const pos = p => new Vec3(p.x, p.y, p.z);
 const plain = p => ({ x: p.x, y: p.y, z: p.z });
 const base = () => require('./home-base');
-const isChest = block => block?.name === 'chest';
+// An ender chest opens like one (note 2058): its store is the player's, kept through every death.
+const isChest = block => block?.name === 'chest' || block?.name === 'ender_chest';
 const toolKind = name => /_(pickaxe|sword)$/.exec(name || '')?.[1] || null;
 const toolTier = name => { const m = /^(\w+)_(pickaxe|sword|axe|shovel|hoe)$/.exec(name || ''); return m ? TOOL_TIERS.indexOf(m[1]) + 1 : 0; };
 const durabilityLeft = (bot, item) => { const max = bot.registry?.itemsByName?.[item.name]?.maxDurability; return max ? max - (item.durabilityUsed || 0) : Infinity; };

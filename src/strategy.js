@@ -380,6 +380,35 @@ function bareChainSays(bot) {
   const bare = chains.reduce((k, c) => k + c.n, 0), worst = chains.slice().sort((a, b) => b.n - a.n)[0];
   return ` After this run's ${chains.length} death${chains.length === 1 ? '' : 's'} in armour (of its last ${deaths.length}), ${bare} death${bare === 1 ? '' : 's'} came in no armour before any in armour again; the most, ${worst.n} in ${worst.minutes} minutes after the one at ${worst.at.slice(11, 16)}Z, each back for iron with nothing on.`;
 }
+// An ender chest (note 2058; the user, 2026-10-24: 'add the ender chest as an option'): eight obsidian round an eye
+// of ender, its store the player's own, kept through every death and opened the same at any ender chest. Offered
+// where an eye can be spared (the portal wanting fewer than are carried, or lit) and the obsidian is to be had (carried,
+// or made from lava and water with a diamond pickaxe and a water bucket), with a bed slept in to put it beside.
+function enderChestOption(bot, goal) {
+  if (bot.game?.gameMode && bot.game.gameMode !== 'survival') return null;
+  if (!/overworld/.test(String(bot.game?.dimension || ''))) return null;
+  if (goal.bedKit?.ender) return null;
+  const bed = bot._survivalState?.spawnBed?.foot;
+  if (!bed || !bot.entity?.position) return null;
+  const items = bot.inventory?.items?.() || [], has = n => items.filter(i => i.name === n).reduce((k, i) => k + i.count, 0);
+  if (has('ender_chest') >= 1) return null;
+  const { eyeTarget } = require('./eye-need');
+  const target = eyeTarget(goal), eyes = has('ender_eye');
+  const spare = target === 0 ? eyes : Math.max(0, eyes - target);
+  const makeOne = target === 0 && has('ender_pearl') >= 1 && (has('blaze_powder') >= 1 || has('blaze_rod') >= 1);
+  if (spare < 1 && !makeOne) return null;
+  const obsidian = has('obsidian'), canMake = has('diamond_pickaxe') >= 1 && (has('water_bucket') >= 1 || has('bucket') >= 1);
+  if (obsidian < 8 && !canMake) return null;
+  const off = Math.round(bot.entity.position.distanceTo(new Vec3(bed.x + 0.5, bed.y, bed.z + 0.5)));
+  const eyeSays = spare >= 1 ? `${spare === eyes ? `all ${eyes} eyes carried are spare, the portal lit` : `${spare} of the ${eyes} eyes carried spare over the ${target} the portal wants`}` : 'an eye made from an ender pearl and blaze powder carried, the portal lit';
+  const obsSays = obsidian >= 8 ? `${obsidian} obsidian carried` : `the obsidian made from lava and water with the diamond pickaxe and the water bucket (${obsidian} carried)`;
+  return {
+    description: `Make an ender chest (eight obsidian round an eye of ender: ${eyeSays}; ${obsSays}) and put it beside the bed slept in, ${off} blocks off. What is put in it stays through every death, wherever the bot dies, and every ender chest opens the same store: the spare kit left there is taken out at the bed after a death, by the bed's chores, instead of made again. Broken without silk touch it gives back its obsidian, not the eye.${bareDeathsSays(bot)}${bareChainSays(bot)}`,
+    says: "I'll make an ender chest for the bed",
+    rung: { phase: 'ender_chest', action: 'acquire', item: 'ender_chest', count: 1 },
+  };
+}
+
 function spareArmourOption(bot, goal) {
   if (bot.game?.gameMode && bot.game.gameMode !== 'survival') return null;
   if (!/overworld/.test(String(bot.game?.dimension || ''))) return null;
@@ -610,6 +639,8 @@ function strategyOptions(bot, goal, stage, sides = {}, planFor = null) {
   if (home) options.home_base = home;
   const spare = !toolless && spareArmourOption(bot, goal);
   if (spare) options.spare_armour = spare;
+  const ender = !toolless && enderChestOption(bot, goal);
+  if (ender) options.ender_chest = ender;
   if (fit && !toolless) for (const [key, side] of Object.entries(sides)) {
     // A wild wolf in view with bones carried is its own choice at the top,
     // not one of the side trips under one (note 1329): offered there once in
@@ -980,4 +1011,4 @@ async function strategyStep(bot, task, goal, save, stage, { client, decide, side
   return { ran: true };
 }
 
-module.exports = { bareChainSays, spareArmourOption, SPARE_ORDER, bareDeathsSays, cameOutSays, errandUnderWay, woolTrip, WOOL_HUNTS, oreFacts, carryBedOption, homeOption, strategyTree, pickaxeLeft, planSpends, HAND_BLOCKS_PER_MINUTE, rungTakes, WITHOUT, RUNG_WHY, rungOption, strategyOptions, strategyStep, HOLD_MS, SIDE_REST_MS, SIDE_FAIL_MS, rungStatus, lastStrategyFact };
+module.exports = { enderChestOption, bareChainSays, spareArmourOption, SPARE_ORDER, bareDeathsSays, cameOutSays, errandUnderWay, woolTrip, WOOL_HUNTS, oreFacts, carryBedOption, homeOption, strategyTree, pickaxeLeft, planSpends, HAND_BLOCKS_PER_MINUTE, rungTakes, WITHOUT, RUNG_WHY, rungOption, strategyOptions, strategyStep, HOLD_MS, SIDE_REST_MS, SIDE_FAIL_MS, rungStatus, lastStrategyFact };
