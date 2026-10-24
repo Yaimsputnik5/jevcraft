@@ -1020,13 +1020,25 @@ async function searchForSheep(bot, task, goal, save, actions) {
     await actions.acquireStep(bot, task, 'white_wool', countOf(bot, 'white_wool') + fromString, goal, save);
     return;
   }
+  // Left for now, the climb for sheep chosen before goes too: held, it ran
+  // on to the top. full-4 (2026-10-24 20:02:28Z), bare and below at night,
+  // chose climb_first and the climb, then until_day 2 seconds after; the
+  // climb's walk went on from 41 to the surface at 61, and a creeper, three
+  // zombies and two skeletons there ended it at 20:04:25Z (note 2069).
+  const dropSheepClimb = () => {
+    if (goal.surfaceTrip?.need !== 'sheep') return;
+    delete goal.surfaceTrip; delete goal.surfaceReturn;
+    try { bot.pathfinder?.setGoal?.(null); } catch (_) {}
+  };
   if (pick === 'without_bed') {
+    dropSheepClimb();
     setAside(goal, 'bed_search', 'wool', 'gone on without the bed for now (Jev chose without_bed)', 30 * 60000); save();
     bot.chat?.('No bed for now. On with the rest.');
     return;
   }
   if (pick === 'until_day') {
     const ms = Math.max(60000, Math.round(((DAY.DAWN - tod + 24000) % 24000) * 50));
+    dropSheepClimb();
     setAside(goal, 'bed_search', 'wool', 'left for the night: sheep are looked for by day (Jev chose until_day)', ms); save();
     bot.chat?.('The sheep can wait till morning.');
     return;

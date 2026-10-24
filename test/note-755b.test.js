@@ -143,8 +143,15 @@ test('at night below, the sheep search says the time to dawn on the climb and of
     const said = [];
     const bot = { entity: { position: new Vec3(0.5, 47, 0.5) }, game: { dimension: 'overworld', gameMode: 'survival' }, time: { timeOfDay: 16000 }, registry,
       inventory: { items: () => [] }, blockAt: () => null, findBlocks: () => [], chat: m => said.push(m) };
-    const goal = {};
+    // A climb for sheep chosen just before (full-4, 2026-10-24 20:02:28Z,
+    // note 2069): left with the sheep, its walk stopped.
+    let stopped = false;
+    bot.pathfinder = { setGoal: g => { if (g === null) stopped = true; } };
+    const goal = { surfaceTrip: { need: 'sheep', pick: 'climb', asked: true, at: new Date().toISOString() }, surfaceReturn: { origin: { x: 0, y: 47, z: 0 } } };
     await home.searchForSheep(bot, { check() {}, opportunityClient: {} }, goal, () => {}, { explore: async () => assert.fail('climbed') });
+    assert.equal(goal.surfaceTrip, undefined, 'the held climb for sheep is dropped');
+    assert.equal(goal.surfaceReturn, undefined);
+    assert(stopped, 'the walk in flight is stopped');
     assert.match(asked.tree.climb_first.description, /It is night: the surface's mobs are out until dawn, about 6 real minutes off, and the walk to look comes out among them\./);
     assert.match(asked.tree.until_day.description, /^Leave the sheep until day, about 6 real minutes to dawn/);
     assert(isSetAside(goal, 'bed_search', 'wool'));
