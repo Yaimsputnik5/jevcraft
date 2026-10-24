@@ -447,6 +447,22 @@ define({
 // now (the user, 2026-09-28: "Ask Jev"), the old order the body's safety
 // rule when Jev cannot answer in time (note 707).
 define({
+  id: 'bed_after_sleep', area: 'survival', parent: null, kind: 'survival', primitive: 'choice', stakes: 'medium', tree: true,
+  overworldOnly: true,
+  question: 'The night passed in the carried bed: leave it standing here as the respawn point, or take it up and carry it for the next night?',
+  trigger: 'On waking from a night slept in a carried bed put down (not the base\'s), the bed standing (note 2063).',
+  source: 'src/survival.js (sleepStep, bedAfterSleepTree)',
+  instructions: {
+    task: 'The bot has just slept the night in the bed it carried. Choose whether it leaves the bed standing as its respawn point or takes it up to carry.',
+    guidance: 'Each way says what it costs: left, a death comes back to life here and the next night needs another bed (the wool for it carried or not); taken, no more wool is needed and a death comes back to life at the world spawn, that far from the work.',
+  },
+  options: [
+    { key: 'leave_as_respawn', label: 'leave the bed standing as the respawn point', when: 'always' },
+    { key: 'take_bed_along', label: 'take the bed up and carry it for the next night', when: 'always' },
+  ],
+});
+
+define({
   id: 'body_way', area: 'survival', parent: null, kind: 'survival', primitive: 'choice', stakes: 'high', tree: true,
   question: 'The body is in danger of its own (in lava, alight or in fire, on a hot floor, the head in a block, out of breath under water), and may be struck by a mob at arm\'s length meanwhile: which way, now?',
   trigger: 'The moment a step meets the condition (the survival step for burning, and for lava only with fire resistance lasting on the body: without it the way out of lava is the body\'s safety rule, taken at once with no question asked, and no other question is asked while the body is in lava (src/lava-escape.js, note 756); the vitals step for fire, a hot floor (a magma block not crouched, a lit campfire) under the body wherever it stands, a head in a block and the breath), with two or more ways out (one is taken without asking); asked again each time the step meets it, unless burning was left to burn out (chosen, or the one way there was), which holds until it could have burned out, health falls four more (or half what it was, when that is less), or a way not on offer when it was left be is on offer (the bucket pours once the body is over a floor); while it holds, every other question says the burning (state.alight).',

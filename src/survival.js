@@ -9620,7 +9620,16 @@ class Survival {
       // standing with its item on the floor (mid-243-bg, note 633).
       // The first carried bed slept in stays standing as the respawn point (the user, 2026-10-20: 'add the bed to the ladder so Jev respawns at base'): picked up, the respawn went back to the world spawn, and of the night's 31 deaths on full-1..4 about half were a bare body come back to life at the world spawn at night among the mobs that had killed it. Left here, a death comes back to this bed, and the ladder wants another bed to carry (game-progress bedRung: none carried, the home's not claimed).
       // Every bed slept in stays (note 1948), the nook's in its wall too: the game moves the respawn to the bed last slept in, so a later night in a carried bed and its pickup put the respawn back at the world spawn with the first bed still standing. full-2 (2026-10-20) left its first bed at (87, 67, 359) at 04:16Z and came back to it from two deaths; at 05:27Z it crafted another, slept in a nook at (-25, 116, 601) and took it up, and its next four deaths (05:40 to 10:35Z) came back to life at the world spawn, (1.5, 80, 4.5) and about, the bed at (87, 67, 359) standing the whole while. The record then points at the bed last slept in, and the ladder makes another to carry.
-      const leaveAsSpawn = !placed && slept && [site.foot, site.head].every(p => isBed(bot.blockAt(p)));
+      // Left as the respawn or taken along is Jev's (note 2063; the user, 2026-10-24: 'Get rid of my rules if they're
+      // not helping ... make choices that give jev more agency and better info'): every bed slept in had stayed (notes
+      // 1944, 1948), so each night slept took a bed of its own, and the bed rung opened again after every night.
+      let leaveAsSpawn = false;
+      if (!placed && slept && [site.foot, site.head].every(p => isBed(bot.blockAt(p)))) {
+        let pick = 'leave_as_respawn';
+        try { pick = (await this.decide(task, goal, save, { id: 'bed_after_sleep', tree: bedAfterSleepTree(bot, this.state), state: { health: bot.health, food: bot.food } }))?.path?.[0] || pick; }
+        catch (err) { if (err?.name === 'Cancelled') throw err; this.report(goal, save, { action: 'bed_after_sleep_unasked', reason: String(err?.message || err).slice(0, 160) }); }
+        leaveAsSpawn = pick === 'leave_as_respawn';
+      }
       if (slept && [site.foot, site.head].every(p => isBed(bot.blockAt(p)))) {
         const was = this.state.spawnBed;
         this.state.spawnBed = { name: item || bot.blockAt(site.foot)?.name || 'bed', foot: { x: site.foot.x, y: site.foot.y, z: site.foot.z }, head: { x: site.head.x, y: site.head.y, z: site.head.z }, at: new Date().toISOString() };
@@ -9632,6 +9641,8 @@ class Survival {
       if (!placed && !leaveAsSpawn) {
         const bed = item;
         await this.pickUpBed(task, site.foot, site.head, bed);
+        // Taken up after a night in it (note 2063), the respawn is the world spawn again: the bed's record goes with it.
+        if (slept && bedCarried(bot) && this.state.spawnBed?.foot && this.state.spawnBed.foot.x === site.foot.x && this.state.spawnBed.foot.y === site.foot.y && this.state.spawnBed.foot.z === site.foot.z) { delete this.state.spawnBed; this.state.bedTakenAlong = { at: new Date().toISOString(), foot: { x: site.foot.x, y: site.foot.y, z: site.foot.z } }; }
         if (bedCarried(bot)) { if (this.state.bedLeft) delete this.state.bedLeft; }
         else {
           const standing = [site.foot, site.head].some(p => isBed(bot.blockAt(p)));
@@ -9646,8 +9657,8 @@ class Survival {
     if (!slept) throw new Error(this.state.lastSleepError || 'The night did not pass in bed');
     attemptsFor(this).clear('sleep', 'bed'); delete this.state.nightPlan;
     this.state.sleptAtAge = worldAge(bot);
-    // A night in any bed sets the respawn point there, and the bed stays (note 1948).
-    this.state.respawn = { x: site.foot.x, y: site.foot.y, z: site.foot.z, dimension: 'overworld' };
+    // A night in any bed sets the respawn point there while the bed stands (note 1948); taken along (note 2063), not.
+    if (this.state.spawnBed) this.state.respawn = { x: site.foot.x, y: site.foot.y, z: site.foot.z, dimension: 'overworld' };
     this.report(goal, save, { action: 'leave_shelter', reason: 'Morning. Back to it.' });
   }
 
@@ -12052,7 +12063,7 @@ class Survival {
       // its bed down at (1353, -8, 1169) under rock, told only of the mobs about; it died seven times after, the last
       // three in 35 seconds at 11:27Z, two blocks from the bed, and a creeper took the bed: the world spawn 1500 blocks off.
       const caveBedSays = !(homeBed && !bed) ? caveBedSaysFor(bot) : '';
-      tree.sleep_in_bed = { description: homeBed && !bed ? `Walk to the bed ${walk} blocks away (about ${Math.round(walk / 4.3)} seconds) and sleep in it. The night passes in seconds, nothing is built or spent, and the request resumes at dawn.${nowAbout}${sleepRuleSays}${refused}${creeperRaceSays}${safety.says}` : `Put the carried bed down here and sleep. The night passes in seconds, the request resumes at dawn, and the bed is spent on it.${' This bed stays standing afterwards as the respawn point: a death comes back to it, not to the world spawn, and another bed is made to carry (three wool and three planks).'}${caveBedSays}${nowAbout}${sleepRuleSays}${refused}${creeperRaceSays}${safety.says}`, run: () => this.sleepStep(task, goal, save) };
+      tree.sleep_in_bed = { description: homeBed && !bed ? `Walk to the bed ${walk} blocks away (about ${Math.round(walk / 4.3)} seconds) and sleep in it. The night passes in seconds and the request resumes at dawn.${nowAbout}${sleepRuleSays}${refused}${creeperRaceSays}${safety.says}` : `Put the carried bed down here and sleep. The night passes in seconds and the request resumes at dawn.${' On waking, the bed is left standing as the respawn point (a death comes back to it, another bed made to carry, three wool and three planks) or taken up and carried (the respawn back at the world spawn), as chosen then.'}${caveBedSays}${nowAbout}${sleepRuleSays}${refused}${creeperRaceSays}${safety.says}`, run: () => this.sleepStep(task, goal, save) };
     }
     // Where the carried bed does not fit (a staircase, a shaft), a nook dug
     // for it beside the bot: the bed that went down in the midgame trials
@@ -12427,6 +12438,20 @@ function sealedWaitCostSays(bot, goal) {
   const run = c?.playedMs && ms >= 30 * 60000 ? ` This run so far: ${Math.round(ms / 360000) / 10} of its ${Math.round(c.playedMs / 360000) / 10} hours of play spent so, sealed in awake.` : '';
   return ` Sealed, the bot waits about ${mins} real minutes to dawn and gains nothing meanwhile unless it mines.${run}`;
 }
+// The bed slept in, on waking: left standing as the respawn or taken up and carried (note 2063), each said with what it
+// costs: the wool for the next bed, or the world spawn a death comes back to.
+function bedAfterSleepTree(bot, state, now = Date.now()) {
+  const items = bot.inventory?.items?.() || [], has = re => items.filter(i => re.test(i.name)).reduce((k, i) => k + i.count, 0);
+  const wool = has(/_wool$/), string = has(/^string$/), beds = has(/_bed$/);
+  const p = bot.entity?.position, sp = bot.spawnPoint;
+  const toSpawn = p && sp ? Math.round(Math.hypot(sp.x - p.x, sp.z - p.z)) : null;
+  const recent = (state?.deaths || []).filter(d => d.at && now - Date.parse(d.at) <= 2 * 3600000).length;
+  const next = beds ? `another bed is carried already` : `the next night needs another bed: ${wool} wool${string ? ` and ${string} string (four a wool)` : ''} carried, three wool a bed`;
+  return {
+    leave_as_respawn: { description: `Leave the bed standing here as the respawn point: a death comes back to life here. ${next[0].toUpperCase()}${next.slice(1)}.`, run: async () => {} },
+    take_bed_along: { description: `Take the bed up and carry it: the next night is slept in it wherever it comes, no more wool needed. The respawn goes back to the world spawn${toSpawn != null ? `, ${toSpawn} blocks from here` : ''}: a death comes back to life there, with nothing, that far from the work. This run's deaths in the last two hours: ${recent}.`, run: async () => {} },
+  };
+}
 function underRock(bot, refuge = null) {
   if (bot.game?.dimension !== 'overworld' || !bot.entity?.position) return false;
   const p = bot.entity.position;
@@ -12800,4 +12825,4 @@ function claim(bot, goal = {}, survival = null) {
   return made;
 }
 
-module.exports = { sealedWaitCostSays, bedLoopOf, caveBedSaysFor, wardenBoom, LEAVES_THE_BOOM, PUSH_RECORD, pushRecordOn, blockRecord, BLOCK_RECORD, bedClimbable, BED_CLIMB, pricedRunCell, runFromRecord, RUN_FROM_RECORD, spawnBedNear, homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
+module.exports = { bedAfterSleepTree, sealedWaitCostSays, bedLoopOf, caveBedSaysFor, wardenBoom, LEAVES_THE_BOOM, PUSH_RECORD, pushRecordOn, blockRecord, BLOCK_RECORD, bedClimbable, BED_CLIMB, pricedRunCell, runFromRecord, RUN_FROM_RECORD, spawnBedNear, homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };

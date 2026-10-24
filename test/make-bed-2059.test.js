@@ -30,7 +30,7 @@ test('wool for the nights ahead is offered with sheep in view and fewer than nin
   const o = woolStockOption(b, { gameProgress: { clock: { playedMs: 3.6e6 * 10, byDoing: { wait_in_shelter: 3.6e6 * 2 } } } });
   assert.ok(o);
   assert.deepEqual(o.rung, { phase: 'wool_stock', action: 'gather_wool', count: 6 });
-  assert.match(o.description, /1 in view, the nearest 12 blocks off.*Carried now: 2 wool, 4 string \(four a wool\)\. Each night slept takes a bed of its own.*This run so far: 2 of its 10 hours/);
+  assert.match(o.description, /1 in view, the nearest 12 blocks off.*Carried now: 2 wool, 4 string \(four a wool\)\. Each night slept in a bed left behind as the respawn point takes a bed of its own.*This run so far: 2 of its 10 hours/);
   b.entities = {};
   assert.equal(woolStockOption(b, {}), null, 'no sheep in view');
 });
