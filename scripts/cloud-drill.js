@@ -34,6 +34,9 @@ bot.once('spawn', async () => {
       const bx = X + 1;
       if (k >= 1) await command(`fill ${bx} 151 0 ${bx} ${feet - 1} 0 glass`);
       if (k < 0) await command(`setblock ${bx} ${feet - 1} 0 glass`);
+      // An open pit under the cloud (note 2056): no floor between the body and the cloud over it, as in a hole dug at
+      // the fountain. CLOUD_OPEN=1 opens the floor's cell over the body and the column between.
+      if (k < 0 && process.env.CLOUD_OPEN === '1') await command(`fill ${bx} ${feet} 0 ${bx} 150 0 air`);
       await command(`effect clear ${username}`);
       await command(`tp ${username} ${bx + .5} ${feet} 0.5`);
       await sleep(1500);
