@@ -102,3 +102,27 @@ test('cap_fight is not offered where a threat that is not an enderman is also ab
   const options = survival.stanceOptions(new Task('x'), { step: { action: 'warped_pearls' } }, () => {}, danger, false);
   assert.equal(options.cap_fight, undefined, Object.keys(options).join(','));
 });
+
+test('under its lid, cap_fight holds for an enderman out of the sword\'s reach, faced, and does not walk out at it; the lid placed is not placed again (note 2072)', async () => {
+  // full-6 (2026-10-24 21:39:27Z): the lid went up, the fight's charge closed on the enderman 2.9 blocks off (out of the swing's reach) out of the capped cell, and its blows landed, 20 to none.
+  const items = [{ name: 'iron_sword', count: 1 }, { name: 'cobblestone', count: 20 }];
+  const e1 = { id: 821, name: 'enderman', type: 'hostile', position: new Vec3(1769.5, 64, 1765.5), height: 2.9, width: 0.6, isValid: true };
+  const bot = flatBot({ endermen: [e1], items, health: 20 });
+  const lid = new Vec3(1765, 66, 1765);
+  let places = 0, walked = 0, looked = 0;
+  const real = bot.blockAt.bind(bot);
+  bot.blockAt = p => (places && Math.floor(p.x) === lid.x && Math.floor(p.y) === lid.y && Math.floor(p.z) === lid.z) ? { position: p, name: 'cobblestone', boundingBox: 'block' } : real(p);
+  bot.pathfinder.setGoal = g => { if (g) walked++; };
+  bot.lookAt = async () => { looked++; };
+  const actions = { place: async () => { places++; }, dig: async () => {}, navigate: async () => { walked++; }, acquireStep: async () => {} };
+  const survival = new Survival(bot, actions, { state: { shelters: [] } });
+  survival.charge = async () => { walked++; return true; };
+  const danger = [{ entity: e1, distance: e1.position.distanceTo(bot.entity.position), visible: true }];
+  const options = survival.stanceOptions(new Task('x'), { step: { action: 'warped_pearls' } }, () => {}, danger, false);
+  assert.ok(options.cap_fight, Object.keys(options).join(','));
+  assert.equal(await options.cap_fight.run(), true);
+  assert.equal(await options.cap_fight.run(), true, 'held again');
+  assert.equal(places, 1, 'the lid is placed once');
+  assert.equal(walked, 0, 'no walk or charge out from under the lid');
+  assert.ok(looked >= 2, 'faced each run');
+});

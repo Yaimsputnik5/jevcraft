@@ -4930,7 +4930,25 @@ class Survival {
           run: async () => {
             this.report(goal, save, { action: 'cap_overhead', kind: plan.kind, blocks: plan.blocks, threats: danger.map(t => t.entity.name).slice(0, 4), health: bot.health, stance: true });
             if (!await roof.takeRoof(bot, task, this.actions, plan)) { this.state.failWhy = plan.why || 'the roof was not taken'; return false; }
-            return fightStance ? fightStance.run() : false;
+            // Under the lid, what is at the sword's reach is struck and an
+            // enderman out of it is held for, faced with the shield up: the
+            // fight's charge walked out from under it. full-6 (2026-10-24
+            // 21:39:27Z), in iron in the Nether, chose cap_fight, the lid
+            // went up, and the fight run after it closed on the enderman
+            // 2.9 blocks off, out of the capped cell; its blows landed, 20
+            // health to none in nine seconds (note 2072). Another biter
+            // about is fought as the fight fights it.
+            const strikable = danger.filter(t => t.entity?.position && t.entity.isValid !== false && canStrike(bot, t.entity));
+            if (strikable.length) { this.report(goal, save, { action: 'fight', threats: strikable.map(t => t.entity.name), health: bot.health, stance: true }); await this.swingFor(task, goal, save); return true; }
+            const others = danger.filter(t => t.entity?.name !== 'enderman' && t.entity?.isValid !== false && !shooter(t.entity));
+            if (others.length) return fightStance ? fightStance.run() : false;
+            const ender = danger.filter(t => t.entity?.name === 'enderman' && t.entity.isValid !== false && t.entity.position).sort((a, b) => a.distance - b.distance)[0];
+            if (!ender) return false;
+            this.report(goal, save, { action: 'cap_hold', threats: ['enderman'], health: bot.health, stance: true, stand: true });
+            await bot.lookAt?.(ender.entity.position.offset(0, 1, 0), true);
+            if (bot.inventory.slots?.[45]?.name === 'shield') raiseShield(bot);
+            await sleep(250);
+            return true;
           } };
       }
     }

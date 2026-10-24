@@ -77,6 +77,8 @@ async function takeRoof(bot, task, actions, plan) {
     const material = shelter.buildingItem(bot)?.name;
     if (!material) { plan.why = 'no block carried for the lid'; return false; }
     const lid = plan.cell.offset(0, 2, 0);
+    // Placed by this stance's run before: the stance is held run after run.
+    if (feetCell(bot).equals(plan.cell) && bot.blockAt(lid)?.boundingBox === 'block') return true;
     try { await actions.place(bot, task, lid, material, { stay: true }); return true; }
     catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; plan.why = `the lid at (${lid.x}, ${lid.y}, ${lid.z}) was not placed: ${String(err.message || err).slice(0, 80)}`; return false; }
   }
