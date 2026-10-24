@@ -6482,3 +6482,23 @@ test('a carried bed put down under rock is said as the respawn it makes: dark at
   assert.match(caveBedSaysFor(at(true)), /^ Here is under rock, no sky over it, at y -8: dark at every hour, so monsters spawn beside the bed by day as by night/);
   assert.equal(caveBedSaysFor(at(false)), '', 'open sky over it: nothing said');
 });
+
+test('tridents that came through the raised shield in the last twenty seconds price shield_the_tridents, said with it (note 2071)', () => {
+  // full-7 (2026-10-24 21:14:55 to 21:15:44Z) was told 0 damage of this way at 8.7 and 1.1 health beside tridents landing with the shield up and rising.
+  const bot = creeperBot({ wall: false, creeper: null, weapon: 'iron_sword', health: 8.7 });
+  const drowned = { id: 7, name: 'drowned', type: 'hostile', position: new Vec3(7.5, 64, 0.5), height: 1.95, width: 0.6, isValid: true, heldItem: { name: 'trident' } };
+  bot.entities = { 7: drowned };
+  const items = bot.inventory.items();
+  bot.inventory.items = () => [...items, { name: 'shield', count: 1 }];
+  const now = Date.now();
+  bot._hitLog = [{ at: now - 7000, name: 'drowned', id: 7, health: 13, shield: false, rising: true }, { at: now - 3000, name: 'drowned', id: 7, health: 10, shield: true }];
+  const survival = new Survival(bot, { place: async () => {}, dig: async () => {}, navigate: async () => {} }, { state: { shelters: [] } });
+  const o = survival.stanceOptions(new Task('x'), {}, () => {}, [{ entity: drowned, distance: 7, visible: true }], false).shield_the_tridents;
+  assert.ok(o);
+  assert.ok(o.expects.damage > 0, `priced ${o.expects.damage}`);
+  assert.match(o.description, /In the last 20 seconds 2 tridents landed with the shield raised here \(up, or still rising before it blocks\): at that rate, about [\d.]+ over the fifteen seconds this way, from 8\.7 health\./);
+  bot._hitLog = [];
+  const clean = survival.stanceOptions(new Task('x'), {}, () => {}, [{ entity: drowned, distance: 7, visible: true }], false).shield_the_tridents;
+  assert.equal(clean.expects.damage, 0);
+  assert.doesNotMatch(clean.description, /landed with the shield raised here/);
+});

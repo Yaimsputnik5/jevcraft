@@ -4477,8 +4477,17 @@ class Survival {
       const near = tridents.sort((a, b) => a.distance - b.distance)[0];
       const worn = [5, 6, 7, 8].map(slot => bot.inventory.slots?.[slot]?.name).filter(Boolean);
       const hit = Math.round(require('./combat-estimate').afterArmour(8, require('./combat-estimate').armourOf(worn)) * 10) / 10;
-      options.shield_the_tridents = { expects: { damage: 0, seconds: 15, oneHit: hit },
-        description: `Face the drowned ${Math.round(near.distance)} blocks off with the shield raised${shielded ? '' : ' (taken to the off hand first)'} and back away from it, the shield kept to it the whole way, until it has no line to the bot or is ${TRIDENT_RANGE} blocks off: it throws a trident about every two seconds at what it sees, about ${hit} through what is worn (8 before it), ${Math.ceil((bot.health ?? 20) / Math.max(hit, 0.1))} of them end the bot from ${Math.round((bot.health ?? 20) * 10) / 10} health, and a shield raised toward it takes each one whole (the game's rule; the shield blocks a quarter second after it is raised). Nothing is eaten, dug or swum for meanwhile: each of those lowers the shield or turns it away. The backing stops at a drop or at lava behind.`,
+      // The tridents that came through the shield raised here, in the hit
+      // log's last twenty seconds (up or still rising), priced over the
+      // fifteen at their own rate: full-7 (2026-10-24 21:14:55 to
+      // 21:15:44Z), in iron and swimming, was told 0 damage of this way at
+      // 8.7 and at 1.1 health, beside its own record of tridents landing
+      // with the shield up and rising, and took them to its death (note 2071).
+      const through = require('./hit-log').recent(bot).filter(h => h.name === 'drowned' && (h.shield || h.rising));
+      const throughDamage = through.length ? Math.round(through.length * hit * 15 / 20 * 10) / 10 : 0;
+      const throughSays = through.length ? ` In the last 20 seconds ${through.length === 1 ? 'a trident' : `${through.length} tridents`} landed with the shield raised here (up, or still rising before it blocks${bot.entity?.isInWater ? ', the bot in the water' : ''}): at that rate, about ${throughDamage} over the fifteen seconds this way, from ${Math.round(bot.health * 10) / 10} health${throughDamage >= bot.health ? ' (more than the bot has)' : ''}.` : '';
+      options.shield_the_tridents = { expects: { damage: throughDamage, seconds: 15, oneHit: hit },
+        description: `Face the drowned ${Math.round(near.distance)} blocks off with the shield raised${shielded ? '' : ' (taken to the off hand first)'} and back away from it, the shield kept to it the whole way, until it has no line to the bot or is ${TRIDENT_RANGE} blocks off: it throws a trident about every two seconds at what it sees, about ${hit} through what is worn (8 before it), ${Math.ceil((bot.health ?? 20) / Math.max(hit, 0.1))} of them end the bot from ${Math.round((bot.health ?? 20) * 10) / 10} health, and a shield raised toward it takes each one whole (the game's rule; the shield blocks a quarter second after it is raised). Nothing is eaten, dug or swum for meanwhile: each of those lowers the shield or turns it away. The backing stops at a drop or at lava behind.${throughSays}`,
         run: async () => {
           this.report(goal, save, { action: 'shield_the_tridents', threats: tridents.map(t => t.entity.name), health: bot.health, stance: true });
           if (!shielded) { const sh = bot.inventory.items().find(i => i.name === 'shield'); if (sh) await bot.equip(sh, 'off-hand'); }
