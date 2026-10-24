@@ -35,13 +35,30 @@ function madeAgain(items = {}) {
   const eyes = n('ender_eye'), pearls = n('ender_pearl') + eyes, rods = n('blaze_rod') + Math.ceil((eyes + n('blaze_powder')) / 2);
   if (pearls) out.push(`${pearls} ender pearl${pearls > 1 ? 's' : ''} from endermen or piglin barter`);
   if (rods) out.push(`${rods} blaze rod${rods > 1 ? 's' : ''} from a fortress's blazes`);
-  const iron = n('iron_helmet') * 5 + n('iron_chestplate') * 8 + n('iron_leggings') * 7 + n('iron_boots') * 4 + n('iron_sword') * 2 + n('iron_pickaxe') * 3 + n('shield') + n('bucket') * 3 + n('water_bucket') * 3 + n('iron_ingot') + n('raw_iron');
+  const iron = ironOf(items);
   if (iron) out.push(`${iron} iron mined and smelted`);
   const diamonds = Object.entries(items).reduce((sum, [name, c]) => sum + c * ({ diamond: 1, diamond_sword: 2, diamond_pickaxe: 3, diamond_axe: 3, diamond_helmet: 5, diamond_chestplate: 8, diamond_leggings: 7, diamond_boots: 4 }[name] || 0), 0);
   if (diamonds) out.push(`${diamonds} diamond${diamonds > 1 ? 's' : ''} found`);
   if (n('bow')) out.push('a bow made of three strings or taken from a skeleton');
   if (n('arrow')) out.push(`${n('arrow')} arrows from skeletons`);
   return out.join(', ');
+}
+
+// The iron in `items` and the minutes of play it takes to make again, at
+// the fresh runs' pace (note 2070): full-5 and full-7 (2026-10-24, 19:42 to
+// 21:10Z) had about 37 and 40 iron in 47 and 27 minutes of their iron work,
+// about a minute an iron. A death costs only the time it loses: full-1
+// (20:18:22Z) was told of four armour pieces 1063 blocks off only '28 iron
+// mined and smelted', against the walk's 28 minutes.
+const IRON_MINUTES = Object.freeze({ low: 0.7, high: 1.3 });
+function ironOf(items = {}) {
+  const n = name => items[name] || 0;
+  return n('iron_helmet') * 5 + n('iron_chestplate') * 8 + n('iron_leggings') * 7 + n('iron_boots') * 4 + n('iron_sword') * 2 + n('iron_pickaxe') * 3 + n('shield') + n('bucket') * 3 + n('water_bucket') * 3 + n('iron_ingot') + n('raw_iron');
+}
+function ironRemakeSays(items = {}) {
+  const iron = ironOf(items);
+  if (iron < 5) return '';
+  return ` The ${iron} iron is about ${Math.round(iron * IRON_MINUTES.low)} to ${Math.round(iron * IRON_MINUTES.high)} minutes of play to mine and smelt again, at the pace of the fresh runs' iron work (about 37 and 40 iron in 47 and 27 minutes, 2026-10-24).`;
 }
 
 // The eyes of ender a run had before a death and has nowhere now (none
@@ -386,7 +403,7 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
     let bedKit = null; try { bedKit = kitActions ? require('./bed-kit').bedKitChores(bot, goal).take_bed_kit : null; } catch (_) { bedKit = null; }
     const tree = {
       go_back: { description: `Go back for ${listed(run.items)}: ${far} blocks off${far >= 100 ? `, about ${minutes} minute${minutes > 1 ? 's' : ''}' ${climbSeconds ? 'walk and climb' : 'walk'}${rec?.walkBlocksAMinute ? ` at the ${rec.walkBlocksAMinute} blocks a minute the bot's walks have made, stalls and detours counted` : ''}` : ''}${Math.abs(spot.y - bot.entity.position.y) > 4 ? `, at y ${Math.round(spot.y)}` : ''}. ${left === null ? 'They last until the bot comes within 128 blocks, then five minutes.' : `About ${left} seconds before they vanish.`} ${death.cause ? `The bot ${death.cause} there; when it died, ` : 'When the bot died there, '}${about ? `about it were ${about}` : 'nothing hostile was in view'}; it wore ${death.worn?.length ? death.worn.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} then and wears ${wornNow.length ? wornNow.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} now. ${hour}${underSays}${stalled}${earlier}${eyesSay}${ringSays}${walkFoodSays}${alsoLying}` },
-      leave_them: { description: `Leave them and go on with what is carried: ${listed(worth(Object.fromEntries(bot.inventory.items().map(i => [i.name, i.count])))) || 'nothing worth listing'}. What was dropped is made again, or found, later${again ? `: ${again}` : ''}.${took}${keptSays}` },
+      leave_them: { description: `Leave them and go on with what is carried: ${listed(worth(Object.fromEntries(bot.inventory.items().map(i => [i.name, i.count])))) || 'nothing worth listing'}. What was dropped is made again, or found, later${again ? `: ${again}` : ''}.${ironRemakeSays(run.items)}${took}${keptSays}` },
     };
     if (quick) for (const k of Object.keys(tree)) tree[k].description += quick;
     if (bedKit) tree.kit_first = { description: `${bedKit.description} Then back for them as go back says.${quick}` };
@@ -609,4 +626,4 @@ function dropsWaitSays(bot, goal, now = Date.now()) {
   if (off > TICKING) return ` Given the turn, the work asks first about going back for what the last death dropped, ${off} blocks off: ${what}. Drops age only while their ground is loaded, so they keep until the bot comes near.`;
   return '';
 }
-module.exports = { dropsWaitSays, quickDeathsSays, TOLD, tripCameToNothing, KIT_ERRAND, kitTrip, corpseRun, corpseRunStep, worth, madeAgain, underWay };
+module.exports = { dropsWaitSays, quickDeathsSays, TOLD, tripCameToNothing, KIT_ERRAND, kitTrip, corpseRun, corpseRunStep, worth, madeAgain, ironRemakeSays, underWay };

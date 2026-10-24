@@ -568,3 +568,11 @@ test('the corpse run says the deaths that came within ten minutes of the one bef
   assert.equal(quickDeathsSays(bot), " Of this run's last 4 deaths, 1 came within ten minutes of the one before, the bot back with what it carries now.");
   assert.equal(quickDeathsSays({ _survivalState: { deaths: [{ at: at(0) }] } }), '');
 });
+
+test('leaving iron behind says the minutes of play to make it again, at the fresh runs\' pace (note 2070)', () => {
+  const { ironRemakeSays } = require('../src/corpse-run');
+  // full-1 (2026-10-24 20:18:22Z): helmet, chestplate, leggings, pickaxe, bucket and an ingot, 1063 blocks off.
+  assert.equal(ironRemakeSays({ iron_helmet: 1, iron_chestplate: 1, iron_leggings: 1, iron_pickaxe: 1, bucket: 1, iron_ingot: 1, golden_boots: 1 }),
+    " The 27 iron is about 19 to 35 minutes of play to mine and smelt again, at the pace of the fresh runs' iron work (about 37 and 40 iron in 47 and 27 minutes, 2026-10-24).");
+  assert.equal(ironRemakeSays({ iron_ingot: 2, bow: 1 }), '', 'a few ingots: nothing said');
+});
