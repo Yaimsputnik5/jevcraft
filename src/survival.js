@@ -550,7 +550,14 @@ function scoutBudget(danger = []) {
   // retreat had its 300 ms, "2 of 24 spots ... tried", and Jev answered
   // none good six times in eight seconds).
   const { LIGHTS_AT } = require('./combat-estimate');
-  const close = danger.some(t => t?.entity && (t.entity.name === 'creeper' ? t.distance <= LIGHTS_AT || (t.visible !== false && t.distance <= SCOUT_CREEPER_CLOSE) : !shooter(t.entity) && t.distance <= SCOUT_CLOSE));
+  // A biter that walks to arm's length within the long search, at its own
+  // speed, is close too (note 2074): full-5 (2026-10-24 22:47:23.8Z), a
+  // wither skeleton 5.3 blocks off at about 3.9 blocks a second, stood
+  // through 1.5 seconds of searching before the stance was asked, and took
+  // two blows, 20 to 10.4, before it.
+  const { blocksPerSecond } = require('./combat-estimate');
+  const arrivesWithin = t => { const v = blocksPerSecond(t.entity.name); return v > 0 && Math.max(0, t.distance - 1.5) / v * 1000 < SCOUT_FAR_MS + 300; };
+  const close = danger.some(t => t?.entity && (t.entity.name === 'creeper' ? t.distance <= LIGHTS_AT || (t.visible !== false && t.distance <= SCOUT_CREEPER_CLOSE) : !shooter(t.entity) && (t.distance <= SCOUT_CLOSE || arrivesWithin(t))));
   return close ? SCOUT_MS : SCOUT_FAR_MS;
 }
 // A swim at the surface: about two blocks a second. mid-215-j swam 29

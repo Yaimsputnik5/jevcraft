@@ -6502,3 +6502,13 @@ test('tridents that came through the raised shield in the last twenty seconds pr
   assert.equal(clean.expects.damage, 0);
   assert.doesNotMatch(clean.description, /landed with the shield raised here/);
 });
+
+test('a biter that walks to arm\'s length within the long route search at its own speed gets the short search, as one within four does (note 2074)', () => {
+  // full-5 (2026-10-24 22:47:23.8Z): a wither skeleton 5.3 blocks off stood the bot through 1.5 seconds of searching, two blows before the stance was asked.
+  const { scoutBudget } = require('../src/survival');
+  const mob = (name, distance) => ({ entity: { name, type: 'hostile' }, distance, visible: true });
+  assert.equal(scoutBudget([mob('wither_skeleton', 5.3)]), 300);
+  assert.equal(scoutBudget([mob('zombie', 3.5)]), 300);
+  assert.equal(scoutBudget([mob('zombie', 9)]), 1200, 'a slow walker far off: the long search');
+  assert.equal(scoutBudget([mob('skeleton', 6)]), 1200, 'a shooter does not walk in');
+});
