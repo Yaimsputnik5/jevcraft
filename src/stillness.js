@@ -1,4 +1,5 @@
 'use strict';
+const { DAY } = require('./day');
 // Getting nowhere is a bug, whatever the bot is doing.
 //
 // Every stuck hour of the runs had the same shape: an action that kept
@@ -695,7 +696,11 @@ function noteTrail(bot, goal, now = Date.now()) {
   if (!p) return;
   const doing = goal?.survivalAction && now - Date.parse(goal.survivalAction.at || 0) < 20000 ? goal.survivalAction.action : goal?.step?.action;
   const phase = goal?.rungTime?.phase || goal?.gameProgress?.phase;
-  require('./game-progress').tallyClock(goal, doing && doing === goal?.step?.action && phase ? `${phase}: ${doing}` : doing || 'between steps', now);
+  // A pocket waited in by day or off the Overworld is not a night (note 2064): the clock's wait_in_shelter counted
+  // both, and full-2's 17.1 hours of it overstated the nights (the night review of 2026-10-24).
+  const t = bot.time?.timeOfDay, overworld = /overworld/.test(String(bot.game?.dimension || ''));
+  const counted = doing === 'wait_in_shelter' && !(overworld && Number.isFinite(t) && t >= DAY.DUSK && t < DAY.DAWN) ? 'wait_in_pocket_not_night' : doing;
+  require('./game-progress').tallyClock(goal, counted && counted === goal?.step?.action && phase ? `${phase}: ${counted}` : counted || 'between steps', now);
   trail.push({ at: now, x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z), doing: doing || null });
   if (trail.length > TRAIL_KEEP) trail.splice(0, trail.length - TRAIL_KEEP);
 }
