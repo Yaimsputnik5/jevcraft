@@ -44,6 +44,7 @@ const kitBack = (now, then) => now.worn >= then.worn && now.pick >= then.pick &&
 function doingOf(snap, t) {
   const sa = snap.survivalAction;
   if (sa?.action && sa.at && t - Date.parse(sa.at) < 20000) return String(sa.action);
+  if (snap.step?.action === 'detour' && snap.step.choice) return `detour:${snap.step.choice}`;
   return snap.step?.action ? String(snap.step.action) : 'between_steps';
 }
 

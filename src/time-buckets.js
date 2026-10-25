@@ -9,7 +9,7 @@ const STILL_WORK = /^(smelt|craft|eat|cook|fill_bucket|cast_portal|place|hold_|s
 const STUCK_STEP = /^(detour|work_free|unstuck|recover_|stillness|differently|relocate)/;
 const TRAVEL = /^(walk|go_to|cross|return_to|reach_|find_|explore|search_|swim|boat|to_lava|approach|fortress_leg|leg_|ascend|descend|climb|dig_to_|travel|head_|back_to|corpse_run|bridge|span|staircase|surface|follow|path|toward|nether_gather|scout)/;
 const FIGHT = /^(escape|encounter|retreat|run_from|hunt|stalk|kill|attack|off_|leave_lava|swim_to|straight_up|creeper|shot|dig_down_to_them|out_of)/;
-const WORK = /^(mine|tunnel|dig|gather|collect|chop|wood|harvest|acquire|smelt|craft|fish|food|shear|bake|brew|plant|farm|strip|wool|stock|obsidian)/;
+const WORK = /^(mine|night_mine|tunnel|dig|gather|collect|chop|wood|harvest|acquire|smelt|craft|cook|trade|fish|food|shear|bake|brew|plant|farm|strip|wool|stock|obsidian)/;
 const BUCKETS = ['work', 'travel', 'fight', 'waiting', 'stuck', 'other'];
 // How each is said beside a rung.
 const WORDS = { work: 'at the work itself (mining, tunnelling, smelting, crafting)', travel: 'on walks, climbs and searches', fight: 'on mobs', waiting: 'waiting (nights, dawns, pockets)', stuck: 'stuck in one place (within 3 blocks for a minute and a half, or working free of a stall)', other: 'on the rest (between steps, eating, the portal)' };
@@ -18,6 +18,17 @@ const STUCK_BLOCKS = 3, STUCK_MS = 90000;
 
 function bucketOf(doing, stuck = false) {
   const d = String(doing || 'between_steps');
+  // A detour by what was chosen for it (note 2104): mining near by or a
+  // night mine is work, the wait for a rest to end is waiting; the rest of
+  // a stall's ways (look around, differently, work free) stay stuck. Every
+  // detour was stuck: full-6 (2026-10-25 13:40 to 16:04Z) counted 21 minutes
+  // stuck of which 17 were the night mine it chose.
+  const detour = /^detour:(.+)$/.exec(d);
+  if (detour) {
+    if (detour[1] === 'until_rest_ends') return 'waiting';
+    const b = bucketOf(detour[1], stuck);
+    return b === 'other' ? 'stuck' : b;
+  }
   if (WAITING.test(d)) return 'waiting';
   if (STUCK_STEP.test(d)) return 'stuck';
   if (stuck && !STILL_WORK.test(d)) return 'stuck';

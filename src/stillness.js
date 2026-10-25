@@ -710,7 +710,7 @@ function noteTrail(bot, goal, now = Date.now()) {
     const tb = require('./time-buckets'), last = trail.at(-1), step = Math.min(60000, now - last.at);
     const back = trail.slice().reverse().find(q => now - q.at >= tb.STUCK_MS);
     const stuck = !!back && Math.hypot(p.x - back.x, p.y - back.y, p.z - back.z) < tb.STUCK_BLOCKS;
-    const bucket = tb.bucketOf(counted, stuck);
+    const bucket = tb.bucketOf(counted === 'detour' && goal?.step?.action === 'detour' && goal.step.choice ? `detour:${goal.step.choice}` : counted, stuck);
     const tally = ((goal.rungBuckets ||= {})[phase] ||= {});
     tally[bucket] = (tally[bucket] || 0) + step;
   }

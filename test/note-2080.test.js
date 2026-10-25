@@ -33,3 +33,14 @@ test('the rung said at the strategy\'s asking carries where its minutes went (no
   assert.equal(says, ' Of its 35 minutes of play so far: 14 stuck in one place (within 3 blocks for a minute and a half, or working free of a stall); 12 at the work itself (mining, tunnelling, smelting, crafting); 8 on walks, climbs and searches.');
   assert.equal(tb.bucketsSays({ work: 60000 }), '', 'under two minutes: nothing said');
 });
+
+test('a detour is bucketed by what was chosen for it: a night mine is work, the wait for a rest is waiting (note 2104)', () => {
+  const tb = require('../src/time-buckets');
+  assert.equal(tb.bucketOf('detour:night_mine'), 'work');
+  assert.equal(tb.bucketOf('detour:mine_nearby'), 'work');
+  assert.equal(tb.bucketOf('detour:night_mine', true), 'stuck', 'still within three blocks for a minute and a half');
+  assert.equal(tb.bucketOf('detour:until_rest_ends'), 'waiting');
+  assert.equal(tb.bucketOf('detour:look_around'), 'stuck');
+  assert.equal(tb.bucketOf('detour:differently'), 'stuck');
+  assert.equal(tb.bucketOf('detour'), 'stuck');
+});
