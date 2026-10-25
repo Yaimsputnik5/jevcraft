@@ -224,3 +224,13 @@ test('take_up_food at the crossing runs the food step there and then, not a late
   assert.ok(asked.length >= 2, `the food step asked its own question after the crossing's: ${asked.map(a => a.slice(0, 3).join('/')).join(' | ')}`);
   assert.ok(asked.slice(1).some(keys => keys.some(k => /food|go_without|cook/.test(k)) && !keys.includes('cross_now')), 'the food step\'s own question, not the crossing\'s again');
 });
+
+test('two iron pickaxes made on this run: the diamond pickaxe is the ladder\'s before the sword, deferrable; none made, it is not (note 2090)', () => {
+  const { openRungs } = require('../src/game-progress');
+  // Past the first Nether entry, where the deferrable rungs are the ladder's (note 776's rule is before it).
+  const bot = atPortal({ ...FED, diamond_sword: 0, iron_sword: 1 });
+  const been = { nether_entered: { at: 1 } };
+  assert.ok(!openRungs(bot, { kind: 'win', gameProgress: { milestones: been } }).some(r => r.phase === 'diamond_pickaxe'));
+  const worn = openRungs(bot, { kind: 'win', gameProgress: { milestones: been }, toolsMade: { iron_pickaxe: 2 } });
+  assert.ok(worn.some(r => r.phase === 'diamond_pickaxe' && r.item === 'diamond_pickaxe'), JSON.stringify(worn));
+});

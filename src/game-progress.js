@@ -123,7 +123,7 @@ function preparationStage(bot, goal = {}) {
 // option, hit by hit, for the mobs there.
 const ARMOUR_PIECES = ['iron_armour', 'iron_helmet', 'iron_chestplate', 'iron_leggings', 'iron_boots'];
 // The crossing's kit may wait too (crossing-kit.js kitRungs, note 673).
-const DEFERRABLE = new Set(['bed', 'home_site', 'home_level', 'home_stash', 'home_bed', 'home_water', 'home_plot', 'home_pen', 'shield', 'leather_armour', 'fishing_rod', 'iron_sword', 'bucket', 'golden_boots', 'bow', 'arrows', 'diamond_sword', ...ARMOUR_PIECES, 'nether_pickaxe', 'nether_blocks', 'nether_food', 'nether_chest']);
+const DEFERRABLE = new Set(['bed', 'home_site', 'home_level', 'home_stash', 'home_bed', 'home_water', 'home_plot', 'home_pen', 'shield', 'leather_armour', 'fishing_rod', 'iron_sword', 'bucket', 'golden_boots', 'bow', 'arrows', 'diamond_pickaxe', 'diamond_sword', ...ARMOUR_PIECES, 'nether_pickaxe', 'nether_blocks', 'nether_food', 'nether_chest']);
 const RUNG_BUDGET_MS = 20 * 60 * 1000, RUNG_WAIT_MS = 30 * 60 * 1000;
 function preparationRung(bot, goal = {}, now = Date.now()) {
   const resting = attemptsFor(goal).of('rung', now);
@@ -506,6 +506,12 @@ function ladderRung(bot, goal, waiting, { allOptional = false } = {}) {
   // live by day. The night rungs come round again at dusk.
   // With the sword in hand and the sun up, the ladder is done for now: the
   // walk to the portal takes the day, and dusk brings the bow rung back.
+  // The diamond pickaxe on the ladder before the sword (note 2090): as a choice of its own (note 2087) it was offered
+  // 20 times on full-5, full-6 and full-7 (2026-10-25 06:05 to 07:51Z) and taken none, this run's own iron pickaxes
+  // said with it (note 2089: 'This run has made 11 iron pickaxes so far, 33 iron'). The user, 2026-10-25: 'it really
+  // seems like this would save time'. It is deferrable, as the sword is: set aside, the ladder goes on.
+  // Once this run has worn out iron pickaxes (two made), where the wear is its own cost.
+  if (best('pickaxe') < 4 && (goal.toolsMade?.iron_pickaxe || 0) >= 2 && ready({ phase: 'diamond_pickaxe' })) return another('diamond_pickaxe');
   if (best('sword') < 4 && ready({ phase: 'diamond_sword' })) return another('diamond_sword');
   // Last before the portal, the crossing's kit: a spare pickaxe, blocks and
   // food for the stay (crossing-kit.js kitRungs, note 673).
