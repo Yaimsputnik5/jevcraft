@@ -5661,6 +5661,14 @@ async function portalWay(bot, task, goal, save, p, where, { walk, pickaxeWanted 
       tree.the_way_in = { description: walkOut.wayBackSays(bot, way, walkOut.wayFacts(bot, way)) + walkOut.endSays(way, target, here) + awaySays };
     }
     const fresh = !rods ? '' : ` Fresh ground, not the way the bot came in: with ${rods} blaze rod${rods === 1 ? '' : 's'} carried, a fall or lava on it loses ${rods === 1 ? 'it' : 'every one'}.`;
+    // The rods' own walking rules, Jev's to set aside (note 2110): said with
+    // the walk's minutes and what the run's own record says a death costs.
+    if (rods && !walkOut.openWalk(bot, now)) {
+      let pace = null; try { pace = require('./game-progress').netherPaceSays(bot, distance); } catch (_) { pace = null; }
+      let own = ''; try { own = require('./rod-risk').runSays(bot, goal, rods); } catch (_) { own = ''; }
+      tree.walk_open = { description: `Walk to the portal by the pathfinder's ordinary rules for the next ${Math.round(walkOut.OPEN_WALK_MS / 60000)} minutes, the rods' own rules set aside: drops of more than ${walkOut.ROD_DROP_MAX} and cells beside lava are taken again where the route needs them (the rules came from 2026-09-30's walks out, when 4 of 6 bots walking out with rods died on the way). The portal is ${distance} blocks off.${pace?.says ? pace.says : ` About ${Math.max(1, Math.round(pace?.seconds / 60 || distance / 25))} minutes at a walk.`} A fall or lava on the way loses the ${rods === 1 ? 'rod' : `${rods} rods`} carried.${own ? ` ${own}` : ''}`,
+        run: () => { goal.rodWalkOpen = { at: now, until: now + walkOut.OPEN_WALK_MS }; save(); return true; } };
+    }
     for (const k of ['climb_here', 'around_left', 'around_right', 'floor_way', 'blocks_then_cross', 'dig_across']) if (tree[k]) tree[k].description += fresh;
   }
   if (until) tree.wait_rest = { description: `Other work until the staircase's rest ends in ${minutes} minute${minutes === 1 ? '' : 's'}, then the way to the portal again from wherever the bot is; the work is asked then.`,
@@ -5685,6 +5693,7 @@ async function portalWay(bot, task, goal, save, p, where, { walk, pickaxeWanted 
     if (moved >= 4 || startOff - Math.hypot(p.x - at.x, p.z - at.z) >= 1) return;
     goal.portalWay.tried = { ...goal.portalWay.tried, [pick]: { at: Date.now(), moved, ...(why ? { why: String(why).slice(0, 120) } : {}) } }; save();
   };
+  if (pick === 'walk_open') { tree.walk_open.run(); return true; }
   if (pick === 'wait_rest') throw new WaysResting(`${says} Jev chose other work until then.`, until);
   if (pick === 'portal_here' && where === 'overworld') { setAside(goal, 'portal_passed', { x: p.x, y: p.y, z: p.z }, 'Jev chose a portal made here, this one out of reach', 30 * 60000); save(); return false; }
   if (pick === 'portal_here') {

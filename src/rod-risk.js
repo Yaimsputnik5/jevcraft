@@ -69,7 +69,7 @@ function risk(bot, goal) {
   const drops = [plural(rods, 'blaze rod'), powder ? `${powder} blaze powder` : null, pearls ? plural(pearls, 'ender pearl') : null].filter(Boolean).join(', ');
   const of = n ? `, ${n.rodsWanted} wanted${inChest ? `, ${inChest} more in a chest` : ''}; ${n.rodsLeft ? `${n.rodsLeft} still needed` : 'none still needed'}` : '';
   const keep = keepSays(bot, goal);
-  const says = `${plural(carried, 'rod')} carried${of}. A death here drops the ${drops} where the bot falls (lava burns them, on the ground they vanish five minutes after) and it comes back to life in the Overworld. ${recordSays(carried)}${keep ? ` ${keep}` : ''}`;
+  const says = `${plural(carried, 'rod')} carried${of}. A death here drops the ${drops} where the bot falls (lava burns them, on the ground they vanish five minutes after) and it comes back to life in the Overworld. ${runSays(bot, goal, carried) || recordSays(carried)}${keep ? ` ${keep}` : ''}`;
   return { carried, inChest, wanted: n?.rodsWanted ?? null, left: n?.rodsLeft ?? null, keep, says };
 }
 

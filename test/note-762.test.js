@@ -260,3 +260,18 @@ test('without rods the way in kept is offered too, and the other ways carry no w
   assert.ok(options?.the_way_in, `offered: ${asked.map(o => Object.keys(o).join(',')).join(' | ')}`);
   for (const k of ['around_left', 'around_right']) if (options[k]) assert.doesNotMatch(options[k], /blaze rods? carried/);
 });
+
+// Note 2110: the rods' rules are Jev's to set aside (portal_way walk_open):
+// while it holds the pathfinder counts no rods.
+test('walk_open sets the rods\' walking rules aside for twenty minutes, then they come back', () => {
+  const { SurvivalMovements } = require('../src/movement');
+  const now = Date.now();
+  const bot = { inventory: { items: () => [{ name: 'blaze_rod', count: 4 }] }, _goal: {} };
+  const self = { bot };
+  assert.equal(SurvivalMovements.prototype.rodStake.call(self), 4, 'the rules on with rods carried');
+  bot._goal.rodWalkOpen = { at: now, until: now + walkOut.OPEN_WALK_MS };
+  assert.equal(walkOut.openWalk(bot), true);
+  assert.equal(SurvivalMovements.prototype.rodStake.call({ bot }), 0, 'set aside: no rods counted');
+  assert.equal(walkOut.openWalk(bot, now + walkOut.OPEN_WALK_MS + 1), false, 'back after twenty minutes');
+  assert.equal(walkOut.OPEN_WALK_MS, 20 * 60000);
+});

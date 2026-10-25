@@ -46,6 +46,14 @@ const keyOf = c => `${c.x},${c.y},${c.z}`;
 // soul sand's own cell (note 580).
 const feetOf = p => ({ x: Math.floor(p.x), y: Math.ceil(p.y - 1e-4), z: Math.floor(p.z) });
 
+// The rods' rules set aside, Jev's choice (note 2110): the walk_open answer
+// of portal_way walks by the pathfinder's ordinary rules until this ends.
+// They were a rule nobody was asked: full-7 (2026-10-25 14:54 to 16:30Z),
+// four rods carried and its portal 843 blocks off, found no walk under them
+// ("Took to long to decide path") and tunnelled home by hand at about twelve
+// blocks a minute, its pickaxes worn out on the way.
+const OPEN_WALK_MS = 20 * 60000;
+const openWalk = (bot, now = Date.now()) => (bot?._goal?.rodWalkOpen?.until || 0) > now;
 // Rods carried, the powder counted two to a rod (rod-stage.js's count).
 function rodsCarried(bot) {
   let rods = 0, powder = 0;
@@ -251,4 +259,4 @@ async function walkBack(bot, task, goal, portal, navigate, { force = false } = {
   return { tried: true, ok: true, walked, reached: way.reaches };
 }
 
-module.exports = { leadsAway, endSays, rodsCarried, noteCell, noteWayIn, wayInPlugin, wayInOf, onWayIn, backTrail, wayFacts, rodsSays, wayBackSays, walkBack, feetOf, ROD_DROP_MAX, ROD_COST, LEG_CELLS, WAY_NEAR, WAY_IN_MOST };
+module.exports = { OPEN_WALK_MS, openWalk, leadsAway, endSays, rodsCarried, noteCell, noteWayIn, wayInPlugin, wayInOf, onWayIn, backTrail, wayFacts, rodsSays, wayBackSays, walkBack, feetOf, ROD_DROP_MAX, ROD_COST, LEG_CELLS, WAY_NEAR, WAY_IN_MOST };

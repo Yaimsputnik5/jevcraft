@@ -343,6 +343,8 @@ class SurvivalMovements extends Movements {
   // the portal's last cells, a crossing's own) keeps them.
   rodStake() {
     const now = Date.now();
+    // Set aside by Jev's walk_open (note 2110): the ordinary rules, rods or not.
+    try { if (require('./walk-out').openWalk(this.bot, now)) return 0; } catch (_) { /* the rods' rules */ }
     if (!this._rods || now - this._rods.at > 250) {
       let n = 0; try { n = require('./walk-out').rodsCarried(this.bot); } catch (_) { n = 0; }
       this._rods = { at: now, n };
