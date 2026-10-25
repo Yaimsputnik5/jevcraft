@@ -23,6 +23,12 @@ test('climb_out says the climbs of the last hour and counts its own once (note 2
 
 test('cooking says the points it gains in the minutes of getting food (note 2101)', () => {
   const { cookTimeSays } = require('../src/work');
-  assert.equal(cookTimeSays(28, 76), " The +28 points are about 5 to 7 minutes of getting food at the fresh runs' pace (3.9 to 5.9 food points a minute of hunting and searching), against the 76 seconds here; eaten raw, the meat gives a third of it.");
+  assert.equal(cookTimeSays(28, 76), " The +28 points are about 5 to 7 minutes of getting food at the fresh runs' pace (3.9 to 5.9 food points a minute of hunting and searching); less the 76 seconds here, cooking saves about 3 to 6 minutes of play. Eaten raw, the meat gives a third of it.");
   assert.equal(cookTimeSays(0, 10), '');
+});
+
+test('eating raw meat says what it gives up in the cook\'s minutes (note 2109)', () => {
+  const { rawCostSays } = require('../src/work');
+  assert.equal(rawCostSays({ raw: 'beef', n: 6, now: 18, after: 48 }, 62), ' Eaten raw, all 6 beef carried give 18 of the 48 points they give cooked: the 30 lost are about 5 to 8 minutes of getting food later, where cooking them first takes about 62 seconds.');
+  assert.equal(rawCostSays({ raw: 'beef', n: 1, now: 3, after: 3 }, 12), '');
 });

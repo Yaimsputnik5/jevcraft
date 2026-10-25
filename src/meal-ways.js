@@ -38,15 +38,21 @@ function foodsCarried(bot) {
 function mealWays(bot, { cook = null } = {}) {
   const f = bot.registry?.foodsByName || {}, food = bot.food ?? 20;
   const ways = {};
+  // The cook as it would be (note 2109): a raw food's own option says what
+  // eating it raw gives up, in the cook's minutes.
+  let c0 = null; try { c0 = cook ? require('./work').cookable(bot) : null; } catch (_) { c0 = null; }
+  const cookSecs = item => item.n * 10 + (c0?.furnace ? 2 : 6);
   for (const c of foodsCarried(bot)) {
     const pts = f[c.name].foodPoints, sat = round(f[c.name].saturation ?? 0), to = Math.min(20, food + pts);
     const waste = food + pts - 20;
     const cooked = require('./vitals').COOKED[c.name];
     const rawSays = cooked && f[cooked] ? ` Raw: cooked it gives ${f[cooked].foodPoints}.` : '';
     const effect = sideEffectSays(c.name);
+    const asCooked = c0?.ready ? c0.items.find(i => i.raw === c.name) : null;
+    const rawCost = asCooked ? require('./work').rawCostSays(asCooked, cookSecs(asCooked)) : '';
     ways[`eat_${c.name}`] = {
       description: `Eat a ${words(c.name)} now (${c.n} carried): about two seconds standing still, ${pts} hunger and ${sat} saturation, hunger ${food} to ${to}` +
-        `${waste > 0 ? `, ${waste} of its points past 20 lost` : ''}.${rawSays}${effect ? ` ${effect[0].toUpperCase()}${effect.slice(1)}.` : ''}`,
+        `${waste > 0 ? `, ${waste} of its points past 20 lost` : ''}.${rawSays}${rawCost}${effect ? ` ${effect[0].toUpperCase()}${effect.slice(1)}.` : ''}`,
       run: async () => c.item,
     };
   }
