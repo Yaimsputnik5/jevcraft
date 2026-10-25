@@ -3435,7 +3435,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         if (route.status === 'success') { plan = p; break; }
       }
       if (plan) tree.bed_bomb = {
-        description: { action: 'Lay a bed beside the perched dragon\'s head and blow it from a trench one block deep: the heaviest blow available, about five health to the bot', bedsCarried: bedsCarried(bot), walk: Number(plan.walk.toFixed(1)) },
+        description: { action: 'Lay a bed beside the perched dragon\'s head and blow it from a trench one block deep: the heaviest blow available, about five health to the bot', bedsCarried: bedsCarried(bot), walk: Number(plan.walk.toFixed(1)), dragonDamage: require('./bed-bomb').dragonBedSays(metadata(bot, dragon, 'health') ?? null) },
         run: async () => {
           const exploded = await bedBomb(bot, task, plan, { navigate: actions.navigate, dig: actions.dig, stillPerched: () => live(bot, dragon) && perched(bot, dragon) });
           (state.beds ||= []).push({ at: new Date().toISOString(), exploded, dragonHealth: metadata(bot, dragon, 'health') ?? null, health: bot.health }); save();

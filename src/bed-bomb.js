@@ -21,6 +21,23 @@ const { goals } = require('mineflayer-pathfinder');
 const DIRS = [new Vec3(1, 0, 0), new Vec3(-1, 0, 0), new Vec3(0, 0, 1), new Vec3(0, 0, -1)];
 const NATURAL = /^(end_stone|stone|cobblestone|dirt|netherrack|deepslate|cobbled_deepslate|andesite|diorite|granite|tuff|blackstone|basalt)$/;
 const HEAD_REACH = 2.5;
+// What a bed does to the dragon, from the 26.1.2 server jar (note 2108):
+// explosions always hurt it (damage_type tag always_hurts_ender_dragons is
+// #is_explosion); EnderDragon.hurt takes a hit on the head part whole and on
+// any other part a quarter and one; at a perch an arrow does nothing
+// (AbstractDragonSittingPhase.onHurt sets it alight and returns 0); and a
+// perch ends once more than a quarter of its 200 health is taken there
+// (sittingDamageReceived over 0.25 of max: TAKEOFF). A bed is a power-5
+// blast: impact (1 - d/10) at d blocks, damage (impact^2 + impact) / 2 x 70
+// + 1, so 60 at a block from the head and 46 at HEAD_REACH. Never measured
+// in the rehearsals (2026-09-24 measured only what the blast took from the bot).
+const DRAGON = Object.freeze({ health: 200, perchCap: 50, bedNear: 60, bedFar: 46 });
+const bedDamage = d => { const i = Math.max(0, 1 - d / 10); return Math.floor((i * i + i) / 2 * 70 + 1); };
+function dragonBedSays(dragonHealth = null) {
+  const hp = Number.isFinite(dragonHealth) ? Math.round(dragonHealth) : null;
+  const beds = Math.ceil((hp ?? DRAGON.health) / ((DRAGON.bedNear + DRAGON.bedFar) / 2));
+  return `By the game's own rules (the 26.1.2 server): a bed laid with its head half within ${HEAD_REACH} blocks of the dragon's head does about ${DRAGON.bedFar} to ${DRAGON.bedNear} damage to it, the head taking a blast whole (the body and wings would take a quarter and one); the dragon has ${DRAGON.health} health${hp != null ? `, ${hp} now` : ''}, and a perch ends once it has taken more than ${DRAGON.perchCap} there, so about one bed a perch and ${beds} in all; at a perch an arrow does it nothing (it glances off alight).`;
+}
 const solid = b => b?.boundingBox === 'block';
 const clear = b => !!b && b.boundingBox === 'empty' && !/water|lava|fire/.test(b.name);
 const bedsCarried = bot => bot.inventory.items().filter(i => /_bed$/.test(i.name)).reduce((n, i) => n + i.count, 0);
@@ -84,4 +101,4 @@ async function bedBomb(bot, task, plan, { navigate, dig, stillPerched = () => tr
   return !/_bed$/.test(bot.blockAt(foot)?.name || '');
 }
 
-module.exports = { bedPlans, bedPlan, bedBomb, bedsCarried, HEAD_REACH };
+module.exports = { DRAGON, bedDamage, dragonBedSays, bedPlans, bedPlan, bedBomb, bedsCarried, HEAD_REACH };
