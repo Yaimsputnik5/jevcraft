@@ -420,7 +420,12 @@ function ladderRung(bot, goal, waiting, { allOptional = false } = {}) {
   // the pack, was handed the iron pickaxe four times and the stone one twice as each wore out, six iron pickaxes made
   // since the count began at 07:02Z.
   const diamonds = bot.inventory.items().filter(i => i.name === 'diamond').reduce((n, i) => n + i.count, 0);
-  const headed = fallback => diamonds >= 3 && !waiting.has('diamond_pickaxe') ? another('diamond_pickaxe') : fallback;
+  // A diamond pickaxe rung set aside by a choice (the Nether first, a rung set aside) does not make the worn one's
+  // replacement stone: the replacement is made either way, and of the best heads carried (note 2094). full-7 (2026-10-25
+  // 09:36 to 10:04Z), five diamonds carried, the diamond rung resting as 'Jev chose the Nether first', was handed the
+  // stone and the iron pickaxe as each wore out. Set aside for coming to nothing, it is left to rest.
+  const diamondFailed = (() => { try { return /fail|nothing|stall|cannot|no way|refus/i.test(attemptsFor(goal).of('rung').diamond_pickaxe?.why || ''); } catch (_) { return false; } })();
+  const headed = fallback => diamonds >= 3 && !(waiting.has('diamond_pickaxe') && diamondFailed) ? another('diamond_pickaxe') : fallback;
   if (best('pickaxe') < 2 && !spare('stone_pickaxe', 2)) return headed(ingots >= 3 && !waiting.has('iron_pickaxe') ? another('iron_pickaxe') : another('stone_pickaxe'));
   if (best('sword') < 2) return another('stone_sword');
   // A bed before the mine. Walled in and waiting was the largest share of

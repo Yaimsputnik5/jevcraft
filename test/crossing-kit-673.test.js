@@ -243,3 +243,15 @@ test('a pickaxe worn out with three diamonds carried: the one made is diamond, n
   const noDiamonds = atPortal({ ...FED, iron_pickaxe: 0, stone_pickaxe: 0, iron_ingot: 6 });
   assert.equal(nextGameStage(noDiamonds, been).item, 'iron_pickaxe');
 });
+
+test('the diamond rung set aside by choosing the Nether first: a worn pickaxe is still made again as diamond with three carried; set aside for failing, it is not (note 2094)', () => {
+  const { nextGameStage } = require('../src/game-progress');
+  const { setAside } = require('../src/progress');
+  const worn = atPortal({ ...FED, iron_pickaxe: 0, stone_pickaxe: 0, iron_ingot: 6, diamond: 5 });
+  const chose = { kind: 'win', gameProgress: { milestones: { nether_entered: { at: 1 } } } };
+  setAside(chose, 'rung', 'diamond_pickaxe', 'Jev chose the Nether first', 30 * 60000);
+  assert.equal(nextGameStage(worn, chose).item, 'diamond_pickaxe');
+  const failed = { kind: 'win', gameProgress: { milestones: { nether_entered: { at: 1 } } } };
+  setAside(failed, 'rung', 'diamond_pickaxe', 'the craft failed twice', 30 * 60000);
+  assert.equal(nextGameStage(worn, failed).item, 'iron_pickaxe');
+});
