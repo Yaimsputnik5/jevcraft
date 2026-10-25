@@ -21,3 +21,9 @@ test('not offered with a diamond pickaxe, without an iron one, or off the Overwo
   assert.equal(diamondPickaxeOption(bot([['stone_pickaxe', 1]]), {}), null);
   assert.equal(diamondPickaxeOption(bot([['iron_pickaxe', 1]], 64, 'the_nether'), {}), null);
 });
+
+test('the run\'s own iron pickaxes are said beside the diamond one (note 2089)', () => {
+  const o = diamondPickaxeOption(bot([['iron_pickaxe', 1]]), { toolsMade: { iron_pickaxe: 11 } });
+  assert.match(o.description, /This run has made 11 iron pickaxes so far, 33 iron, about 23 to 43 minutes of mining and smelting at the fresh runs' pace; one diamond pickaxe outlasts six\./);
+  assert.doesNotMatch(diamondPickaxeOption(bot([['iron_pickaxe', 1]]), {}).description, /This run has made/);
+});

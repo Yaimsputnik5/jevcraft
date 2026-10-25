@@ -3143,6 +3143,8 @@ async function craft(bot, task, step, goal) {
   // A pickaxe made beside another sound one is the spare, kept whole
   // (note 779).
   if (/_pickaxe$/.test(step.item)) { try { require('./pickaxe-roles').noteMade(bot, goal, step.item, goal?.gameProgress?.phase || null); } catch (_) { /* the craft is made either way */ } }
+  // The run's own count of the pickaxes made, said where a better one is weighed (note 2089).
+  if (goal && /_pickaxe$/.test(step.item)) { (goal.toolsMade ||= {})[step.item] = (goal.toolsMade[step.item] || 0) + 1; }
   // Its own table comes back into the pack when it is the only one: trials
   // 47 and 51 left theirs where they were used, wore out the last pickaxe
   // underground, and with forty-four iron ingots could make nothing, with

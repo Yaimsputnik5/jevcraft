@@ -459,6 +459,14 @@ function enderChestOption(bot, goal) {
 // obsidian (the ender chest's eight, a portal frame carried). The fresh runs full-5, full-6 and full-7 (2026-10-24
 // 19:42Z to 2026-10-25 04:00Z) made 7 to 11 iron pickaxes in eight hours and mined no diamond; full-2 mined 22
 // diamonds in 124 hours and spent them on six diamond swords, made again after its deaths, and no pickaxe.
+// This run's own iron pickaxes, said beside the diamond one (note 2089): offered 14 times on full-5, full-6 and full-7
+// (2026-10-25 06:05 to 06:50Z) and taken none, the iron's wear said only in general.
+function madeSays(goal) {
+  const n = goal?.toolsMade?.iron_pickaxe || 0;
+  if (!n) return '';
+  const { IRON_MINUTES } = require('./corpse-run');
+  return ` This run has made ${n} iron pickaxe${n === 1 ? '' : 's'} so far, ${n * 3} iron, about ${Math.round(n * 3 * IRON_MINUTES.low)} to ${Math.round(n * 3 * IRON_MINUTES.high)} minutes of mining and smelting at the fresh runs' pace; one diamond pickaxe outlasts six.`;
+}
 function diamondPickaxeOption(bot, goal) {
   if (bot.game?.gameMode && bot.game.gameMode !== 'survival') return null;
   if (!/overworld/.test(String(bot.game?.dimension || ''))) return null;
@@ -468,7 +476,7 @@ function diamondPickaxeOption(bot, goal) {
   const diamonds = has('diamond'), y = Math.round(bot.entity?.position?.y ?? 64);
   const have = diamonds >= 3 ? `${diamonds} diamonds carried: it is made now, at a crafting table` : `${diamonds} of the three diamonds carried; the rest mined from here, ${y > 16 ? `${y + 58} blocks down to about y -58` : `at y ${y}, ${y > -40 ? 'down to about y -58 where they are thickest' : 'about where they are thickest'}`}`;
   return {
-    description: `Make a diamond pickaxe (${have}): ${RUNG_WHY.diamond_pickaxe}.${bareDeathsSays(bot)}`,
+    description: `Make a diamond pickaxe (${have}): ${RUNG_WHY.diamond_pickaxe}.${madeSays(goal)}${bareDeathsSays(bot)}`,
     says: "I'll get diamonds for a diamond pickaxe",
     rung: { phase: 'diamond_pickaxe', action: 'acquire', item: 'diamond_pickaxe', count: 1 },
   };
