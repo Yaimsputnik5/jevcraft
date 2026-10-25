@@ -2563,6 +2563,25 @@ async function surfaceStep(bot, task, goal, save) {
 const SITE_BY_LAVA = 12;
 const SITE_NEAR_LAVA = 32;
 const siteByLava = (siteDig, lava) => !lava || !siteDig?.origin || Math.hypot(siteDig.origin.x - lava.x, siteDig.origin.y - lava.y, siteDig.origin.z - lava.z) <= SITE_BY_LAVA;
+// The climbs to open sky chosen lately, said at the next one (note 2084):
+// across full-5, full-6 and full-7 (2026-10-24 19:42Z to 2026-10-25 04:00Z)
+// surface_trip's climb was taken 32 times and climb_out's ways 44, the
+// game's own record 4,727 to 6,462 blocks of rock dug and 7 to 11 iron
+// pickaxes made in eight hours, each climb said only with its own cost.
+const CLIMB_LOG_MS = 60 * 60000;
+function noteClimb(goal, need, cost, now = Date.now()) {
+  const log = (goal.climbLog || []).filter(c => now - c.at < 2 * CLIMB_LOG_MS);
+  log.push({ at: now, need, ...(cost ? { up: cost.up, seconds: Math.round(cost.seconds) } : {}) });
+  goal.climbLog = log;
+}
+function climbsLatelySays(goal, now = Date.now()) {
+  const recent = (goal.climbLog || []).filter(c => now - c.at < CLIMB_LOG_MS);
+  if (!recent.length) return null;
+  const byNeed = {};
+  for (const c of recent) byNeed[c.need] = (byNeed[c.need] || 0) + 1;
+  const secs = recent.reduce((n, c) => n + (c.seconds || 0), 0), up = recent.reduce((n, c) => n + (c.up || 0), 0);
+  return `In the last hour ${recent.length === 1 ? 'a climb to open sky was' : `${recent.length} climbs to open sky were`} chosen (${Object.entries(byNeed).map(([k, v]) => `${v} for ${k}`).join(', ')}), about ${Math.round(secs / 60)} minutes of climbing said for them and ${up} blocks up, each leaving the work below and coming back down to it; what is owed at the surface taken in one trip saves the others.`;
+}
 async function surfaceTrip(bot, task, goal, save, need, { siteDig = null, lava = null, cast = null } = {}) {
   const held = goal.surfaceTrip;
   // Chosen, the climb holds to the top: not asked again at each stair. Only
@@ -2738,7 +2757,7 @@ async function surfaceTrip(bot, task, goal, save, need, { siteDig = null, lava =
   let pick = 'climb', asked = false;
   if (tree.stay_below || tree.dig_site || tree.mine_first || tree.dig_to_water || tree.wait_for_dawn) {
     const decision = await require('./decisions').decide('surface_trip', { client, bot, task, goal, save, tree,
-      state: { need, step: phase ? words(phase) : null, ...(cost ? { blocksToOpenSky: cost.up, quickerWayOut: cost.way, minutesUp: Math.round(cost.seconds / 60), pickaxes: cost.state.pickaxes, pickaxeUsesLeft: cost.state.pickaxeUsesLeft } : {}),
+      state: { need, step: phase ? words(phase) : null, ...(climbsLatelySays(goal) ? { climbsLately: climbsLatelySays(goal) } : {}), ...(cost ? { blocksToOpenSky: cost.up, quickerWayOut: cost.way, minutesUp: Math.round(cost.seconds / 60), pickaxes: cost.state.pickaxes, pickaxeUsesLeft: cost.state.pickaxeUsesLeft } : {}),
         ...(budgetOf() ? { pickaxeBudget: budget.says } : {}),
         ...(tree.stay_below ? { goOnWith: `${words(next.phase)}${next.item ? `: ${next.count || ''} ${words(next.item)}` : ''}` } : {}),
         ...(tree.dig_site ? { siteToDig: { at: { ...siteDig.origin }, blocks: siteDig.cells.length } } : {}) } });
@@ -2778,6 +2797,7 @@ async function surfaceTrip(bot, task, goal, save, need, { siteDig = null, lava =
     }
     return;
   }
+  if (pick === 'climb') noteClimb(goal, need, cost);
   goal.surfaceTrip = { need, pick, ...(asked ? { asked } : {}), ...(phase ? { phase } : {}), ...(cost ? { up: cost.up } : {}), ...(lava ? { lava: { x: lava.x, y: lava.y, z: lava.z } } : {}), at: new Date().toISOString() };
   if (pick === 'stay_below') {
     const { RUNG_WAIT_MS } = require('./game-progress');
@@ -9827,4 +9847,4 @@ function constructionObservation(bot, goal) {
   return JSON.stringify(positions.map(p => [p.x, p.y, p.z, bot.blockAt(pos(p))?.stateId ?? bot.blockAt(pos(p))?.name ?? null]));
 }
 
-module.exports = { bedFromPockets, portalToJudge, capLavaBeside, portalPickaxeFirst, endPortalActions, miningCandidates, portalSurfaceFirst, nightUpSays, oreToTunnel, gatherRests, gatherResting, relightPortalAt, stairPickaxeWanted, pickaxeForStair, siteHoldEnds, exploreLand, exploreLandIds, woodWhileUp, WOOD_UP, wantedItems, keepRoom, tidyMoment, smeltBatch, ladderSmeltWants, foodReservePrice, siteByLava, foodTrips, supportMaterialHere, preparePortalSupports, portalJobs, castSiteCost, castSiteSays, NO_WOOD_DEEP, smeltNeedSays, takeBackPlace, detourWork, restWork, restWorkSays, upkeepOffers, kitFoodStep, foodNearFrame, cookable, FUELS, answerOrPutOff, opensPit, persist, returnFromNether, climbSays, holdForRest, liveTurn, workClaim, methodSoFar, gatherBlocks, sculkStep, opensLava, descentTargets, portalInteriorBlockers, nearestLava, lavaGone, mineAtSource, timed, portalHere, walkToKnownPortal, portalWay, lineSays, buildPortalFrame, ruinSays, portalMethod, portalStep, crossingKitReady, walksFailed, occupant, bodyIn, occupiedSays, waitingThere, settleCraftInventory, tripTime, WOOD_RESERVE, woodUnits, crossingWater, sideTrips, plugLeak, leakResponse, logInView, patrolChoice, upkeepStep, moreOfSource, whileCooking, workstation, noteError, localBatch, takeOutBatch, castUnderWay, leftBatch, batchNoRoute, LEAVE_BATCH_MS, smelt, turnSearch, searchFor, enterPortal, gameHandlers, breakStillness, reachableBlocks, hitboxIntrudes, terrainShortage, runGoal, runIdle, idleWork, idleOptions, createSurvival, acquireStep, inventory, planningInventory, catalogPlan, selectSite, explore, dig, place, waitFor, constructionObservation, Blocked, designedBuildStep, surfaceStep, surfaceTrip, answerStall, looseEnds, breakOut, tunnelToward, stairsOrWay, craft, gatherWood, moveOnFromResource, moveOnHistorySays, pickaxeCraftHistorySays, maintainPickaxe, MOVE_ON_MEMORY_MS, PICKAXE_CRAFT_MEMORY_MS, stationCellOk, droppedFoodNear, planDueNow, planRoutes, lavaKnownFrom, straightToward };
+module.exports = { noteClimb, climbsLatelySays, bedFromPockets, portalToJudge, capLavaBeside, portalPickaxeFirst, endPortalActions, miningCandidates, portalSurfaceFirst, nightUpSays, oreToTunnel, gatherRests, gatherResting, relightPortalAt, stairPickaxeWanted, pickaxeForStair, siteHoldEnds, exploreLand, exploreLandIds, woodWhileUp, WOOD_UP, wantedItems, keepRoom, tidyMoment, smeltBatch, ladderSmeltWants, foodReservePrice, siteByLava, foodTrips, supportMaterialHere, preparePortalSupports, portalJobs, castSiteCost, castSiteSays, NO_WOOD_DEEP, smeltNeedSays, takeBackPlace, detourWork, restWork, restWorkSays, upkeepOffers, kitFoodStep, foodNearFrame, cookable, FUELS, answerOrPutOff, opensPit, persist, returnFromNether, climbSays, holdForRest, liveTurn, workClaim, methodSoFar, gatherBlocks, sculkStep, opensLava, descentTargets, portalInteriorBlockers, nearestLava, lavaGone, mineAtSource, timed, portalHere, walkToKnownPortal, portalWay, lineSays, buildPortalFrame, ruinSays, portalMethod, portalStep, crossingKitReady, walksFailed, occupant, bodyIn, occupiedSays, waitingThere, settleCraftInventory, tripTime, WOOD_RESERVE, woodUnits, crossingWater, sideTrips, plugLeak, leakResponse, logInView, patrolChoice, upkeepStep, moreOfSource, whileCooking, workstation, noteError, localBatch, takeOutBatch, castUnderWay, leftBatch, batchNoRoute, LEAVE_BATCH_MS, smelt, turnSearch, searchFor, enterPortal, gameHandlers, breakStillness, reachableBlocks, hitboxIntrudes, terrainShortage, runGoal, runIdle, idleWork, idleOptions, createSurvival, acquireStep, inventory, planningInventory, catalogPlan, selectSite, explore, dig, place, waitFor, constructionObservation, Blocked, designedBuildStep, surfaceStep, surfaceTrip, answerStall, looseEnds, breakOut, tunnelToward, stairsOrWay, craft, gatherWood, moveOnFromResource, moveOnHistorySays, pickaxeCraftHistorySays, maintainPickaxe, MOVE_ON_MEMORY_MS, PICKAXE_CRAFT_MEMORY_MS, stationCellOk, droppedFoodNear, planDueNow, planRoutes, lavaKnownFrom, straightToward };
