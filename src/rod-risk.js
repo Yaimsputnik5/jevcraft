@@ -34,6 +34,28 @@ function recordSays(k) {
   return `In the trials of ${RECORD.from} to ${RECORD.to}, ${r[0]} lives carried ${at} or more rods in the Nether: ${r[1]} died with them${r[2] ? `, ${r[2]} carried them out` : ', none carried them out'}${r[0] - r[1] - r[2] > 0 ? ` (${r[0] - r[1] - r[2]} ended with the trial)` : ''}.`;
 }
 
+// This run's own (note 2105): how often it has died, in the Nether and in all,
+// and what its rods have cost on its own clock, in place of the records of
+// 2026-09-29 to 10-03, from trials that died about ten times as often (70 of
+// 80 lives with rods died with them then). full-7 (2026-10-25 14:54Z), told
+// those, took its one rod back to a portal 550 blocks off and came back 45
+// minutes later with it unbanked. -> text, or '' without a clock
+function runSays(bot, goal, rods) {
+  const clock = goal?.gameProgress?.clock;
+  if (!(clock?.playedMs > 30 * 60000)) return '';
+  const hours = clock.playedMs / 3600000, since = clock.startedAt || 0;
+  const deaths = (bot?._survivalState?.deaths || []).filter(d => Date.parse(d.at) >= since);
+  const nether = deaths.filter(d => /nether/.test(String(d.dimension || ''))).length;
+  const by = clock.byDoing || {};
+  const rodMin = Object.entries(by).filter(([d]) => d.startsWith('obtain_blaze_rods')).reduce((n, [, v]) => n + v, 0) / 60000;
+  let n = null; try { n = require('./eye-need').need(bot, goal); } catch (_) { n = null; }
+  const got = n ? Math.max(0, (n.rodsWanted || 0) - (n.rodsLeft || 0)) : 0;
+  const r = x => Math.round(x);
+  const every = deaths.length ? `, about one each ${r(hours * 60 / deaths.length)} minutes of play` : '';
+  const each = got && rodMin >= 1 ? ` The blaze rods have taken ${r(rodMin)} minutes of its clock for the ${plural(got, 'rod')} had, about ${r(rodMin / got)} minutes a rod: the ${plural(rods, 'rod')} carried ${rods === 1 ? 'is' : 'are'} about ${r(rods * rodMin / got)} minutes to get again where a death drops them out of reach.` : rodMin >= 1 ? ` The blaze rods have taken ${r(rodMin)} minutes of its clock so far.` : '';
+  return `On this run so far: ${plural(deaths.length, 'death')} in ${r(hours)} hours of play${every}, ${nether} of them in the Nether.${each}`;
+}
+
 // In the Nether with a rod or its powder carried and rods still wanted: what
 // a death drops, what the chests hold, and the record. Null otherwise.
 function risk(bot, goal) {
@@ -66,4 +88,4 @@ function keepSays(bot, goal) {
   return 'No chest is carried and no wood to make one (8 planks, and 4 more for a table): nothing here keeps them, and every rod carried is lost with a death; the Overworld\'s trees, past the portal, make one.';
 }
 
-module.exports = { RECORD, CHEST_RECORD, risk, recordSays, keepSays };
+module.exports = { runSays, RECORD, CHEST_RECORD, risk, recordSays, keepSays };

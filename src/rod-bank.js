@@ -99,12 +99,12 @@ function bankOffer(bot, goal, { now = Date.now() } = {}) {
 
 // The option's words: what goes out and where, the walk and its record, the
 // round trip, what it keeps, and what staying with them has come to.
-function offerSays(offer) {
+function offerSays(offer, bot = null, goal = null) {
   const list = offer.what.map(w => plural(w.count, w.item.replaceAll('_', ' ')));
   const what = list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list.at(-1)}` : list[0];
   const walk = offer.paceSays ? offer.paceSays.trim() : `About ${Math.max(1, offer.seconds)} seconds at a walk.`;
   const minutes = Math.max(1, Math.round((2 * offer.seconds + (offer.chest.seconds || 0)) / 60));
-  let staying = ''; try { staying = ` Staying with them: ${require('./rod-risk').recordSays(offer.rods)}`; } catch (_) { staying = ''; }
+  let staying = ''; try { const rk = require('./rod-risk'), own = rk.runSays(bot, goal, offer.rods); staying = ` ${own || `Staying with them: ${rk.recordSays(offer.rods)}`}`; } catch (_) { staying = ''; }
   if (offer.complete) return `Take the rods out: every rod wanted is had (${offer.rods} carried${offer.inChest ? `, ${offer.inChest} in the bot's chest in the Nether, counted as held and taken out on the way out` : ''}, ${offer.wanted} wanted), and ${plural(offer.pearlsLeft, 'ender pearl')} ${offer.pearlsLeft === 1 ? 'is' : 'are'} still wanted. Walk back to the portal ${offer.d} blocks off with the ${what}, go through the portal and put them in ${offer.chest.says}; the pearls are hunted after, from either side, with no rod in the pack. ${walk} The walk out carries them, and a death on it drops them as one here does; once in the chest they are kept through any death after, counted as held, and taken out when the pearls are had too.${staying}`;
   return `Bank the rods got so far: walk back to the portal ${offer.d} blocks off with the ${what}, go through the portal, put them in ${offer.chest.says}, and come back through for the ${plural(offer.left, 'rod')} still needed. ${walk} There and back is about ${minutes} minute${minutes === 1 ? '' : 's'}${offer.chest.how === 'tree' ? ' and the time the wood takes on the Overworld side' : ''}, no rod meanwhile. The walk out carries them, and a death on it drops them as one here does; once in the chest they are kept through any death after, counted as held, and taken out once the rods carried and banked together are what the goal wants, so a death after loses only the rods got since.${staying}`;
 }
@@ -112,7 +112,7 @@ function offerSays(offer) {
 // The option as a tree entry: taken, the intention is kept (bankStage) and
 // the walk begins at once where the caller can walk it.
 function option(bot, task, goal, save, actions, offer) {
-  return { description: offerSays(offer), trip: 'the portal', secs: 2 * offer.seconds,
+  return { description: offerSays(offer, bot, goal), trip: 'the portal', secs: 2 * offer.seconds,
     run: async () => {
       goal.rodBank = { at: Date.now(), rods: offer.rods, from: P(bot.entity.position), chest: offer.chest.how };
       // Chosen now: a set-aside of the stage from before (a step for the
@@ -213,7 +213,9 @@ async function askBank(bot, task, goal, save, actions, client, { now = Date.now(
   if (a && a.rods >= offer.rods && now - a.at < ASK_AGAIN_MS) return null;
   goal.rodsNowAsked = { rods: offer.rods, at: now }; save?.();
   const opt = option(bot, task, goal, save, actions, offer);
-  let staying = ''; try { staying = require('./rod-risk').recordSays(offer.rods); } catch (_) { staying = ''; }
+  let staying = ''; try { const rk = require('./rod-risk'); staying = rk.runSays(bot, goal, offer.rods) || rk.recordSays(offer.rods); } catch (_) { staying = ''; }
+  // The run's own facts in place of the old days' (note 2105); the old record only where the run has no clock yet.
+  const own = !!require('./rod-risk').runSays(bot, goal, offer.rods);
   const today = `On ${TODAY.day}, ${TODAY.lives} lives carried 2 or more rods at a fortress: ${TODAY.died} stayed and died with them (${TODAY.lost.join(', ')} rods lost), ${TODAY.out} left and carried its ${TODAY.outRods} out.`;
   // The chest here (note 931): the rods kept in the Nether, the hunt on.
   let keep = null; try { keep = rs().keepOption(bot, task, goal, save, actions, { thenSays: offer.complete ? 'Then the pearls are hunted with nothing in the pack to lose, and the chest is emptied on the way out.' : `Then the hunt goes on here for the ${plural(offer.left, 'rod')} still needed with nothing in the pack to lose, and the walk out is made once, with them all.` }); } catch (_) { keep = null; }
@@ -273,11 +275,11 @@ async function askBank(bot, task, goal, save, actions, client, { now = Date.now(
     } catch (err) { task?.check?.(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; ownChest = null; }
   }
   const tree = {
-    bank_now: { description: `${opt.description}${last} ${bankWalksSays()} ${today} The way out can be the tunnel dug straight at the portal (asked on the way where the walk fails): in the rock nothing sees or pushes the bot.`, trip: 'the portal', run: opt.run },
+    bank_now: { description: `${opt.description}${last}${own ? '' : ` ${bankWalksSays()} ${today}`} The way out can be the tunnel dug straight at the portal (asked on the way where the walk fails): in the rock nothing sees or pushes the bot.`, trip: 'the portal', run: opt.run },
     ...(keep ? { keep_here: { description: keep.description, run: keep.run } } : {}),
     ...(woodFirst ? { wood_for_chest: woodFirst } : {}),
     ...(ownChest ? { own_chest: ownChest } : {}),
-    stay_for_more: { description: `${offer.complete ? `Go on to the pearls (${offer.pearlsLeft} still wanted)` : `Stay and hunt on for the ${plural(offer.left, 'rod')} still needed`} with the ${plural(offer.rods, 'rod')} in the pack: no walk out now, and every rod carried is lost with a death here.${last} ${staying} ${today} ${bankWalksSays()} Asked again when another rod is carried, or in ten minutes.` },
+    stay_for_more: { description: `${offer.complete ? `Go on to the pearls (${offer.pearlsLeft} still wanted)` : `Stay and hunt on for the ${plural(offer.left, 'rod')} still needed`} with the ${plural(offer.rods, 'rod')} in the pack: no walk out now, and every rod carried is lost with a death here.${last} ${staying}${own ? '' : ` ${today} ${bankWalksSays()}`} Asked again when another rod is carried, or in ten minutes.` },
   };
   let decision;
   try { decision = await require('./decisions').decide('rods_now', { client, bot, task, goal, save, tree, state: { rodsCarried: offer.rods, rodsWanted: offer.wanted, rodsStillNeeded: offer.left, portalBlocks: offer.d, health: bot.health, food: bot.food } }); }
