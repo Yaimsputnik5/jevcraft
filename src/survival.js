@@ -4691,10 +4691,15 @@ class Survival {
     // biter at a time", five zombies within ten blocks, three of them out of
     // sight and uncounted past eight: all five were at it while it dug, and
     // they hit it fourteen times from 20 to none (note 581).
+    // Priced as said (note 2093): the bunker carried its cost in words only, no expects, and was taken unpriced
+    // beside priced ways. full-6 (2026-10-25 09:27:49Z), at 20 health in the Nether with three magma cubes 6.6 to
+    // 9.1 blocks off, its diamond pickaxe carried, took it and was struck six times in 3.3 seconds while it dug.
+    let bunkerCost = null;
     const bunkerSays = () => {
       const setup = bunkerMs / 1000 + BLOCK_SECONDS;
       const first = mobs.filter(m => bites(m) && arrives(m) < setup);
       const c = stanceCost({ mobs, setup, fight: { atOnce: Math.max(1, first.length), only: m => !m.shoots }, reaches: m => m.shoots || m.name === 'creeper' || m.name === 'warden', shield: shielded });
+      bunkerCost = c;
       const done = first.length > 1 ? `In it, with the ${first.length} there before it is dug in fought together in the tunnel (the doorway holds back only those after)` : first.length ? `In it, with the ${first[0].name.replaceAll('_', ' ')} there before it is dug in in the tunnel and the rest one at a time at the doorway` : 'At the doorway, one biter at a time';
       return costSays(c, bot.health, mobs, { doing: 'digging in', done });
     };
@@ -4705,6 +4710,7 @@ class Survival {
       run: async () => { this.report(goal, save, { action: 'dig_in_bunker', threats: danger.map(t => t.entity.name).slice(0, 6), health: bot.health, stance: true });
         try { this.state.bunkerDug = await digBunker(bot, task, goal, save, { from: centroid(danger), navigate: this.actions.navigate, dug: this.state.bunkerDug }); save(); await require('./bunker').holdDoorway(bot, task, goal, save, this.state.bunkerDug); return true; }
         catch (err) { task.check(); if (['NeedsAir', 'Cancelled'].includes(err.name)) throw err; return false; } } };
+    if (options.bunker && bunkerCost && Number.isFinite(bunkerCost.damage)) options.bunker.expects = { damage: bunkerCost.damage, seconds: bunkerCost.seconds, oneHit };
     // Against blazes, the stands a player takes rods from with iron and no
     // fire resistance, back to rock where a fireball's push meets a wall
     // (blaze-stand.js): a hole dug into the brick, the spawner's cage under

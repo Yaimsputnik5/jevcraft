@@ -4949,7 +4949,9 @@ test('the bunker says the wall it leaves for the lava behind it, and once dug is
   survival.state.bunkerDug = { cells: [{ x: 0, y: 64, z: 0 }, { x: 0, y: 64, z: 1 }], inside: { x: 0, y: 64, z: 1 }, mouth: { x: 0, y: 64, z: 1 }, watch: { x: 0, y: 64, z: 0 }, at: Date.now(), dimension: 'overworld' };
   const held = survival.stanceOptions(new Task('x'), {}, () => {}, [threat(bot, zombie)], false);
   // After the hardest blow, said first on every stance (note 576).
-  assert.match(held.bunker.description, /^The zombie \d+ blocks off hits for about 3 a blow[^]*?seconds\. Stay in the bunker already dug here/);
+  assert.match(held.bunker.description, /^The zombie \d+ blocks off hits for about 3 a blow[^]*?\. Stay in the bunker already dug here/);
+  // Priced as its words say (note 2093).
+  assert.ok(Number.isFinite(held.bunker.expects?.damage), 'the bunker is priced');
 });
 
 test('a NoRoute from an emergency walk is not persisted as the work step', async () => {
