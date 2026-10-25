@@ -310,6 +310,28 @@ async function kitTrip(bot, task, goal, save, now = Date.now()) {
 // bot set out at once and died again within ten minutes. full-2 (2026-10-22
 // 15:47:27 and 15:49:57Z) came back to life at its bed and was blown up 60
 // blocks from it two and a half minutes later, nothing worn either time.
+// The walks back for these same drops that ended in a death (note 2113):
+// where, to what, with what about and what worn, said on every way. full-6
+// (2026-10-25 23:26 to 23:50Z), its iron armour 221 blocks off where a
+// skeleton shot it, went back bare at night, was killed on the way at
+// (1, 97, 161) by a spider among three zombies, came back to life at its bed
+// and was offered go_back again 15 seconds later, told nothing of it, with
+// dawn 2 minutes off: it went (0.48 against waiting 0.24) and a zombie killed
+// it 31 seconds later.
+function triedDeathsSays(bot, run, now = Date.now()) {
+  const since = Date.parse(run?.deathAt || run?.at || '');
+  if (!Number.isFinite(since)) return '';
+  const later = (bot._survivalState?.deaths || []).filter(d => Date.parse(d.at) > since && d.position);
+  if (!later.length) return '';
+  const here = bot.entity?.position;
+  const one = d => {
+    const p = d.position, mins = Math.max(1, Math.round((now - Date.parse(d.at)) / 60000));
+    const about = (d.about || []).slice(0, 4).map(t => `a ${String(t.name).replaceAll('_', ' ')} ${t.distance} blocks off`).join(', ');
+    const worn = (d.worn || []).filter(w => w !== 'shield');
+    return `${mins} minute${mins === 1 ? '' : 's'} ago at (${Math.round(p.x)}, ${Math.round(p.y)}, ${Math.round(p.z)})${here ? `, ${Math.round(Math.hypot(p.x - here.x, p.z - here.z))} blocks from here` : ''}, ${String(d.cause || 'died').replace(/^was /, '')}${about ? `, with ${about}` : ''}, ${worn.length ? `in ${worn.map(w => w.replaceAll('_', ' ')).join(', ')}` : 'with no armour on'}`;
+  };
+  return ` Since these were dropped, ${later.length === 1 ? 'a walk back for them ended in a death' : `${later.length} walks back for them ended in deaths`}: ${later.slice(-3).map(one).join('; ')}.`;
+}
 function quickDeathsSays(bot) {
   const t = (bot._survivalState?.deaths || []).map(d => Date.parse(d.at)).filter(Number.isFinite).sort((a, b) => a - b);
   if (t.length < 3) return '';
@@ -406,6 +428,8 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
       leave_them: { description: `Leave them and go on with what is carried: ${listed(worth(Object.fromEntries(bot.inventory.items().map(i => [i.name, i.count])))) || 'nothing worth listing'}. What was dropped is made again, or found, later${again ? `: ${again}` : ''}.${ironRemakeSays(run.items)}${took}${keptSays}` },
     };
     if (quick) for (const k of Object.keys(tree)) tree[k].description += quick;
+    const tried = triedDeathsSays(bot, run);
+    if (tried) for (const k of Object.keys(tree)) tree[k].description += tried;
     if (bedKit) tree.kit_first = { description: `${bedKit.description} Then back for them as go back says.${quick}` };
     // By night, and the drops not ageing (the bot not within 128 blocks of
     // them): going when it is day is a choice of its own, not leaving them.
@@ -416,7 +440,7 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
     // eat, the walk there costing about 47 hunger sprinted, left them.
     const foodWant = Math.min(30, Math.round(far / 40));
     if (gatherFood && far >= 300 && foodCarried < foodWant) tree.food_first = { description: `Get food for the walk first, here: hunted, cooked or taken from a chest, toward ${foodWant} food points carried (${foodCarried} now), then set out for them; the drops do not age meanwhile. Twenty minutes at most on the food; then the walk with what there is.` };
-    if (toDawn !== null && (night || minutes > until) && !run.loadedAt && /overworld/.test(run.dimension)) tree.wait_for_day = { description: `Set out for them at ${night ? 'dawn' : 'the next dawn'}, about ${toDawn} real minute${toDawn === 1 ? '' : 's'} off, with the day ahead for the walk${night ? '' : ` (the day left now, about ${until}, is shorter than the walk, about ${minutes})`}, and go on with other things until then: the drops do not age while the bot is not within 128 blocks of them. Asked again at dawn.` };
+    if (toDawn !== null && (night || minutes > until) && !run.loadedAt && /overworld/.test(run.dimension)) tree.wait_for_day = { description: `Set out for them at ${night ? 'dawn' : 'the next dawn'}, about ${toDawn} real minute${toDawn === 1 ? '' : 's'} off, with the day ahead for the walk${night ? '' : ` (the day left now, about ${until}, is shorter than the walk, about ${minutes})`}, and go on with other things until then: the drops do not age while the bot is not within 128 blocks of them.${night ? ' From dawn the zombies and skeletons on open ground burn in the sun (not under a roof or in water, not husks or a zombie with a helmet, and never spiders or creepers), and no more spawn there in the light.' : ''} Asked again at dawn.${triedDeathsSays(bot, run)}` };
     // Through the Nether, where the drop lies far off in the Overworld and a
     // portal the bot knows stands within 600 blocks of it and another within
     // 600 of the bot (note 1393): the nether shortcut's own way (out to the
@@ -626,4 +650,4 @@ function dropsWaitSays(bot, goal, now = Date.now()) {
   if (off > TICKING) return ` Given the turn, the work asks first about going back for what the last death dropped, ${off} blocks off: ${what}. Drops age only while their ground is loaded, so they keep until the bot comes near.`;
   return '';
 }
-module.exports = { dropsWaitSays, quickDeathsSays, TOLD, tripCameToNothing, KIT_ERRAND, kitTrip, corpseRun, corpseRunStep, worth, madeAgain, ironRemakeSays, IRON_MINUTES, underWay };
+module.exports = { triedDeathsSays, dropsWaitSays, quickDeathsSays, TOLD, tripCameToNothing, KIT_ERRAND, kitTrip, corpseRun, corpseRunStep, worth, madeAgain, ironRemakeSays, IRON_MINUTES, underWay };
