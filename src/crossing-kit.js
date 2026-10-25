@@ -102,6 +102,18 @@ function netherHitSays(bot) {
 
 // The kit, item by item: { key, short, carried, wants, says }. Food and
 // health only where monsters are; all of it only in Survival.
+// The pickaxe uses the Nether wore an hour on the fresh runs full-5, full-6
+// and full-7 (2026-10-24 19:45Z to 10-25 16:30Z, pickaxes gone from the
+// pockets in the Nether with no death; a few may have been left in chests):
+// about 930, 620 and 470 an hour, over 2.4, 4.5 and 7.8 hours there. full-7
+// crossed at 13:37Z with 2 stone and an iron pickaxe, about 510 uses, and had
+// none at 14:11Z; it dug on with wooden pickaxes made of stems and by hand.
+const NETHER_WEAR = Object.freeze({ low: 470, high: 930, handPace: 12, pickPace: 40, woodUses: 59 });
+function netherWearSays(uses) {
+  const W = NETHER_WEAR, m = n => Math.max(1, Math.round(n));
+  const last = uses > 0 ? ` the ${uses} uses carried last about ${m(uses / W.high * 60)} to ${m(uses / W.low * 60)} minutes at that rate;` : '';
+  return ` On the fresh runs (2026-10-24 to 25) the Nether wore about ${W.low} to ${W.high} pickaxe uses an hour of being there:${last} with none left, rock is dug by hand at about ${W.handPace} blocks a minute against ${W.pickPace} with a pickaxe, dropping nothing, and a wooden pickaxe of the Nether's stems lasts ${W.woodUses}.`;
+}
 function kitItems(bot) {
   if (bot.game?.gameMode !== 'survival') return [];
   const items = [];
@@ -127,8 +139,12 @@ function kitItems(bot) {
   const best = Number.isFinite(uses) ? uses : null;
   const sound = soundPickaxes(bot).length;
   const between = pickUses(bot);
+  // What the Nether wears, by the fresh runs' own record (note 2111): the
+  // 250 uses the code takes lasted full-7 a little over half an hour.
+  const allUses = picks.reduce((n, i) => n + Math.max(0, (bot.registry?.itemsByName?.[i.name]?.maxDurability || 0) - (i.durabilityUsed || 0)), 0);
+  const wearSays = netherWearSays(allUses);
   items.push({ key: 'pickaxe', rung: 'nether_pickaxe', short: pickShort(bot), carried: sound, wants: PICKAXES_TAKEN,
-    says: `Pickaxe: ${picks.length ? `${picks.map(i => words(i.name)).join(', ')} carried, the best with ${best ?? 'many'} uses left${Number.isFinite(between) ? `, ${between} between the sound ones` : ''}` : 'none carried'}; the code would take ${PICKAXES_TAKEN}, stone or better with at least ${SPARE_PICKAXE_DURABILITY} uses each and ${NETHER_PICK_USES} between them (a new iron pickaxe's, or two new stone ones'), the one in use and a spare: the way out of a pocket, a fortress wall or a buried portal is dug, a tunnel two high wears two uses a block and netherrack mined for blocks one each, and with no wood carried a pickaxe that breaks there is not made again. A stone pickaxe is three cobblestone or blackstone and two sticks.${kitBudgetSays(bot)}` });
+    says: `Pickaxe: ${picks.length ? `${picks.map(i => words(i.name)).join(', ')} carried, the best with ${best ?? 'many'} uses left${Number.isFinite(between) ? `, ${between} between the sound ones` : ''}` : 'none carried'}; the code would take ${PICKAXES_TAKEN}, stone or better with at least ${SPARE_PICKAXE_DURABILITY} uses each and ${NETHER_PICK_USES} between them (a new iron pickaxe's, or two new stone ones'), the one in use and a spare: the way out of a pocket, a fortress wall or a buried portal is dug, a tunnel two high wears two uses a block and netherrack mined for blocks one each.${wearSays} With no wood carried a pickaxe that breaks there is not made again. A stone pickaxe is three cobblestone or blackstone and two sticks.${kitBudgetSays(bot)}` });
   // The played record of gold carried in (note 1336): it was offered as a
   // top-up 1,538 times in the day to 2026-10-06 01:00Z and chosen once, with
   // the record unsaid; piglins killed 28 that crossed without and 2 with.
@@ -369,4 +385,4 @@ function kitRungSays(bot, goal, rung) {
   return ` ${rung.carried} food points carried, ${rung.wants} wanted: the Nether stay the goal still needs, about ${stay.minutes} minutes for ${left}, at about ${NETHER_HUNGER_AN_HOUR} hunger an hour. Health comes back only at hunger 18 or more, and in the Nether a hoglin is the only meat. At the crossing ${c.none} of ${c.n} carried no food and ${c.shortOfStay} were short of the stay (note 664).${ways}`;
 }
 
-module.exports = { kitBlocksWanted, NETHER_PICK_USES, pickUses, SPARE_PICKAXE_DURABILITY, KIT_PHASES, chestWood, CHEST_PLANKS, kitRungs, kitRungSays, chestRungSays, soundPickaxes, PICKAXES_TAKEN, cauldronSet, stayCauldron, netherStay, staySays, NETHER_HUNGER_AN_HOUR, netherHitSays, kitItems, valuablesAt, kitSummary, netherBlocks, logsCarried, NETHER_HEALTH, NETHER_BLOCKS, SPARE_PICKAXE_DURABILITY, EXPEDITION_LOGS };
+module.exports = { NETHER_WEAR, netherWearSays, kitBlocksWanted, NETHER_PICK_USES, pickUses, SPARE_PICKAXE_DURABILITY, KIT_PHASES, chestWood, CHEST_PLANKS, kitRungs, kitRungSays, chestRungSays, soundPickaxes, PICKAXES_TAKEN, cauldronSet, stayCauldron, netherStay, staySays, NETHER_HUNGER_AN_HOUR, netherHitSays, kitItems, valuablesAt, kitSummary, netherBlocks, logsCarried, NETHER_HEALTH, NETHER_BLOCKS, SPARE_PICKAXE_DURABILITY, EXPEDITION_LOGS };
