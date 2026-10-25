@@ -615,6 +615,25 @@ function localMoves(view, feet, { goal = 'sky', visits = {}, target = null, from
       const pastLava = pastOpen && dropInto(view, past).into === 'lava';
       if (isWater(view.name(land)) || solid(view.name(land.plus(DOWN)))) moves.push({ key: `step_${dir}`, does: `${inWater ? 'Swim' : 'Walk'} one block ${dir}${land.y < feet.y ? `, dropping ${feet.y - land.y}` : ''}${landsApart(land) ? `, and ${landsApart(land)}` : ''}.`, kind: 'move', to: land, ...(pastDrop ? { effects: [`one block past it, ${pastDrop}`] } : {}), ...(pastLava ? { pastLava: true } : {}), ...where(land), ...(/^it lands on a floor of/.test(landsApart(land) || '') ? { dryFooting: false } : {}) });
     }
+    // A jump across a gap in the floor (note 2076): a sprint jump from
+    // where the body stands carries it over one or two open cells to a floor
+    // at its own level, or over one to a floor a block up. full-7 (2026-10-24
+    // 23:50Z to past 01:00Z), on a chest over the Nether's drop with no
+    // pickaxe and nothing to bridge with, had ground at its own level three
+    // blocks north across a gap of two, and no move offered to reach it.
+    if (!inWater && headroom && standable(level) && !solid(view.name(level.plus(DOWN)))) {
+      for (const dist of [2, 3]) {
+        const between = Array.from({ length: dist - 1 }, (_, i) => feet.plus(d.scaled(i + 1)));
+        if (!between.every(c => standable(c) && !solid(view.name(c.plus(DOWN))) && open(view.name(c.offset(0, 2, 0))))) break;
+        const land = [0, 1].filter(rise => !rise || dist === 2).map(rise => feet.plus(d.scaled(dist)).offset(0, rise, 0))
+          .find(c => standable(c) && solid(view.name(c.plus(DOWN))) && (c.y === feet.y || open(view.name(c.offset(0, 2, 0)))));
+        if (!land) continue;
+        const under = dropBelow(view, between[0]);
+        moves.push({ key: `jump_${dir}`, does: `Sprint and jump ${dir} across the gap of ${dist - 1} open cell${dist === 2 ? '' : 's'}${land.y > feet.y ? ', up a block,' : ''} onto the floor ${dist} blocks off, from a standing start: a jump falls short when the body has not the speed${under ? `, and short of it, ${under}` : ''}.`,
+          kind: 'move', to: land, jump: true, through: between, ...where(land) });
+        break;
+      }
+    }
     // Up a block onto the next cell: the cell over the head must be open to
     // rise into, out of water too (the game lifts a swimmer only then).
     const up = level.plus(UP);
@@ -1048,6 +1067,16 @@ async function perform(bot, task, m, { dig }) {
   // and the step south "dropping 1" was run from the cell under, against
   // a wall, and slid off the ledge into the lava sea (note 600).
   if (m.from && !feet.equals(m.from)) throw new Error(`The body is at (${feet.x}, ${feet.y}, ${feet.z}), not at (${m.from.x}, ${m.from.y}, ${m.from.z}) where the move was read`);
+  if (m.kind === 'move' && m.jump) {
+    const to = m.to;
+    const guard = require('./motion').within(bot, [feet, ...(m.through || []), to], `the ${m.key.replaceAll('_', ' ')}`);
+    await move(bot, task, { label: `unstuck_${m.key}`, keys: ['forward', 'sprint', 'jump'], sneak: false, why: `one move out of being stuck: ${m.key.replaceAll('_', ' ')}`,
+      look: to.offset(0.5, 0.6, 0.5), maxMs: 2000, tick: 50, guard,
+      until: () => { const f = terrain.feetCell(bot); return (f.x === to.x && f.z === to.z && f.y >= to.y) || f.y < feet.y - 1; } });
+    bot.clearControlStates?.();
+    for (let n = 0; n < 10 && bot.entity.onGround === false; n++) { task.check(); await new Promise(r => setTimeout(r, 50)); }
+    return;
+  }
   if (m.kind === 'move') {
     const to = m.to, up = to.y > feet.y;
     const keys = m.key === 'swim_up' ? ['jump'] : up || inWater ? ['forward', 'jump'] : ['forward'];

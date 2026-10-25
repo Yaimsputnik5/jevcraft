@@ -145,3 +145,15 @@ test('standing on a chest (its top 0.875 up), the moves are read from the cell o
   assert.match(asked, /step_east/);
   assert.match(asked, /"y":61/);
 });
+
+test('on a perch over a drop, a floor across a gap of one or two at the same level is offered as a sprint jump, its drop said (note 2076)', () => {
+  // full-7 (2026-10-24 23:50Z on): a chest over the Nether's lava sea, ground three blocks north across two open cells, no pickaxe and nothing to bridge with.
+  const cells = { '0,60,0': 'chest', '0,60,-3': 'netherrack', '0,60,-4': 'netherrack' };
+  const v = { name: p => cells[`${p.x},${p.y},${p.z}`] ?? (p.y <= 40 ? 'lava' : 'air'), carried: {}, pickaxe: null };
+  const { moves } = localMoves(v, new Vec3(0, 61, 0), { goal: 'away' });
+  const jump = moves.find(m => m.key === 'jump_north');
+  assert(jump, moves.map(m => m.key).join(', '));
+  assert.deepEqual([jump.to.x, jump.to.y, jump.to.z], [0, 61, -3]);
+  assert.match(jump.does, /^Sprint and jump north across the gap of 2 open cells onto the floor 3 blocks off, from a standing start: a jump falls short when the body has not the speed, and short of it, a drop of \d+ blocks into lava under it/);
+  assert(!moves.some(m => /^jump_(east|west|south)/.test(m.key)), 'no floor across those gaps');
+});
