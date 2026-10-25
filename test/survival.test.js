@@ -6518,3 +6518,19 @@ test('a biter that walks to arm\'s length within the long route search at its ow
   assert.equal(scoutBudget([mob('zombie', 9)]), 1200, 'a slow walker far off: the long search');
   assert.equal(scoutBudget([mob('skeleton', 6)]), 1200, 'a shooter does not walk in');
 });
+
+test('blows that came through the raised shield in the last twenty seconds price the shield guard, said with it (note 2099)', () => {
+  const bot = creeperBot({ wall: false, creeper: null, weapon: 'iron_sword', health: 12.9 });
+  const zombie = { id: 8, name: 'zombie', type: 'hostile', position: new Vec3(1.8, 64, 0.5), height: 1.95, width: 0.6, isValid: true };
+  bot.entities = { 8: zombie };
+  const items = bot.inventory.items();
+  bot.inventory.items = () => [...items, { name: 'shield', count: 1 }];
+  bot.inventory.slots = { ...(bot.inventory.slots || {}), 45: { name: 'shield' } };
+  const now = Date.now();
+  bot._hitLog = [{ at: now - 3000, name: 'zombie', id: 8, health: 16, shield: true }, { at: now - 1000, name: 'zombie', id: 8, health: 14, rising: true, shield: false }];
+  const survival = new Survival(bot, { place: async () => {}, dig: async () => {}, navigate: async () => {} }, { state: { shelters: [] } });
+  const o = survival.stanceOptions(new Task('x'), {}, () => {}, [{ entity: zombie, distance: 1.3, visible: true }], false).shield_guard;
+  assert.ok(o, 'shield guard offered');
+  assert.ok(o.expects.damage > 0, JSON.stringify(o.expects));
+  assert.match(o.description, /In the last 20 seconds 2 blows landed with the shield raised here/);
+});

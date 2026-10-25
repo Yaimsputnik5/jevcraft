@@ -4529,6 +4529,19 @@ class Survival {
     const calmSays = turned => calmAtReach.length ? ` The enderman ${Math.round(calmAtReach[0].distance * 10) / 10} blocks off is calm now: it hits nothing until it is struck or looked in the eye, and ${turned} is that look; from then it is angry, teleports behind the bot, and the figures above are its.` : '';
     const guardOpt = this.shieldGuardOption(task, goal, save, { coming, mobs, shielded, oneHit });
     if (guardOpt) options.shield_guard = guardOpt;
+    // The blows that came through the raised shield in the hit log's last twenty seconds, up or still rising, price
+    // the guard at their rate over its fifteen, as the tridents' (note 2071) do (note 2099): full-5 (2026-10-25
+    // 11:17:48 to 51Z) was told 0 of the shield guard against an enderman 1.3 blocks off, took it twice between
+    // pillars, and went from 12.9 to 1.7 in three seconds of blows.
+    if (options.shield_guard) {
+      const through = require('./hit-log').recent(bot).filter(h => (h.shield || h.rising) && h.name && h.name !== 'arrow');
+      if (through.length) {
+        const rate = Math.round(through.length * (oneHit || 0) * 15 / 20 * 10) / 10;
+        const now = options.shield_guard.expects?.damage || 0;
+        if (rate > now) options.shield_guard.expects = { ...(options.shield_guard.expects || { seconds: 15, oneHit }), damage: rate };
+        options.shield_guard.description += ` In the last 20 seconds ${through.length === 1 ? 'a blow' : `${through.length} blows`} landed with the shield raised here (up, or still rising before it blocks): at that rate, about ${rate} over the fifteen seconds this way, from ${Math.round(bot.health * 10) / 10} health${rate >= bot.health ? ' (more than the bot has)' : ''}.`;
+      }
+    }
     if (calmAtReach.length) { if (options.fight) options.fight.description += calmSays('the turn to it to strike'); if (options.shield_guard) options.shield_guard.description += calmSays('the shield turned to it'); }
     const lowOpt = this.lowCeilingOption(task, goal, save, { coming, mobs, shielded, oneHit });
     if (lowOpt) options.low_ceiling = lowOpt;
