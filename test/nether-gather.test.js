@@ -183,3 +183,13 @@ test('the looking says how long it has gone on and how often it was asked (note 
   await mineAtSource(bot, task, stemStep(), goal, () => {});
   assert.match(client.asked[0].state.soFar, /^This looking for crimson stem has gone on 40 minutes, asked 7 times, without its finding it yet\.$/);
 });
+
+test('the looking\'s clock holds across a walk of half an hour between asks (note 2082)', async () => {
+  const { mineAtSource } = require('../src/work');
+  const bot = spanBot(), goal = recordedGoal();
+  goal.gatherClock = { resource: 'crimson_stem', since: Date.now() - 70 * 60000, asks: 4, lastAt: Date.now() - 30 * 60000 };
+  const client = jevStub(['without']), task = new Task('work');
+  task.opportunityClient = client;
+  await mineAtSource(bot, task, stemStep(), goal, () => {});
+  assert.match(client.asked[0].state.soFar, /^This looking for crimson stem has gone on 70 minutes, asked 5 times/);
+});

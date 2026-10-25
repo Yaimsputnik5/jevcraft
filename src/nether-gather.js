@@ -751,7 +751,9 @@ async function netherGather(bot, task, goal, save, resource, { navigate, returnO
   // nothing said so.
   {
     const now = Date.now(), g = goal.gatherClock;
-    goal.gatherClock = g && g.resource === resource && now - g.lastAt < 10 * 60000 ? { ...g, asks: g.asks + 1, lastAt: now } : { resource, since: now, asks: 1, lastAt: now };
+    // Kept across the walks between asks (note 2082): at ten minutes a walk to a
+    // forest between two asks began it again, and full-7 was told "1 minute".
+    goal.gatherClock = g && g.resource === resource && now - g.lastAt < 45 * 60000 ? { ...g, asks: g.asks + 1, lastAt: now } : { resource, since: now, asks: 1, lastAt: now };
     const m = Math.round((now - goal.gatherClock.since) / 60000);
     if (goal.gatherClock.asks > 1) facts.soFar = `This looking for ${words(resource)} has gone on ${m} minute${m === 1 ? '' : 's'}, asked ${goal.gatherClock.asks} times, without its finding it yet.`;
   }
