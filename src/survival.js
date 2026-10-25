@@ -5410,8 +5410,19 @@ class Survival {
         const runC = runFromCreeper(bot, runCreepers, fleeFrom(lead.entity, runCreepers), RUN_FROM, runWorn);
         const nearest = Math.min(...biters.map(t => t.distance)), rec = runFromRecord(nearest);
         const recSays = rec ? `Runs like this one, from a mob that bites within ${rec.within} blocks begun at 6 health or more: ${rec.runs} in the records, the health lost in the 14 seconds after ${rec.median} on the median, ${rec.quarter} or more in one run in four, and the bot dead within them in ${rec.dead}; the biter strikes as the run turns, and a walk out of a corridor or a dug pocket stalls. ` : '';
-        options.run_from = { expects: { damage: Math.round((runShotCost(secs) + runC.damage + (rec?.median || 0)) * 10) / 10, seconds: Math.max(1, secs), oneHit },
-          description: runC.says.trim() + (runC.says ? ' ' : '') + recSays + `Run from ${biters.length === 1 ? `the ${lead.entity.name.replaceAll('_', ' ')}` : `the ${biters.length} that bite`} at a sprint, to the first cell the walk reaches ${RUN_FROM} blocks or more from ${biters.length === 1 ? 'it' : 'every one of them'}: no footing is picked beforehand and nothing is searched while standing. The ${lead.entity.name.replaceAll('_', ' ')} walks about ${speed} blocks a second and the bot sprints about ${SPRINT}: the gap opens about ${Math.round((SPRINT - speed) * 10) / 10} a second, ${RUN_FROM} blocks in about ${secs} seconds, the back to ${biters.length === 1 ? 'it' : 'them'} and the shield down while it runs${others ? `; ${others} that shoot keep shooting` : ''}.${noWayOut || ' Where it ends is open ground, and what follows is asked of there.'}`,
+        // The turn (note 2078): each that bites at arm's length as the run
+        // begins lands about a blow while the body turns and gets up to a
+        // sprint, its wither on top, the record's median the least of it.
+        // full-5 (2026-10-25 01:15:57Z), at 15.8 in iron, three wither
+        // skeletons 2.5 to 3.3 blocks off, was told 1.4 of this run, took
+        // four blows and their wither running, and died six seconds on.
+        const atArm = biters.filter(t => t.distance <= 3.3);
+        const turnBlows = Math.round(atArm.reduce((n, t) => n + ce.afterArmour(ce.MOBS[t.entity.name].hit, runWorn), 0) * 10) / 10;
+        const turnWither = atArm.some(t => ce.MOBS[t.entity.name]?.withers) ? 5 : 0;
+        const turnSays = atArm.length ? ` At arm's length now: ${atArm.length === 1 ? `the ${atArm[0].entity.name.replaceAll('_', ' ')}` : `${atArm.length} that bite`}, each with about a blow as the run turns and gets up to a sprint, about ${turnBlows} through the armour worn${turnWither ? `, and its wither after, about ${turnWither} more over ten seconds that armour does not stop` : ''}.` : '';
+        const runDamage = Math.max(rec?.median || 0, turnBlows + turnWither);
+        options.run_from = { expects: { damage: Math.round((runShotCost(secs) + runC.damage + runDamage) * 10) / 10, seconds: Math.max(1, secs), oneHit },
+          description: runC.says.trim() + (runC.says ? ' ' : '') + recSays + turnSays.trim() + (turnSays ? ' ' : '') + `Run from ${biters.length === 1 ? `the ${lead.entity.name.replaceAll('_', ' ')}` : `the ${biters.length} that bite`} at a sprint, to the first cell the walk reaches ${RUN_FROM} blocks or more from ${biters.length === 1 ? 'it' : 'every one of them'}: no footing is picked beforehand and nothing is searched while standing. The ${lead.entity.name.replaceAll('_', ' ')} walks about ${speed} blocks a second and the bot sprints about ${SPRINT}: the gap opens about ${Math.round((SPRINT - speed) * 10) / 10} a second, ${RUN_FROM} blocks in about ${secs} seconds, the back to ${biters.length === 1 ? 'it' : 'them'} and the shield down while it runs${others ? `; ${others} that shoot keep shooting` : ''}.${noWayOut || ' Where it ends is open ground, and what follows is asked of there.'}`,
           run: async () => {
             this.report(goal, save, { action: 'run_from', threats: biters.map(t => t.entity.name).slice(0, 4), health: bot.health, stance: true });
             lowerShield(bot);
