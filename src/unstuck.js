@@ -1070,7 +1070,7 @@ async function perform(bot, task, m, { dig }) {
   if (m.kind === 'move' && m.jump) {
     const to = m.to;
     const guard = require('./motion').within(bot, [feet, ...(m.through || []), to], `the ${m.key.replaceAll('_', ' ')}`);
-    await move(bot, task, { label: `unstuck_${m.key}`, keys: ['forward', 'sprint', 'jump'], sneak: false, why: `one move out of being stuck: ${m.key.replaceAll('_', ' ')}`,
+    await move(bot, task, { label: `unstuck_${m.key}`, keys: ['forward', 'sprint', 'jump'], sneak: false, acrossGap: true, why: `one move out of being stuck: ${m.key.replaceAll('_', ' ')}`,
       look: to.offset(0.5, 0.6, 0.5), maxMs: 2000, tick: 50, guard,
       until: () => { const f = terrain.feetCell(bot); return (f.x === to.x && f.z === to.z && f.y >= to.y) || f.y < feet.y - 1; } });
     bot.clearControlStates?.();

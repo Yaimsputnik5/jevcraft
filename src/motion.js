@@ -188,6 +188,7 @@ function burningAhead(bot, keys, { deep = false, flames = true } = {}) {
   return null;
 }
 
+// `acrossGap`: a jump over open cells (unstuck.js jump_<heading>, note 2077): lava or a fall under the gap, below the feet, is what the jump goes over, said to Jev with it, not a cell walked into; a hazard at the feet's level or above still refuses it. full-7 (2026-10-25 01:07Z) chose the jump north off its chest perch and was refused for the lava sea 29 blocks under the gap.
 // `intoFall`: a deadly fall ahead is the move's own purpose (the water drop off a column, end-combat.js note 1490), with the water bucket for the landing; lava ahead is still refused.
 // Who let a move's key go (note 1496): the release is caught at the bot's
 // own setControlState and clearControlStates and named in the move's log,
@@ -203,7 +204,7 @@ function watchReleases(bot) {
   bot.setControlState = (key, on) => { if (!on && bot._controller && !bot._controller.failed && bot._controller.keys?.includes(key) && bot.controlState?.[key]) bot._controller.letGoBy = `set(${key}, false) at ${frames()}`; return raw(key, on); };
   if (typeof bot.clearControlStates === 'function') { const rawClear = bot.clearControlStates.bind(bot); bot.clearControlStates = () => { if (bot._controller && !bot._controller.failed) bot._controller.letGoBy = `clearControlStates at ${frames()}`; return rawClear(); }; }
 }
-async function move(bot, task, { label, keys = ['forward'], sneak = true, why, look, until = () => false, guard = () => {}, maxMs = 1500, tick = 25, throughFlames = false, intoFall = false, stopAt = null } = {}) {
+async function move(bot, task, { label, keys = ['forward'], sneak = true, why, look, until = () => false, guard = () => {}, maxMs = 1500, tick = 25, throughFlames = false, intoFall = false, acrossGap = false, stopAt = null } = {}) {
   if (!label) throw new Error('A held-key move needs a name');
   watchReleases(bot);
   for (const key of keys) if (!MOVEMENT.has(key)) throw new Error(`Not a movement key: ${key}`);
@@ -247,6 +248,7 @@ async function move(bot, task, { label, keys = ['forward'], sneak = true, why, l
   const refused = () => {
     const hit = !escaping && burningAhead(bot, keys, { deep: !sneak, flames });
     if (!hit || (intoFall && hit.name === 'deadly_fall')) return false;
+    if (acrossGap && (hit.name === 'deadly_fall' || (Number.isFinite(hit.y) && hit.y < Math.floor(bot.entity.position.y)))) return false;
     // A move that ends in the cell ahead (stopAt: the portal's, note 1953) is not refused for what lies past that cell: the step into a portal with lava on its far face was 'lava ahead; not walked into' though the body stops in the sheet. A hazard in the stop cell itself still refuses it.
     if (stopAt) {
       const p = bot.entity?.position, yaw = bot.entity?.yaw;
