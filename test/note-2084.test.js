@@ -20,3 +20,9 @@ test('climb_out says the climbs of the last hour and counts its own once (note 2
   assert.match(src, /noteClimb\(goal, goal\.surfaceTrip\?\.need \|\| 'the way up'/);
   assert.match(src, /Date\.now\(\) - c\.at < 3 \* 60000/);
 });
+
+test('cooking says the points it gains in the minutes of getting food (note 2101)', () => {
+  const { cookTimeSays } = require('../src/work');
+  assert.equal(cookTimeSays(28, 76), " The +28 points are about 5 to 7 minutes of getting food at the fresh runs' pace (3.9 to 5.9 food points a minute of hunting and searching), against the 76 seconds here; eaten raw, the meat gives a third of it.");
+  assert.equal(cookTimeSays(0, 10), '');
+});
