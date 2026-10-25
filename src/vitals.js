@@ -1666,7 +1666,7 @@ function bodyTask(task) {
     check() { if (task.cancelled) throw new (require('./skills').Cancelled)(task.label); } };
 }
 
-async function maintainVitals(bot, task, onAction = () => {}, { client = null, goal = null, save = () => {}, claimed = null } = {}) {
+async function maintainVitals(bot, task, onAction = () => {}, { client = null, goal = null, save = () => {}, claimed = null, cookFirst = null } = {}) {
   const own = bodyTask(task);
   own.check();
   const asked = { client, goal, save };
@@ -1787,8 +1787,21 @@ async function maintainVitals(bot, task, onAction = () => {}, { client = null, g
   // points are worth more than the three quarters its Hunger may spend, and
   // the gate that ate it only hurt and under eighteen was a threshold of
   // ours, not the game's (note 515). The claim says what it is and does.
-  const food = chooseFood(bot) || lastResortFood(bot);
+  let food = chooseFood(bot) || lastResortFood(bot);
   if (!food) return false; // The higher-level survival planner must forage.
+  // Raw meat cooked first where a furnace can be put down here and nothing presses (note 2102): hunger over six,
+  // health ten or more, no mob close. The fresh runs full-5, full-6 and full-7 (2026-10-24 19:42Z to 2026-10-25
+  // 15:00Z) ate 260 meals of raw meat, a third of it cooked, most of them here at hunger 16 or 17, eight stone and
+  // fuel carried at 118 of 141; a minute at the furnace triples the points, where getting food ran 4 to 6 a minute.
+  if (COOKED[food.name] && bot.food > 6 && (bot.health ?? 20) >= 10 && !closeHostile(bot) && typeof cookFirst === 'function') {
+    let cook = null; try { cook = require('./work').cookable(bot); } catch (_) { cook = null; }
+    const item = cook?.ready && cook.items.find(i => i.raw === food.name);
+    if (item && cook.after - cook.now >= 8) {
+      onAction({ action: 'cook_meat', item: item.cooked, raw: item.n, then: 'eat', food: bot.food, health: bot.health });
+      try { await cookFirst(item); } catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err?.name)) throw err; }
+      food = chooseFood(bot) || food;
+    }
+  }
   onAction({ action: 'eat', item: food.name, food: bot.food, health: bot.health });
   require('./turn').takeTurn(bot, 'vitals', 'eat', food.name);
   await bot.equip(food, 'hand');

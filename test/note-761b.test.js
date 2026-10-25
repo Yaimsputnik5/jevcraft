@@ -106,3 +106,15 @@ test('a walk home for food chosen is held as a trip, not asked again every ten s
   assert.equal(survival.state.foodChoice?.key, 'obtain_food/go_home_for_food');
   assert(survival.state.foodChoice.ms >= 120000);
 });
+
+test('a raw meal with eight stone and fuel carried: cooking it first is offered beside eating it raw, priced in minutes of getting food (note 2102)', async () => {
+  const { Survival } = require('../src/survival');
+  const bot = surfaceBot({ items: [['mutton', 5], ['cobblestone', 16], ['oak_log', 4], 'iron_sword'], food: 17 });
+  const survival = new Survival(bot, { navigate: async () => {}, dig: async () => {}, place: async () => {}, explore: async () => {} }, { client: { systemOne: async () => ({}) } });
+  let tree = null;
+  survival.decide = async (task, goal, save, q) => { tree = q.tree; return { path: ['eat_carried'], action: { run: async () => {} }, stale: false }; };
+  await survival.step(new Task('t', 'food'), nightGoal(), () => {});
+  assert(tree?.eat_carried, 'the raw meal offered');
+  assert(tree.cook_then_eat, Object.keys(tree).join(', '));
+  assert.match(tree.cook_then_eat.description, /^Cook the raw meat carried first, then eat it: 5 mutton, 10 food points raw and 30 cooked \(\+20\); a furnace of eight of the cobblestone carried put down here, oak log for fuel, about 56 seconds standing at it before the meal\. The \+20 points are about 3 to 5 minutes of getting food/);
+});

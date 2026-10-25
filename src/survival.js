@@ -10868,7 +10868,8 @@ class Survival {
         }
       }
     }
-    await maintainVitals(bot, task, action => this.report(goal, save, action), { client: this.client, goal, save });
+    await maintainVitals(bot, task, action => this.report(goal, save, action), { client: this.client, goal, save,
+      cookFirst: item => require('./work').acquireStep(bot, task, item.cooked, countOf(bot, item.cooked) + item.n, goal, save) });
     // Still in a block: nothing else this turn, the dig out comes again at
     // once. mid-79-c went on to craft its spare pickaxe under the gravel.
     if (require('./vitals').headInBlock(bot)) { onStep(goal); return true; }
@@ -12308,6 +12309,26 @@ class Survival {
           this.report(goal, save, { action: 'eat', item: meal.name, food: bot.food, health: bot.health, why: 'eat_carried' });
           await require('./meal').eatThrough(bot, task, meal, { eaten: () => (bot.food ?? 0) > before, helps: () => (bot.food ?? 20) < 20 });
         } };
+      // The meal carried raw, cooked first where a furnace can be put down here (note 2102): of 260 raw meals on
+      // the fresh runs full-5, full-6 and full-7 (2026-10-24 19:42Z to 2026-10-25 15:00Z), 118 of 141 sampled had
+      // eight stone and fuel carried; the meal question offered only the raw meal or a trip for food.
+      let cook = null; try { cook = require('./work').cookable(bot); } catch (_) { cook = null; }
+      const rawMeal = cook?.ready && cook.items.some(i => i.raw === meal.name);
+      if (rawMeal && cook.after - cook.now >= 8) {
+        const first = cook.items.slice().sort((x, y) => (y.after - y.now) - (x.after - x.now))[0];
+        const secs = first.n * 10 + (cook.furnace ? 2 : 6);
+        const w = require('./work');
+        tree.cook_then_eat = { description: `Cook the raw meat carried first, then eat it: ${cook.items.map(i => `${i.n} ${i.raw.replaceAll('_', ' ')}`).join(', ')}, ${cook.now} food points raw and ${cook.after} cooked (+${cook.after - cook.now}); ${cook.furnace ? `the ${cook.furnace} carried` : `a furnace of eight of the ${cook.stone.replaceAll('_', ' ')} carried`} put down here, ${cook.fuel.replaceAll('_', ' ')} for fuel, about ${secs} seconds standing at it before the meal.${w.cookTimeSays ? w.cookTimeSays(cook.after - cook.now, secs) : ''}`,
+          run: async () => {
+            goal.step = { action: 'cook_meat', item: first.cooked, raw: first.n, then: 'eat' }; save();
+            try { await w.acquireStep(bot, task, first.cooked, countOf(bot, first.cooked) + first.n, goal, save); }
+            catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
+            const cooked = chooseFood(bot) || meal;
+            const before = bot.food;
+            this.report(goal, save, { action: 'eat', item: cooked.name, food: bot.food, health: bot.health, why: 'cook_then_eat' });
+            await require('./meal').eatThrough(bot, task, cooked, { eaten: () => (bot.food ?? 0) > before, helps: () => (bot.food ?? 20) < 20 });
+          } };
+      }
     }
     // The trip home left out for its walk cannot begin from here (note 706).
     if (needsFood && offWorld && !tree.obtain_food?.children?.return_for_food) { try { const c = require('./mob-hunt').tripHomeClosed(bot, goal); if (c) state.tripHome = c.says; } catch (_) { /* none */ } }
