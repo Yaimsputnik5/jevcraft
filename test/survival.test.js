@@ -1926,6 +1926,8 @@ test('in the Nether with the portal close, going back through it is a stance', a
   const options = nether.survival.stanceOptions(new Task('x'), {}, () => {}, [t('skeleton', 9), t('skeleton', 12)], false);
   assert(options.portal_back, Object.keys(options).join(','));
   assert.match(options.portal_back.description, /back through the portal 4 blocks off, to the Overworld/);
+  // Priced as the other stances are (note 2095).
+  assert.ok(Number.isFinite(options.portal_back.expects?.damage) && options.portal_back.expects.seconds === 5, JSON.stringify(options.portal_back.expects));
   await options.portal_back.run();
   assert.equal(nether.count(), 1);
   assert(!make('overworld').survival.stanceOptions(new Task('x'), {}, () => {}, [t('skeleton', 9)], false).portal_back, 'not from the Overworld');

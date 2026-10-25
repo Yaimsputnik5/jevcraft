@@ -5514,7 +5514,12 @@ class Survival {
       ? bot.findBlocks({ matching: portalId, maxDistance: 8, count: 1 })[0] : null;
     if (portal) {
       const blocks = Math.round(portal.distanceTo(bot.entity.position));
-      options.portal_back = { description: `Go back through the portal ${blocks} block${blocks === 1 ? '' : 's'} off, to the Overworld where the bot came from: about ${Math.max(1, Math.round(blocks / 4.3))} second${blocks > 4 ? 's' : ''} to it and about four standing in it before it takes the bot, shot at meanwhile; the mobs here stay here. The work comes back through it afterwards.` + (armsLength ? ' Something that bites is at arm\'s length now, and follows the walk.' : '') + (coming.some(t => t.entity.name === 'hoglin') ? ' A hoglin shuns a nether portal\'s blocks as it does a warped fungus: within 8 blocks of them across and 4 up or down it attacks nothing and walks off.' : ''),
+      // Priced (note 2095): the walk and the four seconds in the portal are the mobs' to strike in, as the other
+      // stances count theirs. Unpriced it was taken beside priced ways: full-6 (2026-10-25 10:45:44 and 10:46:02Z),
+      // bare in the Nether with magma cubes at 2 to 6 blocks, chose it twice, and died between them.
+      const portalSecs = Math.max(1, Math.round(blocks / 4.3)) + 4;
+      const portalCost = stanceCost({ mobs, setup: portalSecs, reaches: () => true, shield: shielded });
+      options.portal_back = { expects: { damage: portalCost.damage, seconds: portalSecs, oneHit }, description: costSays(portalCost, bot.health, mobs, { doing: 'going to the portal and standing in it' }).trim() + ' ' + `Go back through the portal ${blocks} block${blocks === 1 ? '' : 's'} off, to the Overworld where the bot came from: about ${Math.max(1, Math.round(blocks / 4.3))} second${blocks > 4 ? 's' : ''} to it and about four standing in it before it takes the bot, shot at meanwhile; the mobs here stay here. The work comes back through it afterwards.` + (armsLength ? ' Something that bites is at arm\'s length now, and follows the walk.' : '') + (coming.some(t => t.entity.name === 'hoglin') ? ' A hoglin shuns a nether portal\'s blocks as it does a warped fungus: within 8 blocks of them across and 4 up or down it attacks nothing and walks off.' : ''),
         run: async () => { this.report(goal, save, { action: 'portal_back', portal: { x: portal.x, y: portal.y, z: portal.z }, threats: danger.map(t => t.entity.name) }); await this.actions.returnOverworld(bot, task, goal, save); return true; } };
     }
     // What each shot is up against: arrows to bring it down (about six a
