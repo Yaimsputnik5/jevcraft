@@ -730,6 +730,13 @@ function configureMovements(bot) {
   // win even across a small pond. Keep bridging available for actual gaps.
   movement.liquidCost = 1;
   movement.placeCost = 6;
+  // A block dug on a route is priced with the pickaxe it wears, not its seconds alone (note 2100; the user,
+  // 2026-10-25: 'change the dig cost'): at the default 1 a block of stone cost about 2.2 walked blocks, near its
+  // time, and nothing for the wear, a stone pickaxe's 131 uses about a minute to make again. The fresh runs full-5,
+  // full-6 and full-7 (2026-10-24 19:42Z to 2026-10-25 13:30Z) dug 4,700 to 6,500 blocks of rock in their first
+  // eight hours and made a stone pickaxe every 11 to 15 minutes; at 2 a route walks round rather than tunnels where
+  // the way round is up to about twice the digging's own count.
+  movement.digCost = 2;
   // Let navigation clear vegetation and soft terrain. Resource mining stays
   // explicit, and navigation cannot tear down plank houses or stone machines.
   const soft = /^(dirt|grass_block|coarse_dirt|rooted_dirt|podzol|sand|gravel|snow|short_grass|tall_grass|fern|large_fern|leaf_litter|mushroom_stem|red_mushroom_block|brown_mushroom_block)$|_leaves$|_log$/;
