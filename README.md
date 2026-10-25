@@ -32,6 +32,18 @@ The [roadmap](ROADMAP.md) has the order of work, and [CONTRIBUTING.md](CONTRIBUT
 
 ## What we learned
 
+The short version: code decides what is possible, Jev decides what to do, and how good the decisions are depends on how honest and complete the menu is. Six lessons, in order of how much they mattered:
+
+1. **The options are Jev's whole world.** It cannot invent an option and it does not check our arithmetic. Nearly every bad choice we traced was a wrong price, a missing option or a stale fact, not poor judgement. A barter was said to cost nine ingots a pearl, from one lucky sample; the game's table says 15.6 (note 2106). Fixing the menu has worked far better than adding rules on top of it.
+2. **A route that is not offered never happens.** Bartering was offered only once gold and a piglin were already in reach, so in 21 hours no fresh run bartered (note 2107). Beds against the dragon were offered with no damage figure, and Jev gave them 0.07 (note 2108). Speedrunners use both. Offering every real route matters more than tuning any one fight.
+3. **Every option needs a price, in units that compare.** Unpriced options were chosen over priced ones (`keep_working` 39 times while it had no price, note 2097). Health and seconds help; minutes toward the goal are what let unlike options be compared, such as cooking against eating raw (note 2101), or carrying a rod to safety against hunting on (note 2105).
+4. **Code that quietly decides is the biggest blind spot.** The routine meal made 298 of 303 meals and Jev never knew there was a choice (note 2103). Asking "how often is Jev actually asked?" found it. Every hidden threshold is a decision Jev cannot improve.
+5. **Take facts from the game's code and from this run, not from old trials.** Telling Jev that 70 of 80 lives carrying rods died with them, from September trials that died about ten times as often, led to a 45-minute trip to protect one rod (note 2105). The server jar has the real barter odds and bed damage.
+6. **Measure what you are optimizing, and check the measure.** Chasing deaths hid the time lost to walks, waits and stalls. The time-lost tool itself first counted chosen mining as "stuck", overstating it three to four times (note 2104).
+
+The sections below are the episodes these came from.
+
+
 ### Loops
 
 Deaths are easy to spot. Trials that stay busy without progressing are not: pacing a bridge for 70 minutes, or sitting in a sealed pocket for half an hour. Each feature used to keep its own list of what had failed, and none saw the others; one question was answered the same way 4,423 times. We replaced them with one shared record of what has been tried and what came of it, the *ledger* ([src/tried.js](src/tried.js), note 571). An option that came to nothing twice rests for five minutes. When every option rests, the parent question is asked instead and told what failed. Waiting and holding a stance are recorded the same way, so a wait that changed nothing counts as a failure (notes 599, 611).
