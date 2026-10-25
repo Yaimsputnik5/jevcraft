@@ -19,7 +19,7 @@
 // record (pearl-record.js: the trials, the arena, the measured barter and
 // this run's own), and with what it shares with the rods' trip: the
 // fortress's distance from here and from the forest, the rods carried and
-// wanted, the gold carried and its pearls at nine ingots a pearl.
+// wanted, the gold carried and its pearls at the game's barter odds (note 2106).
 //
 // The answer is held half an hour. A pearl way held is the step while it
 // stays real (the enderman in view within 48, the forest open, the barter
@@ -36,7 +36,7 @@ const record = require('./pearl-record');
 
 const HOLD_MS = 30 * 60000, NONE_GOOD_MS = 5 * 60000;
 const ENDERMAN_REACH = 24, HUNT_SIGHT = 48, FOREST_REACH = 512;
-const KIND = { hunt_enderman: 'enderman', warped_forest: 'forest', barter_gold: 'barter' };
+const KIND = { hunt_enderman: 'enderman', warped_forest: 'forest', barter_gold: 'barter', bastion_gold: 'bastion' };
 const PICKS = new Set(['rods_first', ...Object.keys(KIND)]);
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const count = (bot, name) => (bot.inventory?.items?.() || []).filter(i => i.name === name).reduce((n, i) => n + i.count, 0);
@@ -70,6 +70,14 @@ function routes(bot, goal, now = Date.now()) {
   }
   const bartering = require('./bartering');
   if (bartering.barterReady(bot, goal)) out.barter = { gold: bartering.barterGold(bot) };
+  // The gold for a barter from a bastion known (note 2106/2107): the way
+  // speedruns get their pearls, never on offer here before a barter was
+  // already ready. The fresh runs full-5 to 7 (2026-10-24 19:45Z to 10-25
+  // 17:00Z) chose the rods first 20 times and endermen 16, never a barter.
+  else if (!isSetAside(goal, 'rung', 'bastion_gold', now)) {
+    let b = null; try { b = require('./exploration').knownLandmarks(bot, goal, 'bastion', 384)[0] || null; } catch (_) { b = null; }
+    if (b) out.bastion = b;
+  }
   return out;
 }
 
@@ -88,7 +96,7 @@ function askAgainBecause(bot, goal, kinds, now = Date.now()) {
   if (now >= h.until) return `the answer held (${h.pick.replaceAll('_', ' ')}, ${Math.round((now - h.at) / 60000)} minutes ago) has run its time`;
   if (deathsSince(goal, h.at, now)) return 'the bot has died since the answer';
   const fresh = kinds.filter(k => !(h.offered || []).includes(k));
-  if (fresh.length) return `a way to the pearls that was not on offer at the answer is real now: ${fresh.map(k => ({ enderman: 'an enderman in reach', forest: 'a warped forest known and open', barter: 'gold to throw with a piglin in reach' })[k]).join(', ')}`;
+  if (fresh.length) return `a way to the pearls that was not on offer at the answer is real now: ${fresh.map(k => ({ enderman: 'an enderman in reach', forest: 'a warped forest known and open', barter: 'gold to throw with a piglin in reach', bastion: 'a bastion known, its gold to barter with' })[k]).join(', ')}`;
   return null;
 }
 
@@ -110,13 +118,15 @@ function orderStage(bot, goal, { count: want = 1, now = Date.now(), phase = 'obt
   const because = askAgainBecause(bot, goal, kinds, now);
   return because ? { phase, action: 'pearl_order', item: 'blaze_rod', because } : null;
 }
-const endedWhy = pick => ({ hunt_enderman: 'no enderman left within 48 blocks', warped_forest: 'the forest\'s walk or its hunt rests', barter_gold: 'no gold to throw or no piglin within 32' })[pick];
+const endedWhy = pick => ({ hunt_enderman: 'no enderman left within 48 blocks', warped_forest: 'the forest\'s walk or its hunt rests', barter_gold: 'no gold to throw or no piglin within 32', bastion_gold: 'the bastion\'s gold rests or none is known' })[pick];
 
 function stageFor(bot, goal, pick, r, want, now) {
   const base = { phase: 'obtain_ender_pearls', item: 'ender_pearl', via: 'pearl_order' };
   if (pick === 'hunt_enderman') return endermen(bot, HUNT_SIGHT).length ? { ...base, action: 'acquire', count: count(bot, 'ender_pearl') + 1 } : null;
   if (pick === 'warped_forest') return r.forest ? { ...base, action: 'warped_pearls', count: want } : null;
   if (pick === 'barter_gold') return r.barter ? { ...base, action: 'barter', count: want } : null;
+  // The bastion's gold, then the barter with its piglins once gold is to throw.
+  if (pick === 'bastion_gold') return r.barter ? { ...base, action: 'barter', count: want } : r.bastion ? { ...base, action: 'bastion_gold', item: 'gold_ingot' } : null;
   return null;
 }
 
@@ -134,7 +144,7 @@ function overlap(bot, goal, r) {
     rods: `${n.rods} carried of ${n.rodsWanted} wanted (${n.rodsLeft} still needed)`,
     pearls: `${n.pearls} carried of ${n.pearlsWanted} wanted (${n.pearlsLeft} still needed); every pearl got in the Nether is one the Overworld's night hunt need not find, and each eye takes a pearl and half a rod`,
     fortress: fortress ? `a fortress known ${fortress.distance} blocks off at (${fortress.landmark.x}, ${fortress.landmark.z})${forestToFortress != null ? `, ${forestToFortress} blocks from the warped forest known` : ''}` : 'no fortress known yet: the rods\' step is searching for one',
-    gold: gold.total ? `gold for ${plural(gold.total, 'ingot')} carried, ${gold.throwable} to throw once a gold piece is worn (${gold.dressed ? 'one is worn or carried' : 'golden boots take four first'}): about ${Math.floor(gold.throwable / record.BARTER.perPearl * 10) / 10} pearls at the measured nine ingots a pearl` : 'no gold carried',
+    gold: gold.total ? `gold for ${plural(gold.total, 'ingot')} carried, ${gold.throwable} to throw once a gold piece is worn (${gold.dressed ? 'one is worn or carried' : 'golden boots take four first'}): about ${Math.floor(gold.throwable / record.BARTER_TABLE.perPearl * 10) / 10} pearls at about ${record.BARTER_TABLE.perPearl} ingots a pearl (the game's barter table)` : 'no gold carried',
     portalBack: portal != null ? `the portal back ${portal} blocks off` : 'no portal back known',
   };
 }
@@ -174,7 +184,31 @@ function tree(bot, goal, r, now = Date.now()) {
   if (r.barter) {
     out.barter_gold = { description: `Barter with the piglins in reach now: ${o.gold}. A piglin turns on a player in no gold, so a gold piece is worn first. Held while gold is left to throw and a piglin is within 32, then the rods again. ${record.routeSays('barter_gold', goal)} Pearls ${o.pearls}.` };
   }
+  if (r.bastion) {
+    const l = r.bastion.landmark;
+    let pace = '';
+    try { pace = require('./game-progress').netherPaceSays(bot, r.bastion.distance).says; } catch (_) { pace = ''; }
+    out.bastion_gold = { target: { x: l.x, y: Number.isFinite(l.y) ? l.y : Math.round(bot.entity.position.y), z: l.z },
+      description: `Go to the bastion at (${l.x}, ${l.z}), ${r.bastion.distance} blocks off, for its gold, then barter it with the piglins there: ${goldWaySays(bot, goal)} Its gold blocks and the chests are asked of on arrival (take only the gold blocks no piglin sees, raid the chests, or leave it). Held while the bastion's gold does not rest, the barter after, then the rods again.${pace} Pearls ${o.pearls}.` };
+  }
   return { tree: out, overlap: o };
+}
+
+// What gold buys in pearls and minutes, beside what this run's pearls have
+// cost on its clock (note 2107): the trade the speedruns make, said in the
+// run's own terms.
+function goldWaySays(bot, goal) {
+  const T = record.BARTER_TABLE, r = n => Math.round(n);
+  const raw = count(bot, 'raw_gold'), gold = require('./bartering').barterGold(bot);
+  const carried = gold.total ? `${plural(gold.total, 'ingot')} of gold carried` : 'no gold ingots carried';
+  const rawSays = raw ? `, and ${raw} raw gold that a furnace makes ingots of, about ten seconds each` : '';
+  const blocks = `A gold block is 9 ingots, about ${Math.round(9 / T.perPearl * 10) / 10} of a pearl at the game's ${T.perPearl} ingots a pearl, so a pearl is about ${Math.round(T.perPearl / 9 * 10) / 10} blocks and about ${r(T.perPearl * T.tradeSeconds / 60 * 10) / 10} minutes of throwing (one piglin; up to three at once, a third of it); how many blocks this bastion has is not known until it is seen.`;
+  const by = goal?.gameProgress?.clock?.byDoing || {};
+  const mins = Object.entries(by).filter(([d]) => d.startsWith('obtain_ender_pearls')).reduce((n, [, v]) => n + v, 0) / 60000;
+  let n = null; try { n = require('./eye-need').need(bot, goal); } catch (_) { n = null; }
+  const got = n ? Math.max(0, (n.pearlsWanted || 0) - (n.pearlsLeft || 0)) : 0;
+  const run = mins >= 1 ? ` On this run's clock the pearls have taken ${r(mins)} minutes for the ${plural(got, 'pearl')} had${got ? `, about ${r(mins / got)} minutes a pearl` : ''}.` : '';
+  return `${carried}${rawSays}. ${blocks}${run}`;
 }
 
 // The pearl way held, ended by name (note 982): the ladder goes on with the

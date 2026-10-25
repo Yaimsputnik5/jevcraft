@@ -18,7 +18,7 @@ const pos = p => new Vec3(p.x, p.y, p.z);
 // reach, with the shortage in the option.
 const FUEL_UNITS_WANTED = 8;
 const fuelCarried = bot => bot.inventory.items().reduce((n, i) => n + (i.name === 'coal' || i.name === 'charcoal' ? i.count : i.name === 'coal_block' ? i.count * 9 : 0), 0);
-// Gold in the Nether is pearls: nine ingots a pearl bartered with piglins
+// Gold in the Nether is pearls: about 15.6 ingots a pearl bartered with piglins (the game's table, note 2106)
 // (see bartering.js), so nether gold ore within reach is taken while the
 // pearls are short, like coal while the fuel is.
 // The pearls wanted are eye-need.js's (thirteen, the frames and the spare
@@ -183,7 +183,7 @@ const PASSING_RADIUS = 4, PASSING_REACH = 8, PASSING_STEPS = 16, PASSING_ASK_MS 
 const WALK_SPEED = 4.3;
 // Nuggets a block gives, without Fortune: nether gold ore 2 to 6; gilded
 // blackstone the block itself nine times in ten, 2 to 5 nuggets the tenth;
-// a block of gold nine ingots. Nine nuggets an ingot, nine ingots a pearl
+// a block of gold nine ingots. Nine nuggets an ingot, about 15.6 ingots a pearl (note 2106)
 // (bartering.js, measured on this server).
 const GOLD_WORTH = Object.freeze({
   nether_gold_ore: { nuggets: 4, says: '2 to 6 gold nuggets, about 4' },
@@ -191,7 +191,7 @@ const GOLD_WORTH = Object.freeze({
   gilded_blackstone: { nuggets: 0.35, says: 'a 1 in 10 chance of 2 to 5 gold nuggets (about 0.35 nuggets a block on average), otherwise the block itself, which barters nothing' },
 });
 const RULE_GOLD = ['nether_gold_ore', 'gold_block'];
-const NUGGETS_A_PEARL = 81;
+const NUGGETS_A_PEARL = Math.round(9 * require('./pearl-record').BARTER_TABLE.perPearl); // the game's barter table (note 2106)
 const shortOfPearls = (bot, goal = null) => !!bot.inventory?.items && /nether/.test(String(bot.game?.dimension || '')) && countOf(bot, 'ender_pearl') < pearlsWanted(bot, goal);
 // Diamonds, iron and lapis the same way, on any walk in any dimension,
 // within four blocks and by the rule only.
@@ -248,7 +248,7 @@ function detourSeconds(bot, c) {
 }
 function passingSays(bot, c) {
   const worth = GOLD_WORTH[c.block];
-  const what = `${c.block.replace(/_/g, ' ')}: ${worth.says}, ${ingotSays(worth.nuggets)}, ${pearlSays(worth.nuggets)} at nine ingots a pearl`;
+  const what = `${c.block.replace(/_/g, ' ')}: ${worth.says}, ${ingotSays(worth.nuggets)}, ${pearlSays(worth.nuggets)} at the game's ${require('./pearl-record').BARTER_TABLE.perPearl} ingots a pearl`;
   const low = vitalsFit(bot) ? '' : ` Health ${round(bot.health ?? 20)} of 20 and food ${bot.food ?? 20} of 20: under the ${VITALS.health} health or ${VITALS.food} food at which gold this near is taken without asking.`;
   const seconds = detourSeconds(bot, c), blocks = Math.ceil(NUGGETS_A_PEARL / worth.nuggets);
   const perPearl = blocks <= 1 ? '' : ` At this rate a pearl is ${blocks} such blocks, about ${Math.round(blocks * seconds / 60) || 1} minute${Math.round(blocks * seconds / 60) > 1 ? 's' : ''} of detours like this one.`;

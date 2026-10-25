@@ -107,7 +107,7 @@ test('the forest and the barter: said with the forest\'s distance from the fortr
   assert.match(o.warped_forest, /warped forest at \(150, 120\), 192 blocks off/);
   assert.match(o.warped_forest, /130 blocks from the warped forest known/);
   assert.match(o.warped_forest, /5 pearls \(about 5\.6 minutes a pearl in the forest/);
-  assert.match(o.barter_gold, /gold for 18 ingots carried, 18 to throw.*about 2 pearls/);
+  assert.match(o.barter_gold, /gold for 18 ingots carried, 18 to throw.*about 1\.1 pearls at about 15\.6 ingots a pearl \(the game's barter table\)/);
   assert.match(o.barter_gold, /160 ingots thrown bought 18 pearls/);
   assert.equal(nextGameStage(bot, goal).action, 'warped_pearls');
   setAside(goal, 'rung', 'warped_pearls', 'fifteen minutes in the warped forest without a pearl', 1800000);
@@ -136,4 +136,23 @@ test('rods carried in the Nether are asked on their own before the order (note 8
   assert.equal(askedB.length, 2);
   assert.ok(askedB[1].options.rods_first, 'then the order');
   assert.ok(pickB);
+});
+
+// Note 2107: a bastion known is a way to the pearls (its gold, then the barter),
+// said with the game's table and the run's own minutes a pearl.
+test('a bastion known is a pearl way: its gold then a barter, priced by the table and the run\'s own pearl minutes (note 2107)', () => {
+  const { bot, goal } = nether({ items: { ...ITEMS, raw_gold: 6 }, landmarks: [{ kind: 'bastion', x: 120, y: 64, z: 50, dimension: 'nether' }] });
+  goal.gameProgress.clock = { startedAt: Date.now() - 20 * 3600000, playedMs: 20 * 3600000, byDoing: { 'obtain_ender_pearls: acquire': 150 * 60000 } };
+  const r = order.routes(bot, goal);
+  assert.ok(r.bastion, 'the bastion is a way');
+  const { tree } = order.tree(bot, goal, r);
+  assert.ok(tree.bastion_gold);
+  assert.match(tree.bastion_gold.description, /^Go to the bastion at \(120, 50\), 130 blocks off, for its gold, then barter it with the piglins there: no gold ingots carried, and 6 raw gold that a furnace makes ingots of, about ten seconds each\. A gold block is 9 ingots, about 0\.6 of a pearl at the game's 15\.6 ingots a pearl, so a pearl is about 1\.7 blocks and about 1\.6 minutes of throwing/);
+  assert.match(tree.bastion_gold.description, /On this run's clock the pearls have taken 150 minutes for the/);
+  // Chosen, the step is the bastion's gold; with gold to throw and a piglin about, the barter.
+  assert.equal(order.stageFor(bot, goal, 'bastion_gold', r, 3).action, 'bastion_gold');
+  assert.equal(order.stageFor(bot, goal, 'bastion_gold', { barter: {} }, 3).action, 'barter');
+  // Resting, it is not offered.
+  setAside(goal, 'rung', 'bastion_gold', 'left', 600000);
+  assert.equal(order.routes(bot, goal).bastion, undefined);
 });

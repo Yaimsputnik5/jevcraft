@@ -71,7 +71,7 @@ test('the pearls stalling in the Nether with the rods set aside: the rods are of
   assert.match(options.pearls_overworld || '', /A route survey from here found no way there\.$/, 'the walk to the portal is surveyed too');
   assert.match(options.pearls_overworld || '', /^Go back to the Overworld for the pearls: endermen spawn in the dark there.* The nearest portal remembered is 91 blocks off, .* about 3 to 5 minutes, not seconds\..* It comes out in the Overworld at dusk, about 1 minutes before dark\..* 0 blaze rods carried/);
   assert.equal(options.pearls_barter, undefined, 'no gold: no barter');
-  assert.match(state.stalled.pearlRoutesNotOffered.join(' '), /^a barter with piglins: no gold carried \(about nine ingots a pearl, measured\) and no bastion known to take gold from; 1 piglin about, the nearest 55 blocks off/);
+  assert.match(state.stalled.pearlRoutesNotOffered.join(' '), /^a barter with piglins: no gold carried \(about 15\.6 ingots a pearl by the game's barter table.*\) and no bastion known to take gold from; 1 piglin about, the nearest 55 blocks off/);
   assert.equal(options.pearls_search, undefined, 'the sweep is not resting: it is the work in hand');
   assert.equal(options.work_free, undefined, 'no walk has failed yet');
   // The walk off that found no route, said at every asking on 25600, is a walk failing: working free is offered.

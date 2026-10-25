@@ -53,7 +53,7 @@ test('Jev is told the gold in nuggets, the share of a pearl and the seconds; con
   const goal = { kind: 'win', step: { action: 'find_fortress' } };
   const actions = { navigate: async () => {}, dig: async (b, t, p) => { dug.push(`${p}`); } };
   assert.equal(await mining.mineInPassing(bot, new Task('walk'), goal, () => {}, actions, client), false);
-  assert.match(told.criteria.gold_0, /2 to 6 gold nuggets, about 4, about 0\.44 of an ingot, about 1\/20 of a pearl at nine ingots a pearl/);
+  assert.match(told.criteria.gold_0, /2 to 6 gold nuggets, about 4, about 0\.44 of an ingot, about 1\/35 of a pearl at the game's 15\.6 ingots a pearl/);
   assert.match(told.criteria.gold_0, /a detour of about \d+ s there and back with the dig, then the same walk goes on/);
   assert.equal(told.state.pearls, 0);
   assert.deepEqual(dug, []);
@@ -74,7 +74,7 @@ test('gilded blackstone is priced as what it is: about 0.35 nuggets a block', as
   const client = { systemOne: async ({ questions }) => { told = questions.passing.criteria; return { answers: { passing: { choice: 'continue' } } }; } };
   await mining.mineInPassing(bot, new Task('walk'), { kind: 'win' }, () => {}, { navigate: async () => {}, dig: async () => assert.fail('dug') }, client);
   assert.match(told.gold_0, /gilded blackstone: a 1 in 10 chance of 2 to 5 gold nuggets/);
-  assert.match(told.gold_0, /about 1\/231 of a pearl/);
+  assert.match(told.gold_0, /about 1\/400 of a pearl/);
 });
 
 test('a walk stopped for gold mines it and walks on to the same goal, its time given back', async () => {

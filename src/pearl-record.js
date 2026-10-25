@@ -59,6 +59,13 @@ function endermanSays() {
 
 // The barter, measured on this server (note 87): 160 ingots thrown to eight
 // penned piglins bought 18 pearls; the barter drill, 40 ingots, 2 to 4.
+// The game's own odds (note 2106), from the 26.1.2 server jar
+// (data/minecraft/loot_table/gameplay/piglin_bartering.json): ender pearls are
+// weight 10 of 469, 2 to 4 a barter, so 3 pearls in 46.9 throws on the
+// average, about 15.6 ingots a pearl; the 160 measured were above it (about
+// ten pearls expected), and said as the 9 a pearl the bot was told.
+const BARTER_TABLE = Object.freeze({ weight: 10, total: 469, min: 2, max: 4, perPearl: Math.round(469 / 30 * 10) / 10, tradeSeconds: 6.05 });
+const barterRateSays = () => `about ${BARTER_TABLE.perPearl} ingots a pearl by the game's barter table (a pearl roll is ${BARTER_TABLE.weight} in ${BARTER_TABLE.total} a throw, ${BARTER_TABLE.min} to ${BARTER_TABLE.max} pearls when it comes), each throw about ${Math.round(BARTER_TABLE.tradeSeconds)} seconds of a piglin's looking`;
 const BARTER = { ingots: 160, pearls: 18, perPearl: 9, drillIngots: 40, drillPearls: '2 to 4', admireSeconds: 8, perRound: 3 };
 
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
@@ -97,10 +104,10 @@ function routeSays(route, goal) {
     return `Record: in the arena's forest drills (three and five endermen about, ${a.forest.runs} runs, ${a.forest.minutes} minutes) ${a.forest.pearls} pearls (about ${round(a.forest.minutes / a.forest.pearls)} minutes a pearl in the forest, the walk there not counted), ${a.forest.deaths ? plural(a.forest.deaths, 'death') : 'no death'}; before note 713's fix the three killed the bot in ${a.forestBefore.deaths} of ${a.forestBefore.runs} runs. In the trials a forest hunt held the turn ${TRIALS.forestStalkMinutes} minutes in all, stalking endermen, and struck none; ${TRIALS.warpedFoundRecords} of ${TRIALS.netherRecords} Nether records found a warped forest on the way. ${runSays(goal, route)}`;
   }
   if (route === 'barter_gold') {
-    return `Record: measured on this server, ${BARTER.ingots} ingots thrown bought ${BARTER.pearls} pearls (about ${BARTER.perPearl} ingots a pearl, every throw a roll), the barter drill ${BARTER.drillIngots} ingots for ${BARTER.drillPearls}; a round throws one ingot to each of up to ${BARTER.perRound} piglins and waits about ${BARTER.admireSeconds} s while they admire it, so a pearl's ${BARTER.perPearl} ingots are about three rounds. In the trials one barter was made: ${TRIALS.barterIngots} ingots thrown, ${TRIALS.barterPearls ? plural(TRIALS.barterPearls, 'pearl') : 'no pearl'} (about half of one was the expectation); gold to throw was carried in ${TRIALS.goldRecords} of ${TRIALS.netherRecords} Nether records, with a piglin within 32 for ${TRIALS.piglinGoldMinutes} minutes. ${runSays(goal, route)}`;
+    return `The game: ${barterRateSays()}. Record: on this server ${BARTER.ingots} ingots thrown bought ${BARTER.pearls} pearls (about ${BARTER.perPearl} ingots a pearl, luckier than the table's ten pearls for them), the barter drill ${BARTER.drillIngots} ingots for ${BARTER.drillPearls}; a round throws one ingot to each of up to ${BARTER.perRound} piglins and waits about ${BARTER.admireSeconds} s while they admire it, so a pearl's ${BARTER.perPearl} ingots are about three rounds. In the trials one barter was made: ${TRIALS.barterIngots} ingots thrown, ${TRIALS.barterPearls ? plural(TRIALS.barterPearls, 'pearl') : 'no pearl'} (about half of one was the expectation); gold to throw was carried in ${TRIALS.goldRecords} of ${TRIALS.netherRecords} Nether records, with a piglin within 32 for ${TRIALS.piglinGoldMinutes} minutes. ${runSays(goal, route)}`;
   }
   if (route === 'rods_first') return `${LIVE()} ${runSays(goal, route)}`;
   return runSays(goal, route);
 }
 
-module.exports = { TRIALS, ARENA, BARTER, ENDERMAN_FIGHTS, endermanSays, routeSays, runSays, settle, ledger, LIVE };
+module.exports = { BARTER_TABLE, barterRateSays, TRIALS, ARENA, BARTER, ENDERMAN_FIGHTS, endermanSays, routeSays, runSays, settle, ledger, LIVE };

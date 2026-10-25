@@ -54,7 +54,7 @@ test('the question says the trip, what the chests hold, what a lid does, the fig
   assert.match(f.state.goldArmorWorn, /^yes/);
   assert.match(f.state.fights.oneBrute, /piglin brute.*seconds.*damage.*leaving about|more than the/);
   assert.match(f.state.fights.note, /not measured on a bastion/);
-  assert.match(f.state.whatItHelps, /3 ingots of gold carried.*about 9 ingots a pearl/);
+  assert.match(f.state.whatItHelps, /3 ingots of gold carried.*about 15\.6 ingots a pearl \(the game's barter table\), so a hoglin stable's chest is about a third of a pearl/);
   const tree = raid.options(bot, g, o, f);
   assert.deepEqual(Object.keys(tree), ['raid_chests', 'gold_only', 'leave_it']);
   assert.match(tree.raid_chests.description, /never been tried: no bastion chest has ever been opened by the bot/);
