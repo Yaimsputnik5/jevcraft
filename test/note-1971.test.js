@@ -36,5 +36,6 @@ test('keep_working is priced at nothing when every mob about has stood off, and 
   off.mock.mockImplementation(() => null);
   options = survival.stanceOptions(new Task('x'), {}, () => {}, list, false);
   assert.ok(options.keep_working);
-  assert.equal(options.keep_working.expects, undefined, 'a zombie that has not stood off: unpriced as before');
+  // A zombie that has not stood off: its first blow as it comes, within the fifteen seconds (note 2097).
+  assert.ok(options.keep_working.expects?.damage > 0, JSON.stringify(options.keep_working.expects));
 });

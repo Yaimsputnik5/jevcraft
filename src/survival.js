@@ -5195,7 +5195,14 @@ class Survival {
     let atCage = null;
     try { atCage = require('./cage-hold').cageFight(bot, goal); } catch (_) { atCage = null; }
     const workLabel = atCage ? 'waiting at the spawner for blazes' : (goal?.step?.action === 'combined_request' ? goal.step.detail?.action : goal?.step?.action);
-    if (!coming.some(t => t.distance <= 3 && !calmAtReach.includes(t))) options.keep_working = { description: `Carry on with the work${(w => w ? ` (${atCage ? w : w.replaceAll('_', ' ')})` : '')(workLabel)} and leave these mobs be for fifteen seconds${coming.length ? ` (nearest that can get to the bot ${Math.round(coming[0].distance)} blocks)` : ''}.${calmAtReach.length ? ` The enderman ${Math.round(calmAtReach[0].distance * 10) / 10} blocks off is calm: it hits nothing until it is struck or looked in the eye, and the gaze is kept off every enderman's head while the work goes on.` : ''}${this.workProgress(goal)}${reachSays} The work stops at once if one comes within three blocks or lands a hit. Suits mobs that are far, slow, cannot reach the bot, or are not coming this way.${creeperCount ? (() => {
+    // Priced (note 2097): the shooters' fire over the fifteen seconds the mobs are left be, and the first blow of a
+    // biter that comes to the bot within them (the work stops at three blocks or a hit). Offered 1,464 times on the
+    // fresh runs, unpriced in 1,427, and chosen unpriced 39 (2026-10-24 19:42Z to 2026-10-25 10:50Z).
+    const keepShots = stanceCost({ mobs, setup: 15, reaches: m => m.shoots, shield: shielded }).damage || 0;
+    // A biter's blow at the record's rate for the carry-on: 1 of 39 taken drew a hit within fifteen seconds (2026-10-14 to 20, note 1971).
+    const keepBlow = mobs.some(m => bites(m) && !m.shoots && arrives(m) < 15) ? (oneHit || 0) / 39 : 0;
+    const keepDamage = Math.round((keepShots + keepBlow) * 10) / 10;
+    if (!coming.some(t => t.distance <= 3 && !calmAtReach.includes(t))) options.keep_working = { expects: { damage: keepDamage, seconds: 15, oneHit }, description: `Carry on with the work${(w => w ? ` (${atCage ? w : w.replaceAll('_', ' ')})` : '')(workLabel)} and leave these mobs be for fifteen seconds${coming.length ? ` (nearest that can get to the bot ${Math.round(coming[0].distance)} blocks)` : ''}.${calmAtReach.length ? ` The enderman ${Math.round(calmAtReach[0].distance * 10) / 10} blocks off is calm: it hits nothing until it is struck or looked in the eye, and the gaze is kept off every enderman's head while the work goes on.` : ''}${this.workProgress(goal)}${reachSays} The work stops at once if one comes within three blocks or lands a hit. Suits mobs that are far, slow, cannot reach the bot, or are not coming this way.${creeperCount ? (() => {
       // When the work would stop, against when the creeper lights: the
       // work stops at three blocks, which is where the fuse starts (the
       // decision review, 2026-09-26).
@@ -5237,7 +5244,7 @@ class Survival {
     // that stops the work", keep_working at 0. Over 2026-10-14 to 20, with
     // every mob stood off, keep_working was taken 3 times in 71 and no hit
     // came in the 15 seconds after; overall 1 of 39 taken drew one.
-    if (options.keep_working && !options.keep_working.expects && danger.length) {
+    if (options.keep_working && danger.length) {
       let off = false;
       try { const { standsOff } = require('./danger'); off = danger.every(t => !!standsOff(bot, t)); } catch (_) { off = false; }
       if (off) options.keep_working.expects = { damage: 0, seconds: 15, oneHit };
