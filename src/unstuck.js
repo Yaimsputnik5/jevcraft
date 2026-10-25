@@ -985,7 +985,7 @@ function walledSays(view, feet) {
 // Where the bot has to get: out of water onto dry ground, or up to the
 // surface. Null where it is neither in water nor under cover.
 function aimFor(bot, { walksFailing = false } = {}) {
-  const view = liveView(bot), feet = bot.entity.position.floored();
+  const view = liveView(bot), feet = terrain.feetCell(bot);
   if (isWater(view.name(feet))) return { goal: 'dry', aim: 'out of the water onto dry ground' };
   // Below the surface as the rest of the bot judges it (surface.js): at
   // the bottom of an open shaft the sky is in view and the bot is still in
@@ -1016,20 +1016,20 @@ function moveReached(m, feet, after, { failure = null, changed = false } = {}) {
 // One move, done on the live bot.
 async function perform(bot, task, m, { dig }) {
   const { move } = require('./motion');
-  const feet = bot.entity.position.floored();
+  const feet = terrain.feetCell(bot);
   if (m.kind === 'bridge_back') {
     const { goals } = require('mineflayer-pathfinder');
     const bridging = require('./bridging');
     const stand = new Vec3(m.edge.x, m.edge.y + 1, m.edge.z), goalCell = new Vec3(m.target.x, m.target.y + 1, m.target.z);
     if (!feet.equals(stand)) await require('./skills').navigate(bot, task, new goals.GoalBlock(stand.x, stand.y, stand.z), { timeoutMs: 15000, stallMs: 4000 });
-    if (!bot.entity.position.floored().equals(stand)) throw new Error(`Not at the floor's cell at (${m.edge.x}, ${m.edge.y}, ${m.edge.z}) to bridge from`);
+    if (!terrain.feetCell(bot).equals(stand)) throw new Error(`Not at the floor's cell at (${m.edge.x}, ${m.edge.y}, ${m.edge.z}) to bridge from`);
     await bridging.bridgeTo(bot, task, goalCell, { maxBlocks: m.cells + 1, whole: true });
     // The last of it corner to corner, crouched.
-    if (!bot.entity.position.floored().equals(goalCell)) {
+    if (!terrain.feetCell(bot).equals(goalCell)) {
       bot.setControlState('sneak', true);
       try { await bridging.creepTo(bot, task, goalCell, 3000); } finally { bot.setControlState('forward', false); bot.setControlState('sneak', false); }
     }
-    const at = bot.entity.position.floored();
+    const at = terrain.feetCell(bot);
     if (Math.abs(at.x - goalCell.x) > 1 || Math.abs(at.z - goalCell.z) > 1) throw new Error(`The bridge back ended at (${at.x}, ${at.y}, ${at.z}), short of (${goalCell.x}, ${goalCell.y}, ${goalCell.z})`);
     return;
   }
@@ -1063,7 +1063,7 @@ async function perform(bot, task, m, { dig }) {
       // In the cell is enough: waiting to be on the ground there kept the
       // keys down, and a swimmer's jump out of the water onto land is not
       // on the ground, so forward ran on past it (mid-236-h, note 474).
-      until: () => { const f = bot.entity.position.floored(); return m.key === 'swim_up' ? f.y >= to.y : f.x === to.x && f.z === to.z && f.y >= to.y - (to.y < feet.y ? 3 : 0); } });
+      until: () => { const f = terrain.feetCell(bot); return m.key === 'swim_up' ? f.y >= to.y : f.x === to.x && f.z === to.z && f.y >= to.y - (to.y < feet.y ? 3 : 0); } });
     bot.clearControlStates?.();
     // Then still until it lands, the keys up.
     for (let n = 0; n < 10 && bot.entity.onGround === false && !isWater(bot.blockAt(bot.entity.position.floored())?.name); n++) { task.check(); await new Promise(r => setTimeout(r, 50)); }
@@ -1075,11 +1075,11 @@ async function perform(bot, task, m, { dig }) {
   if (m.kind === 'walk') {
     for (const cell of m.path) {
       task.check();
-      const at = bot.entity.position.floored();
+      const at = terrain.feetCell(bot);
       const step = { key: m.key, kind: 'move', to: cell, from: at, pastLava: cell.y === at.y && lavaBeside(liveView(bot), cell) };
       await perform(bot, task, step, { dig });
       await landed(bot, task);
-      const now = bot.entity.position.floored();
+      const now = terrain.feetCell(bot);
       if (now.x !== cell.x || now.z !== cell.z) throw new Error(`The walk off stopped at (${now.x}, ${now.y}, ${now.z}), short of (${cell.x}, ${cell.y}, ${cell.z})`);
     }
     return;
@@ -1139,7 +1139,7 @@ async function perform(bot, task, m, { dig }) {
       task.check?.();
       if (vitals.headSubmerged(bot)) break;
       if (Date.now() > until) throw new Error('The water over the rock was not reached');
-      const feetNow = bot.entity.position.floored(), over = bot.blockAt(feetNow.offset(0, 2, 0));
+      const feetNow = terrain.feetCell(bot), over = bot.blockAt(feetNow.offset(0, 2, 0));
       if (!over) throw new Error('The column over the head is not loaded');
       if (over.boundingBox === 'block') {
         try { await require('./skills').equipBestTool(bot, over); } catch (_) { /* the hand */ }
@@ -1177,7 +1177,7 @@ async function workFree(bot, task, goal, save, { client, dig, maxMoves = 24, aim
   if (aim.goal === 'away' && here0) record.stuckAt = [...stuckAt.map(p => ({ x: p.x, y: p.y, z: p.z })), { x: here0.x, y: here0.y, z: here0.z }].slice(-6);
   // Begun again where a spell ended gaining nothing (asked for: the stall's
   // question offered it with that said): its minute starts now.
-  const startFeet = bot.entity.position.floored();
+  const startFeet = terrain.feetCell(bot);
   if (spellRests(goal, startFeet)) record.windowFrom = Date.now();
   if (!Number.isFinite(record.startMeasure)) record.startMeasure = measureOf(aim, startFeet);
   bot.chat?.(`Stuck. Working my way ${aim.goal === 'dry' ? 'out of the water' : aim.goal === 'away' ? 'off this spot' : 'up'} one move at a time.`);
@@ -1193,7 +1193,7 @@ async function workFree(bot, task, goal, save, { client, dig, maxMoves = 24, aim
     // on 25583 the moves were read at y 40 with the body falling from 41 to
     // 38, and every move was a move from the wrong cell (note 600).
     await landed(bot, task);
-    const feet = bot.entity.position.floored();
+    const feet = terrain.feetCell(bot);
     record.visits[`${feet}`] = (record.visits[`${feet}`] || 0) + 1;
     const view = liveView(bot);
     const { moves, done, here } = localMoves(view, feet, { goal: aim.goal, visits: record.visits, from: aim.from ? new Vec3(aim.from.x, aim.from.y, aim.from.z) : null, stuckAt: aim.goal === 'away' ? stuckAt : [], breathS: require('./vitals').breathSeconds(bot), last: record.moves.at(-1) || null, recent: record.moves, toward });
@@ -1301,7 +1301,7 @@ async function workFree(bot, task, goal, save, { client, dig, maxMoves = 24, aim
     // so, kept, and not offered from this cell again in this spell (note 938).
     const refusedNow = bot._moveRefused && bot._moveRefused.at >= movedAt && /^unstuck_/.test(bot._moveRefused.label || '') ? bot._moveRefused : null;
     if (refusedNow && !failure) failure = `refused: ${String(refusedNow.name || 'lava').replaceAll('_', ' ')} at (${refusedNow.x}, ${refusedNow.y}, ${refusedNow.z}) ahead, not walked into`;
-    const after = bot.entity.position.floored();
+    const after = terrain.feetCell(bot);
     const changed = before.distanceTo(bot.entity.position) >= 0.5 || (m.cell && bot.blockAt(m.cell)?.name !== blocks) || (m.kind === 'resync' && m.result?.corrected?.length > 0);
     still = changed ? 0 : still + 1;
     // Got there: the column, and the height when the move rises. A pillar

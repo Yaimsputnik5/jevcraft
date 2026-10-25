@@ -124,3 +124,24 @@ test('(d) the spell says its own age and how many moves have been tried, on ever
   assert(seenState, 'Jev was asked');
   assert.match(seenState.spell, /^\d+ s into this stuck spell, 1 move tried so far$/);
 });
+
+test('standing on a chest (its top 0.875 up), the moves are read from the cell over it, not from inside the chest (note 2075)', async () => {
+  // full-7 (2026-10-24 23:50Z to past 00:53Z) stood on a chest it had set over the Nether's drop; the feet floored into the chest's own cell, every move was read from inside it, "no move here is checked against the world", and it stood there over an hour.
+  const { workFree } = unstuck;
+  const { Task } = require('../src/skills');
+  const bot = { game: { gameMode: 'survival', difficulty: 'normal', dimension: 'overworld' }, entity: { position: new Vec3(0.5, 60.875, 0.5), onGround: true }, entities: {},
+    health: 20, food: 20, world: { raycast: () => null },
+    blockAt: p => {
+      const x = Math.floor(p.x), y = Math.floor(p.y), z = Math.floor(p.z);
+      if (x === 0 && y === 60 && z === 0) return { name: 'chest', boundingBox: 'block', shapes: [[0.0625, 0, 0.0625, 0.9375, 0.875, 0.9375]], position: p };
+      const solid = y <= 60;
+      return { name: solid ? 'stone' : 'air', boundingBox: solid ? 'block' : 'empty', shapes: solid ? [[0, 0, 0, 1, 1, 1]] : [], position: p };
+    },
+    inventory: { items: () => [] }, chat() {} };
+  let asked = null;
+  const client = { systemOne: async args => { asked = JSON.stringify(args); return { answers: { branch_0: { choice: 'none_good', confidence: 0.2, probabilities: { none_good: 0.4 } } } }; } };
+  try { await workFree(bot, new Task('free'), {}, () => {}, { client, dig: async () => {}, aim: { goal: 'away', aim: 'off this spot' }, maxMoves: 1 }); } catch (_) { /* the mock has no motion */ }
+  assert(asked, 'moves were found and Jev asked');
+  assert.match(asked, /step_east/);
+  assert.match(asked, /"y":61/);
+});
