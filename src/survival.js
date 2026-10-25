@@ -5136,7 +5136,16 @@ class Survival {
     // A creeper the player's way: hit, back out of the blast, hit again.
     // Possible with a blade and no drop or lava to back into.
     const feetDrop = dropWithin(bot, feet, 2) || lavaBeside(bot, feet);
+    // Priced (note 2096): the blast where nothing the dance does stops a lit one, else the blast at the record's
+    // rate for the dance (2 hurt of 42, 2026-10-02 to 03), with the other mobs, which it does not watch, at their
+    // fifteen seconds. Unpriced, it was the last answer in full-7's (2026-10-25 04:31:11Z) and full-6's (06:19:57Z)
+    // creeper deaths, chosen at 0.5 and 2.5 health beside priced ways.
+    const danceBlast = (estimate.mobs || []).find(m => m.name === 'creeper')?.fought?.blast || 0;
+    const danceLit = (estimate.mobs || []).some(m => m.name === 'creeper' && m.fought?.litNowFuseLeft != null && !m.fought.diesBeforeItGoesOff && m.fought.blast > 0);
+    const danceOthers = stanceCost({ mobs: mobs.filter(m => m.name !== 'creeper'), setup: 0, reaches: () => true, shield: shielded }).damage || 0;
+    const danceDamage = Math.round(((danceLit ? danceBlast : danceBlast * 2 / 42) + danceOthers) * 10) / 10;
     if (coming.some(t => t.entity.name === 'creeper' && t.distance <= 6) && /_(sword|axe)$/.test(defenseWeapon(bot)?.name || '') && !feetDrop) options.creeper_dance = {
+      expects: { damage: danceDamage, seconds: 15, oneHit },
       // What it costs, said as the fight's figures say it: the blast where
       // it goes off, or none where the swings kill it inside its fuse. It
       // said the knockback put the fuse out; a hit does not (26.1.2

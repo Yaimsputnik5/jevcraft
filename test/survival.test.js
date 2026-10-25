@@ -1792,6 +1792,8 @@ test('a creeper coming on at a wall-backed bot is priced by where it goes off: t
   assert.match(options.creeper_dance.description, /it goes off first, about 3 blocks off/);
   assert.doesNotMatch(options.creeper_dance.description, /puts its fuse out/);
   assert.match(options.creeper_dance.description, /Gone off where the dance backs to here, a blast is about 11\.5 after the armour worn: 1 of them ends it/);
+  // Priced (note 2096): the blast at the dance's record rate, or whole where the creeper is lit and nothing the dance does stops it.
+  assert.ok(Number.isFinite(options.creeper_dance.expects?.damage) && options.creeper_dance.expects.damage > 0, JSON.stringify(options.creeper_dance.expects));
   // A block of room behind: four blocks off, still more than it has.
   const oneBlock = new Survival(creeperBot({ wallAt: -1 }), { place: async () => {}, dig: async () => {}, navigate: async () => {} }, { state: { shelters: [] } })
     .stanceOptions(new Task('x'), {}, () => {}, [creeper], false);
