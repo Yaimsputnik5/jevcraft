@@ -8788,7 +8788,10 @@ async function crossingKitReady(bot, task, goal, save, client = task.opportunity
   // beside lava.
   const FR = require('./food-reserve');
   const underNether = foodItem && foodItem.carried < FR.FLOOR.nether ? ` Under the Nether's reserve of ${FR.FLOOR.nether} food points, the first question there is food: back through this portal for it, or food found there (a hoglin, a bastion's chests). ${FR.says(foodItem.carried, 'nether')}` : '';
-  const hungerWeigh = foodItem ? ` Hunger ${hungerNow} now${hungerNow < 18 ? ', already below eighteen: health does not come back' : ''}; ${foodItem.carried} of ${foodItem.wants} food points carried for the stay, spent there at about ${NETHER_HUNGER_AN_HOUR} an hour.${underNether}` : '';
+  // And at the rate blaze fights eat it (note 2092, as note 2083 has it in the Nether): full-5 (2026-10-25 09:05Z)
+  // crossed with 24 food points, told "spent there at about 40 an hour", ate them in six minutes at the blazes and
+  // burned to death at 09:15 with nothing to eat, leave_and_heal priced at no healing four times.
+  const hungerWeigh = foodItem ? ` Hunger ${hungerNow} now${hungerNow < 18 ? ', already below eighteen: health does not come back' : ''}; ${foodItem.carried} of ${foodItem.wants} food points carried for the stay, spent there at about ${NETHER_HUNGER_AN_HOUR} an hour.${require('./nether-food').blazeFoodSays(foodItem.carried)}${underNether}` : '';
   const tree = {
     cross_now: { description: `Cross with what is carried now${short.length ? `, short of what the code would take in ${short.map(i => i.key).join(', ')}` : ''}${valuables ? `, and with the valuables carried (${valuables.what})` : ''}.${going}${leftSays}${hungerWeigh} ${items.filter(i => !i.rung).map(i => i.says).join(' ')}` },
   };

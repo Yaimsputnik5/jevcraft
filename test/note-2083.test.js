@@ -16,3 +16,8 @@ test('the stay\'s and keep-on\'s texts carry it', () => {
   const src = require('fs').readFileSync(require.resolve('../src/nether-food'), 'utf8');
   assert.equal((src.match(/blazeFoodSays\((stay\.carried|stock\.points)\)/g) || []).length, 3);
 });
+
+test('the crossing\'s cross_now says the food carried at the blaze fights\' rate too (note 2092)', () => {
+  const src = require('fs').readFileSync(require.resolve('../src/work'), 'utf8');
+  assert.match(src, /spent there at about \$\{NETHER_HUNGER_AN_HOUR\} an hour\.\$\{require\('\.\/nether-food'\)\.blazeFoodSays\(foodItem\.carried\)\}/);
+});
