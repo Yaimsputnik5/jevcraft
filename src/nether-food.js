@@ -55,6 +55,19 @@ const inNether = bot => /nether/.test(String(bot?.game?.dimension || ''));
 // The food a stay wants is crossing-kit.js netherStay's; a stay spends about
 // forty hunger an hour (99.5 hours of the trials' Nether time, note 607).
 const HUNGER_AN_HOUR = 40;
+// Food eaten with blazes about (note 2083): over the October flight
+// records, 37 stretches of a minute or more with a blaze among the threats,
+// 140 minutes in all, 231 food points eaten, about 1.7 a minute, two and a
+// half times the stay's 40 an hour: health lost to fire is healed from the
+// food. full-7 (2026-10-25 03:24 to 03:40Z) went on with 28 points, told
+// "about 42 minutes of it", ate all of them in four minutes at a spawner,
+// and died at 1.5 health with nothing to eat 793 blocks from its portal.
+const BLAZE_POINTS_A_MINUTE = { rate: 1.7, stretches: 37, minutes: 140, points: 231 };
+function blazeFoodSays(points) {
+  if (!points) return '';
+  const m = Math.max(1, Math.round(points / BLAZE_POINTS_A_MINUTE.rate));
+  return ` With blazes about the bots ate about ${BLAZE_POINTS_A_MINUTE.rate} food points a minute (${BLAZE_POINTS_A_MINUTE.stretches} stretches of a minute or more, ${BLAZE_POINTS_A_MINUTE.minutes} minutes, October's flight records), healing what their fire takes: ${points} points is about ${m} minute${m === 1 ? '' : 's'} at a blaze spawner.`;
+}
 // Food points carried under which the step is offered (a fact said in the
 // option, not a rule: Jev chooses).
 const LOW_POINTS = 8;
@@ -385,7 +398,7 @@ async function askRestockFood(bot, task, goal, save, { actions = {}, survival = 
     // 25584: keep_on was chosen at 6.4 health, hunger 15, no food, without
     // ever being told what fights begun in that row came to).
     const ff = require('./food-facts');
-    options.keep_on = { description: `Stay in the Nether and go on without more food for twenty minutes: ${stock.points ? `eat what is carried (${stock.points} food points)` : 'nothing edible is carried'}, hunger ${bot.food}, ${(bot.food ?? 20) < 18 ? `health comes back only at eighteen or more. ${nv.keepOnFightSays(bot)}` : 'health comes back at eighteen or more, as it does now.'} ${(bot.food ?? 20) < 18 ? ff.recordSays(bot) : ''}`,
+    options.keep_on = { description: `Stay in the Nether and go on without more food for twenty minutes: ${stock.points ? `eat what is carried (${stock.points} food points)` : 'nothing edible is carried'}, hunger ${bot.food}, ${(bot.food ?? 20) < 18 ? `health comes back only at eighteen or more. ${nv.keepOnFightSays(bot)}` : 'health comes back at eighteen or more, as it does now.'}${blazeFoodSays(stock.points)} ${(bot.food ?? 20) < 18 ? ff.recordSays(bot) : ''}`,
       run: async () => { const { setAside } = require('./progress'); setAside(goal, 'nether_return', 'food', nv.keepOnWhy(bot), 20 * 60000); delete goal.stockFood; save?.(); } };
   }
   if (!Object.keys(options).length) throw new Error(`No way to food from here: ${notOffered.join('; ')}`.slice(0, 500));
@@ -444,8 +457,8 @@ async function askStayKit(bot, task, goal, save, { actions = {}, survival = null
   const found = foodRoutes(bot, task, goal, save, { actions, survival });
   const tree = {
     go_on: { description: stay.short
-      ? `Go on with the stay on what is carried: ${stay.carried} food points, about ${stay.lasts} minutes of it at ${HUNGER_AN_HOUR} an hour, against the ${stay.minutes} minutes the goal still wants; ${stay.short} points short. Nothing is done about food now; it is asked again in an hour, and when health and hunger say so the food step is offered at the stalls.`
-      : `Go on with the stay as it is: ${stay.carried} food points carried, about ${stay.lasts} minutes of it at ${HUNGER_AN_HOUR} an hour, ${stay.minutes} minutes wanted, so food is not short. Nothing is made now; it is asked again in an hour.` },
+      ? `Go on with the stay on what is carried: ${stay.carried} food points, about ${stay.lasts} minutes of it at ${HUNGER_AN_HOUR} an hour, against the ${stay.minutes} minutes the goal still wants; ${stay.short} points short.${blazeFoodSays(stay.carried)} Nothing is done about food now; it is asked again in an hour, and when health and hunger say so the food step is offered at the stalls.`
+      : `Go on with the stay as it is: ${stay.carried} food points carried, about ${stay.lasts} minutes of it at ${HUNGER_AN_HOUR} an hour, ${stay.minutes} minutes wanted, so food is not short.${blazeFoodSays(stay.carried)} Nothing is made now; it is asked again in an hour.` },
   };
   // The raw meat carried, cooked here, counted against the stay (note
   // 754b): 25585 (mid-239-cb, 15:22:30Z) arrived at hunger 19 with 14 raw
@@ -493,5 +506,5 @@ async function askStayKit(bot, task, goal, save, { actions = {}, survival = null
   return pick;
 }
 
-module.exports = { huntsSays, foodStock, foodNeed, stayFacts, staySays, foodRoutes, restockFoodOption, askRestockFood, askStayKit, kitEndsTrip, makeCauldron, stayKitDue, startFoodHunt, huntHoglin, pillarHuntStep, noteHunt, noteRoute, recordSays, mushroomsIn,
+module.exports = { BLAZE_POINTS_A_MINUTE, blazeFoodSays, huntsSays, foodStock, foodNeed, stayFacts, staySays, foodRoutes, restockFoodOption, askRestockFood, askStayKit, kitEndsTrip, makeCauldron, stayKitDue, startFoodHunt, huntHoglin, pillarHuntStep, noteHunt, noteRoute, recordSays, mushroomsIn,
   HUNGER_AN_HOUR, LOW_POINTS, STAY_KIT_MS, PILLAR_RECORD, PILLAR_FROM, PILLAR_WAIT_MS, PILLAR_BLOCKS, CHEST_FOOD, NOT_FOOD, RAW_MEAT };
