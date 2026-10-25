@@ -107,10 +107,10 @@ test('in a lava sea with no dry cell, water or scaffold in reach, swim_up is sai
   assert.match(ways.swim_up.description, /Swim straight up to the lava's own top \(y 32\)/);
   assert.match(ways.swim_up.description, /about [\d.]+ seconds? to reach it/);
   assert.match(ways.swim_up.description, /health in the lava/);
-  // The old order's default (no client, no answer) still takes the last
-  // dry footing first, as before: swim_up is a new fact for Jev to weigh,
-  // not a new default.
-  assert.equal(Object.keys(ways)[0], 'back_the_way_came');
+  // The safety rule's first is the rise to the top where the way back is many
+  // times longer (note 2098): here about 172 seconds back against 6 up; lava
+  // asks nothing since note 756, so the first is the body's way.
+  assert.equal(Object.keys(ways)[0], 'swim_up');
 });
 
 test('a body already at the lava\'s top prices swimming up at about half a second, not the seconds a real rise would take (note 748)', () => {

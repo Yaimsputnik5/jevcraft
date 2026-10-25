@@ -10691,7 +10691,12 @@ class Survival {
     // to death in it in 4.4 seconds (note 2073).
     // Swimming up reaches the lava's top, not out of it: last, as before.
     const ORDER = ['to_water', 'to_dry_ground', 'pillar_out', 'back_the_way_came'];
-    const first = ORDER.filter(k => ways[k]).sort((a, b) => ((ways[a].seconds ?? Infinity) - (ways[b].seconds ?? Infinity)) || (ORDER.indexOf(a) - ORDER.indexOf(b)))[0] || (ways.swim_up ? 'swim_up' : null);
+    const exitFirst = ORDER.filter(k => ways[k]).sort((a, b) => ((ways[a].seconds ?? Infinity) - (ways[b].seconds ?? Infinity)) || (ORDER.indexOf(a) - ORDER.indexOf(b)))[0];
+    // Up first where the way out is many times longer than the rise to the top (note 2098): there the next
+    // question has the ways the top reaches. full-7 (2026-10-25 10:55Z), 17.9 health in a lava pool, was taken
+    // back the way it came, 31 blocks and 'about 77.5 seconds' by its own count, beside a rise of 4.7, and burned.
+    const upFirst = ways.swim_up && (!exitFirst || (ways[exitFirst].seconds ?? Infinity) > 3 * (ways.swim_up.seconds ?? Infinity));
+    const first = upFirst ? 'swim_up' : exitFirst || (ways.swim_up ? 'swim_up' : null);
     return first ? { [first]: ways[first], ...ways } : ways;
   }
 
