@@ -433,12 +433,18 @@ function enderChestOption(bot, goal) {
   const { eyeTarget } = require('./eye-need');
   const target = eyeTarget(goal), eyes = has('ender_eye');
   const spare = target === 0 ? eyes : Math.max(0, eyes - target);
-  const makeOne = target === 0 && has('ender_pearl') >= 1 && (has('blaze_powder') >= 1 || has('blaze_rod') >= 1);
-  if (spare < 1 && !makeOne) return null;
+  // An eye made for it as soon as one can be (the user, 2026-10-25: "offer it as soon as one eye can be made"):
+  // before the portal's eyes are all had, it is one of them spent, said with what getting it again took on this
+  // run's clock (note 2086). It had been offered only with an eye spare over the portal's, which no run had while
+  // a death could still lose its kit.
+  const makeOne = has('ender_pearl') >= 1 && (has('blaze_powder') >= 1 || has('blaze_rod') >= 1);
+  if (spare < 1 && !makeOne && eyes < 1) return null;
   const obsidian = has('obsidian'), canMake = has('diamond_pickaxe') >= 1 && (has('water_bucket') >= 1 || has('bucket') >= 1);
   if (obsidian < 8 && !canMake) return null;
   const off = Math.round(bot.entity.position.distanceTo(new Vec3(bed.x + 0.5, bed.y, bed.z + 0.5)));
-  const eyeSays = spare >= 1 ? `${spare === eyes ? `all ${eyes} eyes carried are spare, the portal lit` : `${spare} of the ${eyes} eyes carried spare over the ${target} the portal wants`}` : 'an eye made from an ender pearl and blaze powder carried, the portal lit';
+  const by = goal.gameProgress?.clock?.byDoing || {}, took = k => Math.round(Object.entries(by).filter(([d]) => d.startsWith(k)).reduce((n, [, v]) => n + v, 0) / 60000);
+  const spentSays = target > 0 ? `, one of the ${target} the portal still wants: the pearl and half a rod are to get again (on this run's clock so far the pearls took ${took('obtain_ender_pearls')} minutes and the rods ${took('obtain_blaze_rods')})` : ', the portal lit';
+  const eyeSays = spare >= 1 ? `${spare === eyes ? `all ${eyes} eyes carried are spare, the portal lit` : `${spare} of the ${eyes} eyes carried spare over the ${target} the portal wants`}` : eyes >= 1 ? `one of the ${eyes} eye${eyes === 1 ? '' : 's'} carried${spentSays}` : `an eye made from an ender pearl and blaze powder carried${spentSays}`;
   const obsSays = obsidian >= 8 ? `${obsidian} obsidian carried` : `the obsidian made from lava and water with the diamond pickaxe and the water bucket (${obsidian} carried)`;
   return {
     description: `Make an ender chest (eight obsidian round an eye of ender: ${eyeSays}; ${obsSays}) and put it beside the bed slept in, ${off} blocks off. What is put in it stays through every death, wherever the bot dies, and every ender chest opens the same store: the spare kit left there is taken out at the bed after a death, by the bed's chores, instead of made again. Broken without silk touch it gives back its obsidian, not the eye.${bareDeathsSays(bot)}${bareChainSays(bot)}`,

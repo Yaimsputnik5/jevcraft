@@ -18,7 +18,11 @@ test('an ender chest is offered with an eye to spare and the obsidian to be had,
   assert.deepEqual(o.rung, { phase: 'ender_chest', action: 'acquire', item: 'ender_chest', count: 1 });
   assert.match(o.description, /^Make an ender chest \(eight obsidian round an eye of ender: all 2 eyes carried are spare, the portal lit; 8 obsidian carried\) and put it beside the bed slept in, 10 blocks off\. What is put in it stays through every death/);
   assert.match(enderChestOption(bot([['ender_pearl', 1], ['blaze_rod', 1], ['diamond_pickaxe', 1], ['water_bucket', 1]]), lit).description, /an eye made from an ender pearl and blaze powder carried, the portal lit; the obsidian made from lava and water/);
-  assert.equal(enderChestOption(bot([['ender_eye', 2], ['obsidian', 8]]), {}), null, 'twelve eyes still wanted: none to spare');
+  // Offered as soon as one eye is had or can be made, one of the portal's spent (the user, 2026-10-25, note 2086).
+  assert.match(enderChestOption(bot([['ender_eye', 2], ['obsidian', 8]]), {}).description, /one of the 2 eyes carried, one of the \d+ the portal still wants: the pearl and half a rod are to get again \(on this run's clock so far the pearls took 0 minutes and the rods 0\)/);
+  const clock = { gameProgress: { clock: { byDoing: { 'obtain_ender_pearls: hunt_mob': 40 * 60000, 'obtain_blaze_rods: find_fortress': 25 * 60000, 'obtain_blaze_rods: hunt_mob': 20 * 60000 } } } };
+  assert.match(enderChestOption(bot([['ender_pearl', 1], ['blaze_rod', 1], ['obsidian', 8]]), clock).description, /an eye made from an ender pearl and blaze powder carried, one of the \d+ the portal still wants: .*the pearls took 40 minutes and the rods 45\)/);
+  assert.equal(enderChestOption(bot([['ender_pearl', 1], ['obsidian', 8]]), {}), null, 'no rod or powder: no eye to be made');
   assert.equal(enderChestOption(bot([['ender_eye', 2]]), lit), null, 'no obsidian and no way to it');
   assert.equal(enderChestOption(bot([['ender_eye', 2], ['obsidian', 8]]), { ...lit, bedKit: { ender: true } }), null, 'one stands by the bed');
 });
