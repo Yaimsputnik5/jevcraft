@@ -269,7 +269,7 @@ function rungOption(rung, first, bot, goal, planFor = null) {
   const piece = /^iron_(helmet|chestplate|leggings|boots)$/.test(rung.phase) ? 'iron_armour' : rung.phase;
   const why = rung.kit ? null : RUNG_WHY[rung.phase] || RUNG_WHY[piece];
   const clock = goal?.rungClocks?.[rung.phase];
-  const spent = clock?.activeMs >= 60000 ? ` Worked on for ${Math.round(clock.activeMs / 60000)} minutes so far.` : '';
+  const spent = clock?.activeMs >= 60000 ? ` Worked on for ${Math.round(clock.activeMs / 60000)} minutes so far.${require('./time-buckets').bucketsSays(goal?.rungBuckets?.[rung.phase])}` : '';
   const without = WITHOUT[piece] ? ` Until it is done, ${WITHOUT[piece]}.` : '';
   // An armour rung with nothing worn: the day's deaths with none on and with some (note 1359).
   const bareRate = bot && /^(iron_armour|leather_armour|iron_(helmet|chestplate|leggings|boots))$/.test(rung.phase) && ![5, 6, 7, 8].some(i => bot.inventory?.slots?.[i]) ? (() => { try { return ' ' + require('./kit-record').bareSays(bot.game?.dimension); } catch (_) { return ''; } })() : '';

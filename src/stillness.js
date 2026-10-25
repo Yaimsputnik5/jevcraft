@@ -701,6 +701,19 @@ function noteTrail(bot, goal, now = Date.now()) {
   const t = bot.time?.timeOfDay, overworld = /overworld/.test(String(bot.game?.dimension || ''));
   const counted = doing === 'wait_in_shelter' && !(overworld && Number.isFinite(t) && t >= DAY.DUSK && t < DAY.DAWN) ? 'wait_in_pocket_not_night' : doing;
   require('./game-progress').tallyClock(goal, counted && counted === goal?.step?.action && phase ? `${phase}: ${counted}` : counted || 'between steps', now);
+  // The rung's own minutes by what they went on (note 2080): said beside it
+  // at the strategy's asking, so a rung whose time goes on walks or on
+  // standing stuck is seen to (time-buckets.js). full-7 (2026-10-24 19:48Z
+  // to 02:20Z) spent 106 of 406 minutes stuck and 138 on walks and
+  // searches, and its rungs were said only "worked on for N minutes".
+  if (phase && trail.length) {
+    const tb = require('./time-buckets'), last = trail.at(-1), step = Math.min(60000, now - last.at);
+    const back = trail.slice().reverse().find(q => now - q.at >= tb.STUCK_MS);
+    const stuck = !!back && Math.hypot(p.x - back.x, p.y - back.y, p.z - back.z) < tb.STUCK_BLOCKS;
+    const bucket = tb.bucketOf(counted, stuck);
+    const tally = ((goal.rungBuckets ||= {})[phase] ||= {});
+    tally[bucket] = (tally[bucket] || 0) + step;
+  }
   trail.push({ at: now, x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z), doing: doing || null });
   if (trail.length > TRAIL_KEEP) trail.splice(0, trail.length - TRAIL_KEEP);
 }
