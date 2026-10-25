@@ -66,6 +66,7 @@ const RUNG_WHY = {
   golden_boots: 'a piglin leaves a player wearing any one gold armour piece alone in the Nether, save one the player struck (and those near it) for about 30 seconds; a brute ignores gold; four gold ingots at a crafting table',
   bow: 'answers skeletons, blazes and the dragon\'s crystals from range',
   arrows: 'the bow is nothing without them; they come from skeletons, none to two a skeleton, and are spent as they are shot (or are crafted, a feather, a flint and a stick each: feathers come from chickens, a hunt that needs no armour)',
+  diamond_pickaxe: 'three diamonds and two sticks: the diamonds are mined with the iron pickaxe from y 16 down, most at about y -58 in the deepslate, where lava lakes lie and the digging is slower; it lasts 1,561 uses against the iron pickaxe\'s 250 and digs faster, and it alone mines obsidian, eight of which make an ender chest whose store survives every death and ten a portal frame carried. The fresh runs of 2026-10-24 made 7 to 11 iron pickaxes in eight hours, three iron each',
   diamond_sword: 'ends a blaze or a piglin in two swings',
   // The crossing's kit (crossing-kit.js kitRungs, note 673).
   nether_pickaxe: 'a spare pickaxe for the Nether',
@@ -453,6 +454,26 @@ function enderChestOption(bot, goal) {
   };
 }
 
+// The diamond pickaxe as a choice (the user, 2026-10-25: "add the diamond pickaxe option. it really seems like this
+// would save time"; note 2087): six times the iron pickaxe's wear and faster, and the one pickaxe that mines
+// obsidian (the ender chest's eight, a portal frame carried). The fresh runs full-5, full-6 and full-7 (2026-10-24
+// 19:42Z to 2026-10-25 04:00Z) made 7 to 11 iron pickaxes in eight hours and mined no diamond; full-2 mined 22
+// diamonds in 124 hours and spent them on six diamond swords, made again after its deaths, and no pickaxe.
+function diamondPickaxeOption(bot, goal) {
+  if (bot.game?.gameMode && bot.game.gameMode !== 'survival') return null;
+  if (!/overworld/.test(String(bot.game?.dimension || ''))) return null;
+  const items = bot.inventory?.items?.() || [], has = n => items.filter(i => i.name === n).reduce((k, i) => k + i.count, 0);
+  if (has('diamond_pickaxe') + has('netherite_pickaxe') >= 1) return null;
+  if (has('iron_pickaxe') < 1) return null;
+  const diamonds = has('diamond'), y = Math.round(bot.entity?.position?.y ?? 64);
+  const have = diamonds >= 3 ? `${diamonds} diamonds carried: it is made now, at a crafting table` : `${diamonds} of the three diamonds carried; the rest mined from here, ${y > 16 ? `${y + 58} blocks down to about y -58` : `at y ${y}, ${y > -40 ? 'down to about y -58 where they are thickest' : 'about where they are thickest'}`}`;
+  return {
+    description: `Make a diamond pickaxe (${have}): ${RUNG_WHY.diamond_pickaxe}.${bareDeathsSays(bot)}`,
+    says: "I'll get diamonds for a diamond pickaxe",
+    rung: { phase: 'diamond_pickaxe', action: 'acquire', item: 'diamond_pickaxe', count: 1 },
+  };
+}
+
 function spareArmourOption(bot, goal) {
   if (bot.game?.gameMode && bot.game.gameMode !== 'survival') return null;
   if (!/overworld/.test(String(bot.game?.dimension || ''))) return null;
@@ -685,6 +706,8 @@ function strategyOptions(bot, goal, stage, sides = {}, planFor = null) {
   if (spare) options.spare_armour = spare;
   const ender = !toolless && enderChestOption(bot, goal);
   if (ender) options.ender_chest = ender;
+  const diamondPick = !toolless && diamondPickaxeOption(bot, goal);
+  if (diamondPick) options.diamond_pickaxe = diamondPick;
   const woolStock = !toolless && woolStockOption(bot, goal);
   if (woolStock) options.wool_stock = woolStock;
   if (fit && !toolless) for (const [key, side] of Object.entries(sides)) {
@@ -1057,4 +1080,4 @@ async function strategyStep(bot, task, goal, save, stage, { client, decide, side
   return { ran: true };
 }
 
-module.exports = { woolStockOption, WOOL_STOCK, enderChestOption, bareChainSays, spareArmourOption, SPARE_ORDER, bareDeathsSays, cameOutSays, errandUnderWay, woolTrip, WOOL_HUNTS, oreFacts, carryBedOption, homeOption, strategyTree, pickaxeLeft, planSpends, HAND_BLOCKS_PER_MINUTE, rungTakes, WITHOUT, RUNG_WHY, rungOption, strategyOptions, strategyStep, HOLD_MS, SIDE_REST_MS, SIDE_FAIL_MS, rungStatus, lastStrategyFact };
+module.exports = { diamondPickaxeOption, woolStockOption, WOOL_STOCK, enderChestOption, bareChainSays, spareArmourOption, SPARE_ORDER, bareDeathsSays, cameOutSays, errandUnderWay, woolTrip, WOOL_HUNTS, oreFacts, carryBedOption, homeOption, strategyTree, pickaxeLeft, planSpends, HAND_BLOCKS_PER_MINUTE, rungTakes, WITHOUT, RUNG_WHY, rungOption, strategyOptions, strategyStep, HOLD_MS, SIDE_REST_MS, SIDE_FAIL_MS, rungStatus, lastStrategyFact };
