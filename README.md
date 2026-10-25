@@ -2,11 +2,11 @@
 
 **Can an AI that only chooses from a menu beat Minecraft?**
 
-Meet Jev. It is trying to beat Minecraft, and so far the Nether is winning.
+Meet Jev. It has beaten Minecraft from a fresh world, and now it is trying to do it faster.
 
-Jev does not write text or code to decide what to do. Code lists the actions the bot can really take (fight, retreat, take cover, eat, keep working), and [TypeSafe's Jev](https://typesafe.ai/), a [System One](https://docs.typesafe.ai/concepts/system-one) model, picks one in about 0.2 seconds, for about 1.7 cents per bot-hour. **Code decides what is possible. Jev decides what to do.** The bot is built on [mineflayer](https://github.com/PrismarineJS/mineflayer).
+Jev does not write text or code to decide what to do. Code lists the actions the bot can really take (fight, retreat, take cover, eat, keep working), and [TypeSafe's Jev](https://typesafe.ai/), a [System One](https://docs.typesafe.ai/concepts/system-one) model, picks one in about 0.2 seconds, for a few cents per bot-hour. **Code decides what is possible. Jev decides what to do.** The bot is built on [mineflayer](https://github.com/PrismarineJS/mineflayer).
 
-Starting from a fresh world with an empty inventory, 15 of the 40 worlds we started on 2026-09-28 reached the Nether (the fastest in 7 minutes, the median 28). None has beaten the game. Getting six blaze rods is the current wall. Every run and every fix is logged in [docs/trial-notes.md](docs/trial-notes.md), which this README cites as "note N".
+On 2026-10-24 one run, full-2, went from a fresh world with an empty inventory to killing the Ender Dragon ([Free the End]) in about 107 hours of play, in one world, with deaths along the way. The work now is the time it takes. Every run and every fix is logged in [docs/trial-notes.md](docs/trial-notes.md), which this README cites as "note N".
 
 [Clips](#two-clips) | [Status](#status) | [Lessons](#what-we-learned) | [Development process](#improving-the-bot-with-coding-agents) | [How decisions work](#how-decisions-work) | [Setup](#running-it)
 
@@ -22,13 +22,13 @@ A loss: Jev chose to `fight` (p=0.22) a ghast, and a fireball knocked it off its
 
 ## Status
 
-- Early game: four trials have passed the first-days audit (three in-game days with no deaths, and iron tools and armor, a shield, a bed and a home). The goal asks for two passes in a row, and that has not happened yet ([GOAL.md](GOAL.md)).
-- The Nether: 15 of 40 fresh worlds on 2026-09-28 got there, in a median of 28 minutes (7 to 143). Most of the other 25 died or were still going when this was counted.
-- Blaze rods: one trial (mid-235-p-nether-4-fortress-6, from a Nether save) took 7 rods, 30 minutes in, at full health with `charge_nearest` at a live spawner; the six rods needed were reached once. Several other trials took 3 to 5, and most of the trials that took rods died in the same Nether soon after. The bot now dies to blazes at a spawner, to fireballs that push it into lava, and from running out of health in the Nether with little food. In 2026-09-28's flight records, 415 fights with blazes ended 79 times in the bot's death and 42 in a rod ([scripts/blaze-record.js](scripts/blaze-record.js)); of the 26 begun under 8 health, 15 ended in death and none in a rod, and a fireball that lands costs its hit and four ticks of fire, 6.5 through full iron (note 631).
-- Cost and speed, measured the same day: **about 1.7 cents per bot-hour**. That is 22,800 decisions over about 178 bot-hours, a median answer of 186 ms (90th percentile 292 ms) and about 3,100 input tokens a decision, at TypeSafe's published $0.042 per million input tokens (output is free).
-- The dragon: only fought from staged worlds.
+- **The dragon, from a fresh world:** full-2 (started 2026-10-19) made [Free the End] on 2026-10-24 at 06:53Z. By its own clock it reached the Nether at 0.8 hours, had its eyes of ender at 26.2, found the stronghold at 27.0, entered the End at 76.1 and killed the dragon at 107.2. On the last of five End trips it came in with the dragon at 145 health and finished it with sword blows at the perched head from holes by the fountain. Logs are in [artifacts/wins/](artifacts/wins/). Jev's part of the win cost about $4 to $5: about 25,700 decisions and 102 million input tokens up to the kill (the run's ledger, its totals scaled to the 107 of 133 hours played so far), which is $4.30 at TypeSafe's published $0.042 per million input tokens and about $4.80 at the $0.045 per run-hour the spend tracker measured on OpenRouter.
+- **The dragon, from a staged world:** first killed on 2026-10-19 (run mid-243-ma-end-3-stronghold-1-dragon-300), in one 30-minute life: 10 crystals, then about 54 arrows and sword blows at the head.
+- **Where the time goes:** the two big gaps are the 49 hours from the stronghold to the kill (getting the End kit, dying in the End and re-kitting) and the 25 hours from the Nether to the eyes (blaze rods and pearls). A good human speedrun takes about eleven minutes ([an analysed run](https://www.speedrun.com/posts/1m4ty)), getting its pearls by bartering and killing the dragon with beds; full-2 did neither ([scripts/trials/time-lost.js](scripts/trials/time-lost.js) splits a run's minutes into work, travel, fights, waiting and stuck).
+- **Now running:** seven full runs. full-2 has finished and plays on. full-3 is fighting in the End (entered at 54.6 hours). full-1 and full-4 are in the Nether stage. full-5, full-6 and full-7 started fresh on 2026-10-24 to measure the time to the dragon after the latest changes, and reached the Nether at 3.0, 0.8 and 3.2 hours.
+- **Cost:** Jev is reached through OpenRouter (typesafe/jev-1.14). Four full runs cost about $0.18 an hour together, about 4.5 cents per bot-hour ([scripts/jev-spend.js](scripts/jev-spend.js)). On 2026-09-28, on TypeSafe's own API, it was about 1.7 cents per bot-hour, with a median answer of 186 ms.
 
-The next problem is surviving the blaze spawner. The [roadmap](ROADMAP.md) has the order of work, and [CONTRIBUTING.md](CONTRIBUTING.md) explains how a concrete failure becomes a test and a general fix.
+The [roadmap](ROADMAP.md) has the order of work, and [CONTRIBUTING.md](CONTRIBUTING.md) explains how a concrete failure becomes a test and a general fix.
 
 ## What we learned
 
@@ -67,6 +67,18 @@ Quoting an arena average against three distant blazes to a bot facing four at a 
 ### Blaze tactics
 
 We built boxing in, lighting the spawner, a corner ambush and retreating to heal, and measured them in an arena (below). At a live spawner none beat walking in and fighting. The safe ones produce no rods. They are still offered, with their measured numbers (note 606).
+
+### Deaths were not the whole story
+
+For weeks each fix started from a death. Measuring a run's minutes by what they went on showed more time lost to walks, waits and stalls than to dying, and a death costs only the time it takes to get the kit back. The goal is now the time to the dragon, and a death counts only by the time it loses.
+
+### Code that decided, quietly
+
+Some code still chose for Jev without asking. The routine meal ate whatever the code ranked first at hunger 16: about 298 of 303 meals on the fresh runs, 260 of them raw meat with a furnace's makings carried. It is now a question (note 2103): each food, cooking the raw meat first, or eating later, each with its points and seconds.
+
+### Facts from the game itself
+
+Several prices came from our own small samples or from trials a month old. A barter was said to cost nine gold ingots a pearl, from one lucky measure; the server's own loot table says about 15.6 (note 2106). The rods' risk was quoted from trials that died ten times as often as today's (note 2105). What a bed does to the dragon was "not measured" until it was read from the server's code: 46 to 60 damage beside the head, about one bed a perch (note 2108). Where the game has a number, Jev is now told the game's number, and our own records beside it.
 
 ### A second opinion from an LLM
 
