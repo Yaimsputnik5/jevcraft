@@ -862,7 +862,8 @@ test('the meal given the turn is stopped by what its claim is made by, not by a 
   bot._arbiter = {};
   const { liveTurn } = require('../src/work');
   const goal = { request: 'beat the game', kind: 'win', step: { action: 'find_fortress' } };
-  const client = { systemOne: async () => ({ answers: { branch_0: { choice: 'vitals', confidence: 0.9 } } }) };
+  // The turn to the meal, then the meal itself (note 2103): the beef.
+  const client = { systemOne: async ({ questions }) => ({ answers: { branch_0: { choice: JSON.stringify(questions).includes('eat_beef') ? 'eat_beef' : 'vitals', confidence: 0.9 } } }) };
   const turn = await liveTurn(bot, new Task('the turn'), goal, goal, { step: async () => false, state: {} }, () => {}, { client, onStep: () => {}, save: () => {} });
   assert.equal(turn.layer, 'vitals');
   assert.equal(eaten, 1, 'the meal Jev gave the turn to is eaten, not stopped at once');
@@ -1097,28 +1098,43 @@ test('the food gone from the pack by the bite (eaten just before): no error, cho
   assert.equal(await maintainVitals(bot, new Task('heal')), false);
 });
 
-// Note 2102: raw meat at the routine meal is cooked first where a furnace can go
-// down here and nothing presses; at hunger six or with no cook given it is eaten raw.
-test('the routine meal of raw meat is cooked first where eight stone and fuel are carried (note 2102)', async () => {
-  const make = (food, cookFirst) => {
+// Note 2103: the routine meal is Jev's question: each food carried, the raw
+// meat cooked first where a furnace can go down here, or later, held until
+// hunger or health falls.
+test('the routine meal is asked: the foods carried, the cook first, or later (note 2103)', async () => {
+  const { withAnswers } = require('./support/jev-stand-in');
+  const make = () => {
     const items = [{ name: 'mutton', count: 5 }, { name: 'cobblestone', count: 16 }, { name: 'oak_log', count: 4 }];
     const eaten = [];
-    const bot = { food, health: 18, entity: { position: new (require('vec3').Vec3)(0, 64, 0) }, entities: {}, blockAt: () => null,
-      registry: { foodsByName: { mutton: { foodPoints: 2, effectiveQuality: 3.2 }, cooked_mutton: { foodPoints: 6, effectiveQuality: 15.6 } } },
+    const bot = { food: 14, health: 18, entity: { position: new Vec3(0, 64, 0) }, entities: {}, blockAt: () => null,
+      registry: { foodsByName: { mutton: { foodPoints: 2, saturation: 1.2, effectiveQuality: 3.2 }, cooked_mutton: { foodPoints: 6, saturation: 9.6, effectiveQuality: 15.6 } } },
       inventory: { items: () => items },
       equip: async item => eaten.push(item.name), consume: async () => { bot.food += 6; }, deactivateItem: () => {} };
     const cooks = [];
-    const opts = cookFirst ? { cookFirst: async item => { cooks.push(item); items.splice(0, 1, { name: 'cooked_mutton', count: 5 }); } } : {};
-    return { bot, eaten, cooks, opts };
+    const cookFirst = async item => { cooks.push(item); items.splice(0, 1, { name: 'cooked_mutton', count: 5 }); };
+    return { bot, eaten, cooks, cookFirst };
   };
-  const a = make(14, true), actions = [];
-  assert(await maintainVitals(a.bot, new Task('test', 'eat'), s => actions.push(s), a.opts));
+  let offered = null;
+  const a = make(), actions = [];
+  await withAnswers({ meal: children => { offered = children; return 'cook_then_eat'; } }, async () => {
+    assert(await maintainVitals(a.bot, new Task('test', 'eat'), s => actions.push(s), { cookFirst: a.cookFirst }));
+  });
+  assert.deepEqual(Object.keys(offered), ['eat_mutton', 'cook_then_eat', 'eat_later']);
+  assert.match(offered.eat_mutton.description, /^Eat a mutton now \(5 carried\): about two seconds standing still, 2 hunger and 1\.2 saturation, hunger 14 to 16\. Raw: cooked it gives 6\./);
+  assert.match(offered.cook_then_eat.description, /^Cook the 5 mutton carried first, then eat: 10 food points raw, 30 cooked \(\+20\); a furnace of eight of the cobblestone carried put down here, oak log for fuel, about 56 seconds/);
   assert.deepEqual(a.cooks.map(i => [i.raw, i.cooked, i.n]), [['mutton', 'cooked_mutton', 5]]);
   assert.deepEqual(actions.map(s => s.action), ['cook_meat', 'eat']);
   assert.deepEqual(a.eaten, ['cooked_mutton']);
-  // Hunger six: no cook, the raw meal now.
-  const b = make(6, true);
-  assert(await maintainVitals(b.bot, new Task('test', 'eat'), () => {}, b.opts));
-  assert.equal(b.cooks.length, 0);
-  assert.deepEqual(b.eaten, ['mutton']);
+  // Later: nothing eaten, not asked again until hunger falls.
+  const b = make();
+  let asked = 0;
+  await withAnswers({ meal: () => { asked++; return 'eat_later'; } }, async () => {
+    assert.equal(await maintainVitals(b.bot, new Task('test', 'later'), () => {}, { cookFirst: b.cookFirst }), false);
+    assert.equal(await maintainVitals(b.bot, new Task('test', 'later'), () => {}, { cookFirst: b.cookFirst }), false);
+    assert.equal(asked, 1);
+    b.bot.food = 13;
+    assert.equal(await maintainVitals(b.bot, new Task('test', 'later'), () => {}, { cookFirst: b.cookFirst }), false);
+    assert.equal(asked, 2);
+  });
+  assert.deepEqual(b.eaten, []);
 });

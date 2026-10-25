@@ -8,7 +8,7 @@ One rule holds for every question about playing the game (`src/decisions/unchang
 
 Three more rules from note 749 (`src/decisions/loops.js`, `src/decisions/keys.js`, `src/intention.js`). A key names its thing: every dynamic option says what its key names (`names`: by name, by where it is, by entity id), never its place in the list, so what came of an option is said on the same thing at the next asking. A question asked round and round goes up: its askings each within a minute of the one before are its spell, said from the third (`spellSoFar`: how many, what was answered, how far the bot walked and how far it is from where they began, whether anything new is carried, how often none of the options was good); when none good was Jev's likeliest at three of its last five askings, or six askings over ninety seconds or more have left the bot within 48 blocks of where they began with nothing new carried, the answers it gave rest from there and the question above is asked with that said (not the stance, the body's way, the shield or the routing, which are said only). And a trip holds: an answer to a question about the plan whose option walks to a target, or whose catalogue entry says where it goes (`trip`), is the intention until it arrives, is done, fails, the dimension changes, health falls a blow's worth, a walk brings nothing for three minutes or ten minutes pass; its own question asked again offers only it. A rung set aside holds the same way (`src/decisions/asides.js`): an option that would take it back (`takeBack` on its node) is not offered for five minutes unless the bot is 16 blocks from where it was set aside, carries a new kind of thing or its health band changes (`asideHolds`). An answer thrown away as stale that keeps on with what is under way is kept, and from the second stale answer in a row within 30 seconds a question is watched a second first and not sent while its facts are still changing.
 
-117 questions: 67 decision trees and 50 batched questions.
+118 questions: 68 decision trees and 50 batched questions.
 
 ## Batches
 
@@ -256,6 +256,23 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | `food_first` | root | get food for the walk first, then go back for them | a walk of 300 blocks or more with less food carried than the walk costs sprinted (to 30 points); twenty minutes at most on the food |
 | `through_nether` | root | go back for them through the Nether | the drop in the Overworld 400 blocks or more off, a known Overworld portal within 600 blocks of the bot and another within 600 of the drop; said with the walks to each portal and the blocks across the Nether (note 1393) |
 | `wait_for_day` | root | go back for them when it is day | by night in the Overworld, the drops not ageing (the bot not within 128 blocks of them since) |
+
+### `meal`
+
+**Hunger is down with food carried: which food to eat now, the raw meat cooked first, or no meal yet?**
+
+- When: The vitals step, at hunger 16 or less, under 18 hurt, or under 20 at 12 health or less, with no mob at arm's length and no stance held against one (in a fight the meal is a stance); after "later", again only once hunger or health has fallen (note 2103).
+- Decision tree, choice; stakes low; ledger kind `survival`
+- Bar: none
+- Jev unreachable: no fallback: nothing is decided by code; the bot holds, says once that it is waiting for Jev, asks again with a backoff, and asks it fresh when Jev answers
+- Options built in: src/meal-ways.js (mealWays), src/vitals.js (maintainVitals)
+- Nothing left to try: the stall's question, as before (nothing above it)
+
+| Option | Level | What it is | Offered when |
+| --- | --- | --- | --- |
+| `eat_[a-z_]+` (pattern: names the food item eaten, by its name) | root | eat one of this food carried now | a food carried that is safe, or a last resort (rotten flesh, raw chicken, spider eye); said with its points and saturation, any points lost past 20, the cooked points if it is raw, and its side effect |
+| `cook_then_eat` | root | cook the raw meat carried at a furnace put down here, then eat | raw meat carried with a furnace, or eight stone, carried and fuel; said with the seconds, the points gained in minutes of getting food, and the mobs about |
+| `eat_later` | root | eat nothing now and go on | always; asked again once hunger or health has fallen |
 
 ### `bed_after_sleep`
 

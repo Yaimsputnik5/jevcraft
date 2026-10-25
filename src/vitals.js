@@ -1789,19 +1789,23 @@ async function maintainVitals(bot, task, onAction = () => {}, { client = null, g
   // ours, not the game's (note 515). The claim says what it is and does.
   let food = chooseFood(bot) || lastResortFood(bot);
   if (!food) return false; // The higher-level survival planner must forage.
-  // Raw meat cooked first where a furnace can be put down here and nothing presses (note 2102): hunger over six,
-  // health ten or more, no mob close. The fresh runs full-5, full-6 and full-7 (2026-10-24 19:42Z to 2026-10-25
-  // 15:00Z) ate 260 meals of raw meat, a third of it cooked, most of them here at hunger 16 or 17, eight stone and
-  // fuel carried at 118 of 141; a minute at the furnace triples the points, where getting food ran 4 to 6 a minute.
-  if (COOKED[food.name] && bot.food > 6 && (bot.health ?? 20) >= 10 && !closeHostile(bot) && typeof cookFirst === 'function') {
-    let cook = null; try { cook = require('./work').cookable(bot); } catch (_) { cook = null; }
-    const item = cook?.ready && cook.items.find(i => i.raw === food.name);
-    if (item && cook.after - cook.now >= 8) {
-      onAction({ action: 'cook_meat', item: item.cooked, raw: item.n, then: 'eat', food: bot.food, health: bot.health });
-      try { await cookFirst(item); } catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err?.name)) throw err; }
-      food = chooseFood(bot) || food;
-    }
-  }
+  // Which meal, the raw meat cooked first, or none yet, is Jev's (meal-ways.js, note 2103): this step ate at hunger
+  // sixteen with the food the code ranked first, about 298 of 303 meals on full-5, full-6 and full-7, 260 of them
+  // raw. "Later" holds until hunger or health falls; a question Jev cannot answer is held, as every other.
+  const mw = require('./meal-ways');
+  if (mw.laterHolds(bot)) return false;
+  const ways = mw.mealWays(bot, { cook: typeof cookFirst === 'function' ? async item => {
+    onAction({ action: 'cook_meat', item: item.cooked, raw: item.n, then: 'eat', food: bot.food, health: bot.health });
+    try { await cookFirst(item); } catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err?.name)) throw err; }
+  } : null });
+  const first = `eat_${food.name}`;
+  let pick = ways[first] ? first : Object.keys(ways)[0];
+  const decision = await require('./decisions').decide('meal', { client, bot, task: own, goal, save, tree: ways, watchAir: false,
+    context: { default: pick }, state: { says: mw.hungerSays(bot), hunger: bot.food, health: bot.health, ...(claimed?.action === 'eat' ? { turn: 'the meal was given this turn' } : {}) } });
+  if (!decision || decision.stale) return false;
+  if (decision.path?.[0] && ways[decision.path[0]]) pick = decision.path[0];
+  food = await ways[pick].run();
+  if (!food) return false;
   onAction({ action: 'eat', item: food.name, food: bot.food, health: bot.health });
   require('./turn').takeTurn(bot, 'vitals', 'eat', food.name);
   await bot.equip(food, 'hand');
@@ -1928,4 +1932,4 @@ function claim(bot) {
 // stepOnce runs it too): the turn they took was the vitals'.
 const ACTIONS = new Set(['dig_out_of_block', 'douse', 'eat', 'out_of_fire', 'off_hot_floor', 'out_of_powder_snow', 'surface']);
 
-module.exports = { rawFacts, bodyColumns, wayOutRunning, atWaterTop, bobUp, blowsAtBody, blowsDuring, strikeAtArm, strikeWay, BLOW_REACH, shootersAtBody, flamesAbout, pourFloor, claim, checkMeal, closeHostile, ACTIONS, onHotFloor, hotFloorRoute, hotFloorWays, offHotFloor, crouchOnHotFloor, suffocatingBlock, douse, intoWater, pondNear, fireWays, headWays, creeperAtFuse, airWays, asideCell, inFire, fireRoute, outOfFire, inPowderSnow, snowRoute, outOfPowderSnow, lastResortFood, lastResortFoods, sideEffectSays, SIDE_EFFECTS, chooseFood, safeFood, maintainVitals, needsAir, checkAir, headSubmerged, headInBlock, NeedsAir, digWithAirGuard, airRoute, surfaceForAir, straightUp, breathSeconds, breathShort, STEP_S, fireToAnswer, onFire };
+module.exports = { COOKED, rawFacts, bodyColumns, wayOutRunning, atWaterTop, bobUp, blowsAtBody, blowsDuring, strikeAtArm, strikeWay, BLOW_REACH, shootersAtBody, flamesAbout, pourFloor, claim, checkMeal, closeHostile, ACTIONS, onHotFloor, hotFloorRoute, hotFloorWays, offHotFloor, crouchOnHotFloor, suffocatingBlock, douse, intoWater, pondNear, fireWays, headWays, creeperAtFuse, airWays, asideCell, inFire, fireRoute, outOfFire, inPowderSnow, snowRoute, outOfPowderSnow, lastResortFood, lastResortFoods, sideEffectSays, SIDE_EFFECTS, chooseFood, safeFood, maintainVitals, needsAir, checkAir, headSubmerged, headInBlock, NeedsAir, digWithAirGuard, airRoute, surfaceForAir, straightUp, breathSeconds, breathShort, STEP_S, fireToAnswer, onFire };

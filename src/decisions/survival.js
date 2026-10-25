@@ -449,6 +449,22 @@ define({
 // now (the user, 2026-09-28: "Ask Jev"), the old order the body's safety
 // rule when Jev cannot answer in time (note 707).
 define({
+  id: 'meal', area: 'survival', parent: null, kind: 'survival', primitive: 'choice', stakes: 'low', tree: true,
+  question: 'Hunger is down with food carried: which food to eat now, the raw meat cooked first, or no meal yet?',
+  trigger: 'The vitals step, at hunger 16 or less, under 18 hurt, or under 20 at 12 health or less, with no mob at arm\'s length and no stance held against one (in a fight the meal is a stance); after "later", again only once hunger or health has fallen (note 2103).',
+  source: 'src/meal-ways.js (mealWays), src/vitals.js (maintainVitals)',
+  instructions: {
+    task: 'The bot is hungry with food carried. Choose what it eats now, whether it cooks the raw meat first, or whether it eats later.',
+    guidance: 'says is what the game does with hunger: health comes back by itself only at 18 or more, sprinting stops at 6, at 0 hunger takes health. Each food says its hunger and saturation, any points lost past 20, what it gives cooked if it is raw, and any side effect. The cook says its seconds, the points it gains in minutes of getting food, and the mobs about.',
+  },
+  options: [
+    { pattern: 'eat_[a-z_]+', dynamic: true, names: 'the food item eaten, by its name', label: 'eat one of this food carried now', when: 'a food carried that is safe, or a last resort (rotten flesh, raw chicken, spider eye); said with its points and saturation, any points lost past 20, the cooked points if it is raw, and its side effect' },
+    { key: 'cook_then_eat', label: 'cook the raw meat carried at a furnace put down here, then eat', when: 'raw meat carried with a furnace, or eight stone, carried and fuel; said with the seconds, the points gained in minutes of getting food, and the mobs about' },
+    { key: 'eat_later', label: 'eat nothing now and go on', when: 'always; asked again once hunger or health has fallen' },
+  ],
+});
+
+define({
   id: 'bed_after_sleep', area: 'survival', parent: null, kind: 'survival', primitive: 'choice', stakes: 'medium', tree: true,
   overworldOnly: true,
   question: 'The night passed in the carried bed: leave it standing here as the respawn point, or take it up and carry it for the next night?',

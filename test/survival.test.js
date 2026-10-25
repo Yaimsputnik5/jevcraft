@@ -6393,6 +6393,7 @@ test('sealed in at night with raw meat, fuel and a furnace carried: cooking it i
   let tree;
   survival.decide = async (task, g, save, { id, tree: t }) => { if (id === 'pocket_next') tree = t; return { path: ['stay'], stale: false }; };
   survival.wait = async () => {};
+  survival.client = null; // the meal question (note 2103) to the stand-in
   await survival.step(new Task('night'), goal, () => {});
   assert(tree?.cook_here, `cooking is offered (${Object.keys(tree || {}).join(', ')})`);
   assert.match(tree.cook_here.description, /6 beef, 18 food points as carried and 48 cooked \(\+30\); the furnace carried put down in the pocket, coal for fuel/);

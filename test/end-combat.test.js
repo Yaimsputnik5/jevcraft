@@ -227,6 +227,7 @@ test('a dragon charge aborts a pending Jev choice and hands control to the cance
   assert.equal(bot.pathfinder.movements.canDig, false);
 });
 
+// The meal itself is Jev's question (note 2103): answered with the beef; nothing else is asked before the escape.
 test('a cloud arriving while eating interrupts consumption and starts an escape before another choice', async () => {
   const { bot, goal, task } = fixture(); bot.health = 13; bot.food = 17;
   bot.inventory.items = () => [{ name: 'cooked_beef', count: 2 }];
@@ -235,7 +236,7 @@ test('a cloud arriving while eating interrupts consumption and starts an escape 
   bot.consume = () => { entity(bot, 30, 'area_effect_cloud', bot.entity.position.clone(), { radius: 3 }); return new Promise(() => {}); };
   bot.deactivateItem = () => { stopped = true; };
   bot.look = async () => { reflex = true; task.cancel(); };
-  await assert.rejects(fightEndStep(bot, task, goal, () => {}, {}, { systemOne: () => { throw new Error('Emergency must precede ordinary choices'); } }), { name: 'Cancelled' });
+  await assert.rejects(fightEndStep(bot, task, goal, () => {}, {}, { systemOne: async ({ questions }) => { if (JSON.stringify(questions).includes('eat_cooked_beef')) return { answers: { branch_0: { choice: 'eat_cooked_beef', confidence: 0.9 } } }; throw new Error('Emergency must precede ordinary choices'); } }), { name: 'Cancelled' });
   assert(reflex); assert(stopped); assert.equal(goal.endCombat.lastInterrupted.reason, 'dragon_breath_cloud');
   assert.equal(task.interruptCheck, undefined); assert.equal(bot.listenerCount('entityMoved'), 0);
 });

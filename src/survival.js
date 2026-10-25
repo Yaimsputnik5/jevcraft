@@ -12314,7 +12314,7 @@ class Survival {
       // eight stone and fuel carried; the meal question offered only the raw meal or a trip for food.
       let cook = null; try { cook = require('./work').cookable(bot); } catch (_) { cook = null; }
       const rawMeal = cook?.ready && cook.items.some(i => i.raw === meal.name);
-      if (rawMeal && cook.after - cook.now >= 8) {
+      if (rawMeal && cook.after > cook.now) {
         const first = cook.items.slice().sort((x, y) => (y.after - y.now) - (x.after - x.now))[0];
         const secs = first.n * 10 + (cook.furnace ? 2 : 6);
         const w = require('./work');
