@@ -939,11 +939,17 @@ async function chooseClimb(bot, task, goal, save, state, target, { landing = fal
   // stillness_detour and rung_progress (critic ~14:40Z items 1 and 4).
   const outAt = { straight_up: column?.cells ? { x: feet.x, y: column.top, z: feet.z } : null, walk_then_up: options.walk_then_up?.walkTo ? { x: options.walk_then_up.walkTo.x, y: Math.max(options.walk_then_up.walkTo.y, target?.y ?? options.walk_then_up.walkTo.y), z: options.walk_then_up.walkTo.z } : null };
   for (const [k, node] of Object.entries(options)) { const at = outAt[k] || (target && Number.isFinite(target.x) ? { x: Math.floor(target.x), y: Math.floor(target.y), z: Math.floor(target.z) } : null); if (at && !node.target) node.target = at; }
+  // The climbs of the last hour beside this one (note 2085, as surface_trip's, note 2084).
+  { const lately = require('./work').climbsLatelySays(goal); if (lately) facts.climbsLately = lately; }
   const decision = await require('./decisions').decide('climb_out', { client: task.opportunityClient, bot, task, goal, save, tree: options, state: facts, context: { quicker } });
   // Held through an outage (note 707): asked fresh.
   if (decision.stale) return chooseClimb(bot, task, goal, save, state, target, { landing });
   const method = decision.path.at(-1);
   const walkTo = method === 'walk_then_up' ? options.walk_then_up?.walkTo : undefined;
+  // Counted once: a climb surface_trip chose a moment ago is this one.
+  if (/^(staircase|straight_up|walk_then_up)$/.test(method) && !((goal.climbLog || []).some(c => Date.now() - c.at < 3 * 60000))) {
+    require('./work').noteClimb(goal, goal.surfaceTrip?.need || 'the way up', { up: Math.max(0, Math.round((target?.y ?? feet.y) - feet.y)), seconds: Math.round(estimate[method] ?? 0) });
+  }
   state.climb = { method, tools, offered: Object.keys(options), ...(state.climb?.failedColumn ? { failedColumn: state.climb.failedColumn } : {}), estimate: Math.round(estimate[method] ?? 0), fromY: feet.y, best: { y: feet.y, at: Date.now() }, ...(walkTo ? { walkTo } : {}), at: new Date().toISOString() };
   save();
   return { method, column, walkTo, item: options[method]?.item };

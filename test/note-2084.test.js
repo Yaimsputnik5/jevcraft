@@ -13,3 +13,10 @@ test('climbs of the last hour are counted by need; older ones are not', () => {
   assert.equal(climbsLatelySays(goal, now), 'In the last hour 2 climbs to open sky were chosen (2 for sheep), about 4 minutes of climbing said for them and 40 blocks up, each leaving the work below and coming back down to it; what is owed at the surface taken in one trip saves the others.');
   assert.equal(climbsLatelySays({}, now), null);
 });
+
+test('climb_out says the climbs of the last hour and counts its own once (note 2085)', () => {
+  const src = require('fs').readFileSync(require.resolve('../src/surface'), 'utf8');
+  assert.match(src, /facts\.climbsLately = lately/);
+  assert.match(src, /noteClimb\(goal, goal\.surfaceTrip\?\.need \|\| 'the way up'/);
+  assert.match(src, /Date\.now\(\) - c\.at < 3 \* 60000/);
+});
