@@ -416,7 +416,12 @@ function ladderRung(bot, goal, waiting, { allOptional = false } = {}) {
   // mid-243-ga, its iron pickaxe worn out 72 blocks down with 69 ingots
   // carried, was sent after "another stone pickaxe" (note 671).
   const ingots = bot.inventory.items().filter(i => i.name === 'iron_ingot').reduce((n, i) => n + i.count, 0);
-  if (best('pickaxe') < 2 && !spare('stone_pickaxe', 2)) return ingots >= 3 && !waiting.has('iron_pickaxe') ? another('iron_pickaxe') : another('stone_pickaxe');
+  // Three diamonds carried make it a diamond one (note 2091): full-7 (2026-10-25 08:02 to 08:36Z), three diamonds in
+  // the pack, was handed the iron pickaxe four times and the stone one twice as each wore out, six iron pickaxes made
+  // since the count began at 07:02Z.
+  const diamonds = bot.inventory.items().filter(i => i.name === 'diamond').reduce((n, i) => n + i.count, 0);
+  const headed = fallback => diamonds >= 3 && !waiting.has('diamond_pickaxe') ? another('diamond_pickaxe') : fallback;
+  if (best('pickaxe') < 2 && !spare('stone_pickaxe', 2)) return headed(ingots >= 3 && !waiting.has('iron_pickaxe') ? another('iron_pickaxe') : another('stone_pickaxe'));
   if (best('sword') < 2) return another('stone_sword');
   // A bed before the mine. Walled in and waiting was the largest share of
   // the run's standing still, and a night slept passes in seconds; the bed
@@ -449,7 +454,7 @@ function ladderRung(bot, goal, waiting, { allOptional = false } = {}) {
   // with no other rung beside it, as each one wore out on the tunnels to
   // the ore: ninety minutes for one pair of leggings (note 1108).
   const pickAfterArmour = best('pickaxe') < 3 && !spare('iron_pickaxe', 3) && best('pickaxe') >= 2 && !beforeNether(goal) && armourOwed();
-  if (best('pickaxe') < 3 && !spare('iron_pickaxe', 3) && !pickAfterArmour) return another('iron_pickaxe');
+  if (best('pickaxe') < 3 && !spare('iron_pickaxe', 3) && !pickAfterArmour) return headed(another('iron_pickaxe'));
   if (!carried.includes('shield') && ready({ phase: 'shield' })) return { phase: 'shield', action: 'acquire', item: 'shield', count: 1 };
   // A fishing rod, the food that comes (note 1304): half the questions of
   // the hour to 18:40Z (2026-10-05) were at hunger under eighteen, 93 in 100
@@ -482,7 +487,7 @@ function ladderRung(bot, goal, waiting, { allOptional = false } = {}) {
   const armourPhase = short.length === 4 ? 'iron_armour' : missing[0];
   if (missing.length && ready({ phase: armourPhase })) return { phase: armourPhase, action: 'acquire_set', item: missing[0], items: missing, count: missing.length };
   // The iron pickaxe that waited for the armour (note 1108).
-  if (pickAfterArmour) return another('iron_pickaxe');
+  if (pickAfterArmour) return headed(another('iron_pickaxe'));
   if (!carried.includes('golden_boots') && ready({ phase: 'golden_boots' })) return { phase: 'golden_boots', action: 'acquire', item: 'golden_boots', count: 1 };
   // Most of the run's deaths were arrows: skeletons in the caves, crossbow
   // piglins in the Nether, and a bot that could only answer at arm's length.

@@ -234,3 +234,12 @@ test('two iron pickaxes made on this run: the diamond pickaxe is the ladder\'s b
   const worn = openRungs(bot, { kind: 'win', gameProgress: { milestones: been }, toolsMade: { iron_pickaxe: 2 } });
   assert.ok(worn.some(r => r.phase === 'diamond_pickaxe' && r.item === 'diamond_pickaxe'), JSON.stringify(worn));
 });
+
+test('a pickaxe worn out with three diamonds carried: the one made is diamond, not iron or stone (note 2091)', () => {
+  const { nextGameStage } = require('../src/game-progress');
+  const been = { kind: 'win', gameProgress: { milestones: { nether_entered: { at: 1 } } } };
+  const worn = atPortal({ ...FED, iron_pickaxe: 0, stone_pickaxe: 0, iron_ingot: 6, diamond: 3 });
+  assert.equal(nextGameStage(worn, been).item, 'diamond_pickaxe');
+  const noDiamonds = atPortal({ ...FED, iron_pickaxe: 0, stone_pickaxe: 0, iron_ingot: 6 });
+  assert.equal(nextGameStage(noDiamonds, been).item, 'iron_pickaxe');
+});
