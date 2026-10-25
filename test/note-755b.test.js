@@ -158,3 +158,21 @@ test('at night below, the sheep search says the time to dawn on the climb and of
     assert.deepEqual(said, ['The sheep can wait till morning.']);
   } finally { exploration.biomeTrips = realTrips; surface.surfaceObserver = realObs; surface.climbToSurface = realClimb; decisions.decide = realDecide; }
 });
+
+test('at night below, the climb for sheep says the surface\'s night record by armour (note 2088)', async () => {
+  const home = require('../src/home-base');
+  const exploration = require('../src/exploration');
+  const surface = require('../src/surface');
+  const decisions = require('../src/decisions');
+  const realTrips = exploration.biomeTrips, realObs = surface.surfaceObserver, realClimb = surface.climbToSurface, realDecide = decisions.decide;
+  try {
+    let asked = null;
+    decisions.decide = async (id, opts) => { asked = opts; return { path: ['until_day'], stale: false }; };
+    exploration.biomeTrips = () => [{ x: 30, z: 0, biome: 'forest', distance: 32, direction: 'east', says: 'the forest 32 blocks east' }];
+    surface.surfaceObserver = () => () => false; surface.climbToSurface = () => 20;
+    const bot = { entity: { position: new Vec3(0.5, 47, 0.5) }, game: { dimension: 'overworld', gameMode: 'survival' }, time: { timeOfDay: 16000 }, registry,
+      inventory: { items: () => [], slots: {} }, blockAt: () => null, findBlocks: () => [], chat() {} };
+    await home.searchForSheep(bot, { check() {}, opportunityClient: {} }, {}, () => {}, { explore: async () => {} });
+    assert.match(asked.tree.climb_first.description, /By armour \(.*\), on the surface at night: with nothing worn [\d.]+ deaths an hour .* Nothing is worn now: to dawn, about \d+ real minutes, that is .* of a death at that rate\./);
+  } finally { exploration.biomeTrips = realTrips; surface.surfaceObserver = realObs; surface.climbToSurface = realClimb; decisions.decide = realDecide; }
+});

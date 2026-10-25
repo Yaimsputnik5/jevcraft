@@ -976,7 +976,11 @@ async function searchForSheep(bot, task, goal, save, actions) {
   // back to daylight", at night.
   const nightNow = tod >= DAY.DARK && tod < DAY.DAWN;
   const toDawn = Math.round(((DAY.DAWN - tod + 24000) % 24000) / 1200);
-  const nightSays = nightNow ? ` It is night: the surface's mobs are out until dawn, about ${toDawn} real minutes off, and the walk to look comes out among them.` : '';
+  // With the surface's night record by armour (note 2088): full-6 (2026-10-25 06:25Z), bare two climbs after its
+  // third death in twenty minutes, chose climb_first at night told only that mobs are out, was shot to 9.7 on the
+  // surface, and died there at 06:32, its fourth in thirty-three minutes; full-4 had climbed so on 2026-10-24.
+  let nightRecord = ''; if (nightNow) { try { nightRecord = require('./night-record').byArmourSays('surface', bot, toDawn); } catch (_) { nightRecord = ''; } }
+  const nightSays = nightNow ? ` It is night: the surface's mobs are out until dawn, about ${toDawn} real minutes off, and the walk to look comes out among them.${nightRecord}` : '';
   // With what is still owed at each level and the climb at the bot's own
   // measured pace (note 763: 239's trials climbed for sheep 22 times from
   // the home bed's wool hunt, 54.6 minutes, before the Nether).
