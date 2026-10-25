@@ -90,3 +90,15 @@ Kept for the record; they load but reproduce a specific moment and may need a re
 - `audit.js`: flight-recorder analysis shared by `audit-day.js` and the first-days verdict.
 - `win-witness.js`: watches live packets during an acceptance run to confirm a win.
 - `flooded-cave.json`: a block capture of a flooded cave, for the terrain drills.
+
+## Trail maps
+
+[trail-map.js](trials/trail-map.js) draws one PNG per trial from the server's saved region files: a top-down map and a side view, the path colored by what the bot was doing, and the audit's flags in the header (red is over the limit). This trial spent 20 minutes in a bunker beside a blaze spawner: 25 blocks walked, one block of net movement, no new ground.
+
+<img src="../docs/media/trail-map-stuck.png" width="600">
+
+## Running many trials on one machine
+
+- CPU runs out first. Twenty trials saturated 16 cores and bots stalled 2 to 4 seconds at a time, which kills them in fights. About 14 is the practical limit.
+- The decision service has outages. There are no fallbacks: while Jev is down the bot holds where it is, says once in chat that it is waiting for Jev, and asks again with a backoff; the body's reflexes (lava, fire, air, a shot, the one-shot line) still run. When Jev answers, what was held is asked fresh (note 707).
+- Anything that watches trials needs a timeout. A hung check once kept the watcher silent for five hours while trials failed.

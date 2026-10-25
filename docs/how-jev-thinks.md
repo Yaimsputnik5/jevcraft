@@ -57,7 +57,7 @@ When there is a choice, it is a semantic one. Gathering wood in Survival, code f
 
 At dusk the choice is between spending the next action on the request and getting under cover first. Jev sees the time, the ticks of daylight left, whether a shelter is already verified and how far it is, hunger, and the request. With no shelter and seven hundred ticks of light, it chose shelter at 0.99. That is a judgment code could only make with a threshold someone guessed; Jev makes it from the situation.
 
-Some things are never a choice. Eating carried food when hungry is a rule. Surfacing for air is a rule. A hostile mob within reach interrupts whatever Jev was asked mid-call. The model decides between good options; code decides what is not optional.
+Very little is never a choice. Even the routine meal is a question now: which food carried, cooking the raw meat first, or eating later, each with its points and seconds (note 2103); before, code ate whatever it ranked first, about 298 of 303 meals on the fresh runs. What stays code is the body's physics and what is faster than an answer: surfacing for air, a shot already in the air, and a hostile mob within reach interrupting whatever Jev was asked mid-call. The model decides between real options; code decides only what cannot wait.
 
 ## When things go wrong
 
@@ -76,5 +76,5 @@ A custom build in Creative is the one place a generative model draws something. 
 - **Jev chooses; code enumerates.** The model never sees an option that code did not construct and check.
 - **Ask everything at once.** Independent questions over the same state go in one call, speculative ones included.
 - **Confidence is a second axis.** The answer says what; the probability says whether to act; the threshold scales with the stakes.
-- **Rules stay rules.** If code knows the threshold, it should not ask.
-- **Escalate, do not default.** The expensive model is for the failure the cheap one could not judge.
+- **Hidden thresholds are decisions Jev cannot improve.** Where code would guess a number, give Jev the facts and the option instead; keep code for the game's physics and what cannot wait for an answer.
+- **A bigger model is not a better judge here.** A generative model reviewing Jev's recoveries agreed with it, at fourteen seconds and a hundred times the cost; it was removed. When Jev chooses badly, fix the menu: a missing option, a wrong price or a stale fact.

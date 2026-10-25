@@ -1,35 +1,31 @@
 # Roadmap
 
-The goal is to beat Minecraft from a fresh Survival world with an empty inventory, with Jev making the judgment calls and no help from commands, kits or a person ([GOAL.md](GOAL.md)). The items are in order of priority, without dates. Where things stand is in the [README](README.md#status) and the [trial notes](docs/trial-notes.md).
+The first goal, to beat Minecraft from a fresh Survival world with an empty inventory, with Jev making the judgment calls and no help from commands, kits or a person ([GOAL.md](GOAL.md)), was met on 2026-10-24 ([the win](docs/wins/full-2.md)). The goal now is the time it takes. The items are in order of priority, without dates.
 
 ## Done
 
-- The first three in-game days, passed by four trials so far (`scripts/first-days.js`). Two passes in a row is still open.
-- Reaching the Nether from a fresh world (15 of 40 on 2026-09-28, median 28 minutes) and finding a fortress.
-- Most reflexes and hand-written rules handed to Jev as questions ([rule audit](docs/rule-audit.md)).
+- The first three in-game days (`scripts/first-days.js`), the Nether, blaze rods, ender pearls, the stronghold and the dragon, in one continuous run from a fresh world: full-2, about 107 hours of play.
+- The dragon killed from a staged world in one life (2026-10-19).
+- Most reflexes and hand-written rules handed to Jev as questions ([rule audit](docs/rule-audit.md)), the routine meal among them (note 2103).
 
-## Now: blaze rods
+## Now: the time to the dragon
 
-Six rods from a fortress without dying. One trial has taken seven rods (at full health, at a live spawner); others took three to five, and most then died within minutes. Twelve pearls come next, then the End. What kills the bot:
+A death counts only by the time it costs. full-2's two big losses were 49 hours from the stronghold to the kill (getting the End kit, dying in the End, re-kitting) and 25 hours from the Nether to the eyes (blaze rods and pearls). `scripts/trials/time-lost.js` splits a run's minutes into work, travel, fights, waiting and stuck. The work:
 
-- Blazes at a live spawner. The arena shows walking in and fighting is the only tactic that gets rods; the work is in pricing it honestly and knowing when to leave and heal.
-- Ghast and blaze fireballs pushing the bot off a ledge into lava.
-- Low health that doesn't come back in the Nether, where food is scarce.
+- Every route a speedrun uses, on Jev's menu with the game's own numbers: bartering for pearls with gold from bastions (notes 2106, 2107), beds against the perched dragon (note 2108).
+- Prices in minutes toward the goal, so unlike options compare: cooking against raw food, banking rods against hunting on, a bed carried against nights waited out awake.
+- Facts from the run itself and the server's code, not from old trials.
+- Fewer deaths in the End, where each one meant a long walk back with a new kit.
 
-Alongside: trials that stay busy without progressing (pacing, sitting in a shelter, flipping between two plans). The progress audit and trail maps flag these.
+The measure is the clock of fresh runs started after each round of changes (full-5 to full-7 from 2026-10-24).
 
-The milestone is two fortress runs in a row that reach six rods and twelve pearls with no deaths and no loops.
+## After: the exit portal
 
-## Next: the End
-
-- Ender pearls: endermen in warped forests, or bartering with piglins.
-- Eyes of Ender, following their flight to a stronghold, and finding the portal room.
-- The dragon: crystals, the fight, food, falls and the exit portal. So far it has only been fought from staged worlds.
-- One continuous run from a fresh world, checked independently: Normal difficulty, no item grants, teleports, Creative mode or manual help.
+After the kill the bot does not yet find its way out of the End through the exit portal.
 
 ## Later: netherite
 
-The bot does not aim for netherite. It counts ancient debris as worth picking up and knows netherite gear is stronger, but nothing searches for debris, smelts scrap, crafts ingots or uses a smithing table. Netherite armor would help against fireball pushes (it resists knockback). The chain is long and dangerous: debris at y 8 to 22 in lava-rich caves with a diamond pickaxe, four scrap and four gold ingots plus a diamond piece and a template for each upgrade, and the templates come from bastion chests. It comes after reliable rods and pearls and full diamond armor. When it does, Jev chooses whether to go for it, with the prices in front of it.
+The bot does not aim for netherite. It counts ancient debris as worth picking up and knows netherite gear is stronger, but nothing searches for debris, smelts scrap, crafts ingots or uses a smithing table. Netherite armor would help against fireball pushes (it resists knockback). The chain is long and dangerous: debris at y 8 to 22 in lava-rich caves with a diamond pickaxe, four scrap and four gold ingots plus a diamond piece and a template for each upgrade, and the templates come from bastion chests. It would come after the time to the dragon is short. When it does, Jev chooses whether to go for it, with the prices in front of it.
 
 ## Companion
 
