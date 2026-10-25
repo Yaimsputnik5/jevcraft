@@ -8853,6 +8853,9 @@ async function crossingKitReady(bot, task, goal, save, client = task.opportunity
     }
   } catch (_) { /* nothing said */ }
   tree.cross_now.description += require('./entry-kit').goingWithout(entry);
+  // The deaths at the far side of the portal (note 2112): the crossing comes
+  // out where the bot died before, said with what killed it and when.
+  try { tree.cross_now.description += require('./crossing-kit').portalDeathsSays(bot, goal); } catch (_) { /* nothing said */ }
   // The crossing chosen for the kit a death left on the far side (note 1233).
   { const cr = require('./corpse-run'), run = goal.corpseRun; if (goal.errand?.for === cr.KIT_ERRAND && run?.status === 'open' && run.dimension === 'nether') tree.cross_now.description += ` This crossing was chosen for the kit dropped at the death in the Nether, taken up there before anything else: ${Object.entries(run.items || {}).map(([n, c]) => `${c > 1 ? `${c} ` : ''}${n.replaceAll('_', ' ')}`).join(', ')}.`; }
   for (const o of entry) tree[`top_up_${o.key}`] = { description: `${o.says}${soFar({ carried: countOf(bot, o.item) }, o.key)}` };

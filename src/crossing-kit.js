@@ -114,6 +114,31 @@ function netherWearSays(uses) {
   const last = uses > 0 ? ` the ${uses} uses carried last about ${m(uses / W.high * 60)} to ${m(uses / W.low * 60)} minutes at that rate;` : '';
   return ` On the fresh runs (2026-10-24 to 25) the Nether wore about ${W.low} to ${W.high} pickaxe uses an hour of being there:${last} with none left, rock is dug by hand at about ${W.handPace} blocks a minute against ${W.pickPace} with a pickaxe, dropping nothing, and a wooden pickaxe of the Nether's stems lasts ${W.woodUses}.`;
 }
+// Deaths where the crossing comes out (note 2112): within 16 blocks of the
+// Nether portal the bot would arrive at (the remembered one nearest the
+// Overworld portal's place over eight), in the last 24 hours, by cause. full-6
+// (2026-10-25 09:27, 10:46 and 14:13Z) died three times within 4 blocks of
+// its Nether portal at (2, 55, 24), each to magma cubes, each crossing asked
+// with nothing said of it; each death was a bare respawn in the Overworld and
+// a new kit, 58% of its time from 06:00Z went on getting the kit back.
+const PORTAL_DEATH_REACH = 16, PORTAL_DEATH_MS = 24 * 3600000;
+function portalDeathsSays(bot, goal, now = Date.now()) {
+  if (!/overworld/.test(String(bot?.game?.dimension || ''))) return '';
+  const here = bot.entity?.position;
+  const netherPortals = (goal?.portals || []).filter(q => /nether/.test(String(q.dimension)));
+  if (!here || !netherPortals.length) return '';
+  const want = { x: here.x / 8, z: here.z / 8 };
+  const exit = netherPortals.slice().sort((a, b) => Math.hypot(a.x - want.x, a.z - want.z) - Math.hypot(b.x - want.x, b.z - want.z))[0];
+  const deaths = (bot._survivalState?.deaths || []).filter(d => /nether/.test(String(d.dimension || '')) && d.position && now - Date.parse(d.at) <= PORTAL_DEATH_MS &&
+    Math.hypot(d.position.x - exit.x, d.position.z - exit.z) <= PORTAL_DEATH_REACH);
+  if (!deaths.length) return '';
+  const by = {};
+  for (const d of deaths) { const c = String(d.cause || 'died').replace(/^was /, ''); by[c] = (by[c] || 0) + 1; }
+  const last = Math.max(...deaths.map(d => Date.parse(d.at)));
+  const ago = Math.max(1, Math.round((now - last) / 60000));
+  const near = Math.round(Math.min(...deaths.map(d => Math.hypot(d.position.x - exit.x, d.position.z - exit.z))));
+  return ` Where this crossing comes out, the Nether portal at (${exit.x}, ${exit.y}, ${exit.z}): ${deaths.length} death${deaths.length === 1 ? '' : 's'} within ${PORTAL_DEATH_REACH} blocks of it in the last 24 hours (${Object.entries(by).map(([c, n]) => `${n} ${c}`).join(', ')}), the nearest ${near} blocks from the portal, the last ${ago < 120 ? `${ago} minutes` : `${Math.round(ago / 60)} hours`} ago; each came back to life in the Overworld with nothing carried. A portal made elsewhere in the Overworld comes out elsewhere in the Nether: 128 blocks from this one, about 16 blocks from its Nether side.`;
+}
 function kitItems(bot) {
   if (bot.game?.gameMode !== 'survival') return [];
   const items = [];
@@ -385,4 +410,4 @@ function kitRungSays(bot, goal, rung) {
   return ` ${rung.carried} food points carried, ${rung.wants} wanted: the Nether stay the goal still needs, about ${stay.minutes} minutes for ${left}, at about ${NETHER_HUNGER_AN_HOUR} hunger an hour. Health comes back only at hunger 18 or more, and in the Nether a hoglin is the only meat. At the crossing ${c.none} of ${c.n} carried no food and ${c.shortOfStay} were short of the stay (note 664).${ways}`;
 }
 
-module.exports = { NETHER_WEAR, netherWearSays, kitBlocksWanted, NETHER_PICK_USES, pickUses, SPARE_PICKAXE_DURABILITY, KIT_PHASES, chestWood, CHEST_PLANKS, kitRungs, kitRungSays, chestRungSays, soundPickaxes, PICKAXES_TAKEN, cauldronSet, stayCauldron, netherStay, staySays, NETHER_HUNGER_AN_HOUR, netherHitSays, kitItems, valuablesAt, kitSummary, netherBlocks, logsCarried, NETHER_HEALTH, NETHER_BLOCKS, SPARE_PICKAXE_DURABILITY, EXPEDITION_LOGS };
+module.exports = { portalDeathsSays, PORTAL_DEATH_REACH, NETHER_WEAR, netherWearSays, kitBlocksWanted, NETHER_PICK_USES, pickUses, SPARE_PICKAXE_DURABILITY, KIT_PHASES, chestWood, CHEST_PLANKS, kitRungs, kitRungSays, chestRungSays, soundPickaxes, PICKAXES_TAKEN, cauldronSet, stayCauldron, netherStay, staySays, NETHER_HUNGER_AN_HOUR, netherHitSays, kitItems, valuablesAt, kitSummary, netherBlocks, logsCarried, NETHER_HEALTH, NETHER_BLOCKS, SPARE_PICKAXE_DURABILITY, EXPEDITION_LOGS };

@@ -38,3 +38,16 @@ test('the crossing kit says what the Nether wears an hour, by the fresh runs, an
   assert.equal(netherWearSays(510), " On the fresh runs (2026-10-24 to 25) the Nether wore about 470 to 930 pickaxe uses an hour of being there: the 510 uses carried last about 33 to 65 minutes at that rate; with none left, rock is dug by hand at about 12 blocks a minute against 40 with a pickaxe, dropping nothing, and a wooden pickaxe of the Nether's stems lasts 59.");
   assert.match(netherWearSays(0), /an hour of being there: with none left/);
 });
+
+test('the crossing says the deaths where it comes out in the Nether (note 2112)', () => {
+  const { portalDeathsSays } = require('../src/crossing-kit');
+  const now = Date.parse('2026-10-25T15:00:00Z');
+  const death = (at, x, z, dimension = 'the_nether', cause = 'was slain by Magma Cube') => ({ at, dimension, position: { x, y: 55, z }, cause });
+  const bot = { game: { dimension: 'overworld' }, entity: { position: { x: 20, y: 70, z: 190 } }, _survivalState: { deaths: [
+    death('2026-10-25T09:27:53Z', -3, 31), death('2026-10-25T10:46:04Z', 1, 23), death('2026-10-25T14:13:48Z', 4, 25),
+    death('2026-10-25T12:01:02Z', 4, 25, 'overworld', 'was blown up by Creeper'), death('2026-10-24T09:00:00Z', 2, 24) ] } };
+  const goal = { portals: [{ x: 2, y: 55, z: 24, dimension: 'nether' }, { x: 20, y: 70, z: 190, dimension: 'overworld' }] };
+  assert.match(portalDeathsSays(bot, goal, now), /^ Where this crossing comes out, the Nether portal at \(2, 55, 24\): 3 deaths within 16 blocks of it in the last 24 hours \(3 slain by Magma Cube\), the nearest 1 blocks from the portal, the last 46 minutes ago;/);
+  assert.equal(portalDeathsSays({ ...bot, _survivalState: { deaths: [] } }, goal, now), '');
+  assert.equal(portalDeathsSays({ ...bot, game: { dimension: 'the_nether' } }, goal, now), '', 'said only on the Overworld side');
+});
