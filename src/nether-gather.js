@@ -558,6 +558,7 @@ async function netherGather(bot, task, goal, save, resource, { navigate, returnO
   const refused = require('./bridging').spanRefused(bot);
   const places = knownPlaces(bot, goal, names);
   const placesSaid = [];
+  let blocksNeed = 0;
   const placeIds = require('./decisions/keys').ids(goal, 'gather_place', places.map(p => p.at), { near: 8, base: 1 });
   for (const [pi, place] of places.entries()) {
     const placeId = placeIds[pi];
@@ -570,6 +571,7 @@ async function netherGather(bot, task, goal, save, resource, { navigate, returnO
     const says = `${whereSays}. ${walkSays(way, bot)} ${crossSays(bot, way)}${floorSays(way)} ${standSays}`;
     const offered = waysOffered(way);
     if (way.cross.whole.bridge > way.cross.carried) require('./block-stock').noteBlocksShort(goal, way.cross.whole.bridge, way.cross.carried, `the crossing to ${where} at ${at3(place.at)}`);
+    if (way.cross.whole.bridge > way.cross.carried) blocksNeed = Math.max(blocksNeed, way.cross.whole.bridge);
     const keys = [];
     for (const method of ['walk', 'cross', 'floor']) {
       if (!offered[method]) continue;
@@ -592,6 +594,7 @@ async function netherGather(bot, task, goal, save, resource, { navigate, returnO
     const climb = mineAt && !way.walk?.found && !wayResting(bot, goal, place.at, 'climb') ? climbTo(bot, place.at) : null;
     if (climb) {
       require('./block-stock').noteBlocksShort(goal, climb.need, climb.carried, `the way up to ${where} at ${at3(place.at)}`);
+      if (climb.need > climb.carried) blocksNeed = Math.max(blocksNeed, climb.need);
       const key = `climb_to_${placeId}`;
       keys.push(key);
       options[key] = { description: `Go up to ${where} at ${at3(place.at)}: ${climb.says}`, target: place.at, run: () => climbThen(bot, task, goal, save, climb, place.at, `${where} at ${at3(place.at)}`, navigate) };
@@ -726,6 +729,32 @@ async function netherGather(bot, task, goal, save, resource, { navigate, returnO
   { const away = require('./fortress-away').awayFacts(bot, goal); if (away) facts.fortressLeft = away; }
   try { facts.threatsInView = require('./danger').threats(bot, 64).filter(t => t.visible && (t.distance <= 32 || t.entity.name === 'ghast')).map(t => `${words(t.entity.name)} ${Math.round(t.distance)} blocks off`); } catch (_) { /* none said */ }
   try { facts.seenSoFar = coverage.coverageSays(state, dim, here, LEG); } catch (_) { /* none said */ }
+  // Blocks dug first, where a way to a known place needs more than are
+  // carried and a pickaxe makes each block dug drop itself (note 2081):
+  // full-7 (2026-10-24 23:50Z to 02:48Z) was told of 302 crimson stems 69
+  // blocks off, "needs 1 block laid and 0 are carried: it cannot be done",
+  // a pickaxe in the pack and netherrack all round, was offered no way to
+  // blocks, and took search legs over its own span thirteen times.
+  const carriedNow = require('./bridging').blocksCarried(bot);
+  const picked = (bot.inventory?.items?.() || []).some(i => /_pickaxe$/.test(i.name));
+  if (blocksNeed > carriedNow && picked && mineAt) {
+    const want = Math.min(64, blocksNeed + 8), dig = want - carriedNow;
+    options.blocks_first = { description: `Dig blocks first, toward ${want} carried (${carriedNow} now): the rock round about, netherrack the most of it, dug with the ${words((bot.inventory.items().find(i => /_pickaxe$/.test(i.name)) || {}).name || 'pickaxe')}, each block dropping itself, about ${Math.round(dig * 1.5)} seconds for ${dig}; the way to the place that wants the most here needs ${blocksNeed} laid. Asked again after, with the blocks carried.`,
+      run: async () => {
+        goal.step = { action: 'nether_gather', way: 'blocks_first', want }; save();
+        const done = await require('./bridging').gatherSpanBlocks(bot, task, want, { navigate, mineAt: s => mineAt(s.p, s.name), skip: p => isSetAside(goal, 'reach', p) });
+        if (!done.gained) throw new Error(`Digging for blocks gave none${done.why ? `: ${done.why}` : ''}`);
+      } };
+  }
+  // How long this looking has gone on, and how often it was asked (note
+  // 2081): full-7 asked it 23 times over two and a half hours for wood, and
+  // nothing said so.
+  {
+    const now = Date.now(), g = goal.gatherClock;
+    goal.gatherClock = g && g.resource === resource && now - g.lastAt < 10 * 60000 ? { ...g, asks: g.asks + 1, lastAt: now } : { resource, since: now, asks: 1, lastAt: now };
+    const m = Math.round((now - goal.gatherClock.since) / 60000);
+    if (goal.gatherClock.asks > 1) facts.soFar = `This looking for ${words(resource)} has gone on ${m} minute${m === 1 ? '' : 's'}, asked ${goal.gatherClock.asks} times, without its finding it yet.`;
+  }
   const tree = Object.fromEntries(Object.entries(options).map(([k, o]) => [k, { description: o.description, ...(o.target ? { target: { x: Math.round(o.target.x), y: Math.round(o.target.y), z: Math.round(o.target.z) } } : {}) }]));
   const unseen = Object.fromEntries(HEADING_NAMES.map((n, i) => [`leg_${n}`, options[`leg_${n}`] ? coverage.headingCoverage(state, dim, here, HEADINGS[i], { length: LEG }).unseen : null]));
   const decision = await require('./decisions').decide('nether_gather', { client, bot, task, goal, save, tree, state: facts, context: { unseen } });

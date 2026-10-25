@@ -157,3 +157,29 @@ test('either Nether stem stands for the other where only it is in view (note 608
   assert.equal(swapped.block, 'warped_stem');
   assert.equal(swapped.insteadOf, 'crimson_stem');
 });
+
+test('a way to the stems short of blocks, a pickaxe carried: digging blocks first is offered; with no pickaxe it is not (note 2081)', async () => {
+  // full-7 (2026-10-24 23:50Z to 02:48Z): 302 crimson stems 69 blocks off, "needs 1 block laid and 0 are carried", a pickaxe in the pack, no way to blocks offered; it took search legs over its own span thirteen times.
+  const { mineAtSource } = require('../src/work');
+  const ask = async items => {
+    const bot = spanBot({ items }), goal = recordedGoal();
+    const client = jevStub(['without']), task = new Task('work');
+    task.opportunityClient = client;
+    await mineAtSource(bot, task, stemStep(), goal, () => {});
+    return client.asked[0];
+  };
+  const withPick = await ask([...CARRIED, ['wooden_pickaxe', 1]]);
+  assert.match(withPick.options.blocks_first || '', /^Dig blocks first, toward \d+ carried \(0 now\): the rock round about, netherrack the most of it, dug with the wooden pickaxe, each block dropping itself/, Object.keys(withPick.options).join(', '));
+  const bare = await ask(CARRIED);
+  assert.equal(bare.options.blocks_first, undefined);
+});
+
+test('the looking says how long it has gone on and how often it was asked (note 2081)', async () => {
+  const { mineAtSource } = require('../src/work');
+  const bot = spanBot(), goal = recordedGoal();
+  goal.gatherClock = { resource: 'crimson_stem', since: Date.now() - 40 * 60000, asks: 6, lastAt: Date.now() - 60000 };
+  const client = jevStub(['without']), task = new Task('work');
+  task.opportunityClient = client;
+  await mineAtSource(bot, task, stemStep(), goal, () => {});
+  assert.match(client.asked[0].state.soFar, /^This looking for crimson stem has gone on 40 minutes, asked 7 times, without its finding it yet\.$/);
+});
