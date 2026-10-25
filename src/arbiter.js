@@ -486,7 +486,19 @@ function workBodySays(bot, mobs) {
   const dark = Number.isFinite(t) && t >= 12542 && t <= 23460 && /overworld/.test(String(bot.game?.dimension || ''));
   let nightSays = '';
   if (dark) { try { nightSays = require('./night-record').bareNightSays(bot, 'continue_request'); } catch (_) { nightSays = ''; } }
-  return `Health ${Math.round(hp * 10) / 10}: ${back}.${starve}${nightSays}${near.length ? ` ${far.length ? 'Mobs about now, within sixteen blocks and the shooters farther off whose fire reaches the bot' : 'Mobs within sixteen blocks now'}: ${near.join(heals ? '; ' : '. ')}.` : ''}`;
+  // Under a lid two high with an enderman about (note 2079): the lid keeps
+  // its blows off, and the work's walk leaves it. full-6 (2026-10-25
+  // 01:40:38Z) took cap_fight against an enderman 3.4 blocks off, was given
+  // the work over survival two seconds on, told only "an enderman 3.3
+  // blocks off (out of sight)", walked out, and was struck from 18.3 to
+  // none in eight seconds.
+  let lidSays = '';
+  try {
+    const f = require('./terrain').feetCell(bot), b = q => bot.blockAt?.(f.offset(0, q, 0));
+    const ender = said.find(t => t.entity?.name === 'enderman' && t.distance <= 16);
+    if (ender && b(1)?.boundingBox === 'empty' && b(2)?.boundingBox === 'block') lidSays = ` The bot stands under a lid two high, where the enderman ${Math.round(ender.distance * 10) / 10} blocks off cannot come at it (it is 2.9 tall); the work's walk leaves it, and an angry enderman runs at about 8.7 blocks a second.`;
+  } catch (_) { lidSays = ''; }
+  return `Health ${Math.round(hp * 10) / 10}: ${back}.${starve}${nightSays}${lidSays}${near.length ? ` ${far.length ? 'Mobs about now, within sixteen blocks and the shooters farther off whose fire reaches the bot' : 'Mobs within sixteen blocks now'}: ${near.join(heals ? '; ' : '. ')}.` : ''}`;
 }
 function withSays(option, c, bot, state, mobs, now) {
   const add = [];

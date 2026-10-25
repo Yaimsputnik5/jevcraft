@@ -52,3 +52,13 @@ test('raw meat carried with fuel and a furnace: cooking it now is an upkeep offe
   assert.ok(options.cook_meat, Object.keys(options).join(','));
   assert.match(options.cook_meat.description, /Cook the raw meat carried now: 6 beef, 18 food points as carried and 48 cooked \(\+30\); the furnace carried put down here, coal for fuel/);
 });
+
+test('under a lid two high with an enderman about, the work says the lid keeps it off and its walk leaves it (note 2079)', () => {
+  // full-6 (2026-10-25 01:40:40Z): given the work two seconds after cap_fight, told only "an enderman 3.3 blocks off (out of sight)", walked out, and was struck to death.
+  const { workBodySays } = require('../src/arbiter');
+  const lid = y => ({ health: 18.3, food: 20, game: { difficulty: 'normal', dimension: 'the_nether' }, entity: { position: new Vec3(0.5, 64, 0.5) }, entities: {}, inventory: { items: () => [], slots: [] }, registry: require('minecraft-data')('26.1'),
+    blockAt: p => { const f = p.floored(); const solid = f.y < 64 || f.y === y; return { name: solid ? 'netherrack' : 'air', boundingBox: solid ? 'block' : 'empty', position: f }; } });
+  const ender = { entity: { id: 9, name: 'enderman', position: new Vec3(3.5, 64, 0.5), isValid: true }, distance: 3.3, visible: false };
+  assert.match(workBodySays(lid(66), [ender]), /The bot stands under a lid two high, where the enderman 3\.3 blocks off cannot come at it \(it is 2\.9 tall\); the work's walk leaves it/);
+  assert.doesNotMatch(workBodySays(lid(99), [ender]), /under a lid/, 'open overhead: nothing said');
+});
