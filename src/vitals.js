@@ -1797,7 +1797,7 @@ async function maintainVitals(bot, task, onAction = () => {}, { client = null, g
   const ways = mw.mealWays(bot, { cook: typeof cookFirst === 'function' ? async item => {
     onAction({ action: 'cook_meat', item: item.cooked, raw: item.n, then: 'eat', food: bot.food, health: bot.health });
     try { await cookFirst(item); } catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err?.name)) throw err; }
-  } : null });
+  } : null, goal });
   const first = `eat_${food.name}`;
   let pick = ways[first] ? first : Object.keys(ways)[0];
   const decision = await require('./decisions').decide('meal', { client, bot, task: own, goal, save, tree: ways, watchAir: false,

@@ -35,14 +35,23 @@ function foodsCarried(bot) {
 // The ways: eat_<food> for each food carried, cook_then_eat where a furnace
 // can be put down here, eat_later. `cook(item)` cooks one raw kind; without
 // it the cook is not offered. Each way's run gives the food to eat, or null.
-function mealWays(bot, { cook = null } = {}) {
-  const f = bot.registry?.foodsByName || {}, food = bot.food ?? 20;
+function mealWays(bot, { cook = null, goal = null } = {}) {
+  const f = bot.registry?.foodsByName || {}, food = bot.food ?? 20, health = round(bot.health ?? 20);
   const ways = {};
+  const carried = foodsCarried(bot), totalPts = carried.reduce((t, c) => t + c.n * (f[c.name]?.foodPoints || 0), 0);
+  // The last food carried said as the last (note 2129): full-5 (2026-10-26
+  // 02:42Z, health 20, hunger 16) ate its one cooked porkchop at 0.97 with
+  // four of its points past 20 lost, was told nothing of what came after,
+  // and seven minutes later stood at 4.3 health with nothing to eat, hunger
+  // 16, for twenty minutes of the night.
+  let known = null; try { known = require('./healing').nearestFood(bot, goal); } catch (_) { known = null; }
+  const lastSays = c => c.n === 1 && totalPts === (f[c.name]?.foodPoints || 0)
+    ? ` It is the last food carried: eaten, nothing carried heals after it${health >= 20 ? ', and health is full now, so it eats back hunger alone' : ''}; the food known from here: ${known?.length ? known.join('; ') : 'none known'}.` : '';
   // The cook as it would be (note 2109): a raw food's own option says what
   // eating it raw gives up, in the cook's minutes.
   let c0 = null; try { c0 = cook ? require('./work').cookable(bot) : null; } catch (_) { c0 = null; }
   const cookSecs = item => item.n * 10 + (c0?.furnace ? 2 : 6);
-  for (const c of foodsCarried(bot)) {
+  for (const c of carried) {
     const pts = f[c.name].foodPoints, sat = round(f[c.name].saturation ?? 0), to = Math.min(20, food + pts);
     const waste = food + pts - 20;
     const cooked = require('./vitals').COOKED[c.name];
@@ -52,7 +61,7 @@ function mealWays(bot, { cook = null } = {}) {
     const rawCost = asCooked ? require('./work').rawCostSays(asCooked, cookSecs(asCooked)) : '';
     ways[`eat_${c.name}`] = {
       description: `Eat a ${words(c.name)} now (${c.n} carried): about two seconds standing still, ${pts} hunger and ${sat} saturation, hunger ${food} to ${to}` +
-        `${waste > 0 ? `, ${waste} of its points past 20 lost` : ''}.${rawSays}${rawCost}${effect ? ` ${effect[0].toUpperCase()}${effect.slice(1)}.` : ''}`,
+        `${waste > 0 ? `, ${waste} of its points past 20 lost` : ''}.${rawSays}${rawCost}${effect ? ` ${effect[0].toUpperCase()}${effect.slice(1)}.` : ''}${lastSays(c)}`,
       run: async () => c.item,
     };
   }
@@ -71,7 +80,7 @@ function mealWays(bot, { cook = null } = {}) {
     };
   }
   ways.eat_later = {
-    description: 'Eat nothing now and go on with the work: asked again when hunger or health falls.',
+    description: `Eat nothing now and go on with the work: asked again when hunger or health falls.${totalPts ? ` Kept, the ${totalPts} food point${totalPts === 1 ? '' : 's'} carried ${totalPts === 1 ? 'is' : 'are'} the meal for a hurt later: health comes back only at hunger 18 or more, and from hunger ${food} ${food >= 18 ? 'it comes back now' : `that takes ${18 - food} point${18 - food === 1 ? '' : 's'} eaten first`}.` : ''}`,
     run: async () => { bot._mealLater = { food, health: bot.health ?? 20, at: Date.now() }; return null; },
   };
   return ways;
