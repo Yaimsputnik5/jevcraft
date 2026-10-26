@@ -255,6 +255,24 @@ function hungerRecordSays(bot, hunger) {
   return `in the Overworld (${r.from} to ${r.to}), deaths a bot-hour at hunger 18 or more ${r.fed.armoured} in armour and ${r.fed.bare} with nothing worn; at 14 to 17, ${r.mid.armoured} and ${r.mid.bare}; under 14, ${r.low.armoured} and ${r.low.bare}. At hunger ${hunger} with ${bare ? 'nothing worn' : 'armour on'}: ${row[bare ? 'bare' : 'armoured']} an hour, against ${r.fed[bare ? 'bare' : 'armoured']} fed to 18`;
 }
 
+// How many hits are left (note 2202; Fable, 2026-10-26): the hardest hit of the mobs about, through the armour worn, and how
+// many such hits the health takes before the next ends it. The fight questions said that health does not come back and
+// never how close the end was: 25599 (2026-10-26 11:33:49Z) at 4.1 health took keep_on against a blaze 4 blocks off (one
+// fireball ends it) and died; 25591 at 2.3 among seven blazes took the fight; 25600 at 4.7 walked to blazes for five
+// minutes. The blaze's fireball is 5 (and sets the body alight), the ghast's 6; the rest from the estimate's table.
+const HIT_OF = { blaze: 5, ghast: 6 };
+function hitsLeftSays(bot, health) {
+  const ce = require('./combat-estimate');
+  let near; try { near = require('./danger').threats(bot, 16).filter(t => t.distance <= 16); } catch (_) { return null; }
+  if (!near?.length) return null;
+  const worn = ce.armourOf([5, 6, 7, 8].map(slot => bot.inventory?.slots?.[slot]?.name).filter(Boolean));
+  const priced = near.map(t => ({ name: t.entity.name, hit: HIT_OF[t.entity.name] ?? ce.MOBS[t.entity.name]?.hit })).filter(x => Number.isFinite(x.hit))
+    .map(x => ({ ...x, through: ce.MOBS[x.name]?.ignoresArmour ? x.hit : ce.afterArmour(x.hit, worn) }));
+  if (!priced.length) return null;
+  const worst = priced.reduce((a, b) => b.through > a.through ? b : a);
+  const more = Math.max(0, Math.ceil(health / worst.through) - 1);
+  return `the hardest hit about, the ${worst.name.replace(/_/g, ' ')}'s, is about ${round(worst.through)} through what is worn${worn.points ? '' : ' (nothing worn)'}: at ${health} health the body takes ${more} more such hit${more === 1 ? '' : 's'}, and the ${more ? 'one after' : 'next one'} ends it${worst.name === 'blaze' ? '; a fireball that lands sets the body alight too, about a health a second for five seconds' : ''}`;
+}
 // The standing fact: health and hunger, whether health comes back, the food
 // carried and the nearest known, the time to daylight, and what standing
 // still costs. Null where there is nothing to say (no body, Creative).
@@ -275,12 +293,14 @@ function healingSays(bot, goal) {
   // takes a point each 1.25 seconds to healing's one each four: said beside
   // it, so "yes" is not read as holding even. mid-243-f was poisoned from
   // 8.1 to 0.23 (note 542).
+  const hitsLeft = hitsLeftSays(bot, health);
   const poisoned = require('./combat-estimate').effectLeft(bot, 'poison');
   const poisonSays = poisoned && poisoned.seconds > 0 && health > 1
     ? `poisoned, about ${Math.round(poisoned.seconds)} seconds left: one health each 1.25 seconds that armour does not stop, about ${Math.min(Math.floor(poisoned.seconds / 1.25), Math.ceil(health - 1))} more before it ends, ${hunger >= 20 && bot.foodSaturation > 0 ? 'while hunger is full and saturation lasts health comes back as fast or faster (up to a point each half second), after that a point each four seconds, which it outruns three to one' : hunger >= 18 ? 'three times as fast as health comes back here' : 'and none comes back meanwhile'}; it takes a point only while health is above 1, so it never kills on its own, but it leaves the bot at 1 or just under for the next hit`
     : null;
   return {
     health, hunger, healthComesBack: comesBack,
+    ...(hitsLeft ? { hitsLeft } : {}),
     ...(poisonSays ? { poison: poisonSays } : {}),
     foodCarried: carried.length ? carried.map(f => f.says) : 'nothing to eat',
     ...(hungerRecordSays(bot, hunger) ? { hungerRecord: hungerRecordSays(bot, hunger) } : {}),
@@ -292,4 +312,4 @@ function healingSays(bot, goal) {
   };
 }
 
-module.exports = { HUNGER_RECORD, hungerRecordSays, healingSays, noHealSays, withNoHealSays, HEALTH_SAID, withoutFoodSays, overworldFoodSays, foodCarried, nearestFood, foodSources, daylightSays, MEAT_POINTS, RAW_MEAT_POINTS, preyFailed };
+module.exports = { HUNGER_RECORD, hungerRecordSays, healingSays, hitsLeftSays, noHealSays, withNoHealSays, HEALTH_SAID, withoutFoodSays, overworldFoodSays, foodCarried, nearestFood, foodSources, daylightSays, MEAT_POINTS, RAW_MEAT_POINTS, preyFailed };

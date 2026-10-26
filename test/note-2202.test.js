@@ -1,0 +1,38 @@
+'use strict';
+// Note 2202: the healing facts say how many hits are left. 25599 (2026-10-26
+// 11:33:49Z) at 4.1 health, iron chestplate, a blaze 4 blocks off, was asked
+// the shot question with 'health does not come back' and took keep_on: one
+// fireball ended it. 25591 at 2.3 among seven blazes took the fight.
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { EventEmitter } = require('events');
+const { Vec3 } = require('vec3');
+const registry = require('minecraft-data')('26.1');
+const { healingSays, hitsLeftSays } = require('../src/healing');
+
+const item = (name, count = 1) => ({ name, count, type: registry.itemsByName[name].id, durabilityUsed: 0 });
+function bot({ health, worn = {}, entities = {} }) {
+  const slots = [];
+  for (const [slot, name] of Object.entries({ 5: worn.head, 6: worn.torso, 7: worn.legs, 8: worn.feet })) if (name) slots[slot] = item(name);
+  return Object.assign(new EventEmitter(), { registry, health, food: 17, foodSaturation: 0, entity: { id: 1, position: new Vec3(0.5, 64, 0.5), height: 1.8, width: 0.6, onGround: true },
+    game: { dimension: 'the_nether', gameMode: 'survival', difficulty: 'normal' }, time: { timeOfDay: 6000 }, inventory: { items: () => [], slots }, entities, world: { raycast: () => null },
+    blockAt: p => ({ name: p.y < 64 ? 'netherrack' : 'air', boundingBox: p.y < 64 ? 'block' : 'empty', position: p }) });
+}
+const blaze = (id, x) => ({ id, name: 'blaze', type: 'hostile', position: new Vec3(x, 65, 0.5), isValid: true, height: 1.8 });
+
+test('25599: 4.1 health in an iron chestplate, a blaze 4 blocks off: the fireball is about 4.3 through the armour, no more hits, the next one ends it', () => {
+  const b = bot({ health: 4.1, worn: { torso: 'iron_chestplate' }, entities: { 2: blaze(2, 4.5) } });
+  const says = hitsLeftSays(b, 4.1);
+  assert.equal(says, "the hardest hit about, the blaze's, is about 4.3 through what is worn: at 4.1 health the body takes 0 more such hits, and the next one ends it; a fireball that lands sets the body alight too, about a health a second for five seconds");
+  assert.equal(healingSays(b, {}).hitsLeft, says, 'carried on the healing facts every fight question has');
+});
+
+test('full health with nothing worn and a wither skeleton beside a blaze: the hardest hit named, four more before the one after ends it', () => {
+  const b = bot({ health: 20, entities: { 2: blaze(2, 6.5), 3: { id: 3, name: 'wither_skeleton', type: 'hostile', position: new Vec3(3.5, 64, 0.5), isValid: true, height: 2.4 } } });
+  assert.match(hitsLeftSays(b, 20), /^the hardest hit about, the wither skeleton's, is about 8 through what is worn \(nothing worn\): at 20 health the body takes 2 more such hits, and the one after ends it$/);
+});
+
+test('nothing hostile about: nothing said', () => {
+  assert.equal(hitsLeftSays(bot({ health: 5 }), 5), null);
+  assert.equal(healingSays(bot({ health: 5 }), {}).hitsLeft, undefined);
+});
