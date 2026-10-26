@@ -9051,7 +9051,18 @@ async function crossingKitReady(bot, task, goal, save, client = task.opportunity
     if (key === 'food' && goal.kitFood?.choice?.pick === 'go_without') delete goal.kitFood.choice;
     // The food taken up is the ladder's next rung whatever rest it had, as the trip back for food is (note 763's foodTrip; note 1964): the opt-in alone left the rung resting, the ladder went on to the crossing, and the question came back ten seconds later with nothing done. full-3 (2026-10-20 15:14:15Z, 0 of 80 food points) chose take_up_food at 0.63, was asked again at 15:14:25 ('Chosen 10 seconds ago, and it changed nothing'), crossed, and turned back for food three minutes in; full-2 did the same at 13:35 with 31 of 80 and died at 5.6 health with nothing to eat.
     if (key === 'food' && !goal.foodTrip) goal.foodTrip = { at: Date.now(), from: 'crossing' };
-    delete kit.choice; save();
+    // The food taken up holds as the kit's choice (note 2133): run from here
+    // a pass at a time, each pass that brought nothing (a furnace batch out
+    // of reach, a herd walk ended) had the crossing asked again at once with
+    // 'take up food was chosen 10 seconds ago and changed nothing'. Tonight
+    // (2026-10-26 01:00 to 03:45Z, five fresh runs) take_up_food was 59 of
+    // crossing_kit's 87 answers, in runs of 2 to 10, and the run's end was
+    // cross_now bare: full-6 (03:29Z) crossed with 0 food, no pickaxe and no
+    // armour and died four times in fifty minutes. Held, the food is
+    // gathered until it is carried, its own question (kit_food) goes
+    // without, or its ten working minutes without a point more are up.
+    if (key !== 'food') delete kit.choice;
+    save();
     bot.chat?.(`The ${key} for the Nether is empty: taking it up again first.`);
     // The food taken up is gathered here and now, its own step run from the crossing (note 1969): handed back to the ladder, the crossing step ran again before any other stage (an enter_nether stage for the pearls as for the rods), the crossing question came back ten seconds later, and was answered cross_now. full-2 (2026-10-20 17:45:48 and 17:45:58Z, 17 of 80 food points, on notes 1964 and 1965's build) chose take_up_food and then crossed with the 17.
     if (key === 'food') {
