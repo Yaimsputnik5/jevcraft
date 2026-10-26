@@ -698,6 +698,12 @@ function configureMovements(bot) {
   // dirt, and the base's plot was retilled after every visit. Tilling and
   // planting stand beside the cell, so nothing needs to step on it.
   if (bot.registry.blocksByName.farmland) movement.blocksToAvoid.add(bot.registry.blocksByName.farmland.id);
+  // Pointed dripstone is no floor (note 2242): its collision is a thin spike set off the cell's middle at random, and
+  // the pathfinder read its 'block' box as ground. full-4 (25594, 2026-10-26 17:18Z) sank in a waterfall at (-1141, 70,
+  // 837) beside a ravine; the walk to the ruined portal stepped it east onto the dripstone at (-1140, 68, 837), the body
+  // missed the spike and fell 32 blocks onto a stalagmite at y 36, 20 to none, 'impaled on a stalagmite'. Counted with
+  // the fences (not stood on, not walked through) and avoided.
+  if (bot.registry.blocksByName.pointed_dripstone) { movement.fences.add(bot.registry.blocksByName.pointed_dripstone.id); movement.blocksToAvoid.add(bot.registry.blocksByName.pointed_dripstone.id); }
   // A portal is stepped into on purpose (work.js enterPortal walks up to it
   // and steps in), never on the way somewhere else: mid-87-l's fortress
   // search set out from beside its Nether portal, walked through the sheet
