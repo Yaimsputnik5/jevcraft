@@ -2746,6 +2746,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // How long the dragon has sat (note 1405): it takes off after five
     // seconds to most of a minute, and the run under it is said with that.
     if (dragon && perched(bot, dragon)) state.perchedSince ||= Date.now(); else delete state.perchedSince;
+    // How long the dragon has been coming down (note 2199): the landing approach (phase 2) and the landing (3) before it sits.
+    if (dragon && live(bot, dragon) && [2, 3].includes(metadata(bot, dragon, 'phase'))) state.landingSince ||= Date.now(); else delete state.landingSince;
     // For the sword at the perched head the place is judged by what is at
     // hand (note 1159): no mob within eight blocks, no breath or crystal
     // over it. The twenty blocks kept from a turned enderman are for a bow
@@ -3893,12 +3895,21 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         const axisH = dragon && live(bot, dragon) ? { x: Math.sin(dragon.yaw || 0), z: Math.cos(dragon.yaw || 0) } : null;
         const relH = axisH ? { x: bot.entity.position.x - dragon.position.x, z: bot.entity.position.z - dragon.position.z } : null;
         const frontOfIt = !axisH || (relH.x * axisH.x + relH.z * axisH.z > 0 && Math.abs(relH.x * axisH.z - relH.z * axisH.x) <= 3);
-        if (thickAt(feetAt) && !solid(feetAt) && !solid(feetAt.offset(0, 1, 0)) && !([2, 3].includes(phase) && walk0 > 4) && (walk0 === 0 || frontOfIt)) {
+        // The walk into the landing is Jev's (note 2199), said with its seconds against the approach's: the cutoff at four
+        // blocks (note 1623) left the bot with the dragon coming down and nothing but the bow and 'observe' to choose from.
+        // dragon-313 (25592, 2026-10-26 10:38 to 11:09Z) saw the dragon come down to the fountain at 10:49, 10:53, 11:04
+        // and 11:07 with every crystal gone, standing 8 to 24 blocks off, took shoot_dragon or a move each time, and in 31
+        // minutes of fight struck the head from a hole once (dragon 200 to 186); 35 askings at a landing across the day's
+        // dragon trials, the hole offered at none. The approach's seconds are this server's record (83 of them: 2 to 43 s,
+        // 10 as a rule); the walk's are the blocks at a sprint and the two digs.
+        const landing = [2, 3].includes(phase) && !head;
+        if (thickAt(feetAt) && !solid(feetAt) && !solid(feetAt.offset(0, 1, 0)) && (walk0 === 0 || frontOfIt || landing)) {
           const walk = walk0;
+          const landingSays = landing ? `the dragon is coming down to land on the fountain, ${Math.round(Math.hypot(dragon.position.x - centre.x, dragon.position.z - centre.z))} blocks from its middle, ${Math.round((Date.now() - (state.landingSince || Date.now())) / 1000)} s into its landing approach; on this server's dragon trials the approach took 2 to 43 s before it sat, 10 as a rule (83 approaches); it sits on while a player is within 20 of it. The walk of ${walk} blocks at a sprint is about ${Math.round(walk / 5.6 * 10) / 10} s and the two digs about 2 s${walk > 4 ? `: met in the open by the body coming down the bot is thrown (dragon-159, 2026-10-14: a walk of 7 into the landing 18 blocks off met the body, four blows 20 to 6.4 and a throw of 25 blocks)` : ''}` : null;
           const t = state.holeHead || { tries: 0, dugIn: 0, swings: 0 };
           tree.hole_under_head = {
             description: { action: `${walk ? `Walk ${walk} blocks to the cell 7 from the fountain's middle on the bot's own side, dig` : `Dig`} two down ${walk ? '' : 'here, ' + Math.round(byFountain * 10) / 10 + ' from the fountain\'s middle, '}and strike the dragon's head for as long as it sits: sitting on the fountain with its belly at about 65, its head a block under its middle and 6.5 before it is 3.4 over the eyes of a body two deep, out of the sword's three, so the blows are struck from the hole's rim (two blocks laid, the body up on its cell) and the hole dug again when the dragon rises; the body in the hole is below the wings' boxes and the breath's cloud, the body on the rim is in the breath and the push (dragon-163, 2026-10-14: ten blows struck from the ground by the head at 20 to 17 health). The dig is two seconds; the way out two blocks laid. While the dragon flies a block is laid over the hole's mouth (its fireball bursts on it and the cloud lies above; a hole with its mouth open took a fireball's cloud, dragon-159), and taken off when it sits for the sword.`,
-              dragonNow: head ? 'perched now' : 'coming down to land now', walkBlocks: walk, holeBlocksFromFountain: 7, blocksFromFountain: Math.round(byFountain), health: bot.health, dragonHealth: beforeDragon, blocksCarried: blocksCarried(bot),
+              dragonNow: head ? 'perched now' : 'coming down to land now', ...(landingSays ? { landingNow: landingSays } : {}), walkBlocks: walk, holeBlocksFromFountain: 7, blocksFromFountain: Math.round(byFountain), health: bot.health, dragonHealth: beforeDragon, blocksCarried: blocksCarried(bot),
               headHitThroughArmourWorn: headHit(bot),
               // The breath's cloud on the ground at the hole's cell or where the bot stands said (note 2050): the walk and the dig two down are in it, about six a second. full-3 (2026-10-23 21:44Z, dragon 185) took hole_under_head beside a cloud 7 wide 1.4 off at its feet's level, 20 to 0.8 in the dig, and died.
               ...(() => { const near = [feetAt.offset(.5, 0, .5), bot.entity.position].map(p => Object.values(bot.entities || {}).filter(e => e.name === 'area_effect_cloud' && e.isValid !== false && e.position && Math.abs(e.position.y - p.y) <= 1 && Math.hypot(e.position.x - p.x, e.position.z - p.z) <= cloudRadius(bot, e) + 1.5)).flat()[0];

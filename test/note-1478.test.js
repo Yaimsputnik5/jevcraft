@@ -772,3 +772,31 @@ test('a pool recorded far below the landing is no pool under the drop (note 1597
   const sides = lines.find(l => l.includes("the drop's sides from"));
   assert.ok(!sides || /lies 24 blocks below this side's landing/.test(sides) || !/the pool/.test(sides), sides);
 });
+
+test('the dragon coming down to land, the bot 14 from the fountain: the hole under the head is offered with the approach\'s and the walk\'s seconds, and chosen it is walked to and dug (note 2199)', async () => {
+  const { bot, goal, task } = fixture();
+  delete bot._pillarUp;
+  bot.entity.position = new Vec3(14.5, 64, 0.5);
+  const removed = new Set();
+  bot.blockAt = p => { const f = p.floored(), k = `${f.x},${f.y},${f.z}`; if (removed.has(k)) return { name: 'air', boundingBox: 'empty', position: f }; if (f.y === 63 && f.x === 0 && f.z === 0) return { name: 'bedrock', boundingBox: 'block', position: f }; return { name: f.y < 64 ? 'end_stone' : 'air', boundingBox: f.y < 64 ? 'block' : 'empty', position: f }; };
+  // Landing (phase 3), 16 blocks from the fountain, high; no head yet.
+  bot.entities[20].position = new Vec3(16, 80, 0); bot.entities[20].yaw = Math.PI / 2;
+  bot.entities[20].metadata[registry.entitiesByName.ender_dragon.metadataKeys.indexOf('phase')] = 3;
+  delete bot.entities[30];
+  bot.inventory.items = () => [{ name: 'diamond_sword', count: 1, durabilityUsed: 0, maxDurability: 1561 }, { name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 20 }];
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, arenaCenter: { x: 0, y: 64, z: 0 }, landingSince: Date.now() - 3000 };
+  const dug = [], walked = [];
+  const dig = async (b, t, p) => { dug.push(p.clone()); removed.add(`${p.x},${p.y},${p.z}`); if (p.x === 7 && p.z === 0) bot.entity.position = new Vec3(7.5, p.y, 0.5); };
+  bot.attack = () => {};
+  bot.setControlState = () => {};
+  const navigate = async (b, t, g) => { walked.push({ x: g.x, z: g.z }); bot.entity.position = new Vec3(g.x + .5, g.y, g.z + .5); };
+  let seen = null;
+  const client = { systemOne: async ({ questions }) => { seen = questions.branch_0.criteria; return { answers: { branch_0: { choice: seen.hole_under_head ? 'hole_under_head' : 'observe' } } }; } };
+  await fightEndStep(bot, task, goal, () => {}, { navigate, dig, place: async () => {} }, client);
+  assert.ok(seen && seen.hole_under_head, `offered at the landing with a walk of 7: ${Object.keys(seen || {}).join(',')}`);
+  assert.match(seen.hole_under_head.action, /Walk 7 blocks to the cell 7 from the fountain's middle/);
+  assert.match(seen.hole_under_head.landingNow, /coming down to land on the fountain, 16 blocks from its middle, 3 s into its landing approach; on this server's dragon trials the approach took 2 to 43 s before it sat, 10 as a rule/);
+  assert.match(seen.hole_under_head.landingNow, /The walk of 7 blocks at a sprint is about 1\.3 s and the two digs about 2 s: met in the open by the body coming down the bot is thrown \(dragon-159/);
+  assert.ok(walked.some(w => w.x === 7 && w.z === 0), `walked to the hole's cell: ${JSON.stringify(walked)}`);
+  assert.equal(dug.filter(p => p.x === 7 && p.z === 0 && (p.y === 63 || p.y === 62)).length, 2, `dug: ${dug.map(String).join(' ')}`);
+});
