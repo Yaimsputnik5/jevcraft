@@ -9836,10 +9836,21 @@ class Survival {
       if (!placed && slept && [site.foot, site.head].every(p => isBed(bot.blockAt(p)))) {
         let pick = 'leave_as_respawn';
         let bedNow = null; try { bedNow = require('./work').bedFromPockets(bot); } catch (_) { bedNow = null; }
-        try { pick = (await this.decide(task, goal, save, { id: 'bed_after_sleep', tree: bedAfterSleepTree(bot, this.state, Date.now(), { bedNow, goal }), state: { health: bot.health, food: bot.food } }))?.path?.[0] || pick; }
+        // The chest beside this bed with spares in it, at the one moment the bot stands at its bed kitted (bed-kit.js,
+        // note 2186): kit_by_bed was offered 49 times in 25 hours, 41 of them on a stall, and stock_bed_kit once; the
+        // six runs' bare respawns re-made the kit from wood up (73 minutes a death). Read with this bed as the respawn.
+        let chores = {};
+        try {
+          const prev = this.state.spawnBed;
+          this.state.spawnBed = { name: item || bot.blockAt(site.foot)?.name || 'bed', foot: { x: site.foot.x, y: site.foot.y, z: site.foot.z }, head: { x: site.head.x, y: site.head.y, z: site.head.z }, at: new Date().toISOString() };
+          try { chores = require('./bed-kit').bedKitChores(bot, goal); } finally { this.state.spawnBed = prev; }
+        } catch (_) { chores = {}; }
+        const choreTree = Object.fromEntries(Object.entries(chores).filter(([k]) => ['kit_by_bed', 'stock_bed_kit', 'spare_armour_by_bed'].includes(k)).map(([k, v]) => [k, { description: `${v.description} This bed stays standing as the respawn: a death comes back to life here, and what is in the chest is on the bot again in minutes instead of made again from wood up.` }]));
+        try { pick = (await this.decide(task, goal, save, { id: 'bed_after_sleep', tree: { ...bedAfterSleepTree(bot, this.state, Date.now(), { bedNow, goal }), ...choreTree }, state: { health: bot.health, food: bot.food } }))?.path?.[0] || pick; }
         catch (err) { if (err?.name === 'Cancelled') throw err; this.report(goal, save, { action: 'bed_after_sleep_unasked', reason: String(err?.message || err).slice(0, 160) }); }
-        leaveAsSpawn = pick === 'leave_as_respawn' || pick === 'second_bed';
+        leaveAsSpawn = pick === 'leave_as_respawn' || pick === 'second_bed' || !!choreTree[pick];
         secondBed = pick === 'second_bed' ? bedNow : null;
+        if (choreTree[pick]) this._bedChore = { key: pick, run: chores[pick].run };
       }
       if (slept && [site.foot, site.head].every(p => isBed(bot.blockAt(p)))) {
         const was = this.state.spawnBed;
@@ -9847,6 +9858,12 @@ class Survival {
         if (leaveAsSpawn) {
           this.report(goal, save, { action: 'spawn_bed_left', bed: item, at: { ...site.foot }, ...(was && (was.foot.x !== site.foot.x || was.foot.y !== site.foot.y || was.foot.z !== site.foot.z) ? { before: { ...was.foot } } : {}) });
           bot.chat?.(secondBed ? `This bed stays here as my respawn point; making another to carry.` : `This bed stays here as my respawn point.`);
+        }
+        // The chest chore Jev chose at the bed (note 2186), run now with the bed recorded as the respawn.
+        if (this._bedChore) {
+          const chore = this._bedChore; delete this._bedChore;
+          this.report(goal, save, { action: 'bed_chore', chore: chore.key, at: { ...site.foot } });
+          try { await chore.run(bot, task, goal, save, this.actions); } catch (err) { if (['Cancelled', 'NeedsAir', 'NeedsSafety'].includes(err?.name)) throw err; this.report(goal, save, { action: 'bed_chore_failed', chore: chore.key, error: String(err?.message || err).slice(0, 160) }); }
         }
       }
       // The second bed, crafted from the pockets (note 2159); one not made is said, and the bed rung has it.

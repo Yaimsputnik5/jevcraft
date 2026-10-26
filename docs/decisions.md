@@ -307,6 +307,9 @@ Questions that ride in one call together (the intake batch is one call per chat 
 
 | Option | Level | What it is | Offered when |
 | --- | --- | --- | --- |
+| `kit_by_bed` | root | put a chest with spares beside this bed before setting off, the bed left standing as the respawn | on waking at the bed slept in, no chest by it yet, wood or an ender chest carried and spares to put in or a spare armour piece to make (bed-kit.js, note 2186); said with what goes in and that a death comes back here to it |
+| `stock_bed_kit` | root | put spares in the chest beside this bed | on waking with the chest standing and spares carried (note 2186) |
+| `spare_armour_by_bed` | root | make a spare armour piece and leave it in the chest beside this bed | on waking with the chest standing and the iron for a piece carried (note 2186) |
 | `leave_as_respawn` | root | leave the bed standing as the respawn point | always |
 | `take_bed_along` | root | take the bed up and carry it for the next night | always |
 | `second_bed` | root | leave this bed as the respawn and make another from what is carried to carry | a bed can be made from what is carried with crafts alone (three wool of one colour, or wool dyed white, and planks) |

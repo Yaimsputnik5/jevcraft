@@ -496,6 +496,9 @@ define({
     guidance: 'Each way says what it costs: left, a death comes back to life here and the next night needs another bed (the wool for it carried or not); taken, no more wool is needed and a death comes back to life at the world spawn until the carried bed is next slept in; a second bed made from what is carried keeps this one as the respawn and carries the other for the nights.',
   },
   options: [
+    { key: 'kit_by_bed', label: 'put a chest with spares beside this bed before setting off, the bed left standing as the respawn', when: 'on waking at the bed slept in, no chest by it yet, wood or an ender chest carried and spares to put in or a spare armour piece to make (bed-kit.js, note 2186); said with what goes in and that a death comes back here to it', level: 'root' },
+    { key: 'stock_bed_kit', label: 'put spares in the chest beside this bed', when: 'on waking with the chest standing and spares carried (note 2186)', level: 'root' },
+    { key: 'spare_armour_by_bed', label: 'make a spare armour piece and leave it in the chest beside this bed', when: 'on waking with the chest standing and the iron for a piece carried (note 2186)', level: 'root' },
     { key: 'leave_as_respawn', label: 'leave the bed standing as the respawn point', when: 'always' },
     { key: 'take_bed_along', label: 'take the bed up and carry it for the next night', when: 'always' },
     { key: 'second_bed', label: 'leave this bed as the respawn and make another from what is carried to carry', when: 'a bed can be made from what is carried with crafts alone (three wool of one colour, or wool dyed white, and planks)' },
