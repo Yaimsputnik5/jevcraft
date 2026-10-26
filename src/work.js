@@ -8544,6 +8544,16 @@ async function holdForRest(bot, task, goal, save, { client, survival, onStep = (
         return false;
       }
       task.check();
+      // A smelt's batch done by the furnace's clock ends its hold (note 2154):
+      // the job in hand said '8 of 8 done' while the hold said 'rests 2 more
+      // minutes', and the detour question offered mine_nearby or the wait;
+      // Jev answered none good 18 of 39 times (2026-10-26 04:52-05:28Z). The
+      // smelt step takes the batch out.
+      if (/^smelt:/.test(String(reason)) && goal.smelting?.startedAt && Date.now() >= goal.smelting.startedAt + (goal.smelting.count || 1) * 10000) {
+        console.log(`[wait] the batch in the furnace is done by its clock: the hold on ${String(reason).replace(/^\w+:/, '')} ends`);
+        if (goal.restHeld?.until === until) { delete goal.restHeld; save(); }
+        return true;
+      }
       const started = Date.now(), minutes = Math.max(1, Math.ceil((until - started) / 60000));
       // `none`: nothing was on offer (a detour tried and failed is not that).
       // `waited`: the wait itself chosen (wait_it_out, note 2146): held to

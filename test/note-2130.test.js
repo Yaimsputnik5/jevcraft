@@ -76,3 +76,19 @@ test('the wait chosen holds the rest to its end and asks nothing above again (no
   assert.ok(Date.now() - t0 >= 1400, 'waited the rest out');
   assert.ok(!logs.some(l => /has run out; the question above is asked again/.test(l)), logs.join('\n'));
 });
+
+test('a smelt hold ends when the batch is done by the furnace clock (note 2154)', async () => {
+  const { holdForRest } = require('../src/work');
+  const { bot, goal } = world();
+  goal.smelting.startedAt = Date.now() - 200000; // 11 items, 110 s: long done
+  let asks = 0;
+  const client = { model: 'jev', systemOne: async ({ questions }) => { asks++; return { answers: Object.fromEntries(Object.keys(questions).map(k => [k, { choice: 'wait_it_out', confidence: 0.8 }])) }; } };
+  const log = console.log; const logs = []; console.log = (...a) => logs.push(a.join(' '));
+  const t0 = Date.now(); let done;
+  try { done = await holdForRest(bot, new Task('hold'), goal, () => {}, { client, reason: 'smelt:cooked_mutton', until: Date.now() + 60000, why: '11 mutton cooking', idle: false }); }
+  finally { console.log = log; }
+  assert.equal(done, true);
+  assert.ok(Date.now() - t0 < 2000, 'ended at once');
+  assert.equal(asks, 0, 'nothing asked');
+  assert.ok(logs.some(l => /the batch in the furnace is done by its clock/.test(l)), logs.join('\n'));
+});
