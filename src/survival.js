@@ -12042,7 +12042,30 @@ class Survival {
     // (kit_food): 25588 (mid-241-ce, 17:16:26Z) was sent after a cow at
     // hunger 18 with a beef carried; 25592 flipped between cooking and the
     // walk home at 19 (note 761).
-    const foodMet = errands.met(bot, supplyNow, reserve.floorFor(bot, goal));
+    const floorNow = reserve.floorFor(bot, goal);
+    let foodMet = errands.met(bot, supplyNow, floorNow);
+    // Enough, or more while the animals are here: Jev's, once an errand
+    // (food-enough.js, note 2135). The errand ended at the floor and the
+    // bot went down with a cow and a half, to climb again for the next.
+    if (foodMet && this.state.foodErrand && /overworld/.test(String(bot.game?.dimension || 'overworld'))) {
+      const fe = require('./food-enough');
+      if (fe.keepTo(this.state, supplyNow, now)) foodMet = false;
+      else if (!fe.askedLately(this.state, now)) {
+        let ways = null; try { ways = fe.ways(bot, this.state, goal, { supply: supplyNow, floor: floorNow, now }); } catch (_) { ways = null; }
+        if (ways) {
+          let d = null;
+          try {
+            d = await this.decide(task, goal, save, { id: 'food_enough', tree: { enough_now: ways.enough_now, take_more: ways.take_more },
+              state: { foodCarried: supplyNow, floor: floorNow, animalsInView: ways.prey.map(p => ({ name: p.name, distance: p.distance, cookedPoints: p.points })), hunger: bot.food, health: bot.health } });
+          } catch (err) { if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err?.name)) throw err; d = null; }
+          if (d && !d.stale) {
+            const pick = d.path?.at(-1);
+            this.state.foodKeepTo = { at: now, until: now + fe.KEEP_MS, ...(pick === 'take_more' ? { points: ways.target } : {}) }; save();
+            if (pick === 'take_more') foodMet = false;
+          }
+        }
+      }
+    }
     if (foodMet && this.state.foodErrand) {
       const e = this.state.foodErrand;
       this.report(goal, save, { action: 'food_errand_met', food: bot.food, foodPoints: supplyNow, wanted: desiredFood, minutes: Math.round((now - e.since) / 6000) / 10, climbed: e.climbed || 0, asks: e.asks });

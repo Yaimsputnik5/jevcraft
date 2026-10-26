@@ -84,7 +84,10 @@ function crossingWant(bot, goal = null, stay = null) {
 function wanted(bot, goal) {
   if (goal?.preparingEnd) return { points: 64, for: 'the End', crossing: true };
   if (goal?.preparingNether) return { points: crossingWant(bot, goal), for: 'the Nether stay', crossing: true };
-  return { points: keeps(bot, goal) ? FLOOR[whereOf(bot)] : 12, for: 'healing and the night', crossing: false };
+  // The mark Jev chose at the end of an errand with animals in view
+  // (food-enough.js, note 2135) stands over the floor while it holds.
+  const keep = goal?.survival?.foodKeepTo, kept = keep && Number.isFinite(keep.points) && keep.until > Date.now() ? keep.points : 0;
+  return { points: Math.max(keeps(bot, goal) ? FLOOR[whereOf(bot)] : 12, kept), for: 'healing and the night', crossing: false };
 }
 
 // The record, said for what is carried: its own row, none, and the floor's.

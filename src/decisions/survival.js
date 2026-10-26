@@ -449,6 +449,21 @@ define({
 // now (the user, 2026-09-28: "Ask Jev"), the old order the body's safety
 // rule when Jev cannot answer in time (note 707).
 define({
+  id: 'food_enough', area: 'survival', parent: null, kind: 'survival', primitive: 'choice', stakes: 'low', tree: true, overworldOnly: true,
+  question: 'A surface food errand has met the floor kept with food animals still in view: stop with what is carried and go back to the work, or take the animals in view first?',
+  trigger: 'The survival layer\'s food errand, in the Overworld, the moment what is carried meets the floor kept (food-reserve.js) with a food animal within thirty-two blocks; once an errand, the answer held fifteen minutes or until the mark chosen is carried (src/food-enough.js, note 2135).',
+  source: 'src/food-enough.js (ways, keepTo), src/survival.js (stepOnce), src/food-reserve.js (wanted)',
+  instructions: {
+    task: 'The bot is on a food errand at the surface and carries the floor the code keeps. Choose whether it stops here and goes back to the work, or takes the animals in view first.',
+    guidance: 'Each way says the food points carried and what they last at the record\'s drain, the climbs to open sky chosen lately and what they cost, this bot\'s food errands of the last three hours, and for the animals in view what each gives cooked and the mark the errand would go on to. The goal is the fastest dragon kill: a climb for food later costs its minutes; a hunt now costs these.',
+  },
+  options: [
+    { key: 'enough_now', label: 'stop with the food carried and go back to the work', when: 'always; said with the points carried, the floor, the minutes they last at the record\'s drain, the climbs lately and the errands\' record' },
+    { key: 'take_more', label: 'take the animals in view first, the errand going on to the mark said', when: 'a food animal within thirty-two blocks whose meat would raise what is carried (up to 64 points); said with each animal, its distance and cooked points, and the mark' },
+  ],
+});
+
+define({
   id: 'meal', area: 'survival', parent: null, kind: 'survival', primitive: 'choice', stakes: 'low', tree: true,
   question: 'Hunger is down with food carried: which food to eat now, the raw meat cooked first, or no meal yet?',
   trigger: 'The vitals step, at hunger 16 or less, under 18 hurt, or under 20 at 12 health or less, with no mob at arm\'s length and no stance held against one (in a fight the meal is a stance); after "later", again only once hunger or health has fallen (note 2103).',
