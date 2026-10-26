@@ -2249,12 +2249,19 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           // to none in two seconds, nothing pressed; dragon-124 and 110 the
           // same on the island's ground.
           // Not under a roof, not on a pillar's top, and not twice (note 1608): with a block two over the head the jump is stopped and the two blocks never go down, and 25588 (dragon-148, 2026-10-14 08:57Z) stood on crystal 9's top under its stand's roof, 'up out of the breath on thin ground: 0 blocks up' seven times in the cloud, 20 to 17, and the dragon's body carried it 42 blocks off, dead. A climb that gains nothing falls through to the dig and the other ways.
-          const roofed = [2, 3].some(dy => bot.blockAt(bot.entity.position.floored().offset(0, dy, 0))?.boundingBox === 'block');
+          // A block three over the head stops only the second block (note 2204): the jump rises a block and a fifth under
+          // it, enough for one block under the feet, and the cloud is half a block high, so one up is out of it. dragon-309
+          // (25592, 2026-10-26 11:53Z) dug down its column to the island at (31, 59, -23), its last roof three over its head,
+          // took a fireball's cloud on the body there (20 to 14), was refused the climb for the roof, dug down instead (end
+          // stone, about a second and a half a block, the cloud six a second) and died in it; seven of today's thirteen
+          // End deaths were 'killed by Ender Dragon using magic', the cloud on a body whose way out was refused.
+          const over = dy => bot.blockAt(bot.entity.position.floored().offset(0, dy, 0))?.boundingBox === 'block';
+          const roofed = over(2), lowRoof = over(3);
           if (inBreath() && blocksCarried(bot) >= 2 && !roofed && !onObsidianTop()) {
             goal.step = { action: 'up_out_of_breath_on_ground', health: bot.health }; save();
             await leeForClimb();
             const from = Math.floor(bot.entity.position.y);
-            const want = upClear(from);
+            const want = lowRoof ? 1 : upClear(from);
     try { await require('./pillar-recovery').pillarUp(bot, task, from + want, { dig: actions.dig, maxBlocks: want, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
             const rose = Math.floor(bot.entity.position.y) - from;
             console.log(`[end combat] up out of the breath on ${thick ? 'the ground' : 'thin ground'}: ${rose} blocks up at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health`);

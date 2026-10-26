@@ -422,7 +422,8 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
     if (dragon.name === 'area_effect_cloud' && Math.abs(dragon.position.y - bot.entity.position.y) <= 0.5 && bot.entity.onGround) {
       const f = bot.entity.position.floored(), pr = require('./pillar-recovery');
       const items = bot.inventory?.items?.() || [], carried = pr.SCAFFOLD.reduce((n, k) => n + items.filter(i => i.name === k).reduce((m, i) => m + i.count, 0), 0);
-      const headClear = [2, 3].every(dy => bot.blockAt(f.offset(0, dy, 0))?.boundingBox !== 'block');
+      // Two over the head clear, not three (note 2204): a block three over stops the second block, not the first; the jump rises a block and a fifth under it and the one block goes under the feet.
+      const headClear = bot.blockAt(f.offset(0, 2, 0))?.boundingBox !== 'block';
       const ballNear = Object.values(bot.entities).some(e => e.name === 'dragon_fireball' && e.isValid !== false && e.position.distanceTo(bot.entity.position) < 14);
       // The water at the feet taken up first (note 1902): a jump from water does not reach a block's top, and the one up, the stub and the climb were all refused in the bot's own pool. 25588's dragon-274 (2026-10-19 09:3xZ) in its pool's pit at (-10, 62, -38) under a cloud: 'one block up ... not up', 'water at the feet', 'no straight run ... from a pit', 10 to none. A source at the feet goes back into an empty bucket.
       if (carried >= 1 && headClear && !ballNear && /water/.test(bot.blockAt(f)?.name || '') && items.some(i => i.name === 'bucket')) {
