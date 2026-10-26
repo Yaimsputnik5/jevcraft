@@ -105,10 +105,13 @@ function netherHitSays(bot) {
 // The pickaxe uses the Nether wore an hour on the fresh runs full-5, full-6
 // and full-7 (2026-10-24 19:45Z to 10-25 16:30Z, pickaxes gone from the
 // pockets in the Nether with no death; a few may have been left in chests):
-// about 930, 620 and 470 an hour, over 2.4, 4.5 and 7.8 hours there. full-7
+// about 370, 690 and 600 an hour, over 2.6, 2.8 and 4.9 hours there (note 2126). full-7
 // crossed at 13:37Z with 2 stone and an iron pickaxe, about 510 uses, and had
 // none at 14:11Z; it dug on with wooden pickaxes made of stems and by hand.
-const NETHER_WEAR = Object.freeze({ low: 470, high: 930, handPace: 12, pickPace: 40, woodUses: 59 });
+// Corrected (note 2126): the first count took the flight record's frames
+// without an inventory as pickaxes gone; with those frames skipped, about
+// 370, 690 and 600 uses an hour on full-5, full-6 and full-7.
+const NETHER_WEAR = Object.freeze({ low: 370, high: 690, handPace: 12, pickPace: 40, woodUses: 59 });
 function netherWearSays(uses) {
   const W = NETHER_WEAR, m = n => Math.max(1, Math.round(n));
   const last = uses > 0 ? ` the ${uses} uses carried last about ${m(uses / W.high * 60)} to ${m(uses / W.low * 60)} minutes at that rate;` : '';

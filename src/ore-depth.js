@@ -3,8 +3,8 @@
 //
 // The fresh runs full-5, full-6 and full-7 (2026-10-24 19:45Z to 10-26
 // 01:00Z, flight records) found raw iron at 212 to 256 an hour of mining and
-// tunnelling at y 16 to 40, 49 to 71 at y 41 to 62 and 31 to 71 at the
-// surface, and spent 110 to 252 minutes in each of the two slow bands against
+// tunnelling at y 17 to 40, 54 to 82 at y 41 to 62 and 25 to 67 at the
+// surface (recounted, note 2126), and spent 110 to 252 minutes in each of the two slow bands against
 // 22 to 36 in the rich one: the step mined the nearest ore in view wherever
 // it stood, and only with none in view went down to the ore's depth (work.js
 // mineAtSource, note 1069's thresholds). The depth is Jev's to choose, with
@@ -57,7 +57,8 @@ function runSays(goal, drop = 'raw_iron') {
   return ` On this run, ${word} found per hour of mining and tunnelling, by the depth stood at: ${rows.map(({ b, r }) => `${b.label}: ${Math.round((r.found[drop] || 0) / (r.ms / 3600000))} (${Math.round(r.ms / 60000)} min)`).join('; ')}.`;
 }
 // The fleet's record where the run has none yet (the fresh runs, as above).
-const FLEET = Object.freeze({ runs: 'full-5, full-6 and full-7 (2026-10-24 to 26)', y17to40: '212 to 256', y41to62: '49 to 71', y63up: '31 to 71' });
+// Recounted with the flight record's inventory-less frames skipped (note 2126).
+const FLEET = Object.freeze({ runs: 'full-5, full-6 and full-7 (2026-10-24 to 26)', y17to40: '201 to 245', y41to62: '54 to 82', y63up: '25 to 67' });
 const fleetSays = () => ` On the fresh runs ${FLEET.runs}, raw iron found per hour of mining was ${FLEET.y17to40} at y 17 to 40, ${FLEET.y41to62} at y 41 to 62 and ${FLEET.y63up} at y 63 and up; they spent most of their mining minutes in the two slower bands.`;
 function gameSays(drop) { return drop === 'diamond' ? ` ${GAME.diamond}` : drop === 'raw_iron' ? ` ${GAME.iron}` : ''; }
 

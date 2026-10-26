@@ -20,7 +20,7 @@ test('the ore tally lays mining minutes and ore picked up to the depth band stoo
   assert.equal(goal.oreByDepth.y63up.ms, 0);
   assert.match(od.runSays(goal, 'raw_iron'), /^ On this run, raw iron found per hour of mining and tunnelling, by the depth stood at: y 17 to 40: 48 \(6 min\)\.$/);
   assert.equal(od.runSays({}, 'raw_iron'), '', 'nothing said with under five minutes mined');
-  assert.match(od.fleetSays(), /212 to 256 at y 17 to 40, 49 to 71 at y 41 to 62 and 31 to 71 at y 63 and up/);
+  assert.match(od.fleetSays(), /201 to 245 at y 17 to 40, 54 to 82 at y 41 to 62 and 25 to 67 at y 63 and up/);
   assert.match(od.gameSays('raw_iron'), /ten a chunk between y -24 and 56, most at y 16 .* ninety a chunk between y 80 and 384, most at y 232/);
   assert.match(od.gameSays('diamond'), /seven veins a chunk between y -144 and 16, most at y -64/);
   assert.equal(od.bandOf(16).key, 'y16under'); assert.equal(od.bandOf(17).key, 'y17to40'); assert.equal(od.bandOf(63).key, 'y63up');

@@ -35,7 +35,7 @@ test('eating raw meat says what it gives up in the cook\'s minutes (note 2109)',
 
 test('the crossing kit says what the Nether wears an hour, by the fresh runs, and how long the pickaxes carried last (note 2111)', () => {
   const { netherWearSays } = require('../src/crossing-kit');
-  assert.equal(netherWearSays(510), " On the fresh runs (2026-10-24 to 25) the Nether wore about 470 to 930 pickaxe uses an hour of being there: the 510 uses carried last about 33 to 65 minutes at that rate; with none left, rock is dug by hand at about 12 blocks a minute against 40 with a pickaxe, dropping nothing, and a wooden pickaxe of the Nether's stems lasts 59.");
+  assert.equal(netherWearSays(510), " On the fresh runs (2026-10-24 to 25) the Nether wore about 370 to 690 pickaxe uses an hour of being there: the 510 uses carried last about 44 to 83 minutes at that rate; with none left, rock is dug by hand at about 12 blocks a minute against 40 with a pickaxe, dropping nothing, and a wooden pickaxe of the Nether's stems lasts 59.");
   assert.match(netherWearSays(0), /an hour of being there: with none left/);
 });
 
