@@ -103,6 +103,13 @@ const rehearsedSays = () => `On 2026-10-06 the arena killed the dragon on a fres
 // 01:26Z on 2026-10-06 with nothing worn and a stone sword, never said here.
 const gearSays = bot => { try { return require('./mob-hunt').endFightGearSays(bot); } catch (_) { return ''; } };
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+// What going in with the beds carried means against the dragon (note 2120): the kit question's enter_now said
+// 'beds 1 of 4' with the bed's worth only on its top-up; full-3 (2026-10-25 17:06Z) chose enter_now with one bed.
+function bedsWorthSays(items) {
+  const beds = items.find(i => i.key === 'beds');
+  if (!beds || !beds.short) return '';
+  return ` With ${beds.carried} bed${beds.carried === 1 ? '' : 's'}: ${require('./bed-bomb').dragonBedSays()}`;
+}
 const bedsOf = bot => bot.inventory.items().filter(i => /_bed$/.test(i.name)).reduce((n, i) => n + i.count, 0);
 
 // The kit, item by item: { key, item, carried, wants, short, says }.
@@ -270,7 +277,7 @@ async function prepareEndSupplies(bot, task, goal, save, actions, client = task.
   }
   if (!pick) {
     const ring = goal.endPortal?.center && bot.entity?.position ? ` The portal's ring is ${Math.round(Math.hypot(bot.entity.position.x - goal.endPortal.center.x, bot.entity.position.z - goal.endPortal.center.z))} blocks off and ${Math.round(bot.entity.position.y - goal.endPortal.center.y)} under where the bot stands.` : '';
-    const tree = { enter_now: { description: `Go to the End with what is carried now: ${kitSays(items)}; health ${Math.round((bot.health ?? 20) * 10) / 10}.${ring} Short of what the code would take: ${short.map(i => i.key).join(', ')}.${gearSays(bot)} ${rehearsedSays()} ${LIVE_END_SAYS} There is no way back out of the End but the dragon's death or the bot's own, and a death there leaves everything carried on its island.` } };
+    const tree = { enter_now: { description: `Go to the End with what is carried now: ${kitSays(items)}; health ${Math.round((bot.health ?? 20) * 10) / 10}.${ring} Short of what the code would take: ${short.map(i => i.key).join(', ')}.${bedsWorthSays(items)}${gearSays(bot)} ${rehearsedSays()} ${LIVE_END_SAYS} There is no way back out of the End but the dragon's death or the bot's own, and a death there leaves everything carried on its island.` } };
     // What each top-up has come to so far (note 1307): 25593 (2026-10-05
     // 17:04 to 20:50Z) chose the bow again and again, its time on string
     // said nowhere, the End's ring 700 blocks off and its twelve eyes held.
@@ -358,4 +365,4 @@ async function prepareEndSupplies(bot, task, goal, save, actions, client = task.
   finally { sp.ms += Date.now() - began; save(); }
   return false;
 }
-module.exports = { prepareEndSupplies, kitItems, homeByPortal, HOME_FAR, rehearsedSays, END_BEDS, REHEARSED };
+module.exports = { bedsWorthSays, prepareEndSupplies, kitItems, homeByPortal, HOME_FAR, rehearsedSays, END_BEDS, REHEARSED };
