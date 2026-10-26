@@ -824,3 +824,33 @@ test('no crystal standing and the dragon flying 60 blocks off: the hole under th
   assert.match(seen.hole_under_head.whyNow, /^no crystal stands: the dragon comes down to the fountain at the end of every circuit from here on, and it is 60 blocks from the fountain now, at 186 health; this fight it has come down 4 times; from the hole 7 from the middle the perched head is within the sword's reach, and the hole dug now is the wait for the next landing\. This fight: 1 hole dug under the head, 10 swings at it from one; 3 arrows at the dragon took 10 of its health\.$/);
   assert.equal(seen.hole_under_head.landingNow, undefined, 'not a landing');
 });
+
+test('a boat carried and the dragon flying 20 off: sit_in_boat is offered with the drill\'s record; chosen, the boat is set down, boarded, left when the dragon is gone, and picked up (note 2207)', async () => {
+  const { bot, goal, task } = fixture();
+  delete bot._pillarUp;
+  bot.entity.position = new Vec3(14.5, 64, 0.5); bot.entity.yaw = 0;
+  bot.blockAt = p => { const f = p.floored(); return { name: f.y < 64 ? 'end_stone' : 'air', boundingBox: f.y < 64 ? 'block' : 'empty', position: f }; };
+  bot.entities[20].position = new Vec3(30, 80, 10);
+  bot.entities[20].metadata[registry.entitiesByName.ender_dragon.metadataKeys.indexOf('phase')] = 0;
+  delete bot.entities[30];
+  bot.inventory.items = () => [{ name: 'oak_boat', count: 1 }, { name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 20 }, { name: 'diamond_sword', count: 1, durabilityUsed: 0, maxDurability: 1561 }];
+  goal.endCombat = { steps: 0, shots: [], destroyedCrystals: [], visits: {}, noProgress: 0, arenaCenter: { x: 0, y: 64, z: 0 } };
+  const log = [];
+  bot.equip = async () => {};
+  bot.activateItem = () => { const boat = { id: 77, uuid: 'b-77', name: 'oak_boat', position: new Vec3(14.5, 64, 1.5), isValid: true, passengers: [] }; bot.entities[77] = boat; log.push('placed'); };
+  bot.mount = e => { bot.vehicle = e; log.push('mounted'); setTimeout(() => { bot.entities[20].position = new Vec3(90, 90, 90); }, 300); };
+  bot.dismount = () => { log.push('dismounted'); bot.vehicle = null; };
+  bot.supportFeature = () => false; bot._client.write = () => {};
+  bot.attack = e => { if (e.id === 77) { delete bot.entities[77]; log.push('boat struck'); } };
+  bot.setControlState = () => {};
+  let seen = null;
+  const client = { systemOne: async ({ questions }) => { seen = questions.branch_0.criteria; return { answers: { branch_0: { choice: seen.sit_in_boat ? 'sit_in_boat' : 'observe' } } }; } };
+  await fightEndStep(bot, task, goal, () => {}, { navigate: async () => {}, dig: async () => {}, place: async () => {} }, client);
+  assert.ok(seen && seen.sit_in_boat, `offered with the dragon flying 20 off: ${Object.keys(seen || {}).join(',')}`);
+  assert.match(seen.sit_in_boat.action, /^Set the carried oak boat down at the feet and sit in it through the dragon's pass: seated, the body is not thrown/);
+  assert.match(seen.sit_in_boat.record, /four passes seated, the body carried 0 blocks each time.*four passes standing crouched with the shield, carried 36 to 51 blocks and fallen 4 of 4, 3 dead/);
+  assert.equal(seen.sit_in_boat.dragonBlocksOff, 18);
+  assert.deepEqual(log.slice(0, 2), ['placed', 'mounted'], log.join(','));
+  assert.ok(log.includes('dismounted'), `left the boat once the dragon was gone: ${log.join(',')}`);
+  assert.equal(goal.endCombat.seats, 1);
+});

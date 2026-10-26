@@ -93,6 +93,33 @@ async function hold() {
 }
 function release() { try { bot.deactivateItem(); } catch (_) { /* nothing */ } bot.clearControlStates(); }
 
+// PASS_MODE=boat (note 2207; Fable, 2026-10-26 12:15Z): the body seated in a boat on the column's top through the pass.
+// A rider's own motion is zeroed each tick and its position is the vehicle's, so the wings' push should move it nowhere;
+// it still takes the wings' 5 and the head's 10. Measured as the stand is: carried how far, fell, health lost, dead.
+async function boatTrial(i) {
+  await reset(); await walls(0); await sleep(400);
+  const d = dragon(); if (!d) { log({ trial: i, mode: 'boat', error: 'no dragon in view' }); return null; }
+  await command(end(`kill @e[type=minecraft:oak_boat,distance=..40]`));
+  await command(end(`summon minecraft:oak_boat ${COL.x + .5} ${COL.top + 1} ${COL.z + .5}`));
+  let boat = null; for (let t = 0; t < 30 && !boat; t++) { await sleep(100); boat = Object.values(bot.entities).find(e => /boat/.test(e.name || '') && e.position && horizontal(e.position) < 1.5); }
+  if (!boat) { log({ trial: i, mode: 'boat', error: 'no boat seen on the column' }); return null; }
+  try { bot.mount(boat); } catch (err) { log({ trial: i, mode: 'boat', error: `mount: ${err.message}` }); return null; }
+  for (let t = 0; t < 30 && !bot.vehicle; t++) await sleep(100);
+  const seated = !!bot.vehicle;
+  const h0 = bot.health, p0 = bot.entity.position.clone(); hurt = 0; hurtBy = [];
+  let maxOff = 0, minY = p0.y, carriedTo = null;
+  const tick = () => { const p = bot.entity.position; maxOff = Math.max(maxOff, horizontal(p)); minY = Math.min(minY, p.y); if (horizontal(p) > 2) carriedTo = carriedTo || p.clone(); };
+  bot.on('physicsTick', tick);
+  await command(end(`tp @e[type=ender_dragon] ${COL.x + 3.5} ${COL.top + 2} ${COL.z + .5}`));
+  for (let t = 0; t < 40; t++) { await sleep(100); if (dead) break; }
+  bot.off('physicsTick', tick);
+  const died = dead, stillSeated = !!bot.vehicle;
+  const bp = boat.position ? { off: Math.round(horizontal(boat.position) * 100) / 100, y: Math.round(boat.position.y) } : null;
+  try { bot.dismount(); } catch (_) { /* nothing */ }
+  const row = { trial: i, mode: 'boat', seated, stillSeated, hurt, hurtBy: hurtBy.slice(0, 6), healthLost: Math.round((h0 - (died ? 0 : bot.health)) * 10) / 10, maxOff: Math.round(maxOff * 100) / 100, fell: minY < COL.top - 1, minY: Math.round(minY), carriedTo: carriedTo && { x: Math.round(carriedTo.x), y: Math.round(carriedTo.y), z: Math.round(carriedTo.z) }, boatAfter: bp, dead: died };
+  log(row); return row;
+}
+
 async function passTrial(height, i) {
   await reset(); await walls(height); await sleep(400); await hold();
   const d = dragon(); if (!d) { log({ trial: i, walls: height, error: 'no dragon in view' }); return null; }
@@ -140,7 +167,12 @@ bot.once('spawn', async () => {
     await stage();
     log({ staged: true, position: bot.entity.position, dimension: bot.game?.dimension, dragon: !!dragon() });
     const rows = [];
-    if (mode === 'drop') {
+    if (mode === 'boat') {
+      for (let i = 0; i < trials; i++) { rows.push(await boatTrial(i)); rows.push(await passTrial(0, i)); }
+      const seatedRows = rows.filter(r => r && r.mode === 'boat'), stood = rows.filter(r => r && r.mode !== 'boat');
+      log({ summary: { seated: { trials: seatedRows.length, carriedOver2: seatedRows.filter(r => r.maxOff > 2).length, fell: seatedRows.filter(r => r.fell).length, dead: seatedRows.filter(r => r.dead).length, healthLost: seatedRows.map(r => r.healthLost), stillSeated: seatedRows.filter(r => r.stillSeated).length },
+        standing: { trials: stood.length, carriedOver2: stood.filter(r => r.maxOff > 2).length, fell: stood.filter(r => r.fell).length, dead: stood.filter(r => r.dead).length, healthLost: stood.map(r => r.healthLost) } } });
+    } else if (mode === 'drop') {
       for (let i = 0; i < trials; i++) { rows.push(await dropTrial(false, i)); rows.push(await dropTrial(true, i)); }
       const by = s => rows.filter(r => r && r.sneak === s && r.landedOut !== null).map(r => r.landedOut);
       log({ summary: { drop: dropBlocks, walkLandedOut: by(false), sneakLandedOut: by(true) } });

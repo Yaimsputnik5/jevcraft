@@ -3634,6 +3634,63 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // island's ground within 24 of the fountain while the dragon flies.
     // Anywhere on the island's thick ground, not only within 24 of the fountain (note 1728): the hole with its roof is out of the dragon's sight, which its fireballs need (Fable and the arena, 2026-10-15: a burst within four blocks of the feet puts the cloud on the body), and it is one block laid against two dug, where a stub walled out of sight is twelve. 25588's runs 254 to 272 (2026-10-15 09:20 to 12:05Z) spent four blocks in five on stubs, roofs, walls and pockets, and four of the last five deaths came with none or one carried.
     // Only under the open sky (note 1746): a hole dug from the tunnel's floor is a shaft down, and the stock taken underground from there went a level deeper each time; 25588 (dragon-6 of the new save, 2026-10-15 18:21 to 19:18Z, four crystals broken) went down that way to y 18 under the island with no block left, 'up out of the hole: 0 blocks up at (-3, 18, 13)'.
+    // The seat against the push (note 2207; Fable, 2026-10-26 12:15Z; the arena's drill of 12:16Z, scripts/pass-drill.js
+    // PASS_MODE=boat): a rider's own motion is zeroed each tick and its place is the boat's, so the dragon's wings move a
+    // seated body nowhere. Four passes seated on a column top: carried 0 blocks each, 6.8 health lost in three and one
+    // dead to the blows; four standing: carried 36 to 51, fell 4 of 4, dead 3. Five of today's fifteen End deaths were the
+    // push (314, 315, 301, 304, 308). Offered with a boat carried, on the ground or a top, the dragon within 40 and flying.
+    {
+      const boats = require('./boats');
+      const boatItem = bot.inventory.items().find(i => boats.boatItem(i.name));
+      const flat = dragon && live(bot, dragon) ? Math.hypot(dragon.position.x - bot.entity.position.x, dragon.position.z - bot.entity.position.z) : Infinity;
+      const under = bot.blockAt(bot.entity.position.floored().offset(0, -1, 0));
+      if (boatItem && dragon && live(bot, dragon) && !perched(bot, dragon) && flat <= 40 && bot.entity.onGround && !bot.vehicle && !inWater() && under?.boundingBox === 'block' && !holeHere()) {
+        const edge = voidEdge(bot, bot.entity.position);
+        tree.sit_in_boat = {
+          description: { action: `Set the carried ${boatItem.name.replace(/_/g, ' ')} down at the feet and sit in it through the dragon's pass: seated, the body is not thrown (a rider's own motion is zeroed every tick and its place is the boat's, so the wings' push moves it nowhere); it still takes the wings' 5 and the head's 10 through armour, and the breath's cloud where it lies; about a second to set down and sit, up and the boat picked up after the pass, about two seconds`,
+            dragonBlocksOff: Math.round(flat), dragonPhase: metadata(bot, dragon, 'phase'), health: bot.health, ...(edge ? { voidEdgeBlocks: edge } : {}),
+            standingHere: onOwnPillar() || onObsidianTop() ? `on ${onObsidianTop() ? 'a pillar\'s top' : 'the bot\'s own column'}: the pass there is the wings' sweep, and a body carried off it falls to the island` : 'on the open ground: the pass here is the wings\' sweep over it',
+            record: 'the arena\'s drill (2026-10-26 12:16Z, the dragon flown beside a column top at 85): four passes seated, the body carried 0 blocks each time, 6.8 health lost in three and the fourth dead of five blows in four seconds; four passes standing crouched with the shield, carried 36 to 51 blocks and fallen 4 of 4, 3 dead. Today\'s End trials: five of fifteen deaths were the push (dragon-314, 315, 301, 304 and 308).' },
+          run: async () => {
+            goal.step = { action: 'sit_in_boat', health: bot.health, dragonBlocksOff: Math.round(flat) }; save();
+            const t0 = Date.now(), ids = new Set(Object.keys(bot.entities));
+            bot.pathfinder?.setGoal?.(null); bot.clearControlStates?.();
+            await bot.equip(boatItem, 'hand'); check();
+            // The boat set down on the block in front of the feet (the cell the body looks at), then boarded.
+            const yaw = bot.entity.yaw ?? 0, f = bot.entity.position.floored();
+            const dx = Math.round(-Math.sin(yaw)), dz = Math.round(-Math.cos(yaw));
+            const ahead = f.offset(dx || 1, 0, dz), aheadUnder = bot.blockAt(ahead.offset(0, -1, 0));
+            const target = aheadUnder?.boundingBox === 'block' && bot.blockAt(ahead)?.boundingBox !== 'block' ? ahead.offset(.5, 0, .5) : f.offset(.5, 0, .5);
+            await bot.lookAt(target.offset(0, -0.5, 0), true); await sleep(120); check();
+            bot.activateItem();
+            let boat = null;
+            for (let i = 0; i < 20 && !boat; i++) { await sleep(50); boat = Object.values(bot.entities).find(e => !ids.has(String(e.id)) && boats.boatItem(e.name || '') && e.position && e.position.distanceTo(bot.entity.position) < 4); }
+            if (!boat) throw new Error('The boat was not set down');
+            (bot._ownedBoats ||= new Set()).add(boat.uuid);
+            try { bot.mount(boat); } catch (err) { throw new Error(`No seat in the boat: ${String(err.message || err).slice(0, 60)}`); }
+            for (let i = 0; i < 30 && bot.vehicle !== boat; i++) await sleep(50);
+            if (bot.vehicle !== boat) { try { await boats.recoverBoat(bot, task, boat, boatItem.name, Math.floor(bot.entity.position.y)); } catch (_) { /* left */ } throw new Error('The seat was not taken in a second and a half'); }
+            console.log(`[end combat] seated in the ${boatItem.name.replace(/_/g, ' ')} at ${bot.entity.position.floored()} for the dragon's pass, ${Math.round(flat)} blocks off, in ${Date.now() - t0} ms`);
+            // Seated while the dragon is about, as the column's hold is (waitForThePass): within 40 flat and within 30 up or down and not going away; at most 25 s.
+            const h0 = bot.health, t1 = Date.now(); let why = 'no dragon in sight';
+            for (;;) {
+              check();
+              const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e)); if (!d) break;
+              const ph = metadata(bot, d, 'phase'); if ([5, 6, 7, 9, 10].includes(ph)) { why = `the dragon perched (phase ${ph})`; break; }
+              const q = bot.entity.position, f0 = Math.hypot(d.position.x - q.x, d.position.z - q.z);
+              if (f0 > 40 || Math.abs(d.position.y - q.y) > 30) { why = `the dragon ${Math.round(f0)} blocks off`; break; }
+              if (Date.now() - t1 > 25000) { why = `25 s passed with the dragon still about, ${Math.round(f0)} blocks off`; break; }
+              await sleep(250);
+            }
+            const seatedFor = Date.now() - t1;
+            try { await boats.leaveBoat(bot); } catch (_) { /* left on the next pass */ }
+            for (let i = 0; i < 20 && bot.vehicle; i++) await sleep(50);
+            let got = false; try { got = await boats.recoverBoat(bot, task, boat, boatItem.name, Math.floor(bot.entity.position.y)); } catch (err) { console.log(`[end combat] the boat not picked up after the pass: ${String(err.message || err).slice(0, 80)}`); }
+            console.log(`[end combat] up out of the boat at ${bot.entity.position.floored()} after ${Math.round(seatedFor / 100) / 10} s seated (${why}), ${h0.toFixed(1)} to ${bot.health.toFixed(1)} health, the boat ${got ? 'picked up' : 'left'}`);
+            state.seats = (state.seats || 0) + 1; save();
+          } };
+      }
+    }
     const openSky = (() => { const g = bot.entity.position.floored(); for (let dy = 2; dy <= 8; dy++) if (bot.blockAt(g.offset(0, dy, 0))?.boundingBox === 'block') return false; return true; })();
     if (actions.dig && fountain && openSky && !onOwnPillar() && !onObsidianTop() && !holeHere() && !(dragon && perched(bot, dragon)) && byFountain >= 6) {
       // With no block carried too (note 1742): the hole's two dug end stone are its roof's, and the stock taken underground (note 1741) is for the bot with none; dragon-294 (2026-10-15 17:06Z) was never offered it at none carried and died so in the breath at (8, 64, 2).
