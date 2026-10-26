@@ -273,6 +273,10 @@ async function fight(bot, task, site, { navigate, seconds = 60, want = 1, item =
       const W = require('./work'), t0 = Date.now(); let laid = 0;
       for (const c of site.builds) { task.check(); try { await W.place(bot, task, c, site.material); if (bot.blockAt(c)?.boundingBox === 'block') laid++; } catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; } }
       console.log(`[slot] built at the mouth (${site.mouth.x}, ${site.mouth.y}, ${site.mouth.z}): ${laid} of ${site.builds.length} ${site.material.replaceAll('_', ' ')} laid in ${Math.round((Date.now() - t0) / 100) / 10} s`);
+      // No fight under an open roof (note 2261): an enderman walks into a slot with no roof over its cells and strikes the bot at its
+      // back (the arena, 2026-10-26 21:41Z: the roof not laid, 7 hurt in each of four runs). The roof's cells over a and b are read.
+      const roofOpen = [site.a, site.b].filter(c => bot.blockAt(c.offset(0, 2, 0))?.boundingBox !== 'block');
+      if (roofOpen.length) { out.ended = `the roof not laid over ${roofOpen.map(c => `(${c.x}, ${c.y + 2}, ${c.z})`).join(' and ')}`; console.log(`[slot] not fought from: ${out.ended}`); return out; }
     }
     await navigate(bot, task, new goals.GoalBlock(site.b.x, site.b.y, site.b.z), { timeoutMs: 5000, stallMs: 2000 });
   }
