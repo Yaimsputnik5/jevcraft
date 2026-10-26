@@ -170,6 +170,20 @@ const paceOf = t => t.entity.vehicle ? Math.max(blocksPerSecond(t.entity.name), 
 const RUN_START = 0.3;
 // The cover the bot stands in from shooters (note 2164): one or more within 48 blocks, none with a line to the bot
 // here. -> { count, kinds, nearest, says } or null. `threats` injectable for the tests.
+// The ways that stand where the bot is, for the drop fact (note 2166).
+const STANDING_WAYS = ['fight', 'fight_from_footing', 'strike_from_above', 'cap_fight', 'shield_guard', 'shield_the_blast', 'shield_the_charge', 'eat', 'eat_golden_apple', 'keep_working', 'block_creeper', 'await_in_reach', 'back_to_wall', 'hold_on_span', 'rest_to_heal'];
+// A drop within two blocks of the feet that kills or costs half the health, in words, or ''. A blow throws a body
+// about a block (an enderman's and a hoglin's more), and a step back is a block; crouched, a body cannot step off an
+// edge, but a blow throws it all the same.
+function dropBesideSays(bot, { radius = 2 } = {}) {
+  let drop = null; try { drop = require('./terrain').dropNear(bot, feetCell(bot), radius); } catch (_) { drop = null; }
+  if (!drop) return '';
+  const hp = bot.health ?? 20;
+  if (!(drop.into === 'lava' || drop.damage >= hp / 2)) return '';
+  const where = drop.blocksAway === 0 ? 'under the middle of the feet' : `${drop.blocksAway} block${drop.blocksAway === 1 ? '' : 's'} from the feet`;
+  const fall = drop.into === 'lava' ? `a drop of ${drop.fallBlocks} block${drop.fallBlocks === 1 ? '' : 's'} into lava` : `a drop of ${drop.fallBlocks} blocks (about ${Math.round(drop.damage)} damage, ${drop.damage >= hp ? 'death' : 'half the health or more'} from ${Math.round(hp * 10) / 10})`;
+  return ` Standing here: ${fall} lies ${where}. A blow from a mob throws the body about a block (an enderman's or a hoglin's farther), and a step back is a block: either can put it over; crouched it cannot step off, but a blow throws it all the same.`;
+}
 function shooterCover(bot, { threats = require('./danger').threats } = {}) {
   const { shooter } = require('./mob-policy');
   const shooters = threats(bot, 48).filter(t => t.entity && shooter(t.entity));
@@ -6368,6 +6382,12 @@ class Survival {
       const at = o.description.indexOf(`${lead} `);
       o.description = at >= 0 ? `${o.description.slice(0, at + lead.length + 1)}${price}${o.description.slice(at + lead.length + 1)}` : `${price}${o.description}`;
     }
+    // A deadly drop within two blocks of the feet, said on every way that stands here (note 2166): full-5 (2026-10-26
+    // 07:08Z), at 18.5 health on a Nether ledge 30 blocks over the lava sea, chose cap_fight against an enderman and
+    // then a meal, was struck once (4.1) and thrown off, and died in the lava; the drop was in no option's words.
+    // The runs' footing says it (scouted.edge) and the creeper dance reads it (feetDrop); the standing ways did not.
+    const dropSays = dropBesideSays(bot);
+    if (dropSays) for (const k of STANDING_WAYS) if (options[k] && typeof options[k].description === 'string') options[k].description += dropSays;
     return options;
   }
 
@@ -6896,7 +6916,7 @@ class Survival {
       // behind rock that blew it up six seconds later.
       const outOfSight = (() => { try { return require('./danger').threats(bot, 24).filter(t => !t.visible && !danger.some(d => d.entity.id === t.entity.id)).slice(0, 5); } catch (_) { return []; } })();
       const outOfSightSays = outOfSight.length ? `Within 24 blocks but out of sight, not gone: ${outOfSight.map(t => `a ${String(t.entity.name).replaceAll('_', ' ')} ${Math.round(t.distance * 10) / 10} blocks off`).join(', ')}.${outOfSight.some(t => t.entity.name === 'creeper') ? ' A creeper lights within 7 blocks once it has the bot in sight, about 1.5 seconds to the blast.' : ''}` : null;
-      const state = { ...(kept ? { noWayToTheBot: kept } : {}), ...(outOfSightSays ? { outOfSight: outOfSightSays } : {}), health: bot.health, food: bot.food, dimension: String(bot.game?.dimension || ''), armour, weapon: defenseWeapon(bot)?.name || 'bare hands',
+      const state = { ...(kept ? { noWayToTheBot: kept } : {}), ...(outOfSightSays ? { outOfSight: outOfSightSays } : {}), ...((d => d ? { dropBeside: d.trim() } : {})(dropBesideSays(bot))), health: bot.health, food: bot.food, dimension: String(bot.game?.dimension || ''), armour, weapon: defenseWeapon(bot)?.name || 'bare hands',
         shield: bot.inventory.slots?.[45]?.name === 'shield', arrows: countOf(bot, 'arrow'), buildingBlocks: shelter.materialStock(bot),
         dropWithinThreeBlocks: require('./terrain').dropFacts(bot, feetCell(bot), 3) || false,
         darkHere: darkHere(bot),
@@ -13144,4 +13164,4 @@ function claim(bot, goal = {}, survival = null) {
   return made;
 }
 
-module.exports = { shooterCover, runGroundOf, bedAfterSleepTree, sealedWaitCostSays, bedLoopOf, caveBedSaysFor, wardenBoom, LEAVES_THE_BOOM, PUSH_RECORD, pushRecordOn, blockRecord, BLOCK_RECORD, bedClimbable, BED_CLIMB, pricedRunCell, runFromRecord, RUN_FROM_RECORD, spawnBedNear, homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
+module.exports = { shooterCover, dropBesideSays, STANDING_WAYS, runGroundOf, bedAfterSleepTree, sealedWaitCostSays, bedLoopOf, caveBedSaysFor, wardenBoom, LEAVES_THE_BOOM, PUSH_RECORD, pushRecordOn, blockRecord, BLOCK_RECORD, bedClimbable, BED_CLIMB, pricedRunCell, runFromRecord, RUN_FROM_RECORD, spawnBedNear, homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
