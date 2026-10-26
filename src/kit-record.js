@@ -137,6 +137,17 @@ const ruleSays = `a rung that may wait is made before the Nether unasked only wh
 // The record of a rung before the Nether: what it took, whether it was
 // finished, and what the stays with and without it came to; then where the
 // rule puts it. One sentence, the same wherever the rung is weighed.
+// The bed on the full runs (note 2139): the fresh trials' record above
+// (2026-09-30 to 10-01, a median 2.7 minutes on the bed) is not what the
+// full runs spend. Read from the seven runs' clocks (gameProgress.clock
+// byDoing, 2026-10-26 04:05Z): the bed rung's minutes, the wool's share, the
+// minutes waited out in a shelter at night, and the minutes asleep in all.
+const FULL_BED = Object.freeze({ runs: 7, window: '2026-10-19 to 10-26', playedHours: [26.9, 26.9, 27.0, 138.4, 145.1, 145.1, 145.1],
+  rungMinutes: [29, 40, 41, 71, 238, 307, 555], woolMinutes: [12, 23, 25, 36, 92, 97, 178], waitMinutes: [55, 111, 132, 971, 1043, 1129, 1273], sleepMinutes: [3.7, 3.8, 5.1, 18.1, 20.5, 21.6, 22.6] });
+function fullBedSays() {
+  const F = FULL_BED, med = xs => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)], lo = xs => Math.min(...xs), hi = xs => Math.max(...xs);
+  return `On the ${F.runs} full runs (${F.window}, ${lo(F.playedHours)} to ${hi(F.playedHours)} hours played): the bed rung took ${lo(F.rungMinutes)} to ${hi(F.rungMinutes)} minutes (a median ${med(F.rungMinutes)}; the wool ${lo(F.woolMinutes)} to ${hi(F.woolMinutes)}), the nights waited out in a shelter ${lo(F.waitMinutes)} to ${hi(F.waitMinutes)} minutes (the three 145-hour runs 16 to 21 hours each; a night awake is about eight and a half real minutes from bedtime, a night slept passes in seconds), and ${lo(F.sleepMinutes)} to ${hi(F.sleepMinutes)} minutes asleep in all`;
+}
 function rungRecordSays(phase) {
   const fam = familyOf(phase), r = RUNGS[fam], s = RUNG_STAYS[fam];
   if (!r && !s) return '';
@@ -144,6 +155,7 @@ function rungRecordSays(phase) {
   if (r) parts.push(`fresh trials ${RUNGS.window}: ${r[0]} of ${RUNGS.trials} worked on it before the Nether, a median ${r[2]} minutes each (${r[1]} minutes in all, ${pctOf(r[1], RUNGS.preNetherMinutes)}% of every pre-Nether minute)${r[4] ? `, and ${r[3]} of the ${r[4]} begun without it had it by the Nether` : ''}`);
   if (s) parts.push(`first Nether stays (${RUNG_STAYS.stays}, ${RUNG_STAYS.window}; the played record, not a forecast, and the trials differ in other ways): with it ${s[0][0]}, ${pctOf(s[0][1], s[0][0])}% ended in a death, ${pctOf(s[0][2], s[0][0])}% got a blaze rod; without it ${s[1][0]}, ${pctOf(s[1][1], s[1][0])}% and ${pctOf(s[1][2], s[1][0])}%`);
   const b = benefitOf(phase);
+  if (fam === 'bed') parts.push(fullBedSays());
   if (b.before) parts.push(b.before);
   const verdict = b.before ? b.verdict : b.benefit ? 'a benefit in the record: made before the Nether unless set aside' : b.measured ? 'no benefit in the record: optional before the Nether, made only if chosen' : 'too few stays on a side to measure: optional before the Nether, made only if chosen';
   return ` In the record: ${parts.join('; ')}. ${verdict[0].toUpperCase()}${verdict.slice(1)} (${ruleSays}).`;
@@ -169,4 +181,4 @@ function bareSays(dimension) {
   const rate = ([d, h]) => (Math.round(d / h * 100) / 100).toFixed(2);
   return `In the trials' record (${BARE_RECORD.window}), in ${where} with no armour worn ${rate(r.bare)} deaths a bot-hour (${r.bare[0]} in ${Math.round(r.bare[1])} bot-hours), with any piece on ${rate(r.armoured)} (${r.armoured[0]} in ${Math.round(r.armoured[1])}).`;
 }
-module.exports = { BARE_RECORD, bareSays, BEFORE_NETHER, rungRecordShort, MINUTES, STAYS, RUNGS, RUNG_STAYS, BENEFIT_MIN, BENEFIT_POINTS, ROD_SLACK, familyOf, benefitOf, needBeforeNether, ruleSays, minutesSays, staysSays, rungRecordSays };
+module.exports = { FULL_BED, fullBedSays, BARE_RECORD, bareSays, BEFORE_NETHER, rungRecordShort, MINUTES, STAYS, RUNGS, RUNG_STAYS, BENEFIT_MIN, BENEFIT_POINTS, ROD_SLACK, familyOf, benefitOf, needBeforeNether, ruleSays, minutesSays, staysSays, rungRecordSays };
