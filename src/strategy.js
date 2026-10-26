@@ -574,7 +574,18 @@ function strategyOptions(bot, goal, stage, sides = {}, planFor = null) {
       const through = armourOf(worn), round = n => Math.round(n * 10) / 10;
       return `every hit lands on what is worn now (${worn.length ? worn.map(label).join(', ') : 'nothing'}, ${through.points} armour points): a blaze's fireball about ${round(afterArmour(MOBS.blaze.hit, through))}, a wither skeleton's blade about ${round(afterArmour(MOBS.wither_skeleton.hit, through))}, a piglin's about ${round(afterArmour(MOBS.piglin.hit, through))}, of 20 health; full iron would take about ${round(afterArmour(MOBS.blaze.hit, armourOf(['iron_helmet', 'iron_chestplate', 'iron_leggings', 'iron_boots'])))} of the fireball`;
     };
-    const without = p => /^iron_(armour|helmet|chestplate|leggings|boots)$/.test(p) ? armourHits() : WITHOUT[p] || RUNG_WHY[p] || 'it waits';
+    // A pickaxe rung left behind with a pickaxe carried (note 2160): what is carried and what the Nether makes again.
+    const pickaxesSays = () => {
+      const items = bot.inventory?.items?.() || [], picks = items.filter(i => /_pickaxe$/.test(i.name));
+      if (!picks.length) return null;
+      const uses = i => { const max = bot.registry?.itemsByName?.[i.name]?.maxDurability; return Number.isFinite(max) ? max - (i.durabilityUsed || 0) : null; };
+      const n = re => items.filter(i => re.test(i.name)).reduce((k, i) => k + i.count, 0);
+      const cobble = n(/^(cobblestone|cobbled_deepslate|blackstone)$/), sticks = n(/^stick$/), planks = n(/_planks$/), logs = n(/_log$/), ingots = n(/^iron_ingot$/);
+      const stickWorth = sticks + planks * 2 + logs * 8, heads = Math.floor(cobble / 3), ironHeads = Math.floor(ingots / 3), handles = Math.floor(stickWorth / 2);
+      const list = picks.map(i => `${label(i.name)}${uses(i) !== null ? ` (${uses(i)} uses left)` : ''}`).join(', ');
+      return `the pickaxes carried are ${list}; the Nether has no stone or iron ore for another, so one worn out there is made again only from what is carried (${cobble} cobblestone, ${ingots} iron ingots, ${stickWorth} sticks' worth of wood): about ${Math.min(heads, handles)} stone pickaxe${Math.min(heads, handles) === 1 ? '' : 's'} and ${Math.min(ironHeads, handles)} iron`;
+    };
+    const without = p => /^iron_(armour|helmet|chestplate|leggings|boots)$/.test(p) ? armourHits() : /^(stone|iron)_pickaxe$/.test(p) && pickaxesSays() ? pickaxesSays() : WITHOUT[p] || RUNG_WHY[p] || 'it waits';
     // What the rung left would have taken from here, and its record.
     const priced = p => {
       const phase = p === 'iron_armour' ? (left.find(q => /^iron_/.test(q)) || p) : p;
@@ -627,7 +638,13 @@ function strategyOptions(bot, goal, stage, sides = {}, planFor = null) {
       run: async () => { for (const p of left) setAside(goal, 'rung', p, 'Jev chose the End first', 1800000); delete goal.rungOptIn; },
     };
   };
-  if (rungs.length && rungs[0].phase === stage.phase && dimension(bot) === 'overworld' && rungs.every(r => DEFERRABLE.has(r.phase))) {
+  // A pickaxe rung alone before the Nether, a pickaxe carried (note 2160): the rung and its stage were the only two
+  // options, the same work twice, and Jev answered none good 17 of 38 asks with an iron and a stone pickaxe carried
+  // (2026-10-25 06:00Z to 10-26 06:00Z, the six full runs; the stone rung with a wooden one 8 asks). The Nether
+  // with the pickaxes carried is a route, priced by them (pickaxesSays).
+  const needed = rungs.filter(r => !DEFERRABLE.has(r.phase));
+  const pickaxeRungsOnly = needed.length > 0 && needed.every(r => /^(stone|iron)_pickaxe$/.test(r.phase)) && (bot.inventory?.items?.() || []).some(i => /_pickaxe$/.test(i.name));
+  if (rungs.length && rungs[0].phase === stage.phase && dimension(bot) === 'overworld' && (rungs.every(r => DEFERRABLE.has(r.phase)) || pickaxeRungsOnly)) {
     const first = netherFirst(rungs.map(r => r.phase));
     if (first) options.nether_first = first;
     else { const end = endFirst(rungs.map(r => r.phase)); if (end) options.end_first = end; }
