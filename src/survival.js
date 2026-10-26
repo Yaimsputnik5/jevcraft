@@ -6388,6 +6388,13 @@ class Survival {
     // The runs' footing says it (scouted.edge) and the creeper dance reads it (feetDrop); the standing ways did not.
     const dropSays = dropBesideSays(bot);
     if (dropSays) for (const k of STANDING_WAYS) if (options[k] && typeof options[k].description === 'string') options[k].description += dropSays;
+    // What each way came to at this health on the full runs (stance-record.js, note 2168): the run from mobs was
+    // followed by a death within a minute 10 times of 50 at 11-15 health against the fight's 1 of 35; nothing said it.
+    try {
+      const SR = require('./stance-record'), hp = bot.health ?? 20, arm = require('./combat-estimate').armourOf([5, 6, 7, 8].map(slot => bot.inventory?.slots?.[slot]?.name).filter(Boolean)).points;
+      const offered = Object.keys(options);
+      for (const k of offered) if (typeof options[k]?.description === 'string') { const r = SR.says(k, hp, arm, offered); if (r) options[k].description += r; }
+    } catch (_) { /* the record is not the stance */ }
     return options;
   }
 
