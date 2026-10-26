@@ -575,7 +575,7 @@ function release(bot, now = Date.now(), at_once = false) {
 // while the question was out.
 function coverDue(bot, now) {
   for (const [id, a] of bot._shotAnswers || []) {
-    if (a.choice !== 'behind_cover' || !a.cell) continue;
+    if (!['behind_cover', 'off_the_edge'].includes(a.choice) || !a.cell) continue;
     if (answerFor(bot, id, now) !== a) continue;
     const p = bot.entity.position;
     if (Math.hypot(p.x - a.cell.x - 0.5, p.z - a.cell.z - 0.5) > 2.6 || Math.abs(p.y - a.cell.y) > 0.6) { bot._shotAnswers.delete(id); continue; }
@@ -616,6 +616,12 @@ function shotOptions(bot, warned) {
       tree.shield_up.description += ` Facing it, the ghast's fireball is also struck as it comes within reach: struck with anything, a fireball flies back the way the bot looks and does not land (no hurt, no fire, no push; the shield alone stops the hurt, not the push). In the arena (a ghast 13 to 30 blocks off, the bot standing with its shield up, ${G.REFLEX_ARENA.runs} runs), ${G.REFLEX_ARENA.struck} of ${G.REFLEX_ARENA.came} fireballs that came were struck so, ${G.REFLEX_ARENA.landed || 'none'} landed, no health was lost, and ${G.REFLEX_ARENA.killed} of the ghasts were killed by a fireball sent back; with the shield up and no strike, the bot died in both of two runs.${f?.struck ? ` By this bot since: ${f.struck} struck, ${f.landed} of them landed all the same.` : ''}`;
     }
   }
+  // A deadly drop beside the feet (note 2195): the shot's knockback is about a block, and a span or ledge over the lava
+  // sea is where four of the Nether's five lava deaths of 2026-10-25/26 came (knocked in by a ghast's or a skeleton's
+  // shot, the question offering the shield or keeping on). The step back from the edge, to the open cell farthest from
+  // the drop, is offered and said with the drop.
+  const edge = edgeCell(bot);
+  if (edge) tree.off_the_edge = { cell: edge.cell, steps: edge.steps, description: `Step ${edge.steps} block${edge.steps === 1 ? '' : 's'} back from the edge to (${edge.cell.x}, ${edge.cell.y}, ${edge.cell.z}), ${edge.away} block${edge.away === 1 ? '' : 's'} from the drop, before the shots come, then hold there with the shield up: ${edge.drop.says} A shot's knockback is about a block; the step back takes about a second, and ${doing} stops for it.` };
   const cover = coverCell(bot, warned);
   if (cover) tree.behind_cover = { description: `Step ${cover.steps} block${cover.steps === 1 ? '' : 's'} to (${cover.cell.x}, ${cover.cell.y}, ${cover.cell.z}), out of the line of ${who}, and stay there while the shots come (until about ${round(Math.max(...warned.map(e => WARNS[e._shotWarn.kind].most - (Date.now() - e._shotWarn.at) / 1000)))} seconds from now); ${doing} goes on after.`, cell: cover.cell };
   // Not only a shooter with a warning on now: one that drifted to the
@@ -727,6 +733,28 @@ function firesIn(bot, e, now = Date.now()) {
 }
 // A cell out of the line of every warned shooter, walked to straight on the
 // level in one or two steps, with no lava or deadly drop beside the way.
+// The open level cell within two steps farthest from a deadly drop beside the feet (note 2195), or null.
+function edgeCell(bot) {
+  try {
+    const terrain = require('./terrain'), { lavaWithin } = require('./blaze-stand');
+    const feet = terrain.feetCell(bot), hp = bot.health ?? 20;
+    const drop = terrain.dropNear(bot, feet, 2);
+    if (!drop || !(drop.into === 'lava' || drop.damage >= hp / 2)) return null;
+    const says = `a drop of ${drop.fallBlocks} block${drop.fallBlocks === 1 ? '' : 's'}${drop.into === 'lava' ? ' into lava' : ` (about ${Math.round(drop.damage)} damage)`} lies ${drop.blocksAway === 0 ? 'under the middle of the feet' : `${drop.blocksAway} block${drop.blocksAway === 1 ? '' : 's'} from the feet`}.`;
+    const open = c => { const b = bot.blockAt(c), head = bot.blockAt(c.offset(0, 1, 0)), floor = bot.blockAt(c.offset(0, -1, 0)); return !!b && b.boundingBox !== 'block' && (!head || head.boundingBox !== 'block') && !!floor && floor.boundingBox === 'block' && !/lava|magma/.test(floor.name); };
+    let best = null;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      for (let r = 1; r <= 2; r++) {
+        const c = feet.offset(dx * r, 0, dz * r);
+        if (!open(c)) break;
+        if (lavaWithin(bot, c, 1) || terrain.dropWithin(bot, c, 1)) continue;
+        const away = Math.round(Math.hypot(c.x - drop.cell.x, c.z - drop.cell.z));
+        if (!best || away > best.away || (away === best.away && r < best.steps)) best = { cell: c, steps: r, away, drop: { ...drop, says } };
+      }
+    }
+    return best;
+  } catch (_) { return null; }
+}
 function coverCell(bot, warned) {
   try {
     const bunker = require('./bunker');
@@ -766,6 +794,8 @@ function shotState(bot, warned) {
   return {
     health: round(bot.health ?? 20), doing: bot._survivalGoal?.step?.action || bot._goal?.step?.action || null,
     shooters: warned.slice(0, 4).map(e => ({ name: e.name, distance: round(e.position.distanceTo(here)), warning: WARNS[e._shotWarn.kind].says, firstShotInSeconds: round(firesIn(bot, e)) })),
+    // The deadly drop beside the feet, where there is one (survival.js dropBesideSays, note 2195).
+    ...((d => d ? { dropBeside: d.trim() } : {})((() => { try { return require('./survival').dropBesideSays(bot); } catch (_) { return ''; } })())),
   };
 }
 
@@ -885,7 +915,7 @@ function ask(bot, survival, warned) {
   const answers = bot._shotAnswers ||= new Map();
   const until = new Map(warned.map(e => [e.id, e._shotWarn.at + WARNS[e._shotWarn.kind].most * 1000]));
   const record = (choice, by, extra = {}) => {
-    for (const [id, key] of keys) answers.set(id, { key, choice, at: Date.now(), until: until.get(id), ...(choice === 'behind_cover' ? { cell: tree.behind_cover.cell } : {}), by, ...extra });
+    for (const [id, key] of keys) answers.set(id, { key, choice, at: Date.now(), until: until.get(id), ...(choice === 'behind_cover' ? { cell: tree.behind_cover.cell } : choice === 'off_the_edge' ? { cell: tree.off_the_edge.cell } : {}), by, ...extra });
     if (warned.length === 1) {
       const e = warned[0], d = e.position?.distanceTo?.(bot.entity?.position);
       if (Number.isFinite(d) && d >= FAR) (bot._shotFarHeld ||= new Map()).set(e.id, { choice, at: Date.now(), distance: d });
