@@ -2563,6 +2563,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       }
     }
     const shoot = async target => {
+      delete bot._shootEnded;
+      try { return await shootOnce(target); } catch (err) { bot._shootEnded = err.name === 'EndEmergency' ? `cut by an emergency` : String(err.message || err).replace(/\d+/g, 'N').slice(0, 60); throw err; }
+    };
+    const shootOnce = async target => {
       guardShot();
       if (target === dragon && perched(bot, dragon)) throw new Error('The dragon perched before the shot');
       let explosion = false;
@@ -2576,9 +2580,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           // From its water the endermen about are not what stops the shot; any other mob within six is.
           ...(inWater() ? { standing: () => true, threatCheck: b => { const near = hostileEntities(b, 6).find(e => live(b, e) && e.name !== 'enderman'); if (near) throw new Error(`A ${near.name} came within six blocks`); } } : {}) });
         result.targetPosition = { ...targetPosition };
+        if (target === dragon) result.dragonBefore = metadata(bot, dragon, 'health');
         state.shots.push(result); state.shots = state.shots.slice(-256); save();
         const until = Date.now() + Math.min(5000, Math.ceil(result.ticks * 50) + 500);
         while (Date.now() < until) { check(); if (!safeHere()) break; await sleep(50); }
+        if (target === dragon) { result.dragonAfter = live(bot, dragon) ? metadata(bot, dragon, 'health') : null; save(); }
         if (target.name === 'end_crystal' && Date.now() >= until) result.outcome = live(bot, target) ? 'target_remains' : 'unconfirmed_target_lost';
         if (target.name === 'end_crystal' && explosion && !live(bot, target)) {
           result.outcome = 'confirmed_crystal_explosion';
@@ -2737,8 +2743,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         if (trajectory) tree.shoot_dragon = {
           description: { action: 'Shoot the currently arrow-vulnerable flying dragon along the checked clear trajectory',
             safeFiringPosition: true, flightSeconds: trajectory.ticks / 20, dragonHealth: beforeDragon, observedHealingCrystals: crystals.length, arrowsLeft: countOf(bot, 'arrow'),
+            // What the choice came to this fight (note 2200): dragon-313 (25592, 2026-10-26) chose it 90 times in 31 minutes, 19 picks ended before an arrow left the bow (the firing position unsafe, no clear trajectory, a fireball's cut), the dragon lost 10 health to the arrows in all, and the question said nothing of it each time.
+            thisFight: dragonShotsSays(state, beforeDragon),
             // The arrows against the crystals (note 1172): one loosed at the dragon is one fewer for a crystal, and a crystal standing heals back what the arrow took.
-            ...(crystals.length ? { crystalsHealIt: `${crystals.length} healing crystal${crystals.length === 1 ? '' : 's'} in view still stand${crystals.length === 1 ? 's' : ''}: each heals the dragon while it flies near, only an arrow reaches one on its pillar, and ${countOf(bot, 'arrow')} arrow${countOf(bot, 'arrow') === 1 ? ' is' : 's are'} left` } : {}), ...(wet ? { fromItsWater: wetSays() } : {}) }, run: () => shoot(dragon),
+            ...(crystals.length ? { crystalsHealIt: `${crystals.length} healing crystal${crystals.length === 1 ? '' : 's'} in view still stand${crystals.length === 1 ? 's' : ''}: each heals the dragon while it flies near, only an arrow reaches one on its pillar, and ${countOf(bot, 'arrow')} arrow${countOf(bot, 'arrow') === 1 ? ' is' : 's are'} left` } : {}), ...(wet ? { fromItsWater: wetSays() } : {}) }, run: async () => { const t = state.dragonShots ||= { chosen: 0, loosed: 0, ended: {} }; t.chosen++; const n = state.shots.length; try { await shoot(dragon); } finally { if (state.shots.length > n && state.shots.at(-1).target === 'ender_dragon') t.loosed++; else { const why = bot._shootEnded || 'ended before the shot'; t.ended[why] = (t.ended[why] || 0) + 1; } delete bot._shootEnded; save(); } },
         };
       }
     }
@@ -4453,4 +4461,14 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   }
 }
 
-module.exports = { cloudOverClimb, runOffSides, spanSteps, PUNCH_RECORD, punchRecordSays, dragonNearRoute, enclosed, dropOffs, leaveHighGround, voidEdge, endermenNearRoute, metadata, perched, perchedHead, repeatedCrystalMiss, observeArena, endHazards, safeEndPoint, arenaMovement, arenaRoutes, fightEndStep };
+// The shots at the dragon this fight, said on the option (note 2200): how often chosen, how many arrows left the bow, what the dragon lost to them, and how the other picks ended.
+function dragonShotsSays(state, dragonHealth) {
+  const t = state.dragonShots || { chosen: 0, loosed: 0, ended: {} };
+  const since = state.fightStartedAt || 0;
+  const shots = (state.shots || []).filter(s => s.target === 'ender_dragon' && s.at >= since && Number.isFinite(s.dragonBefore));
+  const lost = shots.reduce((n, s) => n + Math.max(0, s.dragonBefore - (Number.isFinite(s.dragonAfter) ? s.dragonAfter : s.dragonBefore)), 0);
+  if (!t.chosen) return `not chosen yet this fight; the dragon's health ${dragonHealth ?? '?'} of 200`;
+  const ended = Object.entries(t.ended).sort((a, b) => b[1] - a[1]).map(([why, n]) => `${why} ${n}`).join(', ');
+  return `chosen ${t.chosen} time${t.chosen === 1 ? '' : 's'} this fight: ${t.loosed} arrow${t.loosed === 1 ? '' : 's'} left the bow at the dragon and it lost ${Math.round(lost)} health in the seconds after them (its health ${dragonHealth ?? '?'} of 200 now)${t.chosen > t.loosed ? `; the other ${t.chosen - t.loosed} pick${t.chosen - t.loosed === 1 ? '' : 's'} ended before any arrow: ${ended || 'nothing recorded'}` : ''}`;
+}
+module.exports = { dragonShotsSays, cloudOverClimb, runOffSides, spanSteps, PUNCH_RECORD, punchRecordSays, dragonNearRoute, enclosed, dropOffs, leaveHighGround, voidEdge, endermenNearRoute, metadata, perched, perchedHead, repeatedCrystalMiss, observeArena, endHazards, safeEndPoint, arenaMovement, arenaRoutes, fightEndStep };
