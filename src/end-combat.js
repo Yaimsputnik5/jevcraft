@@ -562,7 +562,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     try {
       if (bot._fallRecovery || bot.entity?.onGround !== false || !fallDanger(bot)) return;
       // The fall said even with no bucket to clutch with (note 1803): 25588's dragon-175 (2026-10-18 00:30Z) had poured its last bucket into the drop's pool, took a fireball's cloud on its stub at (-31, 78, 22), 17.5 to 11, and died at 62 sixteen blocks below with not one line between: no fall seen, no step named, nothing to fix from. Once a fall.
-      if (!bot.inventory.items().some(i => i.name === 'water_bucket')) {
+      // A boat carried clutches the fall where no bucket does (fall-recovery.js boatClutch, note 2178).
+      if (!bot.inventory.items().some(i => i.name === 'water_bucket') && !bot.inventory.items().some(i => require('./boats').boatItem(i.name))) {
         if (!(bot._dryFallSaid > Date.now() - 3000)) { bot._dryFallSaid = Date.now(); const u = bot._pillarUp, p = bot.entity.position; const keys = ['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint'].filter(k => bot.controlState?.[k]); console.log(`[end combat] falling from ${p.floored()} at ${bot.health.toFixed(1)} health with no water bucket to clutch with${u ? ` (${Math.round(Math.hypot(u.x + .5 - p.x, u.z + .5 - p.z) * 100) / 100} off the column (${u.x}, ${u.z})'s middle)` : ' (no column)'}; step ${goal.step?.action || 'none'}; keys ${keys.join('+') || 'none'}; velocity ${bot.entity.velocity ? bot.entity.velocity.y.toFixed(2) : '?'}`); }
         return;
       }

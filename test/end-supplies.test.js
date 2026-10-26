@@ -4,7 +4,7 @@ const registry = require('prismarine-registry')('26.1');
 const { Task } = require('../src/skills');
 const { prepareEndSupplies, kitItems } = require('../src/end-supplies');
 function fixture() {
-  const slots = [], items = ['iron_sword', 'iron_pickaxe', 'bow', 'arrow', 'cobblestone', 'cooked_beef', 'water_bucket', 'water_bucket', 'white_bed'].map(name => ({ name,
+  const slots = [], items = ['iron_sword', 'iron_pickaxe', 'bow', 'arrow', 'cobblestone', 'cooked_beef', 'water_bucket', 'water_bucket', 'white_bed', 'oak_boat'].map(name => ({ name,
     count: ({ arrow: 64, cobblestone: 64, cooked_beef: 8, white_bed: 4 })[name] || 1, durabilityUsed: 0 }));
   for (const [slot, name] of [[5, 'iron_helmet'], [6, 'iron_chestplate'], [7, 'iron_leggings'], [8, 'iron_boots'], [45, 'shield']]) slots[slot] = { name, count: 1, durabilityUsed: 0 };
   const bot = { registry, health: 20, food: 20, oxygenLevel: 20, inventory: { slots, items: () => items }, heldItem: items[0] };

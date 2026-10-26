@@ -71,6 +71,11 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
   if (!fallDanger(bot)) return false;
   const dimension = bot.game.dimension, initialHealth = bot.health;
   const water = bot.inventory.items().find(i => i.name === 'water_bucket');
+  const nether = String(dimension).includes('nether');
+  // No water, or the Nether, with a boat carried (note 2178; the user, 2026-10-26): the boat placed on the ground
+  // under the fall and boarded in the air, which lands the body in it unhurt (a rider's fall is the boat's).
+  const boat = (!water || nether) ? bot.inventory.items().find(i => require('./boats').boatItem(i.name)) : null;
+  if (boat) return boatClutch(bot, task, goal, save, boat, { timeoutMs, alive });
   // With no water there is nothing to do in the air but land: as Blocked it
   // stopped the dragon fight mid-flight at twelve health, alive.
   if (!water) {
@@ -78,7 +83,7 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
     while (bot.entity.onGround === false && Date.now() < until) { if (bot.health <= 0 || bot.isAlive === false) break; await new Promise(r => setTimeout(r, 50)); }
     return false;
   }
-  if (String(dimension).includes('nether')) throw new Error('Water cannot protect a landing in the Nether');
+  if (nether) throw new Error('Water cannot protect a landing in the Nether');
   const before = countOf(bot, 'water_bucket'), emptyBefore = countOf(bot, 'bucket');
   bot.pathfinder.setGoal(null); bot.clearControlStates(); bot.stopDigging?.();
   const previousInterrupt = task.interruptCheck; task.interruptCheck = undefined;
@@ -214,4 +219,68 @@ async function recoverFallOnce(bot, task, goal, save, { timeoutMs = 12000, refil
     bot.removeListener('physicsTick', tick); bot.deactivateItem(); bot.clearControlStates(); task.interruptCheck = previousInterrupt;
   }
 }
-module.exports = { fallDanger, clutchTarget, recoverFall };
+// The boat clutch (note 2178): the carried boat clicked onto the ground under the fall as the water is (clutchTarget,
+// the same cell and reach), then boarded the tick it appears; seated, the body takes no fall. full-3's End deaths
+// of 2026-10-25 counted five 'doomed to fall by Ender Dragon' with no bucket to pour. -> true when seated before the ground.
+async function boatClutch(bot, task, goal, save, boat, { timeoutMs = 12000, alive = () => {} } = {}) {
+  const dimension = bot.game.dimension, initialHealth = bot.health, itemName = boat.name;
+  const check = () => { if (bot.game.dimension !== dimension || bot.health <= 0 || bot.isAlive === false) throw new Error('Fall recovery interrupted by dimension change or death'); };
+  bot.pathfinder.setGoal(null); bot.clearControlStates(); bot.stopDigging?.();
+  let previous = bot.entity.position.clone(), placed = null, placedBoat = null, mounting = false, failure = null, ended = false;
+  const ids = new Set(Object.keys(bot.entities));
+  const tick = () => {
+    try {
+      check();
+      if (!placed && bot.heldItem?.name === itemName && bot.entity.velocity.y <= -0.85) {
+        const target = clutchTarget(bot, previous);
+        if (target) {
+          bot.look(target.yaw, target.pitch, true).catch(err => { failure = err; });
+          bot.activateItem(); placed = { at: Date.now(), position: target.position };
+          console.log(`[fall] boat clicked at ${target.position} from the body at ${bot.entity.position.floored()}, falling ${bot.entity.velocity.y.toFixed(2)} a tick, health ${bot.health.toFixed(1)}`);
+          goal.step = { ...(goal.step || {}), boatClicked: { at: { x: target.position.x, y: target.position.y, z: target.position.z }, body: { ...bot.entity.position } } }; save();
+        }
+      }
+      if (placed && !placedBoat) placedBoat = Object.values(bot.entities).find(e => !ids.has(String(e.id)) && require('./boats').boatItem(e.name || '') && e.position && e.position.distanceTo(placed.position) < 3) || null;
+      if (placedBoat && !bot.vehicle && !mounting) { mounting = true; (bot._ownedBoats ||= new Set()).add(placedBoat.uuid); try { bot.mount(placedBoat); } catch (err) { failure = err; } }
+    } catch (err) { failure = err; }
+    previous = bot.entity.position.clone();
+  };
+  try {
+    await bot.equip(boat, 'hand'); check();
+    goal.step = { action: 'protect_fall_with_boat', from: { ...bot.entity.position }, velocity: { ...bot.entity.velocity } }; save();
+    bot.on('physicsTick', tick);
+    const deadline = Date.now() + timeoutMs;
+    let dryAt = null;
+    while (Date.now() < deadline) {
+      check(); if (failure) throw failure;
+      if (bot.vehicle && placedBoat && bot.vehicle === placedBoat) {
+        await sleep(300);
+        const evidence = { at: Date.now(), landing: { ...bot.entity.position }, initialHealth, health: bot.health, outcome: 'seated_in_boat', boat: itemName };
+        goal.fallRecoveries ||= []; goal.fallRecoveries.push(evidence); goal.fallRecoveries = goal.fallRecoveries.slice(-20); goal.lastFallLanding = evidence; save();
+        bot.emit('fall_recovery', evidence);
+        console.log(`[fall] seated in the boat at ${bot.entity.position.floored()}, ${initialHealth.toFixed(1)} to ${bot.health.toFixed(1)}`);
+        const boats = require('./boats');
+        try { await boats.leaveBoat(bot); } catch (_) { /* left on the next pass */ }
+        try { await boats.recoverBoat(bot, task, placedBoat, itemName, Math.floor(bot.entity.position.y)); } catch (_) { /* the boat stays where it is */ }
+        ended = true; return true;
+      }
+      if (bot.entity.onGround && Math.abs(bot.entity.velocity.y) < .1) {
+        dryAt ||= Date.now();
+        if (Date.now() - dryAt >= 150) {
+          const evidence = { at: Date.now(), landing: { ...bot.entity.position }, initialHealth, health: bot.health, outcome: 'landed_before_the_boat', attemptedBoat: !!placed, boatPlaced: !!placedBoat, noBoatBecause: placed ? undefined : (bot._clutchWhy || []).slice(-6) };
+          goal.lastFallLanding = evidence; save(); bot.emit('fall_recovery', evidence);
+          console.log(`[fall] landed at ${bot.entity.position.floored()} ${placed ? (placedBoat ? 'with the boat placed and not boarded in time' : 'with the boat clicked and none seen') : 'with no boat clicked'}, ${initialHealth.toFixed(1)} to ${bot.health.toFixed(1)}${placed ? '' : `: ${(bot._clutchWhy || []).slice(-6).join('; ') || 'no reason kept'}`}`);
+          if (placedBoat) { try { await require('./boats').recoverBoat(bot, task, placedBoat, itemName, Math.floor(bot.entity.position.y)); } catch (_) { /* left */ } }
+          ended = true; return false;
+        }
+      } else dryAt = null;
+      await sleep(10);
+    }
+    ended = true;
+    throw new Error('No seat in a placed boat within the fall-recovery deadline');
+  } finally {
+    if (!ended && !placed) console.log(`[fall] the boat clutch ended in the air at ${bot.entity.position.floored()}, ${bot.health.toFixed(1)} health, no boat clicked: ${(bot._clutchWhy || []).slice(-6).join('; ') || 'no reason kept'}`);
+    bot.removeListener('physicsTick', tick); bot.deactivateItem(); bot.clearControlStates();
+  }
+}
+module.exports = { fallDanger, clutchTarget, recoverFall, boatClutch };

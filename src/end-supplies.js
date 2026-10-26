@@ -160,6 +160,11 @@ function kitItems(bot, goal, actions = {}, now = Date.now()) {
   const water = countOf(bot, 'water_bucket');
   out.push({ key: 'water', item: 'water_bucket', carried: water, wants: WANTS.water_bucket, short: water < WANTS.water_bucket, target: WANTS.water_bucket,
     says: `Fill water buckets up to two first (${water} carried): one for a landing after the dragon's wing throws the bot, one poured at its feet against endermen it has turned, which water hurts. A bucket is three iron ingots at a crafting table (${countOf(bot, 'bucket')} empty bucket${countOf(bot, 'bucket') === 1 ? '' : 's'}, ${countOf(bot, 'iron_ingot')} iron ingots and ${countOf(bot, 'raw_iron')} raw iron carried), filled at any water. ${LIVE_END_SAYS}` });
+  // A boat for the fall (note 2178; the user, 2026-10-26): placed under the body and boarded in the air it lands the
+  // bot unhurt where the bucket is spent or none is carried; five planks.
+  const boatsCarried = (bot.inventory?.items?.() || []).filter(i => require('./boats').boatItem(i.name)).reduce((n, i) => n + i.count, 0);
+  out.push({ key: 'boat', item: 'oak_boat', carried: boatsCarried, wants: 1, short: boatsCarried < 1, target: 1,
+    says: `Make a boat first (${boatsCarried} carried): five planks at a crafting table. In the End a fall off a column is 15 to 20 blocks onto the island; the water bucket catches it while one is full, and a boat placed on the ground under the body and boarded in the air catches it too, the boat picked up after. full-3's End deaths counted five 'doomed to fall by Ender Dragon'.` });
   const beds = bedsOf(bot), bedsOpen = !goal.endBeds || now - goal.endBeds.startedAt < END_BED_MS;
   out.push({ key: 'beds', item: 'bed', carried: beds, wants: END_BEDS, short: beds < END_BEDS && bedsOpen,
     says: `Make beds up to ${END_BEDS} first (${beds} carried), three wool and three planks each, the wool sheared: in the End a bed explodes when slept in, and one laid beside the perched dragon's head and blown from a trench is the heaviest blow the bot can deal it, about five health to the bot each. ${require('./bed-bomb').dragonBedSays()} Not yet used against the dragon in the rehearsals or the runs. Twenty minutes at it at most.` });
