@@ -3728,8 +3728,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             console.log(`[end combat] seated in the ${boatItem.name.replace(/_/g, ' ')} at ${bot.entity.position.floored()} for the dragon's pass, ${Math.round(flat)} blocks off, in ${Date.now() - t0} ms`);
             // Seated while the dragon is about, as the column's hold is (waitForThePass): within 40 flat and within 30 up or down and not going away; at most 25 s.
             const h0 = bot.health, t1 = Date.now(); let why = 'no dragon in sight';
+            // The seat left at once with the breath on it or coming (note 2235): the emergency's throw out of this loop left the body seated, and 25592's dragon-334 (2026-10-26 16:47Z) sat in a fireball's cloud through two evasions that waited for a landing, 20 to none. The cloud or a fireball ends the seat before the check that throws.
             for (;;) {
-              check();
+              if (breathThreat(bot)) { why = `the breath on the seat (${breathThreat(bot).name.replace(/_/g, ' ')})`; break; }
+              try { check(); } catch (err) { try { await boats.leaveBoat(bot); } catch (_) { /* the evasion dismounts too */ } throw err; }
               const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e)); if (!d) break;
               const ph = metadata(bot, d, 'phase'); if ([5, 6, 7, 9, 10].includes(ph)) { why = `the dragon perched (phase ${ph})`; break; }
               // Seated while the dragon is within forty flat and not going away (note 2226): the hold's height test (thirty up

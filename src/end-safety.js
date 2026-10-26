@@ -381,6 +381,13 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
     // that fractional Y as a standing level falsely reports a terrain trap.
     // Let ordinary physics land small hops; escalating launches immediately
     // hand over to the water recovery instead of waiting for impact.
+    // Out of the boat first (note 2235): a seated body is never on the ground, and the wait for its landing is two seconds in the cloud. 25592's dragon-334 (2026-10-26 16:47Z) was seated for the pass at (4, 60, 10) when a fireball's cloud came onto the seat, 'await_knockback_landing, moved 0 blocks ... on ground false' for 2005 ms, 20 to 8.5, and again for 1100 ms, 8.5 to none.
+    if (bot.vehicle) {
+      const t0 = Date.now(), v = bot.vehicle?.name || 'vehicle';
+      try { await require('./boats').leaveBoat(bot); } catch (_) { /* said below */ }
+      for (let i = 0; i < 20 && (bot.vehicle || bot.entity.onGround === false); i++) await sleep(50);
+      console.log(`[end safety] out of the ${v.replace(/_/g, ' ')} before the evasion at ${bot.entity.position.floored()}: ${bot.vehicle ? 'still seated' : 'dismounted'} in ${Date.now() - t0} ms, on ground ${bot.entity.onGround}, ${Number(bot.health).toFixed(1)} health, breath ${breathThreat(bot)?.name || 'none'}`);
+    }
     const landingDeadline = Date.now() + 2000;
     while (bot.entity.onGround === false) {
       check();
