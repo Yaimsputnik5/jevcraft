@@ -1155,7 +1155,11 @@ async function huntObserved(bot, task, goal, save, actions, client) {
       if (target.name === 'enderman' && typeof bot.dig === 'function' && !Object.keys(tree).some(k => k.startsWith('slot_'))) {
         let site = null; try { site = require('./enderman-slot').slotSite(bot, { toward: target }); } catch (_) { site = null; }
         if (site && !site.line && !site.out && !site.turned) slotNoLine = true;
-        if (site?.turned || ((site?.line || site?.out) && !slotMissedHere(bot, state))) tree[`slot_${target.id}`] = { description: require('./enderman-slot').says(site, candidates.filter(e => e.name === 'enderman').length) + ` The enderman is ${Math.round(target.position.distanceTo(bot.entity.position))} blocks off.${slotMissSays(bot, state, target, site)} ${require('./enderman-slot').recordSays()}`,
+        // The slot the bot stands at the back of is always on offer (note 2260): a session ended there with none in line marks the
+        // place missed, and the forest trials of 2026-10-26 (25600, forest-3 21:28:33Z and forest-4 21:59:18Z) were then asked with
+        // the open fight and leave alone as the ways, the bot at its slot's back with an enderman 13 off, none turned; Jev took the
+        // open fight both times and died about ten seconds later (where the slot was offered, 6 of 6 asks took it, 9 killed, none hurt).
+        if (site?.turned || site?.held || ((site?.line || site?.out) && !slotMissedHere(bot, state))) tree[`slot_${target.id}`] = { description: require('./enderman-slot').says(site, candidates.filter(e => e.name === 'enderman').length) + ` The enderman is ${Math.round(target.position.distanceTo(bot.entity.position))} blocks off.${slotMissSays(bot, state, target, site)} ${require('./enderman-slot').recordSays()}`,
           run: () => slotForDrop(bot, task, target, goal, save, actions, site) };
       }
       // A blaze no walk reaches is still a fight with a bow in range (note
