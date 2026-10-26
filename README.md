@@ -2,13 +2,13 @@
 
 **A Minecraft bot that beat the game with a model that never writes a word.**
 
-On 2026-10-24, from a fresh Survival world and an empty inventory, jevcraft killed the Ender Dragon after about 107 hours of play. Every judgement along the way, about 25,700 of them, was made by [Jev](https://typesafe.ai/), a small [System One](https://docs.typesafe.ai/concepts/system-one) model from TypeSafe: a classifier that is given a list of options and returns a probability for each, in about 0.2 seconds. Jev's part of the whole run cost about $4.30.
+On 2026-10-24, from a fresh Survival world and an empty inventory, jevcraft killed the Ender Dragon after about 107 hours of play; a second fresh run did it on 2026-10-26 ([the wins](#the-wins)). Every judgement along the way, about 25,700 of them, was made by [Jev](https://typesafe.ai/), a small [System One](https://docs.typesafe.ai/concepts/system-one) model from TypeSafe: a classifier that is given a list of options and returns a probability for each, in about 0.2 seconds. Jev's part of the whole run cost about $4.30.
 
 Jev never generates text, plans or code. **Code lists what the bot can really do right now, with what each option costs and gains. Jev picks one.** The bot is built on [mineflayer](https://github.com/PrismarineJS/mineflayer). When Jev chose badly, the cause was almost always a wrong price or a missing option on the menu, not bad judgement, and most of what this README teaches follows from that.
 
 The next goal is time. A good human speedrun takes about eleven minutes.
 
-[The loop](#the-loop) · [One decision](#one-decision) · [The win](#the-win) · [What we learned](#what-we-learned) · [How we improve it](#how-we-improve-it) · [Run it yourself](#running-it)
+[The loop](#the-loop) · [One decision](#one-decision) · [The wins](#the-wins) · [What we learned](#what-we-learned) · [How we improve it](#how-we-improve-it) · [Run it yourself](#running-it)
 
 ## The loop
 
@@ -38,19 +38,18 @@ A blaze is 8 blocks away in a Nether fortress. The bot is on fire at 17.5 of 20 
 
 Jev picked `charge_nearest`, code checked the pick was one it had offered, and the bot walked in. The answer is held until a fact it rested on changes (the blaze dies, health drops, another mob arrives); then the question is asked again with the new facts. The last part of each option, what it gains toward the goal, was added after note 614: without it, hiding looked cheap and the bot hid.
 
-## The win
+## The wins
 
-Run full-2 started on 2026-10-19 and made [Free the End] on 2026-10-24 at 06:53Z. By its own clock:
+Every fresh-world run that has killed the dragon, by its own clock (`gameProgress.milestones`); each has a write-up under [docs/wins/](docs/wins/).
 
-| Hours played | Milestone |
-| --- | --- |
-| 0.8 | Entered the Nether |
-| 26.2 | Had its eyes of ender (blaze rods and pearls took 25 hours) |
-| 27.0 | Found the stronghold |
-| 76.1 | Entered the End (49 hours went on kitting up, dying in the End and kitting up again) |
-| 107.2 | Killed the dragon, on its fifth trip to the End, with sword blows at the perched head |
+| Run | Started | Killed the dragon | Hours played | Nether | Eyes | Stronghold | End entered | Deaths | Write-up |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| full-2 | 2026-10-19 | 2026-10-24 06:53Z | 107.2 | 0.8 h | 26.2 h | 27.0 h | 76.1 h | 81 | [full-2.md](docs/wins/full-2.md) |
+| full-3 | 2026-10-19 | 2026-10-26 09:01Z | 150.1 | 7.8 h | 34.0 h | 43.5 h | 54.6 h | 95 | [full-3.md](docs/wins/full-3.md) |
 
-Jev's cost for the run was about 25,700 decisions and 102 million input tokens, about $4.30 at its list price of $0.042 per million input tokens (output is free). The dragon had first been killed five days earlier from a staged world (a saved world from a late stage, so hard parts get many attempts an hour), in one 30-minute life. A human speedrun gets its pearls by bartering with piglins and blows the dragon up with beds; full-2 did neither, so the work now is the time, not the kill. More in [docs/wins/full-2.md](docs/wins/full-2.md). As of 2026-10-25, three more fresh runs are measuring the time to the dragon after these changes.
+Both runs spent most of their time after entering the End: full-2 49 hours from the End kit to the kill, full-3 103 hours and 50 deaths. The fight itself takes minutes once the bot arrives kitted; the hours go on dying at night while kitting up again, nights waited out with no bed carried, and corpse runs. That is the work now: the time, not the kill.
+
+Jev's cost for full-2 was about 25,700 decisions and 102 million input tokens, about $4.30 at its list price of $0.042 per million input tokens (output is free). The dragon had first been killed five days before full-2 from a staged world (a saved world from a late stage, so hard parts get many attempts an hour), in one 30-minute life. A human speedrun gets its pearls by bartering with piglins and blows the dragon up with beds; both are on Jev's menu now with the game's own numbers, and full-3 did set off a bed under the perch. Four more fresh runs are under way measuring the time to the dragon.
 
 ## What we learned
 
