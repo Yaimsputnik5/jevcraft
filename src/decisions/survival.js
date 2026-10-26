@@ -434,6 +434,8 @@ define({
   trigger: 'After a death whose drops are worth fetching (what was worn and in the off hand among them) and still there, once the bot is in their dimension, whatever it wears; asked once a death. With no answer, it goes only with the kit worn (in the Nether or below sea level) or by day (note 559).',
   source: 'src/corpse-run.js (corpseRunStep)',
   options: [
+    { key: 'arm_first', label: 'make a stone sword (and a shield where an ingot is carried) here first, then go back for them', when: 'in the Overworld with no sword or axe carried, or no shield with an iron ingot carried; said with what the arms take and what is carried for them, the drops\' seconds or that they do not age, and how soon this run\'s deaths with nothing worn followed the one before (note 2148)', level: 'root' },
+
     { key: 'go_back', trip: 'the drops', label: 'go back for the drops', when: 'always', level: 'root' },
     { key: 'leave_them', label: 'leave them and go on', when: 'always', level: 'root' },
     { key: 'kit_first', label: 'take the kit out of the chest beside the bed first, then go back for them', when: 'a chest beside the bed slept in holds kit the pockets lack, within 16 blocks (bed-kit.js, note 2032)', level: 'root' },

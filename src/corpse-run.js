@@ -383,7 +383,17 @@ function quickDeathsSays(bot) {
   const quick = t.slice(1).filter((x, i) => x - t[i] <= 10 * 60000).length;
   return quick ? ` Of this run's last ${t.length} deaths, ${quick} came within ten minutes of the one before, the bot back with what it carries now.` : '';
 }
-async function corpseRunStep(bot, task, goal, save, { move = navigate, collect = collectNearbyDrops, surface = null, room = null, gatherFood = null, kitActions = null } = {}) {
+// The arms worth making before a walk back with nothing (note 2148): a
+// stone sword where no sword or axe is carried, a shield where none is and an
+// iron ingot is. -> item names
+function armsFirstWant(bot) {
+  const items = bot?.inventory?.items?.() || [], has = re => items.some(i => re.test(i.name));
+  const out = [];
+  if (!has(/_(sword|axe)$/)) out.push('stone_sword');
+  if (!has(/^shield$/) && !(bot?.inventory?.slots?.[45]?.name === 'shield') && countOf(bot, 'iron_ingot') >= 1) out.push('shield');
+  return out;
+}
+async function corpseRunStep(bot, task, goal, save, { move = navigate, collect = collectNearbyDrops, surface = null, room = null, gatherFood = null, kitActions = null, arm = null } = {}) {
   const run = corpseRun(bot, goal);
   if (!run && await kitTrip(bot, task, goal, save)) return false;
   if (!run) { save(); return false; }
@@ -490,6 +500,19 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
     // 25597 (2026-10-05 15:37Z), twelve eyes 1895 blocks off and nothing to
     // eat, the walk there costing about 47 hunger sprinted, left them.
     const foodWant = Math.min(30, Math.round(far / 40));
+    // Arms first (note 2148, Fable's second opinion 04:40Z): at a respawn the
+    // question was drops or not, and the move a strong player makes first,
+    // a stone sword and a shield in two or three minutes, was not on it.
+    // Tonight (2026-10-26 00:00 to 04:00Z) all 9 deaths with nothing worn
+    // came 11 to 28 minutes after the run's previous death.
+    const armsWant = armsFirstWant(bot);
+    const withNow = `with ${carriesWeapon ? `a ${carriesWeapon}` : 'no sword or axe'} and ${wornNow.length ? wornNow.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'}`;
+    if (arm && armsWant.length) {
+      const cobble = countOf(bot, 'cobblestone') + countOf(bot, 'cobbled_deepslate') + countOf(bot, 'blackstone'), sticks = countOf(bot, 'stick'), planks = (bot.inventory?.items?.() || []).filter(i => /_planks$/.test(i.name)).reduce((n, i) => n + i.count, 0), logs = (bot.inventory?.items?.() || []).filter(i => /_log$|_stem$/.test(i.name)).reduce((n, i) => n + i.count, 0), ingots = countOf(bot, 'iron_ingot');
+      const table = countOf(bot, 'crafting_table') > 0;
+      let spells = ''; try { spells = require('./decisions').deathSpells(goal) || ''; } catch (_) { spells = ''; }
+      tree.arm_first = { description: `Make ${listed(Object.fromEntries(armsWant.map(i => [i, 1])))} here first, then set out for them as go back says: a stone sword is two cobblestone and a stick (${cobble} cobblestone, ${sticks} sticks, ${planks} planks, ${logs} logs carried${cobble >= 2 ? '' : '; stone is dug where the bot stands or below'})${armsWant.includes('shield') ? `, a shield an iron ingot and six planks (${ingots} ingots carried)` : ''}, a few seconds at a crafting table${table ? ' (one is carried)' : ' (four planks make one)'}; about two or three minutes with the gathering. The bot goes to them ${withNow} now. ${left === null ? 'The drops do not age meanwhile.' : `About ${left} seconds before the drops vanish, the arms' minutes among them.`} Ten minutes at most on the arms; then the walk with what there is.${spells ? ` ${spells}` : ''}` };
+    }
     if (gatherFood && far >= 300 && foodCarried < foodWant) tree.food_first = { description: `Get food for the walk first, here: hunted, cooked or taken from a chest, toward ${foodWant} food points carried (${foodCarried} now), then set out for them; the drops do not age meanwhile. Twenty minutes at most on the food; then the walk with what there is.` };
     if (toDawn !== null && (night || minutes > until) && !run.loadedAt && /overworld/.test(run.dimension)) tree.wait_for_day = { description: `Set out for them at ${night ? 'dawn' : 'the next dawn'}, about ${toDawn} real minute${toDawn === 1 ? '' : 's'} off, with the day ahead for the walk${night ? '' : ` (the day left now, about ${until}, is shorter than the walk, about ${minutes})`}, and go on with other things until then: the drops do not age while the bot is not within ${TICKING} blocks of them.${night ? ' From dawn the zombies and skeletons on open ground burn in the sun (not under a roof or in water, not husks or a zombie with a helmet, and never spiders or creepers), and no more spawn there in the light.' : ''} Asked again at dawn.${triedDeathsSays(bot, run)}` };
     // Through the Nether, where the drop lies far off in the Overworld and a
@@ -519,6 +542,7 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
       run.choice = 'go_back'; save(); return false;
     }
     if (decision.path.at(-1) === 'food_first') { run.choice = 'go_back'; note(goal, 'begun'); run.foodFirst = { at: Date.now(), want: foodWant }; save(); }
+    if (decision.path.at(-1) === 'arm_first') { run.choice = 'go_back'; note(goal, 'begun'); run.armFirst = { at: Date.now(), want: armsFirstWant(bot) }; save(); }
     else if (decision.path.at(-1) === 'wait_for_day') { run.waitUntil = Date.now() + toDawn * 60000; save(); return false; }
     if (decision.path.at(-1) === 'through_nether') {
       const ns = require('./nether-shortcut');
@@ -528,9 +552,21 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
       bot.chat?.(`Through the Nether for them: ${Math.round(far / 8)} blocks there in place of ${far} here.`);
       return false;
     }
-    if (decision.path.at(-1) !== 'food_first') run.choice = decision.path.at(-1); save();
+    if (!['food_first', 'arm_first'].includes(decision.path.at(-1))) run.choice = decision.path.at(-1); save();
     if (decision.path.at(-1) === 'go_back') note(goal, 'begun');
     if (run.choice === 'leave_them') { run.status = 'left'; note(goal, 'left'); run.leftWith = { ...run.items }; tripCameToNothing(bot, goal, run, save); save(); return false; }
+  }
+  // The arms for the walk, where that was chosen (note 2148): one item a
+  // pass, until both are carried or ten minutes are spent on them.
+  if (run.armFirst) {
+    const next = (run.armFirst.want || []).find(i => !countOf(bot, i));
+    if (next && Date.now() - run.armFirst.at < 10 * 60000 && arm) {
+      goal.step = { action: 'arm_for_walk', item: next, to: { ...run.position } }; save();
+      try { await arm(bot, task, next, countOf(bot, next) + 1, goal, save); }
+      catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled', 'Stalled'].includes(err?.name)) throw err; console.log(`[corpse] the ${next.replaceAll('_', ' ')} for the walk stopped: ${String(err?.message || err).slice(0, 120)}`); delete run.armFirst; save(); }
+      return true;
+    }
+    delete run.armFirst; save();
   }
   // The food for the walk, where that was chosen: a pass of the gathering
   // at a time, until it is carried or twenty minutes are spent on it.
@@ -718,4 +754,4 @@ function dropsWaitSays(bot, goal, now = Date.now()) {
   if (off > TICKING) return ` Given the turn, the work asks first about going back for what the last death dropped, ${off} blocks off: ${what}. Drops age only while their ground is loaded, so they keep until the bot comes near.`;
   return '';
 }
-module.exports = { dropsSeenSays, byRank, recordSays, FLEET_RECORD, TICKING, triedDeathsSays, dropsWaitSays, quickDeathsSays, TOLD, tripCameToNothing, KIT_ERRAND, kitTrip, corpseRun, corpseRunStep, worth, madeAgain, ironRemakeSays, IRON_MINUTES, underWay };
+module.exports = { armsFirstWant, dropsSeenSays, byRank, recordSays, FLEET_RECORD, TICKING, triedDeathsSays, dropsWaitSays, quickDeathsSays, TOLD, tripCameToNothing, KIT_ERRAND, kitTrip, corpseRun, corpseRunStep, worth, madeAgain, ironRemakeSays, IRON_MINUTES, underWay };

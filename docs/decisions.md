@@ -250,6 +250,7 @@ Questions that ride in one call together (the intake batch is one call per chat 
 
 | Option | Level | What it is | Offered when |
 | --- | --- | --- | --- |
+| `arm_first` | root | make a stone sword (and a shield where an ingot is carried) here first, then go back for them | in the Overworld with no sword or axe carried, or no shield with an iron ingot carried; said with what the arms take and what is carried for them, the drops' seconds or that they do not age, and how soon this run's deaths with nothing worn followed the one before (note 2148) |
 | `go_back` (trip: the drops) | root | go back for the drops | always |
 | `leave_them` | root | leave them and go on | always |
 | `kit_first` | root | take the kit out of the chest beside the bed first, then go back for them | a chest beside the bed slept in holds kit the pockets lack, within 16 blocks (bed-kit.js, note 2032) |
