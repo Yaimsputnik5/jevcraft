@@ -6653,7 +6653,7 @@ class Survival {
     if (extendable) {
       const holds = require('./holds');
       let shot = null; try { shot = require('./projectile-guard').incoming(bot, { reach: 24 })[0] || null; } catch (_) { shot = null; }
-      holdEnded = holds.diverged(held.hold, { health: bot.health, mobs: danger, offered: Object.keys(options), shot, hurtBy: bot._hurtBy || {}, at: bot.entity.position, shield: shieldNow });
+      holdEnded = holds.diverged(held.hold, { health: bot.health, mobs: danger, offered: Object.keys(options), shot, hurtBy: bot._hurtBy || {}, at: bot.entity.position, shield: shieldNow, about: (() => { try { return require('./danger').threats(bot, 24); } catch (_) { return null; } })() });
       if (!holdEnded && inTime) holding = true;
       else if (!holdEnded) {
         const x = holds.extend(held.hold, Date.now(), bot.entity.position);
@@ -6873,7 +6873,13 @@ class Survival {
       let calmNeutrals = null;
       try { calmNeutrals = anger.calmAbout(bot); } catch (_) { calmNeutrals = null; }
       const angryOf = t => { let a = null; try { a = anger.angerOf(bot, t.entity); } catch (_) { a = null; } return a ? { angry: `${a.why}: hunting the bot with its group, any way round` } : {}; };
-      const state = { ...(kept ? { noWayToTheBot: kept } : {}), health: bot.health, food: bot.food, dimension: String(bot.game?.dimension || ''), armour, weapon: defenseWeapon(bot)?.name || 'bare hands',
+      // The hostiles within twenty-four blocks out of sight (note 2134): not
+      // on the threats list, and not gone. full-6 (03:14:33Z) was told of
+      // three zombies in sight and nothing of the creeper 14.7 blocks off
+      // behind rock that blew it up six seconds later.
+      const outOfSight = (() => { try { return require('./danger').threats(bot, 24).filter(t => !t.visible && !danger.some(d => d.entity.id === t.entity.id)).slice(0, 5); } catch (_) { return []; } })();
+      const outOfSightSays = outOfSight.length ? `Within 24 blocks but out of sight, not gone: ${outOfSight.map(t => `a ${String(t.entity.name).replaceAll('_', ' ')} ${Math.round(t.distance * 10) / 10} blocks off`).join(', ')}.${outOfSight.some(t => t.entity.name === 'creeper') ? ' A creeper lights within 7 blocks once it has the bot in sight, about 1.5 seconds to the blast.' : ''}` : null;
+      const state = { ...(kept ? { noWayToTheBot: kept } : {}), ...(outOfSightSays ? { outOfSight: outOfSightSays } : {}), health: bot.health, food: bot.food, dimension: String(bot.game?.dimension || ''), armour, weapon: defenseWeapon(bot)?.name || 'bare hands',
         shield: bot.inventory.slots?.[45]?.name === 'shield', arrows: countOf(bot, 'arrow'), buildingBlocks: shelter.materialStock(bot),
         dropWithinThreeBlocks: require('./terrain').dropFacts(bot, feetCell(bot), 3) || false,
         darkHere: darkHere(bot),

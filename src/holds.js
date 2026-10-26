@@ -75,7 +75,13 @@ function begin({ choice, at = Date.now(), health, expects = null, mobs = [], off
 // Why the hold's expectation no longer stands, or null. `mobs` now in the
 // threats' shape, `offered` the option keys on offer now, `shot` a shot on
 // its way at the bot (projectile-guard.js incoming).
-function diverged(hold, { now = Date.now(), health, mobs = [], offered = [], shot = null, hurtBy = {}, at = null, shield = null } = {}) {
+// `about`: every hostile within twenty-four blocks, in sight or not (note
+// 2134): one that has only gone out of sight is said so, not 'gone'. full-6
+// (2026-10-26 03:14:33Z, 7 health) held shield_the_blast against a creeper,
+// was asked again for 'the creeper it was chosen against is gone' with it
+// 14.7 blocks off behind rock, chose run_from the zombies, and was blown up
+// by that creeper six seconds later.
+function diverged(hold, { now = Date.now(), health, mobs = [], offered = [], shot = null, hurtBy = {}, at = null, shield = null, about = null } = {}) {
   if (!hold) return 'no hold';
   // The shield spent on the hold (note 1955): full-3 (2026-10-20 11:39 to 11:42Z) held a pillar 193 seconds under one skeleton, the hold extended twice as 'nothing it was chosen on has changed', every arrow blocked on the shield, until the shield broke; shot dead from 18 health within a minute of that. The arrows taken on the shield are what changed.
   if (shield?.held && Number.isFinite(hold.shieldLeft) && hold.shieldLeft - shield.left >= Math.max(1, Math.round(hold.shieldLeft * SHIELD_SPENT))) {
@@ -109,7 +115,10 @@ function diverged(hold, { now = Date.now(), health, mobs = [], offered = [], sho
   const stillHere = hold.against.filter(m => mobs.some(x => x?.entity?.id === m.id));
   for (const m of hold.against) {
     const t = mobs.find(x => x?.entity?.id === m.id);
-    if (!t && (m === nearestAgainst || !stillHere.length)) return `the ${name(m.name)} it was chosen against is gone`;
+    if (!t && (m === nearestAgainst || !stillHere.length)) {
+      const near = Array.isArray(about) ? about.find(x => x?.entity?.id === m.id) : null;
+      return near ? `the ${name(m.name)} it was chosen against is out of sight now, ${Math.round(near.distance * 10) / 10} blocks off: not gone` : `the ${name(m.name)} it was chosen against is gone`;
+    }
     if (!t) continue;
     // Come to arm's length, one that bites, from out of it: mid-242-ah-
     // fortress-3's retreat was held on past its run with the wither skeleton
