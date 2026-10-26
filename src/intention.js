@@ -255,14 +255,37 @@ function startSays(bot, goal, i, state) {
   return `${what}${at}${why ? `: ${why}` : ''}.`;
 }
 
-// What the intention has brought: the rung's parts, and the distance to its
-// own target, as rung-measure.js parts ({ key: { v, what } }).
+// An errand's own measure (note 2132): a wood, pickaxe or block errand
+// chosen at upkeep, the stall or the Nether's gather gains nothing on the
+// rung by design, its gain is the wood, the pickaxe or the blocks carried.
+// full-7 (2026-10-26 01:14 to 03:03Z) had no pickaxe for 83% of its Nether
+// time, chose fetch_stems 12 times, and 24 of its 43 stem fetches were ended
+// 'no yield: 4 minutes with nothing gained on the rung: killed nothing, no
+// ender pearl or ender eye' on the walk to stems 29 blocks off.
+const ERRANDS = {
+  wood: /^(fetch_stems|wood_reserve|stock_wood|wood_first|wood_in_view|take_owed|climb_to_\d+|(walk|cross|floor)_to_\d+|leg_(east|south|west|north))$/,
+  pickaxe: /^(make_pickaxe|spare_pickaxe|fetch_stems)$/,
+  blocks: /^(block_reserve|blocks_from_shore|blocks_from_pockets|blocks_first)$/,
+};
+const LAID = /^(cobblestone|cobbled_deepslate|netherrack|blackstone|basalt|smooth_basalt|dirt|stone|deepslate|andesite|diorite|granite|tuff|soul_sand|soul_soil|sandstone|end_stone|.*_planks|.*_log|.*_stem)$/;
+function errandParts(bot, i) {
+  const items = bot?.inventory?.items?.() || [], out = {};
+  const count = re => items.filter(x => re.test(x.name)).reduce((t, x) => t + x.count, 0);
+  const choice = String(i?.choice || '');
+  if (ERRANDS.wood.test(choice) || i?.q === 'nether_gather') out['items:wood'] = { v: Math.round(count(/_log$|_stem$|_hyphae$|_wood$/) * 4 + count(/_planks$/) + count(/^stick$/) / 2), what: "wood, by planks' worth" };
+  if (ERRANDS.pickaxe.test(choice)) out['items:pickaxe'] = { v: count(/_pickaxe$/), what: 'pickaxe' };
+  if (ERRANDS.blocks.test(choice)) out['items:blocks'] = { v: count(LAID), what: 'block to lay' };
+  return out;
+}
+// What the intention has brought: the rung's parts, the errand's own, and
+// the distance to its own target, as rung-measure.js parts ({ key: { v, what } }).
 function yieldParts(bot, goal, i) {
   let parts = {};
   try {
     const tried = require('./tried'), rung = tried.rungOf(goal);
     parts = (rung && tried.measureOf(bot, goal, rung)) || {};
   } catch (_) { parts = {}; }
+  Object.assign(parts, errandParts(bot, i));
   // The step's own target is the step's, which changes under a walk: the
   // intention's target stands for it.
   parts = Object.fromEntries(Object.entries(parts).filter(([k]) => !/^step:/.test(k)));
@@ -480,4 +503,4 @@ function yieldWatch(bot, goal, now = Date.now()) {
   try { return require('./stillness').raiseFor(bot, goal, why, now, { escalated: { from: 'intention', to: e.q, says: why } }); } catch (_) { return null; }
 }
 
-module.exports = { tripOf, PLAN, yieldWatch, yieldSays, YIELD_MS, WALKS, wayOf, DROP, committing, holding, gate, after, end, serves, says, startSays, TIMED, GATED, AT_A_CHANGE, ERRAND_GATED, KEEP, WAYS, MAX_MS, NEAR, ARRIVED, HURT };
+module.exports = { errandParts, yieldLook, tripOf, PLAN, yieldWatch, yieldSays, YIELD_MS, WALKS, wayOf, DROP, committing, holding, gate, after, end, serves, says, startSays, TIMED, GATED, AT_A_CHANGE, ERRAND_GATED, KEEP, WAYS, MAX_MS, NEAR, ARRIVED, HURT };
