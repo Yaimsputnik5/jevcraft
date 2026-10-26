@@ -29,3 +29,12 @@ test('the bed question carries the record on every way', () => {
   const tree = bedAfterSleepTree(bot, state, T0 + 46 * 60000, { goal: {} });
   for (const k of Object.keys(tree)) assert.match(tree[k].description, /Since this bed at \(2264, 16, 1284\) became the respawn 46 minutes ago the bot has died 6 times/, k);
 });
+
+test('the sleep option says the hostiles met about the bed\'s place lately (note 2222)', () => {
+  const { mobsMetHereSays } = require('../src/survival');
+  const now = Date.now();
+  const state = { mobPlaces: [{ kind: 'encounter', x: 2266, y: 30, z: 1302, at: now - 300000, mobs: ['zombie', 'skeleton'] }, { kind: 'encounter', x: 2250, y: 20, z: 1290, at: now - 600000, mobs: ['zombie'] }, { kind: 'pocket', x: 2500, y: 60, z: 1500, at: now - 60000, mobs: ['creeper'] }] };
+  const bot = { entity: { position: { x: 2264.5, y: 16, z: 1284.5 } } };
+  assert.equal(mobsMetHereSays(bot, state, null, now), " Hostiles met within 32 blocks of this bed's place in the last 10 minutes: zombie 2, skeleton 1 (2 meetings); a bed slept in becomes the respawn, and each death comes back to life here among whatever stands here then.");
+  assert.equal(mobsMetHereSays(bot, { mobPlaces: [] }, null, now), '');
+});
