@@ -423,8 +423,19 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
       const f = bot.entity.position.floored(), pr = require('./pillar-recovery');
       const items = bot.inventory?.items?.() || [], carried = pr.SCAFFOLD.reduce((n, k) => n + items.filter(i => i.name === k).reduce((m, i) => m + i.count, 0), 0);
       // Two over the head clear, not three (note 2204): a block three over stops the second block, not the first; the jump rises a block and a fifth under it and the one block goes under the feet.
-      const headClear = bot.blockAt(f.offset(0, 2, 0))?.boundingBox !== 'block';
+      let headClear = bot.blockAt(f.offset(0, 2, 0))?.boundingBox !== 'block';
       const ballNear = Object.values(bot.entities).some(e => e.name === 'dragon_fireball' && e.isValid !== false && e.position.distanceTo(bot.entity.position) < 14);
+      // Every cloud at the feet said once (note 2221; Fable, 2026-10-26 14:30Z): dragon-316 (25592, 13:44Z) climbed one block out
+      // of four clouds and died in the fifth under its own roof from the hold, 20 to none, nothing said. The cell, the cloud's
+      // height against the feet, the ground, the blocks carried, what is two over the head, the nearest fireball, the health.
+      const over2 = bot.blockAt(f.offset(0, 2, 0));
+      if (!(bot._cloudAtFeetSaid > Date.now() - 2000)) { bot._cloudAtFeetSaid = Date.now(); const ball = Object.values(bot.entities).filter(e => e.name === 'dragon_fireball' && e.isValid !== false).map(e => e.position.distanceTo(bot.entity.position)).sort((a, b) => a - b)[0]; console.log(`[end safety] a cloud at the feet at ${f}: ${Math.round((dragon.position.y - bot.entity.position.y) * 10) / 10} from the feet, on ground ${bot.entity.onGround}, ${carried} blocks carried, two over the head ${over2?.boundingBox === 'block' ? over2.name : 'clear'}, fireball ${Number.isFinite(ball) ? Math.round(ball) + ' off' : 'none'}, ${bot.health.toFixed(1)} health`); }
+      // The bot's own roof two over the head dug first (note 2221): the hold's roof against the fireball stops the one block
+      // up, and the cloud at the feet is six a second; a scaffold block over the head is the bot's own and digs in a second.
+      if (!headClear && dig && over2 && pr.SCAFFOLD.includes(over2.name) && carried >= 1 && !ballNear) {
+        try { const td = Date.now(); await dig(bot, task, over2.position, { requireDrops: false }); console.log(`[end safety] the roof over the head at ${over2.position} dug for the one block up out of the cloud in ${Date.now() - td} ms`); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+        headClear = bot.blockAt(f.offset(0, 2, 0))?.boundingBox !== 'block';
+      }
       // The water at the feet taken up first (note 1902): a jump from water does not reach a block's top, and the one up, the stub and the climb were all refused in the bot's own pool. 25588's dragon-274 (2026-10-19 09:3xZ) in its pool's pit at (-10, 62, -38) under a cloud: 'one block up ... not up', 'water at the feet', 'no straight run ... from a pit', 10 to none. A source at the feet goes back into an empty bucket.
       if (carried >= 1 && headClear && !ballNear && /water/.test(bot.blockAt(f)?.name || '') && items.some(i => i.name === 'bucket')) {
         const t1 = Date.now();
