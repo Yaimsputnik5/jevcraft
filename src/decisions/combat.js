@@ -32,6 +32,20 @@ define({
   instructions: { task: 'String is wanted for a bow or a fishing rod. Choose where it comes from.', guidance: 'Each option says what it costs: the walk and what lies at a mineshaft, or the record of the bot\'s own spider hunts.' },
 });
 
+// A dropped item below the bot (note 2170): the way down was a rule.
+define({
+  id: 'drop_below', area: 'combat', parent: 'hunt_target', kind: 'combat', primitive: 'choice', stakes: 'high', tree: true,
+  ungated: 'the drop, the mobs at it, the fall and the item\'s worth are all said; a close call between going down and leaving a rod that vanishes in minutes is a preference, and leaving it costs one rod, not the bot',
+  question: 'The hunt\'s item lies below the bot, out of a walk\'s reach: go down after it, or leave it where it lies?',
+  trigger: 'On a mob hunt, a dropped item of the hunt\'s kind within 24 blocks and more than two below the bot, where the walk to it did not reach (mob-hunt.js prepareMobHunt).',
+  source: 'src/mob-hunt.js (prepareMobHunt), src/drop-below.js',
+  options: [
+    { key: 'go_down_for_it', label: 'go down the drop a step at a time and pick it up', when: 'always; said with the drop, the mobs within eight blocks of it, the fall\'s cost and the health floor the way down keeps', level: 'root' },
+    { key: 'leave_it', label: 'leave it where it lies and go on with the hunt from here', when: 'always; the drop is not asked about again for five minutes, the item\'s own life', level: 'root' },
+  ],
+  instructions: { task: 'A dropped item the hunt wants lies below the bot. Choose whether the bot goes down for it.', guidance: 'The state says how far down it lies, what stands within eight blocks of it, what a fall of that height costs, how long a drop lies, and what the item is worth to the goal.' },
+});
+
 define({
   id: 'hunt_target', area: 'combat', parent: 'rung_progress', kind: 'combat', primitive: 'choice', stakes: 'high', tree: true,
   question: 'The request needs a mob\'s drop: which observed mob should the bot fight now, or leave them for now?',

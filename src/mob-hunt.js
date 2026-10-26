@@ -1662,10 +1662,24 @@ async function prepareMobHunt(bot, task, step, goal, save, actions) {
   // roof. Where the walk fails and the drop is below, go down after it.
   const below = Object.values(bot.entities || {}).find(e => e.getDroppedItem?.()?.name === step.item &&
     e.position && e.position.distanceTo(bot.entity.position) < 24 && e.position.y < bot.entity.position.y - 2);
-  if (below) {
-    goal.step = { action: 'down_for_the_drop', item: step.item, drop: Math.round(bot.entity.position.y - below.position.y) }; save();
-    try { if (await descendTo(bot, task, below.position, { arriveWith: HUNT_FLOOR }) >= 1) return; }
-    catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; goal.mobHunt.lastDescentError = err.message; }
+  // Going down after it is Jev's (drop-below.js, note 2170): full-1 (2026-10-26 07:21:47Z) was sent six blocks down a
+  // fortress bridge for a rod into six wither skeletons by this rule and was dead nine seconds later. Left, the drop
+  // is not asked about again for five minutes (its own life).
+  const left = goal.mobHunt.dropLeft;
+  if (below && left && Date.now() - left.at < 300000 && Math.hypot(left.x - below.position.x, left.z - below.position.z) < 4) { /* left where it lies */ }
+  else if (below) {
+    let worth = ''; try { worth = step.item === 'blaze_rod' ? require('./eye-need').says(bot, goal, { brief: true }) : ''; } catch (_) { worth = ''; }
+    const f = require('./drop-below').facts(bot, below.position, { item: step.item, worth });
+    const tree = {
+      go_down_for_it: { description: `Go down the ${f.drop} blocks for the ${String(step.item).replaceAll('_', ' ')}, a step at a time, landing with at least ${HUNT_FLOOR} health (the way down stops under that), and pick it up: ${f.mobs.length ? `the ${f.mobs.length} mob${f.mobs.length === 1 ? '' : 's'} within ${require('./drop-below').NEAR} blocks of it meet the bot there, in the open` : 'nothing hostile is within eight blocks of it'}.` },
+      leave_it: { description: `Leave the ${String(step.item).replaceAll('_', ' ')} where it lies and go on with the hunt from up here: it vanishes about five minutes after it fell; the next one dropped up here is picked up as usual.` },
+    };
+    const decision = await decide('drop_below', { client: actions.client || task.opportunityClient, bot, task, goal, save, tree, state: { ...f, item: step.item, health: bot.health, food: bot.food, ...(f.mobs.length ? { mobsAtTheDrop: f.mobs.slice(0, 8) } : {}) } });
+    if (!decision.stale && decision.path?.at(-1) === 'go_down_for_it') {
+      goal.step = { action: 'down_for_the_drop', item: step.item, drop: f.drop }; save();
+      try { if (await descendTo(bot, task, below.position, { arriveWith: HUNT_FLOOR }) >= 1) return; }
+      catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; goal.mobHunt.lastDescentError = err.message; }
+    } else if (!decision.stale) { goal.mobHunt.dropLeft = { at: Date.now(), x: below.position.x, z: below.position.z }; save(); }
   }
   if (!handler.passive && !await prepareCombatGear(bot, task, goal, save, actions)) return;
   if (handler.dimension && dimension(bot) !== handler.dimension) { await actions.enterNether(bot, task, goal, save); return; }
