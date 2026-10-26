@@ -3656,12 +3656,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             const t0 = Date.now(), ids = new Set(Object.keys(bot.entities));
             bot.pathfinder?.setGoal?.(null); bot.clearControlStates?.();
             await bot.equip(boatItem, 'hand'); check();
-            // The boat set down on the block in front of the feet (the cell the body looks at), then boarded.
+            // The boat set down on a neighbouring cell's floor, never the bot's own (note 2213): the boat spawns where the
+            // look's ray meets a block, and one spawned in the player's own box is refused; dragon-322 (25589, 2026-10-26
+            // 13:23Z) took the seat with the cell ahead floorless, aimed at its own feet, and 'The boat was not set down',
+            // then was thrown from the fountain and died of the fall. The cell the body faces first, then the other three,
+            // each wanting a solid floor and two clear blocks; the top of that floor is where the look goes.
             const yaw = bot.entity.yaw ?? 0, f = bot.entity.position.floored();
-            const dx = Math.round(-Math.sin(yaw)), dz = Math.round(-Math.cos(yaw));
-            const ahead = f.offset(dx || 1, 0, dz), aheadUnder = bot.blockAt(ahead.offset(0, -1, 0));
-            const target = aheadUnder?.boundingBox === 'block' && bot.blockAt(ahead)?.boundingBox !== 'block' ? ahead.offset(.5, 0, .5) : f.offset(.5, 0, .5);
-            await bot.lookAt(target.offset(0, -0.5, 0), true); await sleep(120); check();
+            const facing = [Math.round(-Math.sin(yaw)) || 0, Math.round(-Math.cos(yaw)) || 0];
+            const sides = [facing, [1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => dx || dz);
+            const open = c => { const b = bot.blockAt(c); return !!b && b.boundingBox !== 'block' && !/water|lava/.test(b.name || ''); };
+            const cell = sides.map(([dx, dz]) => f.offset(dx, 0, dz)).find(c => bot.blockAt(c.offset(0, -1, 0))?.boundingBox === 'block' && open(c) && open(c.offset(0, 1, 0)));
+            if (!cell) throw new Error('No cell beside the feet with a floor for the boat');
+            await bot.lookAt(cell.offset(.5, -0.05, .5), true); await sleep(120); check();
             bot.activateItem();
             let boat = null;
             for (let i = 0; i < 20 && !boat; i++) { await sleep(50); boat = Object.values(bot.entities).find(e => !ids.has(String(e.id)) && boats.boatItem(e.name || '') && e.position && e.position.distanceTo(bot.entity.position) < 4); }
