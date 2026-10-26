@@ -481,7 +481,21 @@ async function airInTheEnd(bot, task, goal, save) {
     }
   }
   bot.setControlState?.('jump', true);
-  while (Date.now() - t0 < 8000 && alive() && wet(headCell())) await sleep(50);
+  // The roof met on the way up dug too (note 2206): the roof was looked for only where the body began, and dragon-317
+  // (25590, 2026-10-26 12:00Z) swam up a water column from 56 to 74 under its own roofs, 'the head still under', 0 air,
+  // and drowned. Now, when the rise stops with the head still under, the block over the head is dug and the swim goes on.
+  let lastY = bot.entity.position.y, stillSince = Date.now();
+  while (Date.now() - t0 < 12000 && alive() && wet(headCell())) {
+    await sleep(50);
+    if (bot.entity.position.y > lastY + 0.05) { lastY = bot.entity.position.y; stillSince = Date.now(); continue; }
+    if (Date.now() - stillSince < 400) continue;
+    const over = roofOver();
+    if (!over) { stillSince = Date.now(); continue; }
+    bot.setControlState?.('jump', false);
+    const b = bot.blockAt(over);
+    try { const td = Date.now(); await bot.dig(b); how.push(`${b.name} over the head at ${over} dug afloat in ${Math.round((Date.now() - td) / 100) / 10} s`); } catch (err) { how.push(`no dig at ${over}: ${String(err.message || err).slice(0, 50)}`); break; }
+    bot.setControlState?.('jump', true); stillSince = Date.now(); lastY = bot.entity.position.y;
+  }
   bot.setControlState?.('jump', false);
   console.log(`[end combat] air in the End at ${p0}: ${a0} air, ${how.join(', ') || 'swam up'}; now ${air()} air at ${feetCell()}, the head ${wet(headCell()) ? 'still under' : 'out'}, ${Math.round((Date.now() - t0) / 100) / 10} s`);
   return true;
