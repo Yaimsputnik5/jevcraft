@@ -4093,7 +4093,20 @@ async function fortressApproaches(bot, task, goal, save, actions, state, nearest
       // pickaxe makes of it, and the ways to one are offered (pickaxeWays).
       if (survey.noPickaxe && survey.dig) handDig = handDigOf(bot, nearest, survey);
       options.cross_level = { description: `${crossingSays(survey, `the fortress, ${where}`)}${climb}${handDig?.says || ''}${require('./pickaxe-budget').lastPickaxeSays(bot, survey.dig)}${risk}`,
-        run: async () => { await bridgeTo(bot, task, nearest, { maxBlocks: survey.bridge, maxSteps: survey.cells }); return survey.stoppedBy; } };
+        // The crossing's own end, not the survey's (note 2225; Fable, 2026-10-26 14:30Z): span() returns with nothing laid
+        // when no level step leads toward the target (at its column but above or below it), and the approach wrote the
+        // survey's stop as the why; mid-230-cc (25599, 2026-10-26) picked cross_level 12 times in 15 askings, each back
+        // within ten seconds 'changed nothing ... still 5 blocks from its target'. Said: the blocks laid, the body's gain,
+        // and the target's height from here when the walk ends at its column.
+        run: async () => {
+          const from = bot.entity.position.clone();
+          const placed = await bridgeTo(bot, task, nearest, { maxBlocks: survey.bridge, maxSteps: survey.cells });
+          const here = bot.entity.position, gain = Math.round((from.distanceTo(nearest) - here.distanceTo(nearest)) * 10) / 10;
+          const dx = nearest.x - Math.floor(here.x), dz = nearest.z - Math.floor(here.z), dy = nearest.y - Math.floor(here.y);
+          if (Math.abs(dx) <= 1 && Math.abs(dz) <= 1 && Math.abs(dy) >= 1) return `the span ended at the target's column with the target ${Math.abs(dy)} ${dy > 0 ? 'up' : 'down'} from the feet: no level step leads to it (${placed || 0} laid, ${gain} blocks gained)`;
+          if (!placed && gain < 1) return `the span laid nothing and the body came no nearer (${survey.stoppedBy || 'no stop named by the survey'})`;
+          return `${placed || 0} laid, ${gain} blocks gained; ${survey.stoppedBy || 'the span ran its cells'}`;
+        } };
     }
   }
   // Far off, the way the search's legs go, toward it: 25584 (mid-242-nh)
