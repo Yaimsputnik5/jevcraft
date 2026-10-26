@@ -69,6 +69,19 @@ function inForest(bot) {
   } catch (_) { return false; }
 }
 
+// The nearest warped nylium within 64 with room to stand on it, as the cell above it (note 2258): the forest's own floor, loaded
+// round the bot, nearer and lower than the point the forest was first seen from.
+function nyliumFloor(bot) {
+  try {
+    const id = bot.registry?.blocksByName?.warped_nylium?.id; if (id == null || typeof bot.findBlocks !== 'function') return null;
+    const here = bot.entity.position, open = c => { const b = bot.blockAt(c); return b && b.boundingBox === 'empty' && !/lava|fire/.test(b.name); };
+    const cells = bot.findBlocks({ matching: [id], maxDistance: 64, count: 60 }).map(p => p.offset(0, 1, 0)).filter(c => open(c) && open(c.offset(0, 1, 0)));
+    // Nearest by the walk's measure: a block up or down costs about as much as three across.
+    cells.sort((a, b) => (Math.hypot(a.x - here.x, a.z - here.z) + 3 * Math.abs(a.y - here.y)) - (Math.hypot(b.x - here.x, b.z - here.z) + 3 * Math.abs(b.y - here.y)));
+    return cells[0] || null;
+  } catch (_) { return null; }
+}
+
 async function warpedPearls(bot, task, goal, save, actions, stage, { now = Date.now } = {}) {
   const exploration = require('./exploration');
   actions.notice?.(bot, goal, save);
@@ -90,6 +103,19 @@ async function warpedPearls(bot, task, goal, save, actions, stage, { now = Date.
     // rods in its chests and standing in its forest at (-64, 59, 28), walked
     // at the point noted for it at (-75, 28) on another level, "33 blocks
     // off, came no nearer", rested the forest, and went sweeping for another.
+    // To the nearest warped nylium the body can stand on first (note 2258): the landmark's point is where the forest was first
+    // seen, often on a ledge or a cliff above the way, and the walks to it ended 18 to 44 blocks short (full-1 'No route' at 20,
+    // full-4 'navigation timed out' at 44 with the point 34 above, full-6 'No route' at 18, full-7 eight walks refused; the
+    // user, 2026-10-26: 'we gotta be able to solve that'). Any of the forest's floor is the forest (inForest).
+    if (!inForest(bot) && actions.navigate) {
+      const floor = nyliumFloor(bot);
+      if (floor) {
+        const t0 = Date.now(), d0 = Math.round(floor.distanceTo(bot.entity.position));
+        try { await actions.navigate(bot, task, new goals.GoalNear(floor.x, floor.y, floor.z, 2), { timeoutMs: 45000, stallMs: 8000 }); }
+        catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
+        console.log(`[warped] to the forest's floor at (${floor.x}, ${floor.y}, ${floor.z}), ${d0} blocks off: ${inForest(bot) ? 'in the forest' : `not reached, ${Math.round(floor.distanceTo(bot.entity.position))} off`} in ${Math.round((Date.now() - t0) / 1000)} s`);
+      }
+    }
     const arrived = inForest(bot) ? known.landmark : (await exploration.goToLandmark(bot, task, goal, save, ['warped_forest'], { navigate: actions.navigate, reach: 512, arrive: 16 })) || (inForest(bot) ? known.landmark : null);
     // A walk that came no nearer sets the trip aside: said as the step's own
     // failure, with where and why, and kept in the ledger, not a quiet
