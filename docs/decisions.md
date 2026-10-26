@@ -8,7 +8,7 @@ One rule holds for every question about playing the game (`src/decisions/unchang
 
 Three more rules from note 749 (`src/decisions/loops.js`, `src/decisions/keys.js`, `src/intention.js`). A key names its thing: every dynamic option says what its key names (`names`: by name, by where it is, by entity id), never its place in the list, so what came of an option is said on the same thing at the next asking. A question asked round and round goes up: its askings each within a minute of the one before are its spell, said from the third (`spellSoFar`: how many, what was answered, how far the bot walked and how far it is from where they began, whether anything new is carried, how often none of the options was good); when none good was Jev's likeliest at three of its last five askings, or six askings over ninety seconds or more have left the bot within 48 blocks of where they began with nothing new carried, the answers it gave rest from there and the question above is asked with that said (not the stance, the body's way, the shield or the routing, which are said only). And a trip holds: an answer to a question about the plan whose option walks to a target, or whose catalogue entry says where it goes (`trip`), is the intention until it arrives, is done, fails, the dimension changes, health falls a blow's worth, a walk brings nothing for three minutes or ten minutes pass; its own question asked again offers only it. A rung set aside holds the same way (`src/decisions/asides.js`): an option that would take it back (`takeBack` on its node) is not offered for five minutes unless the bot is 16 blocks from where it was set aside, carries a new kind of thing or its health band changes (`asideHolds`). An answer thrown away as stale that keeps on with what is under way is kept, and from the second stale answer in a row within 30 seconds a question is watched a second first and not sent while its facts are still changing.
 
-121 questions: 71 decision trees and 50 batched questions.
+122 questions: 72 decision trees and 50 batched questions.
 
 ## Batches
 
@@ -1424,6 +1424,23 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | `the_way_in` | root | back the way the bot came in: the cells it stood on since it came through the portal (loops cut) and its own laid spans, walked in legs of twelve cells by the pathfinder | in the Nether with blaze rods carried, a cell of the way kept within eight blocks, and the way back along it not resting from a stop in the last two minutes (note 762); said with its cells, those on its own laid blocks, how far off the nearest is, whether it begins at the portal, the blocks it runs, and its cells beside lava or a drop |
 | `boat_again` | root | the boat again, its failure or the walk chosen over it set aside | in the Overworld, the boat failed or was declined here and rests |
 | `wait_rest` | root | other work until the staircase's rest ends, the minutes said | the staircase toward the portal rests until a time; a wait: it names what it waits for and when (src/waits.js), and is not offered where that cannot come or its coming changes nothing, said in waitsForNothing (note 698) |
+
+### `ring_way_far`
+
+**The End portal ring is far off across water the walk cannot cross (the boat and the swim across not the way): swim straight at it, or dig a tunnel straight at it through the rock?**
+
+- When: On the way to the End portal ring in the Overworld, more than 96 blocks off, when a surface leg toward it gained no ground and neither the boat nor the swim across was the way (note 2191); the answer holds ten minutes.
+- Decision tree, choice; stakes medium; ledger kind `strategy`
+- Bar: none
+- Jev unreachable: no fallback: nothing is decided by code; the bot holds, says once that it is waiting for Jev, asks again with a backoff, and asks it fresh when Jev answers
+- Options built in: src/ring-way.js (facts, tree, askFarWay), src/end-portal.js (enterEnd)
+- Asked only on the Overworld (its words speak of the day, the night, beds or the surface; asked elsewhere, the tests fail: note 677)
+- Nothing left to try: asks `rung_progress` next up, with this one's failure said
+
+| Option | Level | What it is | Offered when |
+| --- | --- | --- | --- |
+| `swim_on` | root | swim straight at the ring along its line, the head kept up, a minute at a time | always; said with the water on the ground along the line (from, to, land past it, or none seen within 128), the swim's seconds at two blocks a second, the drowned, health and hunger |
+| `tunnel_under` | root | dig a tunnel straight at the ring through the rock, two high, down to its level | a pickaxe carried; said with the cells and digs, the minutes at three seconds a cell, and the pickaxe's digs left against them |
 
 ### `sculk_work`
 

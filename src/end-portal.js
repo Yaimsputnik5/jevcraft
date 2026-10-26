@@ -127,7 +127,14 @@ async function enterEnd(bot, task, goal, save, actions, { confirmationMs = 3000,
       // dug from here it runs level through the rock the whole way (note
       // 1168). The next pass walks again, and a walk that goes nowhere is
       // the rung's own question.
-      if (flat > UNDER_FAR) return;
+      // Far off still, with the boat and the swim across not the way: the ring's far way is Jev's (ring-way.js, note
+      // 2191), a swim straight at it or a tunnel straight at it, held ten minutes. Before, the pass returned to walk
+      // again (note 1168), and the stronghold stage of 2026-10-26 swam forty blocks east and west for twelve minutes.
+      if (flat > UNDER_FAR) {
+        try { if (await require('./ring-way').askFarWay(bot, task, goal, save, actions, { center, flat, client: task.opportunityClient })) return; }
+        catch (err) { task.check(); if (['Cancelled', 'NeedsAir', 'NeedsSafety'].includes(err.name)) throw err; console.log(`[end portal] the far way: ${String(err.message || err).slice(0, 160)}`); }
+        return;
+      }
     }
     const stood = bot.entity.position.clone();
     // The stair to one side of the ring set aside, the next side's is dug

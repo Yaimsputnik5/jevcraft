@@ -115,6 +115,18 @@ define({
   instructions: { task: 'The bot cannot get to the portal it is making for. Choose how it goes on.', guidance: 'Each option says what it takes and what it leaves. The state says where the portal is (portalAbove: how far above the bot it is), what each way ended in, and what lies on the straight line toward it (water, lava, ground, unloaded), and with lava on that line, what one touch of lava costs the bot at its health (aTouchOfLava: in the Nether the fire it sets burns on with no water to put it out). The staircase steps on ground and digs rock: a gap of open air (\"no floor to step onto\") is crossed by a span or a pillar of blocks carried, not stairs. In the Nether a player crosses on its floors where they are walkable and bridges only across lava or a void: the way down to the floor and along it is said with what it takes. triedFromHereToNothing are ways chosen from here that moved the bot nowhere, and why; they are not offered again from here for a few minutes. A portal made here comes out somewhere new on the other side; a leg round goes on foot and asks again from where it ends. With blaze rods carried, rodsOnTheWalk says what a death on the way takes (a fall or lava loses every rod, and lava burns them) and the walk\'s rules while they are carried; the way the bot came in was walked alive, and every other way is fresh ground, said so.' },
 });
 
+define({
+  id: 'ring_way_far', area: 'work', parent: 'rung_progress', kind: 'strategy', primitive: 'choice', stakes: 'medium', tree: true, overworldOnly: true,
+  question: 'The End portal ring is far off across water the walk cannot cross (the boat and the swim across not the way): swim straight at it, or dig a tunnel straight at it through the rock?',
+  trigger: 'On the way to the End portal ring in the Overworld, more than 96 blocks off, when a surface leg toward it gained no ground and neither the boat nor the swim across was the way (note 2191); the answer holds ten minutes.',
+  source: 'src/ring-way.js (facts, tree, askFarWay), src/end-portal.js (enterEnd)',
+  options: [
+    { key: 'swim_on', label: 'swim straight at the ring along its line, the head kept up, a minute at a time', when: 'always; said with the water on the ground along the line (from, to, land past it, or none seen within 128), the swim\'s seconds at two blocks a second, the drowned, health and hunger', level: 'root' },
+    { key: 'tunnel_under', label: 'dig a tunnel straight at the ring through the rock, two high, down to its level', when: 'a pickaxe carried; said with the cells and digs, the minutes at three seconds a cell, and the pickaxe\'s digs left against them', level: 'root' },
+  ],
+  instructions: workInstructions('The bot is carrying its eyes to the End portal and the ring is far off across water. Choose the way: the swim or the tunnel.'),
+});
+
 // Leaving the Nether for the Overworld while the rods step waits, or for
 // food: mid-202-o-nether-3, -4 and mid-218-m-nether-1 each went back at
 // hunger seventeen with nothing to eat, by a rule in the hunt, unasked,
