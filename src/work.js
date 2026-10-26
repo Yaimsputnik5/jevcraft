@@ -2795,6 +2795,11 @@ async function surfaceTrip(bot, task, goal, save, need, { siteDig = null, lava =
     // The dawn waited for here, a way of its own: the climb was made unasked
     // where nothing else was on offer.
     // Not with the dawn under a minute off: the climb itself outlasts it.
+    // The night mine chosen as the night's shelter, which this climb
+    // leaves (note 2128): full-1 (01:34:43Z) chose a night mine and three
+    // seconds later a climb for an oak log, with the mine unsaid.
+    const mine = nightMineLeftSays(bot, goal);
+    if (mine) { tree.climb.description += mine; for (const k of ['stay_below', 'mine_first']) if (tree[k]) tree[k].description += ' The night mine chosen goes on under the rock meanwhile.'; }
     if (client && (cost?.up ?? 0) >= 3 && night.toDawn >= 1) tree.wait_for_dawn = { description: `Wait under the rock here for the dawn, about ${night.toDawn} real minute${night.toDawn === 1 ? '' : 's'}, and make the climb for ${need} then, by day: nothing is gained meanwhile but the night up there gone by; the step waits, and mobs spawn in the dark down here as up there, the rock between.` };
   }
   let pick = 'climb', asked = false;
@@ -2806,6 +2811,7 @@ async function surfaceTrip(bot, task, goal, save, need, { siteDig = null, lava =
         ...(tree.dig_site ? { siteToDig: { at: { ...siteDig.origin }, blocks: siteDig.cells.length } } : {}) } });
     if (decision.stale) return;
     pick = decision.path.at(-1); asked = true;
+    if (pick === 'climb' && nightMineLeftSays(bot, goal)) { goal.nightMinesLeft = (goal.nightMinesLeft || 0) + 1; save(); }
   }
   if (pick === 'wait_for_dawn') {
     goal.surfaceTrip = { need, pick, asked, ...(phase ? { phase } : {}), until: Date.now() + Math.max(1, night.toDawn) * 60000, at: new Date().toISOString() };
@@ -8724,17 +8730,40 @@ function foodTopUpSays(bot, goal, pending, item) {
 function nightUpSays(bot) {
   try {
     const { DAY: D } = require('./day'), tod = bot.time?.timeOfDay;
-    if (!Number.isFinite(tod) || !/overworld/.test(String(bot.game?.dimension || '')) || !(tod >= D.DARK && tod < D.DAWN)) return null;
+    // The climb's night is the shelter's night (note 2128): the survival
+    // layer wants a shelter from dusk (day.js DUSK, 9500), and the climb
+    // called it night only from DARK (12000), so for two real minutes each
+    // evening a night mine was chosen below and the climb said nothing of
+    // the hour. Five fresh runs (2026-10-26 01:05 to 03:05Z) chose 27 night
+    // mines and left 12 of them by a climb within three minutes; full-1 at
+    // 01:15:18Z (11579) was told '10 blocks up to open sky' two seconds
+    // after its night mine began, with no wait for the dawn on offer.
+    if (!Number.isFinite(tod) || !/overworld/.test(String(bot.game?.dimension || '')) || !(tod >= D.DUSK && tod < D.DAWN)) return null;
     const toDawn = Math.round(((D.DAWN - tod + 24000) % 24000) / 1200);
+    const dusk = tod < D.DARK, toDark = dusk ? Math.round((D.DARK - tod) / 1200) : 0;
+    const mins = m => m < 1 ? 'under a minute' : `about ${m} real minute${m === 1 ? '' : 's'}`;
     const weapon = require('./combat').defenseWeapon(bot)?.name?.replaceAll('_', ' ') || 'bare hands';
     const worn = [5, 6, 7, 8].map(n => bot.inventory?.slots?.[n]?.name).filter(Boolean);
     const shield = bot.inventory?.slots?.[45]?.name === 'shield' || (bot.inventory?.items?.() || []).some(i => i.name === 'shield');
     return {
       toDawn,
-      climb: ` It is night up there, ${toDawn < 1 ? 'under a minute' : `about ${toDawn} real minute${toDawn === 1 ? '' : 's'}`} to dawn: mobs spawn in the open until then, and the zombies and skeletons out at dawn burn in the sun. The bot comes out with ${weapon}, ${worn.length ? worn.map(n => n.replaceAll('_', ' ')).join(', ') : 'nothing worn'} and ${shield ? 'a shield' : 'no shield'}.${require('./night-record').keepOnSays('surface', { minutesToDawn: toDawn, bot })}`,
-      below: ` Up there it is night for ${toDawn < 1 ? 'under a minute' : `about ${toDawn} real minute${toDawn === 1 ? '' : 's'}`} more; this keeps the bot under the rock meanwhile.`,
+      climb: dusk ? ` It is dusk up there: the dark comes in ${mins(toDark)}, and from then mobs spawn in the open until dawn, ${mins(toDawn)} off; the zombies and skeletons out at dawn burn in the sun. The bot comes out with` : ` It is night up there, ${mins(toDawn)} to dawn: mobs spawn in the open until then, and the zombies and skeletons out at dawn burn in the sun. The bot comes out with ${weapon}, ${worn.length ? worn.map(n => n.replaceAll('_', ' ')).join(', ') : 'nothing worn'} and ${shield ? 'a shield' : 'no shield'}.${require('./night-record').keepOnSays('surface', { minutesToDawn: toDawn, bot })}`,
+      below: dusk ? ` Up there dusk is on: the dark comes in ${mins(toDark)} and the night lasts until dawn, ${mins(toDawn)} off; this keeps the bot under the rock meanwhile.` : ` Up there it is night for ${mins(toDawn)} more; this keeps the bot under the rock meanwhile.`,
     };
   } catch (_) { return null; }
+}
+// The night mine chosen as the night's shelter (survival.js, state.nightMine)
+// that a climb from here would leave: how long ago, how far, how often this
+// run's climbs have left one, and the fresh runs' record (note 2128).
+const NIGHT_MINES_LEFT = Object.freeze({ runs: 5, window: '2026-10-26 01:05 to 03:05Z', chosen: 27, left: 12 });
+function nightMineLeftSays(bot, goal, now = Date.now()) {
+  const m = goal?.survival?.nightMine, p = bot.entity?.position;
+  if (!m?.startedAt || !p || now - m.startedAt > 30 * 60000) return '';
+  const o = m.origin, dist = o ? Math.round(Math.hypot(o.x - p.x, o.y - p.y, o.z - p.z)) : null;
+  if (dist !== null && dist > 24) return '';
+  const ago = Math.round((now - m.startedAt) / 1000), agoSays = ago < 90 ? `${ago} seconds` : `${Math.round(ago / 60)} minutes`;
+  const run = goal.nightMinesLeft ? ` On this run a climb has left a night mine chosen ${goal.nightMinesLeft} time${goal.nightMinesLeft === 1 ? '' : 's'} so far.` : '';
+  return ` A night mine was chosen as the night's shelter ${agoSays} ago${dist ? `, ${dist} blocks from here` : ', here'} (${m.mined || 0} mined): this climb leaves it, and the night's shelter is asked again up there.${run} On ${NIGHT_MINES_LEFT.runs} fresh runs (${NIGHT_MINES_LEFT.window}) ${NIGHT_MINES_LEFT.left} of the ${NIGHT_MINES_LEFT.chosen} night mines chosen were left by a climb within three minutes, each a climb and a way back down.`;
 }
 async function crossingKitReady(bot, task, goal, save, client = task.opportunityClient, now = Date.now()) {
   // The crossing chosen as the bot stands, for the kit a death left on the
@@ -9946,4 +9975,4 @@ function constructionObservation(bot, goal) {
   return JSON.stringify(positions.map(p => [p.x, p.y, p.z, bot.blockAt(pos(p))?.stateId ?? bot.blockAt(pos(p))?.name ?? null]));
 }
 
-module.exports = { cookTimeSays, rawCostSays, FOOD_POINTS_A_MINUTE, noteClimb, climbsLatelySays, bedFromPockets, portalToJudge, capLavaBeside, portalPickaxeFirst, endPortalActions, miningCandidates, portalSurfaceFirst, nightUpSays, oreToTunnel, gatherRests, gatherResting, relightPortalAt, stairPickaxeWanted, pickaxeForStair, siteHoldEnds, exploreLand, exploreLandIds, woodWhileUp, WOOD_UP, wantedItems, keepRoom, tidyMoment, smeltBatch, ladderSmeltWants, foodReservePrice, siteByLava, foodTrips, supportMaterialHere, preparePortalSupports, portalJobs, castSiteCost, castSiteSays, NO_WOOD_DEEP, smeltNeedSays, takeBackPlace, detourWork, restWork, restWorkSays, upkeepOffers, kitFoodStep, foodNearFrame, cookable, FUELS, answerOrPutOff, opensPit, persist, returnFromNether, climbSays, holdForRest, liveTurn, workClaim, methodSoFar, gatherBlocks, sculkStep, opensLava, descentTargets, portalInteriorBlockers, nearestLava, lavaGone, mineAtSource, timed, portalHere, walkToKnownPortal, portalWay, lineSays, buildPortalFrame, ruinSays, portalMethod, portalStep, crossingKitReady, walksFailed, occupant, bodyIn, occupiedSays, waitingThere, settleCraftInventory, tripTime, WOOD_RESERVE, woodUnits, crossingWater, sideTrips, plugLeak, leakResponse, logInView, patrolChoice, upkeepStep, moreOfSource, whileCooking, workstation, noteError, localBatch, takeOutBatch, castUnderWay, leftBatch, batchNoRoute, LEAVE_BATCH_MS, smelt, turnSearch, searchFor, enterPortal, gameHandlers, breakStillness, reachableBlocks, hitboxIntrudes, terrainShortage, runGoal, runIdle, idleWork, idleOptions, createSurvival, acquireStep, inventory, planningInventory, catalogPlan, selectSite, explore, dig, place, waitFor, constructionObservation, Blocked, designedBuildStep, surfaceStep, surfaceTrip, answerStall, looseEnds, breakOut, tunnelToward, stairsOrWay, craft, gatherWood, moveOnFromResource, moveOnHistorySays, pickaxeCraftHistorySays, maintainPickaxe, MOVE_ON_MEMORY_MS, PICKAXE_CRAFT_MEMORY_MS, stationCellOk, droppedFoodNear, planDueNow, planRoutes, lavaKnownFrom, straightToward };
+module.exports = { nightMineLeftSays, NIGHT_MINES_LEFT, cookTimeSays, rawCostSays, FOOD_POINTS_A_MINUTE, noteClimb, climbsLatelySays, bedFromPockets, portalToJudge, capLavaBeside, portalPickaxeFirst, endPortalActions, miningCandidates, portalSurfaceFirst, nightUpSays, oreToTunnel, gatherRests, gatherResting, relightPortalAt, stairPickaxeWanted, pickaxeForStair, siteHoldEnds, exploreLand, exploreLandIds, woodWhileUp, WOOD_UP, wantedItems, keepRoom, tidyMoment, smeltBatch, ladderSmeltWants, foodReservePrice, siteByLava, foodTrips, supportMaterialHere, preparePortalSupports, portalJobs, castSiteCost, castSiteSays, NO_WOOD_DEEP, smeltNeedSays, takeBackPlace, detourWork, restWork, restWorkSays, upkeepOffers, kitFoodStep, foodNearFrame, cookable, FUELS, answerOrPutOff, opensPit, persist, returnFromNether, climbSays, holdForRest, liveTurn, workClaim, methodSoFar, gatherBlocks, sculkStep, opensLava, descentTargets, portalInteriorBlockers, nearestLava, lavaGone, mineAtSource, timed, portalHere, walkToKnownPortal, portalWay, lineSays, buildPortalFrame, ruinSays, portalMethod, portalStep, crossingKitReady, walksFailed, occupant, bodyIn, occupiedSays, waitingThere, settleCraftInventory, tripTime, WOOD_RESERVE, woodUnits, crossingWater, sideTrips, plugLeak, leakResponse, logInView, patrolChoice, upkeepStep, moreOfSource, whileCooking, workstation, noteError, localBatch, takeOutBatch, castUnderWay, leftBatch, batchNoRoute, LEAVE_BATCH_MS, smelt, turnSearch, searchFor, enterPortal, gameHandlers, breakStillness, reachableBlocks, hitboxIntrudes, terrainShortage, runGoal, runIdle, idleWork, idleOptions, createSurvival, acquireStep, inventory, planningInventory, catalogPlan, selectSite, explore, dig, place, waitFor, constructionObservation, Blocked, designedBuildStep, surfaceStep, surfaceTrip, answerStall, looseEnds, breakOut, tunnelToward, stairsOrWay, craft, gatherWood, moveOnFromResource, moveOnHistorySays, pickaxeCraftHistorySays, maintainPickaxe, MOVE_ON_MEMORY_MS, PICKAXE_CRAFT_MEMORY_MS, stationCellOk, droppedFoodNear, planDueNow, planRoutes, lavaKnownFrom, straightToward };
