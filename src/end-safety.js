@@ -465,9 +465,11 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
       if (carried >= 1 && headClear && !ballNear) {
         const h0 = bot.health, t0 = Date.now();
         goal.step = { action: 'one_up_out_of_the_cloud', health: bot.health }; save();
-        try { await pr.pillarUp(bot, task, f.y + 1, { dig, maxBlocks: 1, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+        // The climb's own refusal said (note 2248): 25592's stronghold-1-dragon-342 (2026-10-26 17:59Z) at (61, 46, -23) with 47 blocks and the sky open logged 'not up in 1 ms' and died in the cloud, the reason swallowed.
+        let refused = null;
+        try { await pr.pillarUp(bot, task, f.y + 1, { dig, maxBlocks: 1, threats: false, wet: true }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; refused = String(err.message || err).slice(0, 160); }
         const up = Math.floor(bot.entity.position.y) - f.y;
-        console.log(`[end safety] one block up out of the cloud at ${f}: ${up >= 1 ? `up at ${bot.entity.position.floored()}` : 'not up'} in ${Date.now() - t0} ms, ${h0.toFixed(1)} to ${bot.health.toFixed(1)} health`);
+        console.log(`[end safety] one block up out of the cloud at ${f}: ${up >= 1 ? `up at ${bot.entity.position.floored()}` : `not up${refused ? ` (${refused})` : ''}`} in ${Date.now() - t0} ms, ${h0.toFixed(1)} to ${bot.health.toFixed(1)} health, on ground ${bot.entity.onGround}, the block under the feet ${bot.blockAt(f.offset(0, -1, 0))?.name || '?'}`);
         if (up >= 1) return { oneUp: true };
       }
     }
