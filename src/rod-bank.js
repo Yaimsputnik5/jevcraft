@@ -99,12 +99,27 @@ function bankOffer(bot, goal, { now = Date.now() } = {}) {
 
 // The option's words: what goes out and where, the walk and its record, the
 // round trip, what it keeps, and what staying with them has come to.
+// Where this run's rods and pearls already lie, and what collecting them has cost (note 2257; Fable, 2026-10-26 19:50Z): banked
+// a few at a time, full-1's 15 pearls lay in 11 chests and full-4's 11 in 11, ten of them holding one, and the walks to collect
+// them took 6.0 hours of full-1's clock, 1.8 of full-6's and 1.6 of full-4's. Said on the bank question beside the walk.
+function spreadSays(bot, goal) {
+  const RS = require('./rod-stash');
+  const held = (goal?.rodStashes || []).filter(s => s?.contents && Object.entries(s.contents).some(([k, n]) => RS.KEPT.includes(k) && n > 0));
+  if (!held.length) return '';
+  const here = bot?.entity?.position, dim = String(bot?.game?.dimension || '');
+  const far = here ? Math.round(Math.max(...held.filter(s => !s.dimension || dim.includes(String(s.dimension).replace(/^.*:/, '').replace(/^the_/, ''))).map(s => Math.hypot(s.position.x - here.x, s.position.z - here.z)), 0)) : null;
+  const hours = Math.round(Object.entries(goal?.gameProgress?.clock?.byDoing || {}).filter(([k]) => /collect_rod_stash|bank_rods/.test(k)).reduce((n, [, v]) => n + v, 0) / 360000) / 10;
+  return ` This run's rods and pearls already lie in ${held.length} chest${held.length === 1 ? '' : 's'}${far ? `, the farthest in this dimension ${far} blocks from here` : ''}; each is a walk of its own when they are collected for the eyes${hours ? `, and banking and collecting have taken ${hours} hours of this run so far` : ''}.`;
+}
+
 function offerSays(offer, bot = null, goal = null) {
   const list = offer.what.map(w => plural(w.count, w.item.replaceAll('_', ' ')));
   const what = list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list.at(-1)}` : list[0];
   const walk = offer.paceSays ? offer.paceSays.trim() : `About ${Math.max(1, offer.seconds)} seconds at a walk.`;
   const minutes = Math.max(1, Math.round((2 * offer.seconds + (offer.chest.seconds || 0)) / 60));
   let staying = ''; try { const rk = require('./rod-risk'), own = rk.runSays(bot, goal, offer.rods); staying = ` ${own || `Staying with them: ${rk.recordSays(offer.rods)}`}`; } catch (_) { staying = ''; }
+  let spread = ''; try { spread = spreadSays(bot, goal); } catch (_) { spread = ''; }
+  staying += spread;
   if (offer.complete) return `Take the rods out: every rod wanted is had (${offer.rods} carried${offer.inChest ? `, ${offer.inChest} in the bot's chest in the Nether, counted as held and taken out on the way out` : ''}, ${offer.wanted} wanted), and ${plural(offer.pearlsLeft, 'ender pearl')} ${offer.pearlsLeft === 1 ? 'is' : 'are'} still wanted. Walk back to the portal ${offer.d} blocks off with the ${what}, go through the portal and put them in ${offer.chest.says}; the pearls are hunted after, from either side, with no rod in the pack. ${walk} The walk out carries them, and a death on it drops them as one here does; once in the chest they are kept through any death after, counted as held, and taken out when the pearls are had too.${staying}`;
   return `Bank the rods got so far: walk back to the portal ${offer.d} blocks off with the ${what}, go through the portal, put them in ${offer.chest.says}, and come back through for the ${plural(offer.left, 'rod')} still needed. ${walk} There and back is about ${minutes} minute${minutes === 1 ? '' : 's'}${offer.chest.how === 'tree' ? ' and the time the wood takes on the Overworld side' : ''}, no rod meanwhile. The walk out carries them, and a death on it drops them as one here does; once in the chest they are kept through any death after, counted as held, and taken out once the rods carried and banked together are what the goal wants, so a death after loses only the rods got since.${staying}`;
 }
@@ -391,4 +406,4 @@ function collectHere(bot, goal) {
   return rs().collectStage(bot, goal);
 }
 
-module.exports = { lastWalkSays, tunnelOpen, OUT_MS, OUT_MAX_MS, askBank, bankOnArrival, bankOffer, offerSays, option, bankStage, bank, collectHere, pending, chestThere };
+module.exports = { spreadSays, lastWalkSays, tunnelOpen, OUT_MS, OUT_MAX_MS, askBank, bankOnArrival, bankOffer, offerSays, option, bankStage, bank, collectHere, pending, chestThere };
