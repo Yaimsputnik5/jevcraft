@@ -154,6 +154,25 @@ function diverged(hold, { now = Date.now(), health, mobs = [], offered = [], sho
   return null;
 }
 
+// A stance that stands and takes the blows (FACES) held past twice the seconds it was chosen for, nothing it was
+// chosen on changed: asked again once with that said, not held on to the five-minute cap (note 2169). Over the six
+// full runs' day to 2026-10-26 08:00Z shield_guard stood 298 minutes in all, 151 of its 526 picks past twice their
+// stated seconds (182 minutes beyond them), the fight 42 minutes beyond, shield_the_blast 36: the price was said as
+// 'about 15 seconds' and the hold ran on while a shooter plinked the shield from range. The hiding and waiting
+// stances (a pillar, cover, out of sight) are not: standing is their point. -> says or null
+const PAST_STATED = 2, PAST_ASK_ONCE_MS = 5 * 60000;
+// `memo`: where the asking is remembered by stance (the survival state's pastAsked), so a stance chosen again after
+// the question is not asked again for it within five minutes (note 715's cap on the asking: a handful a skirmish).
+function pastStated(hold, { choice, at, expects } = {}, now = Date.now(), memo = hold) {
+  if (!hold || !FACES.has(choice) || !(expects?.seconds > 0)) return null;
+  const stated = Math.max(5, expects.seconds), held = (now - at) / 1000;
+  if (held < PAST_STATED * stated) return null;
+  const key = `pastAsked_${choice}`;
+  if (memo[key] && now - memo[key] < PAST_ASK_ONCE_MS) return null;
+  memo[key] = now;
+  return `held ${secs(now - at)}, past twice the ${Math.round(expects.seconds)} seconds it was chosen for, and nothing it was chosen on changed (${againstSays(hold) || 'no mob named'})`;
+}
+
 // At the end of the hold's time, with nothing diverged: held on, or at its
 // cap. -> { extend: ms } or { capped: says }
 function extend(hold, now = Date.now(), at = null) {
@@ -168,4 +187,4 @@ function extend(hold, now = Date.now(), at = null) {
 // The mobs it was chosen against, as the hold says them.
 const againstSays = hold => hold.against.map(m => `the ${name(m.name)} ${Math.round(m.distance)} blocks off${m.visible ? ' in sight' : ' out of sight'}`).join(', ');
 
-module.exports = { begin, diverged, extend, againstSays, EXTEND_MS, HOLD_CAP_MS, NEARER_BY, SHIELD_SPENT };
+module.exports = { begin, diverged, extend, pastStated, againstSays, FACES, EXTEND_MS, HOLD_CAP_MS, NEARER_BY, SHIELD_SPENT, PAST_STATED, PAST_ASK_ONCE_MS };

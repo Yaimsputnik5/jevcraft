@@ -6698,6 +6698,8 @@ class Survival {
       const holds = require('./holds');
       let shot = null; try { shot = require('./projectile-guard').incoming(bot, { reach: 24 })[0] || null; } catch (_) { shot = null; }
       holdEnded = holds.diverged(held.hold, { health: bot.health, mobs: danger, offered: Object.keys(options), shot, hurtBy: bot._hurtBy || {}, at: bot.entity.position, shield: shieldNow, about: (() => { try { return require('./danger').threats(bot, 24); } catch (_) { return null; } })() });
+      // Past twice its stated seconds, a standing stance is asked again once (holds.js pastStated, note 2169).
+      if (!holdEnded) holdEnded = holds.pastStated(held.hold, { choice: held.choice, at: held.at, expects: held.expects }, Date.now(), (this.state.pastAsked ||= {}));
       if (!holdEnded && inTime) holding = true;
       else if (!holdEnded) {
         const x = holds.extend(held.hold, Date.now(), bot.entity.position);
