@@ -40,7 +40,9 @@ test('the dragon coming down to its perch is run from only right overhead; in fl
   bot.entities[20] = dragon;
   assert.equal(dragonThreat(bot), undefined, 'landing approach twelve blocks off: the wait by the fountain holds');
   dragon.metadata[phase] = 3; assert.equal(dragonThreat(bot), undefined);
-  dragon.position = new Vec3(5.5, 68, 0.5); assert.equal(dragonThreat(bot), dragon, 'landing seven blocks off, its head over the bot: run from');
+  dragon.position = new Vec3(5.5, 68, 0.5); dragon.yaw = Math.PI / 2; assert.equal(dragonThreat(bot), dragon, 'landing seven blocks off, its head over the bot: run from');
+  dragon.yaw = -Math.PI / 2; assert.equal(dragonThreat(bot), undefined, 'landing seven blocks off, its head turned away: the landing is Jev\'s question (note 2244)');
+  dragon.position = new Vec3(9.5, 66, 0.5); assert.equal(dragonThreat(bot), dragon, 'landing three blocks off: the body itself touches (note 2244)');
   dragon.position = new Vec3(0.5, 70, 0.5); dragon.metadata[phase] = 0; assert.equal(dragonThreat(bot), undefined, 'in flight twelve blocks off: beyond the wings\' reach (note 1649)');
   dragon.position = new Vec3(3.5, 70, 0.5); assert.equal(dragonThreat(bot), dragon, 'in flight nine blocks off: run from');
 });
