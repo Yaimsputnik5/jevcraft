@@ -26,11 +26,20 @@ const endDecisionInstructions = {
 // pillar_punch_78 at 0.37 with wait_in_hole at 0.11, was struck twice and
 // thrown fifteen blocks by the body, dead at 16.6 health; dragon-121, 130
 // and 136 the same at the take-off.
+// And the sitting dragon (note 2205): the body within twelve of the fountain
+// while it sits stands where its take-off throws. dragon-308 (25589,
+// 2026-10-26 12:01Z, no crystal standing, 20 health) ran under the perched
+// head, ended 1.5 blocks from the fountain's middle under the body, took
+// 'observe' there, and the take-off threw it 26 blocks up, dead of the fall.
 function dragonNow(dragon, position) {
-  if (!dragon || !position || ![2, 3, 4].includes(dragon.phase)) return undefined;
+  if (!dragon || !position || ![2, 3, 4, 5, 6, 7].includes(dragon.phase)) return undefined;
   const byFountain = Math.hypot(position.x || 0, position.z || 0);
   if (byFountain > 24) return undefined;
   const off = dragon.position ? Math.round(Math.hypot(dragon.position.x - position.x, dragon.position.z - position.z)) : null;
+  if ([5, 6, 7].includes(dragon.phase)) {
+    if (byFountain > 12) return undefined;
+    return `the dragon sits on the fountain now${off === null ? '' : `, its middle ${off} blocks off`}, and the bot stands ${Math.round(byFountain)} blocks from the fountain's middle, where its body is: it takes off within seconds of its breaths or of no player within 20, and at the take-off its wings throw what stands within about ten of the fountain (4 over the squared distance a tick, the throw off the ground); dragon-308 (2026-10-26 12:01Z, 20 health) stood 1.5 from the middle under the sitting body and was thrown 26 blocks up, dead of the fall; 25588's dragon-121, 130 and 136 (2026-10-14) the same at a take-off. Two deep in a hole the body is below the wings; the sword reaches the head only from the ground 6 to 8 before it.`;
+  }
   const what = dragon.phase === 4 ? 'taking off from the fountain' : 'coming down to land on the fountain';
   return `the dragon is ${what} now${off === null ? '' : `, ${off} blocks off`}, and the bot stands ${Math.round(byFountain)} blocks from the fountain: its body comes down over the fountain and the ground within about twelve of it, and its wings push a body in the open there (4 over the squared distance a tick, 5 of hurt, the throw off the ground); 25588 standing in the open within twenty of the fountain at a landing or a take-off was struck and thrown each time, dead (dragon-121, 130, 136 and 149, 2026-10-14); two deep in a hole the body is below the wings (the arena's drill of 2026-10-14: in the hole 0 moved and 0 lost in three of three; standing in the open eleven from the fountain, thrown 9 and 6 blocks and 15 and 10 lost in two of three), and the dragon keeps its perch while a player is within twenty of it`;
 }

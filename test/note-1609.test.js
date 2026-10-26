@@ -16,3 +16,11 @@ test('the landing by the fountain is said with the record, the circling and the 
   assert.match(state.dragonNow, /coming down to land/);
   assert.equal(state.dragon.phaseName, 'landing');
 });
+
+test('the sitting dragon and the bot within twelve of the fountain: the take-off throw said on every option, with dragon-308 (note 2205)', () => {
+  const { dragonNow } = require('../src/decisions/end-state');
+  const sitting = { phase: 6, position: { x: 0.5, y: 65, z: 0.5 } };
+  assert.match(dragonNow(sitting, { x: 1.4, y: 61, z: -0.6 }), /^the dragon sits on the fountain now, its middle 1 blocks off, and the bot stands 2 blocks from the fountain's middle, where its body is: it takes off within seconds .* dragon-308 \(2026-10-26 12:01Z, 20 health\) stood 1\.5 from the middle under the sitting body and was thrown 26 blocks up, dead of the fall/);
+  assert.equal(dragonNow(sitting, { x: 14.5, y: 64, z: 0.5 }), undefined, 'fourteen off: not under it');
+  assert.match(dragonNow({ phase: 5, position: { x: 0.5, y: 65, z: 0.5 } }, { x: 6, y: 61, z: 0 }), /the sword reaches the head only from the ground 6 to 8 before it\.$/);
+});
