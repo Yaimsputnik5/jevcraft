@@ -6912,7 +6912,12 @@ class Survival {
             : newcomer ? { askedAgainFor: `a ${newcomer.entity.name.replaceAll('_', ' ')} come within ${Math.round(newcomer.distance)} blocks` }
             // What the hold was chosen on, falsified, or its cap (holds.js).
             : holdEnded ? { askedAgainFor: holdEnded, heldSeconds: Math.round((Date.now() - held.at) / 1000) }
-            : following.length ? { askedAgainFor: `it is over, and ${following.length === 1 ? 'a mob it was chosen against is' : `${following.length} mobs it was chosen against are`} still ${this.lastPillarHold?.stood ? `facing the bot, no nearer in the ${this.lastPillarHold.minutes} up on the pillar` : 'coming at the bot'}` } : {}) } : null,
+            : following.length ? { askedAgainFor: `it is over, and ${following.length === 1 ? 'a mob it was chosen against is' : `${following.length} mobs it was chosen against are`} still ${this.lastPillarHold?.stood ? `facing the bot, no nearer in the ${this.lastPillarHold.minutes} up on the pillar` : 'coming at the bot'}` }
+            // Over, and nothing it was chosen against coming (note 2144): said
+            // so. Of 750 stance questions tonight (2026-10-26 01:00 to
+            // 04:25Z), 240 came with no reason at all for asking again, 215
+            // within five seconds of the last answer.
+            : { askedAgainFor: `the ${held.choice.replaceAll('_', ' ')} is over (${Math.round((Date.now() - held.at) / 1000)} seconds), and nothing it was chosen against is coming at the bot now; the mobs about are asked about afresh` }) } : null,
         // Coming at the bot now, each at its own speed: a retreat's chasers
         // after the run (note 544).
         ...(towardNow.length ? { comingAtTheBot: comingFacts(towardNow) } : {}),
