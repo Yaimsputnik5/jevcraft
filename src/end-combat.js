@@ -2654,14 +2654,18 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       if (!sword) throw new Error('No sword carried for the perched head');
       await bot.equip(sword, 'hand'); check();
       const until = Date.now() + ms; let swings = 0;
+      const pr = require('./perch-record'); pr.begin(bot, 'ground');
       try {
         while (Date.now() < until) {
           check(); checkEndEmergency(bot);
           const fresh = live(bot, dragon) && perchedHead(bot, dragon);
           if (!fresh || !(safeHere() || strikeSafeNow()) || !canStrike(bot, fresh)) break;
           if (typeof bot.lookAt === 'function') await bot.lookAt(fresh.position.offset(0, .5, 0), true);
+          const before = dragon.health ?? metadata(bot, dragon, 'health');
           bot.attack(fresh); swings++;
           for (let n = 0; n < 7; n++) { check(); await sleep(100); }
+          const after = live(bot, dragon) ? (dragon.health ?? metadata(bot, dragon, 'health')) : null;
+          pr.swing(bot, { landed: Number.isFinite(before) && Number.isFinite(after) && before - after >= 1 });
         }
       } finally { state.headSwings = (state.headSwings || 0) + swings; save(); }
       if (!swings) throw new Error('Perched dragon head moved out of reach');
@@ -2793,7 +2797,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const atHand = safe || strikeSafe();
     if (atHand && head && canStrike(bot, head) && bot.inventory.items().some(i => /_sword$/.test(i.name) && durable(bot.registry, i))) {
       const edge = voidEdge(bot, bot.entity.position);
-      tree.strike_head = { description: `Strike the reachable head of the perched dragon with the carried sword, and keep striking for as long as it sits and the place stays safe, up to ten seconds${edge ? `: the void is ${edge} block${edge === 1 ? '' : 's'} from where the bot stands, and the dragon's wing throws a player` : ''}. The perched dragon breathes its cloud at the one before its head, six a second, and its body strikes those beside it: 25588 (dragon-261, 2026-10-15 09:56Z) came up out of its hole to strike the head 3 off with all ten crystals standing, was struck and breathed on at once, 20 to none in two seconds, the dragon's health unmoved. ${healingSays(crystals.length)}.`, run: () => strikeWhilePerched(10000) };
+      tree.strike_head = { description: `Strike the reachable head of the perched dragon with the carried sword, and keep striking for as long as it sits and the place stays safe, up to ten seconds${edge ? `: the void is ${edge} block${edge === 1 ? '' : 's'} from where the bot stands, and the dragon's wing throws a player` : ''}. The perched dragon breathes its cloud at the one before its head, six a second, and its body strikes those beside it: 25588 (dragon-261, 2026-10-15 09:56Z) came up out of its hole to strike the head 3 off with all ten crystals standing, was struck and breathed on at once, 20 to none in two seconds, the dragon's health unmoved. ${healingSays(crystals.length)}. ${require('./perch-record').says(bot)}.`, run: () => strikeWhilePerched(10000) };
     }
     // The perched head out of reach: straight to the ground under it and the
     // sword there for as long as it sits (note 1155). Three routes surveyed
@@ -2819,6 +2823,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       if (ground && head.position.y - ground.y <= (actions.dig ? 6.4 : 4.5)) tree.under_head = {
         description: { action: 'Run to the ground under the perched dragon\'s head and strike it with the sword for as long as it sits: the sword reaches the dragon only here, its breath pools on the ground before its head, and it takes off within seconds',
           headBlocksOff: Math.round(head.position.distanceTo(bot.entity.position)), headBlocksOverItsGround: Math.round((head.position.y - ground.y) * 10) / 10, dragonHealth: beforeDragon, health: bot.health,
+          perchRecord: require('./perch-record').says(bot),
           voidEdgeBlocks: voidEdge(bot, ground), endermenNearRoute: endermenNearRoute(bot, bot.entity.position, ground), headHitThroughArmourWorn: headHit(bot), healing: healingSays(crystals.length), ...(crystals.length ? { withCrystalsStanding: headWithCrystalsRecord } : {}),
           perchedSeconds: Math.round((Date.now() - state.perchedSince) / 1000), runSeconds: Math.round((inFront() ? ground.distanceTo(bot.entity.position) : front.distanceTo(bot.entity.position) + front.distanceTo(ground)) / 5.6 * 10) / 10,
           wayIn: `${inFront() ? 'the bot stands in front of the head already' : `the run goes to a point 11 blocks in front of the dragon first (${Math.round(front.distanceTo(bot.entity.position))} blocks off) and comes in along its head's line`}: the wings' push boxes reach six fore and aft of the body and ten aside, lift what they hold 0.2 a tick and shove it 4 over the squared distance, and a run through them from the side was lifted to y 72 and thrown (dragon-154, 151, 153, 2026-10-14)`,
