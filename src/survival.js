@@ -10779,7 +10779,17 @@ class Survival {
     // with the block under the feet and the way back on offer, and burned
     // to death in it in 4.4 seconds (note 2073).
     // Swimming up reaches the lava's top, not out of it: last, as before.
-    const ORDER = ['to_water', 'to_dry_ground', 'pillar_out', 'back_the_way_came'];
+    // Water poured at the feet (note 2161): the bucket's water takes the lava's cell where the body is, the burning
+    // is out at once, and the lava beside turns to obsidian (sources) or cobblestone (flows). full-1 (2026-10-26
+    // 06:26Z), full iron, 20 food, a water bucket carried, stood in its cast site's lava for five seconds on
+    // back_the_way_came and then to_dry_ground, the body never moving, and died; the water was not a way on offer.
+    // Not in the Nether, where water poured evaporates.
+    const bucket = bot.inventory.items().find(i => i.name === 'water_bucket');
+    if (bucket && !/nether/.test(String(bot.game?.dimension || ''))) {
+      ways.pour_water = { seconds: 0.5, description: `Pour the water bucket at the feet (${countOf(bot, 'water_bucket')} carried): looking down, the water goes into the lava's cell where the body is, the burning is out at once, and the lava beside it turns to obsidian (sources) or cobblestone (flows); about 0.5 seconds, ${costs(0.5)}. The water lies there after, the bucket empty; the way on from the water is the next question's.`,
+        run: async () => { report('pour_water', feet); return this.pourWaterInLava(task, bucket); } };
+    }
+    const ORDER = ['pour_water', 'to_water', 'to_dry_ground', 'pillar_out', 'back_the_way_came'];
     const exitFirst = ORDER.filter(k => ways[k]).sort((a, b) => ((ways[a].seconds ?? Infinity) - (ways[b].seconds ?? Infinity)) || (ORDER.indexOf(a) - ORDER.indexOf(b)))[0];
     // Up first where the way out is many times longer than the rise to the top (note 2098): there the next
     // question has the ways the top reaches. full-7 (2026-10-25 10:55Z), 17.9 health in a lava pool, was taken
@@ -10787,6 +10797,22 @@ class Survival {
     const upFirst = ways.swim_up && (!exitFirst || (ways[exitFirst].seconds ?? Infinity) > 3 * (ways.swim_up.seconds ?? Infinity));
     const first = upFirst ? 'swim_up' : exitFirst || (ways.swim_up ? 'swim_up' : null);
     return first ? { [first]: ways[first], ...ways } : ways;
+  }
+
+  // The water bucket poured at the feet in lava (note 2161): looking down at the floor under the feet, the bucket's
+  // raycast passes through the lava and the water is placed in the cell over the block hit, the body's own. True once
+  // the feet are in water or the body is out of the lava; false when nothing came of the click in a second and a half.
+  async pourWaterInLava(task, bucket) {
+    const bot = this.bot;
+    bot._leavingLava = true;
+    try {
+      await bot.equip(bucket, 'hand'); task.check();
+      const feet = feetCell(bot);
+      await bot.lookAt(feet.offset(0.5, -0.5, 0.5), true); await sleep(60);
+      bot.activateItem();
+      for (let n = 0; n < 30; n++) { task.check(); if (/water/.test(bot.blockAt(feet)?.name || '') || !inLava(bot)) return true; await sleep(50); }
+      return !inLava(bot);
+    } finally { bot._leavingLava = false; }
   }
 
   // The block into the lava under the feet (lavaFill): pressed against the

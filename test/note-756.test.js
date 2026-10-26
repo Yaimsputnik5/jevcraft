@@ -249,7 +249,9 @@ test('the ways out of lava are worked out in a small part of the time they took 
   // First the way with the fewest seconds in the lava by its own count
   // (note 2073): the block under the feet, about 0.6 seconds, before the
   // swim to the dry cell, about 7.5.
-  assert.equal(Object.keys(ways)[0], 'pillar_out', Object.keys(ways).join(', '));
+  // With a water bucket carried, the water poured at the feet comes first (note 2161), about half a second.
+  assert.equal(Object.keys(ways)[0], 'pour_water', Object.keys(ways).join(', '));
+  assert.match(ways.pour_water.description, /^Pour the water bucket at the feet \(1 carried\): looking down, the water goes into the lava's cell where the body is, the burning is out at once/);
   assert.ok(ways.pillar_out.seconds < ways.to_dry_ground.seconds);
   assert.match(ways.to_dry_ground.description, /^Onto the dry cell [\d.]+ blocks off by the way through at \(-145, -54, -516\)/);
 });
@@ -265,4 +267,23 @@ test('after a join the mobs the server sends a moment later are waited for befor
   assert.equal(Object.keys(bot.entities).length, 3, 'waited until the zombies had come');
   assert.ok(ticks >= 6 + 6, `waited 300 ms of quiet after they came (${ticks} ticks)`);
   assert.ok(ticks <= 30, 'and no longer than a second and a half');
+});
+
+// full-1 (2026-10-26 06:26Z): full iron, a water bucket carried, five seconds still in its cast site's lava, dead (note 2161).
+test('the water bucket poured at the feet is the first way out of lava when carried, and none in the Nether', async () => {
+  const { Survival } = require('../src/survival');
+  const set = {};
+  const bot = poolBot({ at: IN_LAVA, set, inLava: true });
+  let looked = null; bot.lookAt = async p => { looked = p; };
+  bot.activateItem = () => { if (bot.heldItem?.name === 'water_bucket') { const f = bot.entity.position.floored(); set[`${f.x},${f.y},${f.z}`] = 'water'; bot.entity.isInLava = false; } };
+  bot.equip = async item => { bot.heldItem = item; };
+  const survival = new Survival(bot, { dig: async () => {} }, { state: { shelters: [], lastDry: { x: -148, y: -54, z: -517, dimension: 'overworld' } } });
+  const ways = survival.lavaWays(new Task('lava'), {}, () => {});
+  assert.equal(await ways.pour_water.run(), true);
+  const f = IN_LAVA.floored();
+  assert.deepEqual({ x: looked.x, y: looked.y, z: looked.z }, { x: f.x + 0.5, y: f.y - 0.5, z: f.z + 0.5 }, 'looking down at the floor under the feet');
+  bot.game.dimension = 'the_nether';
+  assert.equal(survival.lavaWays(new Task('lava'), {}, () => {}).pour_water, undefined, 'no water in the Nether');
+  const dry = poolBot({ at: IN_LAVA, items: [{ name: 'cobblestone', count: 9 }] });
+  assert.equal(new Survival(dry, { dig: async () => {} }, { state: { shelters: [] } }).lavaWays(new Task('lava'), {}, () => {}).pour_water, undefined, 'no bucket, no way');
 });
