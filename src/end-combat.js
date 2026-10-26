@@ -3648,11 +3648,28 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       const boatItem = bot.inventory.items().find(i => boats.boatItem(i.name));
       const flat = dragon && live(bot, dragon) ? Math.hypot(dragon.position.x - bot.entity.position.x, dragon.position.z - bot.entity.position.z) : Infinity;
       const under = bot.blockAt(bot.entity.position.floored().offset(0, -1, 0));
-      if (boatItem && dragon && live(bot, dragon) && !perched(bot, dragon) && flat <= 40 && bot.entity.onGround && !bot.vehicle && !inWater() && under?.boundingBox === 'block' && !holeHere()) {
+      // The boat's cell found in the offer, not the run (note 2220; Fable, 2026-10-26 14:30Z): 'The boat was not set down'
+      // as an outcome taught Jev nothing 365 times; with no cell two out with a floor the seat is not offered. The pass
+      // said too: the dragon's closing speed and seconds off, as waitForThePass reads them, since the seat is for a pass
+      // and the option never said one was coming (Jev took it 11 of 365 offers, mostly with the dragon 18 to 22 off).
+      const seatCell = (() => {
+        const f = bot.entity.position.floored(), yaw = bot.entity.yaw ?? 0;
+        const facing = [Math.round(-Math.sin(yaw)) || 0, Math.round(-Math.cos(yaw)) || 0];
+        const sides = [facing, [1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => dx || dz);
+        const open = c => { const b = bot.blockAt(c); return !!b && b.boundingBox !== 'block' && !/water|lava/.test(b.name || ''); };
+        for (const [dx, dz] of sides) { const near = f.offset(dx, 0, dz), far = f.offset(dx * 2, 0, dz * 2); if (open(near) && open(near.offset(0, 1, 0)) && bot.blockAt(far.offset(0, -1, 0))?.boundingBox === 'block' && open(far) && open(far.offset(0, 1, 0))) return { cell: far, side: dx === 1 ? 'east' : dx === -1 ? 'west' : dz === 1 ? 'south' : 'north', floor: bot.blockAt(far.offset(0, -1, 0)).name }; }
+        return null;
+      })();
+      const closing = (() => { if (!dragon || !live(bot, dragon)) return null; const m = state.dragonTrack?.velocity || null; const p = bot.entity.position, v = dragon.velocity; const speed = v ? Math.hypot(v.x, v.z) * 20 : null; const toward = v ? -((dragon.position.x - p.x) * v.x + (dragon.position.z - p.z) * v.z) / (flat || 1) * 20 : null; return Number.isFinite(toward) ? { speed: Math.round(speed), toward: Math.round(toward), seconds: toward > 0.5 ? Math.round(flat / toward * 10) / 10 : null } : null; })();
+      if (boatItem && dragon && live(bot, dragon) && !perched(bot, dragon) && flat <= 40 && bot.entity.onGround && !bot.vehicle && !inWater() && under?.boundingBox === 'block' && !holeHere() && seatCell) {
         const edge = voidEdge(bot, bot.entity.position);
+        const cloudHere = Object.values(bot.entities || {}).find(e => e.name === 'area_effect_cloud' && e.isValid !== false && e.position && Math.abs(e.position.y - bot.entity.position.y) <= 1.5 && Math.hypot(e.position.x - bot.entity.position.x, e.position.z - bot.entity.position.z) <= cloudRadius(bot, e) + 2);
         tree.sit_in_boat = {
           description: { action: `Set the carried ${boatItem.name.replace(/_/g, ' ')} down at the feet and sit in it through the dragon's pass: seated, the body is not thrown (a rider's own motion is zeroed every tick and its place is the boat's, so the wings' push moves it nowhere); it still takes the wings' 5 and the head's 10 through armour, and the breath's cloud where it lies; about a second to set down and sit, up and the boat picked up after the pass, about two seconds`,
             dragonBlocksOff: Math.round(flat), dragonPhase: metadata(bot, dragon, 'phase'), health: bot.health, ...(edge ? { voidEdgeBlocks: edge } : {}),
+            boatCell: `2 cells ${seatCell.side}, floor ${seatCell.floor.replace(/_/g, ' ')}`,
+            ...(closing ? { dragonClosing: closing.toward > 0.5 ? `closing at about ${closing.toward} blocks a second, about ${closing.seconds} s off at that pace (flying ${closing.speed} a second)` : closing.toward < -0.5 ? `going away at about ${-closing.toward} blocks a second` : `neither closing nor going away (flying ${closing.speed} a second)` } : {}),
+            ...(cloudHere ? { breathCloudHere: `the breath's cloud lies ${Math.round(Math.hypot(cloudHere.position.x - bot.entity.position.x, cloudHere.position.z - bot.entity.position.z) * 10) / 10} from the body at the feet's level, ${Math.round(cloudRadius(bot, cloudHere) * 20) / 10} wide: a seat here sits in it at about six health a second` } : {}),
             standingHere: onOwnPillar() || onObsidianTop() ? `on ${onObsidianTop() ? 'a pillar\'s top' : 'the bot\'s own column'}: the pass there is the wings' sweep, and a body carried off it falls to the island` : 'on the open ground: the pass here is the wings\' sweep over it',
             record: 'the arena\'s drill (2026-10-26 12:16Z, the dragon flown beside a column top at 85): four passes seated, the body carried 0 blocks each time, 6.8 health lost in three and the fourth dead of five blows in four seconds; four passes standing crouched with the shield, carried 36 to 51 blocks and fallen 4 of 4, 3 dead. Today\'s End trials: five of fifteen deaths were the push (dragon-314, 315, 301, 304 and 308).' },
           run: async () => {
@@ -3665,15 +3682,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // 13:23Z) took the seat with the cell ahead floorless, aimed at its own feet, and 'The boat was not set down',
             // then was thrown from the fountain and died of the fall. The cell the body faces first, then the other three,
             // each wanting a solid floor and two clear blocks; the top of that floor is where the look goes.
-            const yaw = bot.entity.yaw ?? 0, f = bot.entity.position.floored();
-            const facing = [Math.round(-Math.sin(yaw)) || 0, Math.round(-Math.cos(yaw)) || 0];
-            const sides = [facing, [1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => dx || dz);
-            const open = c => { const b = bot.blockAt(c); return !!b && b.boundingBox !== 'block' && !/water|lava/.test(b.name || ''); };
-            // Two cells out, not one (note 2218; the arena's seat drill, 2026-10-26 14:08Z, scripts/seat-drill.js): the server refuses
-            // a boat whose box holds any entity, the player included, and a boat on the next cell overlaps the body; one cell away
-            // was refused 4 of 4 (dragon-317's four 'not set down'), two and three cells away placed and boarded 8 of 8.
-            const cell = sides.map(([dx, dz]) => ({ near: f.offset(dx, 0, dz), far: f.offset(dx * 2, 0, dz * 2) })).find(({ near, far }) => open(near) && open(near.offset(0, 1, 0)) && bot.blockAt(far.offset(0, -1, 0))?.boundingBox === 'block' && open(far) && open(far.offset(0, 1, 0)))?.far;
-            if (!cell) throw new Error('No cell two from the feet with a floor for the boat');
+            const cell = seatCell.cell;
             await bot.lookAt(cell.offset(.5, -0.05, .5), true); await sleep(120); check();
             bot.activateItem();
             let boat = null;
