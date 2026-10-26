@@ -2321,7 +2321,7 @@ test('endermen left at the hunt\'s question: the stalk ends for the kind, not go
   setAside(goal, 'hunt_kind', 'enderman', 'Jev chose to leave them for now', 120000);
   const actions = { navigate: async () => {}, tunnel: async () => {} };
   await assert.rejects(prepareMobHunt(bot, task, { entity: 'enderman', item: 'ender_pearl', count: 1 }, goal, () => {}, actions),
-    err => err.name === 'Blocked' && /The enderman hunt is left for now: Jev chose to leave them/.test(err.message));
+    err => err.name === 'WaysResting' && err.until > Date.now() && /The enderman hunt is left for now: Jev chose to leave them/.test(err.message));
   assert.notEqual(goal.step?.action, 'stalk_mob');
 });
 

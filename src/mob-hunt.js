@@ -1358,7 +1358,7 @@ async function huntObserved(bot, task, goal, save, actions, client) {
     for (const target of candidates) setAside(goal, 'hunt_target', target.uuid || target.id, 'Jev chose to leave it for now', 120000);
     // The kind, not only the ones offered (note 959): the stalk had gone on
     // to the next enderman of a forest, asked again and been left again.
-    if (state.entity !== 'blaze') setAside(goal, 'hunt_kind', state.entity, 'Jev chose to leave them for now', 120000);
+    if (state.entity !== 'blaze') { setAside(goal, 'hunt_kind', state.entity, 'Jev chose to leave them for now', 120000); if (goal.mobHunt) goal.mobHunt.deferredUntil = Date.now() + 120000; }
     // Left, an enderman way held from pearl_order ends with them (note
     // 982): 25594, eight blazes in sight and no rod, answered defer, and
     // three seconds on the rung was "getting nowhere with the ender pearl",
@@ -1822,7 +1822,13 @@ async function prepareMobHunt(bot, task, step, goal, save, actions) {
   const state = goal.mobHunt;
   if (step.entity !== 'blaze' && isSetAside(goal, 'hunt_kind', step.entity)) {
     delete state.stalking; save();
-    throw Object.assign(new Error(`The ${step.entity.replaceAll('_', ' ')} hunt is left for now: Jev chose to leave them at the hunt's question, for two minutes`), { name: 'Blocked' });
+    // A rest Jev chose, not a failure (note 2184): thrown as Blocked on every pass, the two minutes read to the
+    // stall watch as 27 strikes of 'hunt mob coming to nothing' and the stillness question was asked three times
+    // in six seconds, answered none good 20 times in 40 minutes (25596, 2026-10-26 09:10 to 09:50Z). As
+    // WaysResting with the rest's end, the stall offers other work until then and holds it (work.js, note 490).
+    const { WaysResting } = require('./tunneling');
+    const until = state.deferredUntil > Date.now() ? state.deferredUntil : Date.now() + 60000;
+    throw new WaysResting(`The ${step.entity.replaceAll('_', ' ')} hunt is left for now: Jev chose to leave them at the hunt's question, for two minutes (until ${new Date(until).toISOString().slice(11, 19)}Z)`, until);
   }
   const near = Object.values(bot.entities || {}).filter(e => e.name === step.entity && e.isValid !== false &&
     !isSetAside(goal, 'hunt_target', e.uuid || e.id) && e.position.distanceTo(bot.entity.position) < 32)
@@ -1916,7 +1922,7 @@ async function prepareMobHunt(bot, task, step, goal, save, actions) {
             run: () => slotForDrop(bot, task, near, goal, save, actions, site) },
           walk_up: { description: `Walk up to it within a sword's reach and strike it first, in the open, the eyes kept off its head. ${require('./pearl-record').endermanSays(bot)}`, run: async () => 'walk' },
           defer: { description: `Leave the endermen for now: the stalk of them ends for two minutes and the way to the ${String(step.item || 'goal').replaceAll('_', ' ')}s is asked again, the rest of the game beside it.`,
-            run: async () => { setAside(goal, 'hunt_target', key, 'Jev chose to leave it for now', 120000); setAside(goal, 'hunt_kind', step.entity, 'Jev chose to leave them for now', 120000); try { require('./pearl-order').endHeld(goal, 'Jev left the endermen in reach'); } catch (_) { /* the order stands */ } delete state.stalking; save(); } },
+            run: async () => { setAside(goal, 'hunt_target', key, 'Jev chose to leave it for now', 120000); setAside(goal, 'hunt_kind', step.entity, 'Jev chose to leave them for now', 120000); state.deferredUntil = Date.now() + 120000; try { require('./pearl-order').endHeld(goal, 'Jev left the endermen in reach'); } catch (_) { /* the order stands */ } delete state.stalking; save(); } },
         };
         let decision = null;
         try { decision = await decide('hunt_target', { client, bot, task, goal, save, tree, state: { health: bot.health, food: bot.food, enderman: { distance: Math.round(distance), inSight: seen }, endermenWithinForty: about } }); }

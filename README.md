@@ -2,7 +2,7 @@
 
 **A Minecraft bot that beat the game with a model that never writes a word.**
 
-On 2026-10-24, from a fresh Survival world and an empty inventory, jevcraft killed the Ender Dragon after about 107 hours of play; a second fresh run did it on 2026-10-26 ([the wins](#the-wins)). Every judgement along the way, about 25,700 of them, was made by [Jev](https://typesafe.ai/), a small [System One](https://docs.typesafe.ai/concepts/system-one) model from TypeSafe: a classifier that is given a list of options and returns a probability for each, in about 0.2 seconds. Jev's part of the whole run cost about $4.30.
+On 2026-10-24, from a fresh Survival world on Normal difficulty (no cheats, no commands, no staged items) and an empty inventory, jevcraft killed the Ender Dragon after about 107 hours of play; a second fresh run did it on 2026-10-26 ([the wins](#the-wins)). Every judgement along the way, about 25,700 of them, was made by [Jev](https://typesafe.ai/), a small [System One](https://docs.typesafe.ai/concepts/system-one) model from TypeSafe: a classifier that is given a list of options and returns a probability for each, in about 0.2 seconds. Jev's part of the whole run cost about $4.30.
 
 Jev never generates text, plans or code. **Code lists what the bot can really do right now, with what each option costs and gains. Jev picks one.** The bot is built on [mineflayer](https://github.com/PrismarineJS/mineflayer). When Jev chose badly, the cause was almost always a wrong price or a missing option on the menu, not bad judgement, and most of what this README teaches follows from that.
 
@@ -40,7 +40,7 @@ Jev picked `charge_nearest`, code checked the pick was one it had offered, and t
 
 ## The wins
 
-Every fresh-world run that has killed the dragon, by its own clock (`gameProgress.milestones`); each has a write-up under [docs/wins/](docs/wins/).
+Every fresh-world run that has killed the dragon (Survival mode, Normal difficulty, a fresh seed and an empty inventory each time), by its own clock (`gameProgress.milestones`); each has a write-up under [docs/wins/](docs/wins/).
 
 | Run | Started | Killed the dragon | Hours played | Nether | Eyes | Stronghold | End entered | Deaths | Write-up |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
