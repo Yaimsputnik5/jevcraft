@@ -29,7 +29,7 @@ const placeName = dim => norm(dim) === 'the_end' ? 'the End' : 'the Nether';
 
 // The day's fields: true only on the Overworld, where the clock turns day
 // into night. Off it they are a clock that means nothing there.
-const DAY_FIELDS = ['timeOfDay', 'night', 'daylight', 'minutesToDawn', 'daylightMinutesRemaining', 'daylightTicksRemaining', 'sleepPossibleFrom', 'nightsWithoutSleep', 'phantoms', 'dusk', 'dawn', 'bedtime', 'dawnAt', 'nightStartsAt', 'hostileMobsSpawnAtNight', 'sleepPossible'];
+const DAY_FIELDS = ['timeOfDay', 'nightAhead', 'night', 'daylight', 'minutesToDawn', 'daylightMinutesRemaining', 'daylightTicksRemaining', 'sleepPossibleFrom', 'nightsWithoutSleep', 'phantoms', 'dusk', 'dawn', 'bedtime', 'dawnAt', 'nightStartsAt', 'hostileMobsSpawnAtNight', 'sleepPossible'];
 // A day field at any depth, as it goes out; one that says there is no day
 // here (healing's daylight off the Overworld) is the truth, and stays.
 const isDayField = (key, value) => DAY_FIELDS.includes(key) && !(typeof value === 'string' && SAID_NOT_SO.test(value));
