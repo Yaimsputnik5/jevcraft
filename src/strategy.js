@@ -854,6 +854,11 @@ function strategyState(bot, goal, stage, extra = {}) {
     situation: 'On the way to beating the game (Nether, blaze rods, ender pearls, the stronghold, the dragon). Several things are open; choose which to do next.',
     workingOn: label(stage.phase), minutesWorkedOn: clock ? Math.round(clock.activeMs / 60000) : 0,
     note: 'minutesWorkedOn is how long the step being worked on has gone without finishing; this is asked again every twenty of them. Nothing skipped here is skipped for good.',
+    // How far the goal's eyes are (eye-need.js, note 2143): full-1 (2026-10-26
+    // 04:14Z, 145 hours played) held 15 pearls and 4 rods in its chests, three
+    // rods from the eyes, and chose between a shield rung and 'the Nether'
+    // with no word of it on this question.
+    ...(() => { try { const n = require('./eye-need').need(bot, goal); return n.rods + n.pearls + n.eyes + n.powder > 0 || goal.gameProgress?.milestones?.nether_entered ? { goalStill: require('./eye-need').says(bot, goal) } : {}; } catch (_) { return {}; } })(),
     ...extra,
     // The day where there is one (note 677).
     ...(/overworld/.test(String(bot.game?.dimension || 'overworld')) ? { timeOfDay: t, daylightMinutesRemaining: Math.round(Math.max(0, DAY.DUSK - t) / 1200 * 10) / 10 } : {}),
