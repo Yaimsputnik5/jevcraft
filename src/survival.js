@@ -9836,7 +9836,7 @@ class Survival {
       if (!placed && slept && [site.foot, site.head].every(p => isBed(bot.blockAt(p)))) {
         let pick = 'leave_as_respawn';
         let bedNow = null; try { bedNow = require('./work').bedFromPockets(bot); } catch (_) { bedNow = null; }
-        try { pick = (await this.decide(task, goal, save, { id: 'bed_after_sleep', tree: bedAfterSleepTree(bot, this.state, Date.now(), { bedNow }), state: { health: bot.health, food: bot.food } }))?.path?.[0] || pick; }
+        try { pick = (await this.decide(task, goal, save, { id: 'bed_after_sleep', tree: bedAfterSleepTree(bot, this.state, Date.now(), { bedNow, goal }), state: { health: bot.health, food: bot.food } }))?.path?.[0] || pick; }
         catch (err) { if (err?.name === 'Cancelled') throw err; this.report(goal, save, { action: 'bed_after_sleep_unasked', reason: String(err?.message || err).slice(0, 160) }); }
         leaveAsSpawn = pick === 'leave_as_respawn' || pick === 'second_bed';
         secondBed = pick === 'second_bed' ? bedNow : null;
@@ -12783,7 +12783,7 @@ function sealedWaitCostSays(bot, goal) {
 // while this one stays as the respawn (note 2159): with only leave or take on offer, Jev left the bed 51 times of 51
 // (2026-10-25 06:00Z to 10-26 06:00Z, take_bed_along at 0.2 to 0.42), and the runs then sat 103 to 139 minutes of
 // nights sealed in that day each, 3 sheep climbs a run for the wool of the next bed.
-function bedAfterSleepTree(bot, state, now = Date.now(), { bedNow = null } = {}) {
+function bedAfterSleepTree(bot, state, now = Date.now(), { bedNow = null, goal = null } = {}) {
   const items = bot.inventory?.items?.() || [], has = re => items.filter(i => re.test(i.name)).reduce((k, i) => k + i.count, 0);
   const wool = has(/_wool$/), string = has(/^string$/), beds = has(/_bed$/);
   const p = bot.entity?.position, sp = bot.spawnPoint;
@@ -12795,6 +12795,8 @@ function bedAfterSleepTree(bot, state, now = Date.now(), { bedNow = null } = {})
   // tonight (2026-10-26 01:00 to 04:30Z) and taken 0; the 145-hour runs
   // waited 16 to 21 hours of nights out with 20 minutes asleep in all.
   let nights = ''; try { nights = ` ${require('./kit-record').fullBedSays()}.`; } catch (_) { nights = ''; }
+  // And this run's own nights (night-ahead.js runNightsSays, note 2180).
+  try { nights += require('./night-ahead').runNightsSays(goal); } catch (_) { /* the fleet's record alone */ }
   return {
     leave_as_respawn: { description: `Leave the bed standing here as the respawn point: a death comes back to life here. ${next[0].toUpperCase()}${next.slice(1)}. Left here, the next night away from it is waited out, not slept.${nights}${(() => { try { return require('./death-places').deathsNearSays(bot, p, { what: 'this bed' }); } catch (_) { return ''; } })()}`, run: async () => {} },
     take_bed_along: { description: `Take the bed up and carry it: the next night is slept in it wherever it comes, no more wool needed.${nights} Taken up, the respawn is the world spawn${toSpawn != null ? `, ${toSpawn} blocks from here` : ''}, until the carried bed is next slept in: a death before then comes back to life there, with nothing, that far from the work; a sleep in the bed set down at the next bedtime makes that place the respawn, so from then the respawn follows the work. This run's deaths in the last two hours: ${recent}.`, run: async () => {} },

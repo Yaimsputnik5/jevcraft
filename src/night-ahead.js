@@ -47,4 +47,18 @@ function nightAheadSays(bot, goal, now = Date.now()) {
   return `Dusk in about ${minutes} real minutes; the night from dusk to dawn is about ${NIGHT_MINUTES} real minutes. How a night is spent: asleep, in seconds, with a bed set down at bedtime (${bed ? 'a bed is carried' : 'no bed is carried'}); or mining from a sealed pocket, which keeps the rock's shelter and gains ore and stone, with a pickaxe (${pickaxeSays(items)}); or sealed in, gaining nothing. ${run}`;
 }
 
-module.exports = { nightAheadSays, pickaxeSays, NIGHT_MINUTES };
+// This run's own nights, for the bed questions (note 2180): the minutes sealed waiting, mining and asleep so far,
+// and the waiting's share of the run's play. full-3 waited 21.8 hours of its 150 (15%) with a bed standing far off
+// and none carried; the bed question had said the fleet's record and nothing of this run's own.
+function runNightsSays(goal) {
+  const clock = goal?.gameProgress?.clock;
+  if (!clock?.byDoing) return '';
+  const by = clock.byDoing, mins = k => Math.round((by[k] || 0) / 60000);
+  const waited = mins('wait_in_shelter'), played = Math.round((clock.playedMs || 0) / 60000);
+  if (!played) return '';
+  const share = Math.round(waited / played * 100);
+  const hours = n => n >= 90 ? `${Math.round(n / 6) / 10} hours` : `${n} minutes`;
+  return ` This run so far: ${hours(waited)} sealed in waiting through nights (${share}% of its ${hours(played)} of play), ${hours(mins('night_mine'))} night-mining, ${hours(mins('sleep'))} asleep; a night with a bed carried and set down at bedtime passes in seconds, one waited out awake is about ${NIGHT_MINUTES} real minutes.`;
+}
+
+module.exports = { nightAheadSays, pickaxeSays, runNightsSays, NIGHT_MINUTES };
