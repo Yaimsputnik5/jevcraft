@@ -76,6 +76,11 @@ function nyliumFloor(bot) {
     const id = bot.registry?.blocksByName?.warped_nylium?.id; if (id == null || typeof bot.findBlocks !== 'function') return null;
     const here = bot.entity.position, open = c => { const b = bot.blockAt(c); return b && b.boundingBox === 'empty' && !/lava|fire/.test(b.name); };
     const cells = bot.findBlocks({ matching: [id], maxDistance: 64, count: 60 }).map(p => p.offset(0, 1, 0)).filter(c => open(c) && open(c.offset(0, 1, 0)));
+    // At the endermen's own height where they are in sight (note 2264): the slot fights only those within four of its mouth's level,
+    // and forest-5 (2026-10-26 22:3x to 22:5xZ) walked to the nearest nylium on high ledges at y 97 to 100 and ended three sessions
+    // 'none of the 3 about has a line to the mouth (all more than 4 blocks over or under it)'.
+    const men = Object.values(bot.entities || {}).filter(e => e.name === 'enderman' && e.isValid !== false && e.position && e.position.distanceTo(here) <= 64);
+    if (men.length) { const level = cells.filter(c => men.some(e => Math.abs(e.position.y - c.y) <= 3)); if (level.length) cells.splice(0, cells.length, ...level); }
     // Nearest by the walk's measure: a block up or down costs about as much as three across.
     cells.sort((a, b) => (Math.hypot(a.x - here.x, a.z - here.z) + 3 * Math.abs(a.y - here.y)) - (Math.hypot(b.x - here.x, b.z - here.z) + 3 * Math.abs(b.y - here.y)));
     return cells[0] || null;
