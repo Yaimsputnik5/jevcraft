@@ -55,6 +55,11 @@ function quiet(bot) {
   const at = Date.now();
   if (at - Math.max(bot._threatResponseAt || 0, bot._recentHurtAt || 0) < FIGHT_MS) return false;
   if (bot._closingOn?.until > at) return false;
+  // Not while the bot stands at the back of its enderman slot (note 2256; Fable, 2026-10-26 19:50Z): the slot is held between
+  // fights with no mob counted hostile (a calm enderman is neutral), and full-6's best pearl stretch (2026-10-25 17:16 to 17:30Z,
+  // eight endermen and five pearls in fourteen minutes) was ended by a quiet restart as a new fight began; its next Nether pearl
+  // stint came five hours later.
+  { const s = bot._slotAt, here = e.position?.floored?.(); if (s?.b && here && here.distanceTo(s.b) <= 3) return false; }
   try {
     const danger = require('./danger');
     if (danger.hostileEntities(bot, 24).length) return false;
