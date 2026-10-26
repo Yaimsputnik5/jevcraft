@@ -3920,7 +3920,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       const sword = bot.inventory.items().find(i => /_sword$/.test(i.name) && durable(bot.registry, i));
       if (!sword || !dragon) return 0;
       await bot.equip(sword, 'hand'); check();
-      const until = Date.now() + ms; let swings = 0, lastSeen = Date.now(), ever = false;
+      const until = Date.now() + ms; let swings = 0, lastSeen = Date.now(), ever = false, jumps = 0, jumpSwings = 0;
       while (Date.now() < until) {
         check();
         if (!holeHere()) break;
@@ -3935,6 +3935,21 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           // Not under a cloud on the rim (note 1650): the climb out for the sword put the body into the breath's cloud lying on the rim, and 25588 (dragon-183, 2026-10-14 16:46Z, one crystal broken) went 12 to 2.4 to none coming up at (5, 59, 10) with the cloud at (6, 61, 7).
           const rimCell = bot.entity.position.floored().offset(0, 2, 0);
           const cloudOnRim = Object.values(bot.entities).some(e => e.name === 'area_effect_cloud' && e.isValid !== false && Math.abs(e.position.y - rimCell.y) <= 1.5 && Math.hypot(e.position.x - rimCell.x - .5, e.position.z - rimCell.z - .5) <= cloudRadius(bot, e) + 1);
+          // The jump for the head from the hole first (note 2209): two deep, the head sits 3.4 over the eyes, a jump lifts them 1.25,
+          // and the sword's three reaches it at the apex; the body stays in its hole, below the wings. Today's dragon trials dug 32
+          // holes under the head and swung 0 times from them (the climb out for the sword wanted 12 health, two blocks and no cloud
+          // on the rim; dragon-311 (25592, 12:19 to 12:43Z) dug five at 2.7 to 13.6 health, 0 swings each, the dragon 127 to 108 to
+          // arrows alone). Three jumps without a strike, and the climb out below is tried as before.
+          if (gap <= 4.4 && !roofed()) {
+            let struck = false; jumps = (jumps || 0) + 1;
+            bot.setControlState?.('jump', true);
+            try {
+              for (let n = 0; n < 12 && !struck; n++) { await sleep(50); check(); const h = live(bot, dragon) && perchedHead(bot, dragon); if (h && canStrike(bot, h)) { if (typeof bot.lookAt === 'function') await bot.lookAt(h.position.offset(0, .5, 0), true); bot.attack(h); swings++; jumpSwings++; struck = true; } }
+            } finally { bot.setControlState?.('jump', false); }
+            if (struck) { for (let n = 0; n < 5; n++) { check(); await sleep(100); } continue; }
+            if (jumps < 3) { await sleep(150); continue; }
+            if (!(state.jumpSaidAt > Date.now() - 20000)) { state.jumpSaidAt = Date.now(); console.log(`[end combat] the jump for the head from the hole at ${bot.entity.position.floored()}: ${jumps} jumps, the head ${Math.round(gap * 10) / 10} from the eyes on the floor, none within the sword's three at the apex`); }
+          }
           if (gap <= 5 && blocksCarried(bot) >= 2 && actions.dig && bot.health >= 12 && !cloudOnRim) {
             const cell = bot.entity.position.floored();
             console.log(`[end combat] the head ${Math.round(gap * 10) / 10} from the eyes in the hole, out of the sword's three: up onto the rim for it`);
@@ -3956,6 +3971,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         await sleep(100);
       }
       if (swings) { state.headSwings = (state.headSwings || 0) + swings; const t = state.holeHead ||= { tries: 0, dugIn: 0, swings: 0 }; t.swings += swings; save(); }
+      if (jumps) { state.holeJumps = (state.holeJumps || 0) + jumps; state.holeJumpSwings = (state.holeJumpSwings || 0) + jumpSwings; console.log(`[end combat] from the hole: ${jumps} jump${jumps === 1 ? '' : 's'} for the head, ${jumpSwings} struck at the apex`); }
       return swings;
     };
     // In the hole: the wait is its own option, said; every other option climbs out first (the dispatch below). The head in reach is struck from it (note 1618).
