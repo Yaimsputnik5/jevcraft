@@ -320,7 +320,7 @@ async function kitChoice(bot, task, goal, save, actions, missing, { client, mob,
   const sig = dimension(bot), was = goal.combatKit;
   const held = was?.sig === sig && now - was.at < KIT_CHOICE_HOLD_MS && missing.every(d => was.missing?.includes(d)) ? was : null;
   const still = list => (list || []).filter(p => missing.includes(p.destination));
-  let pick = held && (held.pick !== 'make_kit_here' || still(held.here).length) ? held.pick : null, here = still(held?.here), away = still(held?.away), one = held?.one || null, arms = still(held?.arms);
+  let pick = held && (held.pick !== 'make_kit_here' || still(held.here).length) ? held.pick : null, here = still(held?.here), away = still(held?.away), one = held?.one || null, arms = still(held?.arms), noneGood = !!held?.noneGood;
   if (!pick) {
     const k = kitPieces(bot, missing);
     ({ here, away } = k);
@@ -427,9 +427,9 @@ async function kitChoice(bot, task, goal, save, actions, missing, { client, mob,
       const decision = await decide('combat_kit', { client, bot, task, goal, save, tree, context: { oldOrder },
         state: { missing: all, carried: carriedFightSays(bot, mob), ...(mob ? { against: mob } : {}), dimension: dimension(bot), health: bot.health, hunger: bot.food, ironIngotsCarried: carriedIron } });
       if (decision.stale) return false;
-      pick = decision.path.at(-1);
+      pick = decision.path.at(-1); noneGood = !!decision.noneGood;
     }
-    goal.combatKit = { pick, sig, missing, at: now, here, away, ...(pick === 'make_one_here' ? { one } : {}), ...(pick === 'make_arms_here' ? { arms } : {}) }; save();
+    goal.combatKit = { pick, sig, missing, at: now, here, away, ...(pick === 'make_one_here' ? { one } : {}), ...(pick === 'make_arms_here' ? { arms } : {}), ...(noneGood ? { noneGood: true } : {}) }; save();
   }
   if (pick === 'fight_with_carried') {
     // For the fight at hand, not the half hour (note 1997): the pieces are
@@ -438,8 +438,17 @@ async function kitChoice(bot, task, goal, save, actions, missing, { client, mob,
     // time: in the four full runs of 2026-10-20 and 21, 109 of 116 answers
     // were this one, and full-2 went bare from 06:09Z to 08:35Z and on,
     // its step the End, re-asked each half hour as the next mob came.
-    for (const destination of missing) setAside(goal, 'rung', PIECE_RUNG[destination][0], 'Jev chose to fight with what is carried', FIGHT_WITH_CARRIED_MS);
-    delete goal.combatKit; save();
+    // Taken as the least bad after none good (note 2142): not Jev's choice,
+    // so the pieces are not set aside for it; the fight is with what is
+    // carried this once and the ladder keeps the kit. full-7 (2026-10-26
+    // 04:03Z, bare, 5 raw iron) answered combat_kit none good, the code took
+    // this and set the iron armour aside five minutes 'Jev chose to fight
+    // with what is carried', and win_strategy a minute later offered no
+    // armour at all ('Nothing left is needed before the Nether'), answered
+    // none good four times.
+    if (!noneGood) for (const destination of missing) setAside(goal, 'rung', PIECE_RUNG[destination][0], 'Jev chose to fight with what is carried', FIGHT_WITH_CARRIED_MS);
+    if (!noneGood) delete goal.combatKit;
+    save();
     return true;
   }
   if (pick === 'return_for_kit') {

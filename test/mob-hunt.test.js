@@ -2492,3 +2492,19 @@ test('with the sword and shield among the pieces short, they are offered alone b
   assert(asked[0].make_one_here && asked[0].make_kit_here);
   assert.deepEqual(fetched, ['iron_sword']);
 });
+
+test('none good at the kit question fights with what is carried this once and sets no piece aside (note 2142)', async () => {
+  const { isSetAside } = require('../src/progress');
+  const { bot, slots, goal, task } = fixture('skeleton');
+  bot.game.dimension = 'overworld';
+  for (const slot of [5, 6, 7, 8, 45]) slots[slot] = null;
+  slots[36] = { name: 'stone_sword', slot: 36, count: 1, type: registry.itemsByName.stone_sword.id, durabilityUsed: 0 };
+  slots[20] = { name: 'stone_pickaxe', slot: 20, count: 1, type: registry.itemsByName.stone_pickaxe.id, durabilityUsed: 0 };
+  const client = { systemOne: async ({ questions }) => ({ answers: { branch_0: { choice: 'none_good', confidence: 0.6, probabilities: { fight_with_carried: 0.3, make_kit_here: 0.1, none_good: 0.6 } } } }) };
+  const actions = { acquireStep: async () => assert.fail('nothing made') };
+  const env = process.env.JEV_NONE_GOOD; process.env.JEV_NONE_GOOD = '1';
+  try { assert.equal(await prepareCombatGear(bot, task, goal, () => {}, actions, { client }), true); }
+  finally { if (env === undefined) delete process.env.JEV_NONE_GOOD; else process.env.JEV_NONE_GOOD = env; }
+  assert.ok(!isSetAside(goal, 'rung', 'iron_armour') && !isSetAside(goal, 'rung', 'iron_sword') && !isSetAside(goal, 'rung', 'shield'), 'nothing set aside on a none good');
+  assert.ok(goal.combatKit?.noneGood, 'the least bad is held, marked as not Jev\'s');
+});
