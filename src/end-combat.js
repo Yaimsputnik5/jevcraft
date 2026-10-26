@@ -222,6 +222,24 @@ function voidEdge(bot, p, reach = 8) {
   }
   return null;
 }
+// The nearest cell of the island's edge, with the way to it (note 2236): the first cell in eight directions with no floor
+// within forty below, as voidEdge counts it. -> { at: {x, z}, distance, side, dx, dz } or null
+function voidEdgeCell(bot, p, reach = 48) {
+  const name = { '1,0': 'east', '-1,0': 'west', '0,1': 'south', '0,-1': 'north', '1,1': 'south-east', '1,-1': 'north-east', '-1,1': 'south-west', '-1,-1': 'north-west' };
+  for (let r = 1; r <= reach; r++) {
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      const x = Math.floor(p.x) + dx * r, z = Math.floor(p.z) + dz * r;
+      let floor = false, loaded = true;
+      for (let y = Math.floor(p.y); y >= Math.floor(p.y) - 40; y--) {
+        const b = bot.blockAt(new Vec3(x, y, z));
+        if (!b) { loaded = false; break; }
+        if (b.boundingBox === 'block') { floor = true; break; }
+      }
+      if (loaded && !floor) return { at: { x: x - dx, z: z - dz }, distance: Math.max(0, r - 1), side: name[`${dx},${dz}`], dx, dz };
+    }
+  }
+  return null;
+}
 function endermenNearRoute(bot, from, to, width = 6) {
   const d = to.minus(from), len2 = d.dot(d) || 1;
   return Object.values(bot.entities || {}).filter(e => e.name === 'enderman' && live(bot, e) && e.position).filter(e => {
@@ -526,7 +544,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   const check = () => {
     task.check(); checkAir(bot);
     // A run cut by the breath's watch (note 1619) ends at its next check, or it runs on beside the response (dragon-158, 2026-10-14 10:46Z: the quarry cut at 20 health dug its ten cells on while the response ran) (note 1620).
-    if (stepCut) throw Object.assign(new Error(stepCut), { name: 'EndEmergency' });
+    if (stepCut && !require('./respawn-fresh').standing(goal)) throw Object.assign(new Error(stepCut), { name: 'EndEmergency' });
     if (dimension(bot) !== 'end' || bot.game.gameMode !== 'survival' || bot.health <= 0 || bot.isAlive === false) throw blocked('End combat requires a living Survival player in the End');
   };
   // In the End the fight is the answer to what hurts the bot: it owns every
@@ -3753,6 +3771,20 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             state.seats = (state.seats || 0) + 1; save();
           } };
       }
+      // A fresh start from the End (note 2236, as the Nether's respawn_fresh of note 2173): no pickaxe and nothing to eat, so
+      // health lost stays lost and no hole can be dug; the void at the island's edge is the way, and everything carried
+      // is lost in it. Offered with its cost; Jev's choice, never run unasked.
+      {
+        const RF = require('./respawn-fresh');
+        const edgeCell = (!bot.inventory.items().some(i => /_pickaxe$/.test(i.name))) ? voidEdgeCell(bot, bot.entity.position, 48) : null;
+        const rf = RF.offeredEnd(bot, goal, { edge: edgeCell });
+        if (rf) {
+          tree.respawn_fresh = { description: RF.saysEnd(bot, goal, rf, { dragonHealth: dragon?.health ?? null }), run: async () => {
+            const died = await RF.runEnd(bot, task, goal, save, { edge: rf.edge, navigate: actions.navigate, move: require('./motion').move });
+            console.log(`[end combat] respawn_fresh from the End at ${bot.entity.position.floored()}: ${died ? 'the body fell into the void, as Jev chose' : 'the body did not fall in ninety seconds'}`);
+          } };
+        }
+      }
     }
     const openSky = (() => { const g = bot.entity.position.floored(); for (let dy = 2; dy <= 8; dy++) if (bot.blockAt(g.offset(0, dy, 0))?.boundingBox === 'block') return false; return true; })();
     if (actions.dig && fountain && openSky && !onOwnPillar() && !onObsidianTop() && !holeHere() && !(dragon && perched(bot, dragon)) && byFountain >= 6) {
@@ -4622,7 +4654,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // In the recorded hole as well as a walled one (note 1621): a hole beside an older hole has a side open and holeHere says no, and 25588 (dragon-158, 2026-10-14 10:46Z) had hole_under_head and stay_in_hole cut in its hole at (2, 60, -7). The cloud is named on the cut, to learn where the breath's cloud forms against a body in a hole.
     let cutCloud = null;
     // Cut only with the body in the cloud itself (note 1622), not within the two blocks of margin breathThreat keeps: at the margin 25588 (dragon-159, 2026-10-14 10:55Z) had its walks cut eight times in six minutes at 20 health, each cut a response and a question over again.
-    breathWatch = () => { try { if (!raced && !bot._dropping && !bot._fallRecovery && !onOwnPillar() && !onColumnCell() && !onObsidianTop() && !holeHere() && !inRecordedHole()) { const c = breathThreat(bot); if (c?.name === 'area_effect_cloud' && hazardDistance(bot.entity.position, c) <= cloudRadius(bot, c) - 2 + 0.3) { raced = true; cutCloud = c; stepCut = 'dragon_breath_cloud'; cutRun(Object.assign(new Error('dragon_breath_cloud'), { name: 'EndEmergency' })); } } } catch (_) { /* nothing */ } };
+    breathWatch = () => { try { if (!raced && !require('./respawn-fresh').standing(goal) && !bot._dropping && !bot._fallRecovery && !onOwnPillar() && !onColumnCell() && !onObsidianTop() && !holeHere() && !inRecordedHole()) { const c = breathThreat(bot); if (c?.name === 'area_effect_cloud' && hazardDistance(bot.entity.position, c) <= cloudRadius(bot, c) - 2 + 0.3) { raced = true; cutCloud = c; stepCut = 'dragon_breath_cloud'; cutRun(Object.assign(new Error('dragon_breath_cloud'), { name: 'EndEmergency' })); } } } catch (_) { /* nothing */ } };
     bot.on('physicsTick', breathWatch);
     try {
       const running = Promise.resolve().then(() => decision.action.run()); running.catch(() => {});

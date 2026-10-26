@@ -23,3 +23,17 @@ test('offered only in the Nether with no pickaxe, no block and lava known; said 
   assert.equal(RF.standing({ deliberateDeath: { at: Date.now() - 100000 } }), false);
   assert.equal(RF.standing({}), false);
 });
+
+test('the End (note 2236): offered with no pickaxe and nothing to eat and the edge known; said with the void, the lost kit, the health that does not come back and the re-kit record', () => {
+  const edge = { at: { x: 30, z: -12 }, distance: 7, side: 'east', dx: 1, dz: 0 };
+  const bare = botWith([{ name: 'bow', count: 1 }, { name: 'arrow', count: 54 }, { name: 'white_bed', count: 1 }], 'the_end');
+  bare.health = 1.3; bare.food = 11;
+  assert.deepEqual(RF.offeredEnd(bare, {}, { edge }), { edge });
+  assert.equal(RF.offeredEnd(botWith([{ name: 'stone_pickaxe', count: 1 }], 'the_end'), {}, { edge }), null, 'a pickaxe carried');
+  assert.equal(RF.offeredEnd(botWith([{ name: 'cooked_rabbit', count: 2 }], 'the_end'), {}, { edge }), null, 'food carried');
+  assert.equal(RF.offeredEnd(bare, {}, { edge: null }), null, 'no edge known');
+  assert.equal(RF.offeredEnd(botWith([], 'the_nether'), {}, { edge }), null, 'not the Nether');
+  const s = RF.saysEnd(bare, { survival: { spawnBed: { foot: { x: 5, y: 63, z: 9 } } } }, { edge }, { dragonHealth: 200 });
+  assert.match(s, /^Die here on purpose and come back to life at the bed at \(5, 63, 9\) in the Overworld: walk off the island's edge 7 blocks east at \(30, -12\) into the void\. Everything carried, 3 stacks \(1 bow, 54 arrow, 1 white bed\), is lost at once in the void\. With no pickaxe and nothing to eat here, health 1\.3 at hunger 11 does not come back/);
+  assert.match(s, /the dragon keeps its health \(200 of 200\)\. On the full runs the time from a death to the kit worn and held again was about 73 minutes/);
+});

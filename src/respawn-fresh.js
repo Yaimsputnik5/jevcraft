@@ -56,7 +56,47 @@ async function run(bot, task, goal, save, { lava, navigate, move }) {
   return (bot.health ?? 0) <= 0 || bot.isAlive === false;
 }
 
+// The End's way (note 2236): no pickaxe and nothing to eat, so the health lost does not come back and no hole can be dug,
+// with the island's edge known within reach -> { edge } or null. 25590's stronghold-1-dragon-328 (2026-10-26 16:44 to
+// 16:49Z) stood five minutes at 1.3 health, hunger 11 to 9, 'nothing to eat ... none known', no pickaxe, one crystal left,
+// with moves, shoot_dragon and observe its only options, and was slain by the body.
+function offeredEnd(bot, goal, { edge = null } = {}) {
+  if (!/end/.test(String(bot.game?.dimension || ''))) return null;
+  const items = bot.inventory?.items?.() || [];
+  if (items.some(i => /_pickaxe$/.test(i.name))) return null;
+  let food = []; try { food = require('./healing').foodCarried(bot) || []; } catch (_) { food = []; }
+  if (food.length || items.some(i => /cooked_|bread|apple|carrot|potato|melon_slice|chorus_fruit|beef|porkchop|mutton|chicken|rabbit|cod|salmon|rotten_flesh|stew|pie/.test(i.name))) return null;
+  if (!edge || !(edge.distance <= 48)) return null;
+  return { edge };
+}
+function saysEnd(bot, goal, { edge }, { dragonHealth = null } = {}) {
+  const items = bot.inventory?.items?.() || [];
+  const stacks = items.length;
+  const valued = items.filter(i => /blaze_rod|ender_pearl|ender_eye|diamond|gold_ingot|iron_ingot|_sword$|bow$|arrow|shield|_helmet$|_chestplate$|_leggings$|_boots$|bed$|bucket|_boat$/.test(i.name)).map(i => `${i.count} ${words(i.name)}`).join(', ');
+  const sp = bot.spawnPoint;
+  const bed = goal?.survival?.spawnBed?.foot;
+  const respawn = bed ? `the bed at (${bed.x}, ${bed.y}, ${bed.z}) in the Overworld` : sp ? `the world spawn at (${Math.round(sp.x)}, ${Math.round(sp.y)}, ${Math.round(sp.z)}) in the Overworld` : 'the world spawn in the Overworld';
+  const health = Number(bot.health ?? 0).toFixed(1), hunger = bot.food ?? 20;
+  return `Die here on purpose and come back to life at ${respawn}: walk off the island's edge ${edge.distance} blocks ${edge.side} at (${edge.at.x}, ${edge.at.z}) into the void. Everything carried, ${stacks} stack${stacks === 1 ? '' : 's'}${valued ? ` (${valued})` : ''}, is lost at once in the void. With no pickaxe and nothing to eat here, health ${health} at hunger ${hunger} does not come back and no hole can be dug; the End has no food but chorus fruit on the outer islands. The stronghold's portal stays open for the way back, and the dragon keeps its health${dragonHealth != null ? ` (${Math.round(dragonHealth)} of 200)` : ''}. On the full runs the time from a death to the kit worn and held again was about ${REKIT.minutesEach} minutes (${REKIT.deaths} deaths, ${REKIT.window}). Never run unasked: Jev's choice, as the Nether's lava way is.`;
+}
+async function runEnd(bot, task, goal, save, { edge, navigate, move }) {
+  goal.deliberateDeath = { at: Date.now(), why: 'Jev chose to come back to life fresh from the End (respawn_fresh)' }; save?.();
+  bot.chat?.('No pickaxe and nothing to eat here. Starting over from the bed.');
+  const { goals } = require('mineflayer-pathfinder');
+  const { Vec3 } = require('vec3');
+  const y = Math.floor(bot.entity.position.y);
+  try { await navigate(bot, task, new goals.GoalNear(edge.at.x, y, edge.at.z, 1), { timeoutMs: 60000, stallMs: 8000 }); } catch (err) { task.check(); if (['Cancelled'].includes(err.name)) throw err; }
+  const began = Date.now(), beyond = new Vec3(edge.at.x + edge.dx * 3 + 0.5, y + 1.6, edge.at.z + edge.dz * 3 + 0.5);
+  while (Date.now() - began < DEATH_WAIT_MS && (bot.health ?? 0) > 0 && bot.isAlive !== false) {
+    task.check();
+    try { await move(bot, task, { label: 'respawn_fresh', keys: ['forward', 'sprint'], sneak: false, why: 'off the island\'s edge into the void, as Jev chose', look: beyond, maxMs: 1500, tick: 50, intoFall: true, acrossGap: true, until: () => bot.entity.position.y < y - 3 }); }
+    catch (err) { if (err.name === 'Cancelled') throw err; }
+    if (bot.entity.position.y < y - 3) { for (let i = 0; i < 400 && (bot.health ?? 0) > 0 && bot.isAlive !== false; i++) await new Promise(r => setTimeout(r, 100)); break; }
+  }
+  return (bot.health ?? 0) <= 0 || bot.isAlive === false;
+}
+
 // Whether the flag stands now (the lava rule and the survival step read it).
 const standing = (goal, now = Date.now()) => !!goal?.deliberateDeath && now - goal.deliberateDeath.at < DEATH_WAIT_MS;
 
-module.exports = { offered, says, run, standing, spellsSays, SPELLS, REKIT, DEATH_WAIT_MS };
+module.exports = { offered, says, run, standing, spellsSays, SPELLS, REKIT, DEATH_WAIT_MS, offeredEnd, saysEnd, runEnd };
