@@ -1367,6 +1367,12 @@ async function huntObserved(bot, task, goal, save, actions, client) {
     if (blazesInSight.length) setAside(goal, 'hunt_stand', 'blaze', 'Jev chose to leave them for now', 120000);
     save();
   } };
+  // Leaving the fortress for the rest of the kit (leave-for-kit.js, note 2174): on a blaze or wither skeleton hunt in
+  // the Nether, the trip back offered beside the fight and the two-minute leave, with what is worn against the set.
+  if (/^(blaze|wither_skeleton)$/.test(state.entity)) {
+    let lfk = null; try { lfk = require('./leave-for-kit').option(bot, goal, actions, { where: 'the fortress' }); } catch (_) { lfk = null; }
+    if (lfk) tree.leave_for_kit = { description: lfk.description, run: async () => { await lfk.run(task, save); } };
+  }
   // What the stay at this cage has itself come to (kills, rods, health lost
   // since the bot came near), said on defer and on every hold beside it
   // (cage-yield.js HOLDS, note 702): defer's own arena row (a fight begun
@@ -3288,6 +3294,12 @@ async function chooseLeg(bot, task, goal, save, actions, state, fortress = null)
   if (homeBy && homeStart.ok) {
     options.return_for_blocks = { description: returnForKitSays(bot, homeBy, { goal, plan, ground: groundSaid }),
       run: async () => { await actions.returnOverworld(bot, task, goal, save); return 'returned'; } };
+  }
+  // Leaving the fortress for the rest of the kit (leave-for-kit.js, note 2174): on its floors or with it in view,
+  // the trip back beside the legs and the ways in, with what is worn against the set and the record of each.
+  if (onFortressFloors(bot, state) || state.fortressAt) {
+    let lfk = null; try { lfk = require('./leave-for-kit').option(bot, goal, actions, { where: onFortressFloors(bot, state) ? 'the fortress' : 'the fortress search' }); } catch (_) { lfk = null; }
+    if (lfk) options.leave_for_kit = { description: lfk.description, run: () => lfk.run(task, save) };
   }
   // A fortress floor known overhead within a climb's reach: the climb with
   // what is carried, or the blocks dug for it first (note 694).
