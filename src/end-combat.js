@@ -2496,11 +2496,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const waterStands = lastWater && bot.blockAt(lastWater)?.name === 'water' && lastWater.distanceTo(bot.entity.position) <= 6;
     // The last full bucket kept here too (note 1827, as note 1819 for the pool): 25588's dragon-192 (2026-10-18 05:25Z, three crystals, 372 blocks, full health) poured its second bucket against an enderman three blocks off, was flung off its column top at 86 by the dragon's body, 'falling ... with no water bucket to clutch with', and went into the void. The last bucket goes against an enderman only at 8 health or under.
     // Not kept from an enderman at arm's length (note 1851): 25588's dragon-210 (2026-10-18 12:46Z, one crystal) fought one with the sword at 1.4 to 1.8 blocks, 'the one full bucket carried is kept for the landing (health 13.5)', and went 13.5 to 2 to none under its blows; the water ends that fight at once, and a knock off a column is a lesser risk than a blow a second now.
-    // With a boat carried the landing is the boat's (fall-recovery.js boatClutch, note 2178), and the last bucket is not kept
-    // from an enderman (note 2194): dragon-312 (25592, 2026-10-26 10:33Z) kept its one bucket from an enderman at 5 blocks
-    // at 14 health, poured it at 1 block, and died on its climb.
-    const boatCarried = bot.inventory.items().some(i => require('./boats').boatItem(i.name));
-    const lastBucketKept = countOf(bot, 'water_bucket') < 2 && !boatCarried && bot.health > 8 && !(turned && turned.position.distanceTo(bot.entity.position) <= 4);
+    // The boat carried does not free the last bucket (note 2203, undoing note 2194; Fable, 2026-10-26 12:15Z): the boat
+    // clutch clicks within the water's reach, 4.8 from the eye, and at a block and a third a tick that leaves two ticks
+    // to the ground, in which the boat must spawn, be seen and be boarded; the water is one tick. dragon-314 (25589,
+    // 11:05Z) had its one bucket in the pool and a boat carried, was hit off its stub top at 79, the boat clicked a block
+    // above the ground, and it died of the fall. The boat stays the free last resort with no bucket; the End keeps two.
+    const lastBucketKept = countOf(bot, 'water_bucket') < 2 && bot.health > 8 && !(turned && turned.position.distanceTo(bot.entity.position) <= 4);
     if (turned && !waterStands && lastBucketKept && !(state.lastBucketEndermanSaid > Date.now() - 20000)) { state.lastBucketEndermanSaid = Date.now(); console.log(`[end combat] no water against the enderman ${Math.round(turned.position.distanceTo(bot.entity.position))} blocks off: the one full bucket carried is kept for the landing after a knock off a column (health ${bot.health.toFixed(1)})`); }
     // No reflex pour where the water would run off (note 1843, as the option's own check): the flow carries the body with it, and 25588's dragon-204 (2026-10-18 10:50Z) poured against an enderman on the island's lower shelf at (45, 29, -19) and went off its edge into the void at 11 health.
     const pourRunsOff = runOffSides(bot, bot.entity.position.floored()).length >= 1;
@@ -2755,7 +2756,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // seconds to most of a minute, and the run under it is said with that.
     if (dragon && perched(bot, dragon)) state.perchedSince ||= Date.now(); else delete state.perchedSince;
     // How long the dragon has been coming down (note 2199): the landing approach (phase 2) and the landing (3) before it sits.
-    if (dragon && live(bot, dragon) && [2, 3].includes(metadata(bot, dragon, 'phase'))) state.landingSince ||= Date.now(); else delete state.landingSince;
+    if (dragon && live(bot, dragon) && [2, 3].includes(metadata(bot, dragon, 'phase'))) { if (!state.landingSince) { state.landingSince = Date.now(); state.landings = (state.landings || 0) + 1; } } else delete state.landingSince;
     // For the sword at the perched head the place is judged by what is at
     // hand (note 1159): no mob within eight blocks, no breath or crystal
     // over it. The twenty blocks kept from a turned enderman are for a bow
@@ -3887,7 +3888,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     {
       const sword = bot.inventory.items().find(i => /_sword$/.test(i.name) && durable(bot.registry, i));
       const phase = dragon && live(bot, dragon) ? metadata(bot, dragon, 'phase') : null;
-      const coming = phase !== null && ([2, 3].includes(phase) || !!head) && !crystals.length;
+      // And while it flies with no crystal standing (note 2203; Fable, 2026-10-26 12:15Z): the dragon comes down to the
+      // fountain at the end of every circuit from then on, so the perch is the whole fight, and the hole dug beforehand is
+      // the wait for it (stay_in_hole). dragon-313 (25592, 10:58 to 11:09Z) had 152 askings with no crystal standing and
+      // the hole offered at none of them.
+      const flying = phase !== null && ![2, 3].includes(phase) && !head && !crystals.length;
+      const coming = phase !== null && !crystals.length && ([2, 3].includes(phase) || !!head || flying);
       const solid = c => bot.blockAt(c)?.boundingBox === 'block';
       const thickAt = f => !!f && [1, 2, 3, 4, 5, 6].every(dy => solid(f.offset(0, -dy, 0))) && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => solid(f.offset(dx, -1, dz)) && solid(f.offset(dx, -2, dz))) && voidEdge(bot, f, 4) === null;
       if (actions.dig && sword && coming && !holeHere() && !onOwnPillar() && !onObsidianTop() && byFountain >= 4 && byFountain <= 30 && blocksCarried(bot) >= 2) {
@@ -3911,13 +3917,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         // dragon trials, the hole offered at none. The approach's seconds are this server's record (83 of them: 2 to 43 s,
         // 10 as a rule); the walk's are the blocks at a sprint and the two digs.
         const landing = [2, 3].includes(phase) && !head;
-        if (thickAt(feetAt) && !solid(feetAt) && !solid(feetAt.offset(0, 1, 0)) && (walk0 === 0 || frontOfIt || landing)) {
+        if (thickAt(feetAt) && !solid(feetAt) && !solid(feetAt.offset(0, 1, 0)) && (walk0 === 0 || frontOfIt || landing || flying)) {
           const walk = walk0;
+          const whyNow = flying ? (() => { const t = state.holeHead || { tries: 0, dugIn: 0, swings: 0 }, sh = state.dragonShots || { loosed: 0 }; const arrows = (state.shots || []).filter(x => x.target === 'ender_dragon' && Number.isFinite(x.dragonBefore) && Number.isFinite(x.dragonAfter)).reduce((n, x) => n + Math.max(0, x.dragonBefore - x.dragonAfter), 0);
+            return `no crystal stands: the dragon comes down to the fountain at the end of every circuit from here on, and it is ${Math.round(Math.hypot(dragon.position.x - centre.x, dragon.position.z - centre.z))} blocks from the fountain now, ${dragon && live(bot, dragon) ? `at ${Math.round(dragon.health ?? beforeDragon)} health` : ''}; this fight it has come down ${state.landings || 0} time${state.landings === 1 ? '' : 's'}; from the hole 7 from the middle the perched head is within the sword's reach, and the hole dug now is the wait for the next landing. This fight: ${t.dugIn} hole${t.dugIn === 1 ? '' : 's'} dug under the head, ${t.swings} swing${t.swings === 1 ? '' : 's'} at it from one; ${sh.loosed || 0} arrow${sh.loosed === 1 ? '' : 's'} at the dragon took ${Math.round(arrows)} of its health.`; })() : null;
           const landingSays = landing ? `the dragon is coming down to land on the fountain, ${Math.round(Math.hypot(dragon.position.x - centre.x, dragon.position.z - centre.z))} blocks from its middle, ${Math.round((Date.now() - (state.landingSince || Date.now())) / 1000)} s into its landing approach; on this server's dragon trials the approach took 2 to 43 s before it sat, 10 as a rule (83 approaches); it sits on while a player is within 20 of it. The walk of ${walk} blocks at a sprint is about ${Math.round(walk / 5.6 * 10) / 10} s and the two digs about 2 s${walk > 4 ? `: met in the open by the body coming down the bot is thrown (dragon-159, 2026-10-14: a walk of 7 into the landing 18 blocks off met the body, four blows 20 to 6.4 and a throw of 25 blocks)` : ''}` : null;
           const t = state.holeHead || { tries: 0, dugIn: 0, swings: 0 };
           tree.hole_under_head = {
             description: { action: `${walk ? `Walk ${walk} blocks to the cell 7 from the fountain's middle on the bot's own side, dig` : `Dig`} two down ${walk ? '' : 'here, ' + Math.round(byFountain * 10) / 10 + ' from the fountain\'s middle, '}and strike the dragon's head for as long as it sits: sitting on the fountain with its belly at about 65, its head a block under its middle and 6.5 before it is 3.4 over the eyes of a body two deep, out of the sword's three, so the blows are struck from the hole's rim (two blocks laid, the body up on its cell) and the hole dug again when the dragon rises; the body in the hole is below the wings' boxes and the breath's cloud, the body on the rim is in the breath and the push (dragon-163, 2026-10-14: ten blows struck from the ground by the head at 20 to 17 health). The dig is two seconds; the way out two blocks laid. While the dragon flies a block is laid over the hole's mouth (its fireball bursts on it and the cloud lies above; a hole with its mouth open took a fireball's cloud, dragon-159), and taken off when it sits for the sword.`,
-              dragonNow: head ? 'perched now' : 'coming down to land now', ...(landingSays ? { landingNow: landingSays } : {}), walkBlocks: walk, holeBlocksFromFountain: 7, blocksFromFountain: Math.round(byFountain), health: bot.health, dragonHealth: beforeDragon, blocksCarried: blocksCarried(bot),
+              dragonNow: head ? 'perched now' : flying ? 'flying, no crystal standing' : 'coming down to land now', ...(landingSays ? { landingNow: landingSays } : {}), ...(whyNow ? { whyNow } : {}), walkBlocks: walk, holeBlocksFromFountain: 7, blocksFromFountain: Math.round(byFountain), health: bot.health, dragonHealth: beforeDragon, blocksCarried: blocksCarried(bot),
               headHitThroughArmourWorn: headHit(bot),
               // The breath's cloud on the ground at the hole's cell or where the bot stands said (note 2050): the walk and the dig two down are in it, about six a second. full-3 (2026-10-23 21:44Z, dragon 185) took hole_under_head beside a cloud 7 wide 1.4 off at its feet's level, 20 to 0.8 in the dig, and died.
               ...(() => { const near = [feetAt.offset(.5, 0, .5), bot.entity.position].map(p => Object.values(bot.entities || {}).filter(e => e.name === 'area_effect_cloud' && e.isValid !== false && e.position && Math.abs(e.position.y - p.y) <= 1 && Math.hypot(e.position.x - p.x, e.position.z - p.z) <= cloudRadius(bot, e) + 1.5)).flat()[0];

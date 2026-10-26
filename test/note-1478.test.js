@@ -800,3 +800,27 @@ test('the dragon coming down to land, the bot 14 from the fountain: the hole und
   assert.ok(walked.some(w => w.x === 7 && w.z === 0), `walked to the hole's cell: ${JSON.stringify(walked)}`);
   assert.equal(dug.filter(p => p.x === 7 && p.z === 0 && (p.y === 63 || p.y === 62)).length, 2, `dug: ${dug.map(String).join(' ')}`);
 });
+
+test('no crystal standing and the dragon flying 60 blocks off: the hole under the head is offered as the wait for the next landing, with the fight\'s record (note 2203)', async () => {
+  const { bot, goal, task } = fixture();
+  delete bot._pillarUp;
+  bot.entity.position = new Vec3(14.5, 64, 0.5);
+  const removed = new Set();
+  bot.blockAt = p => { const f = p.floored(), k = `${f.x},${f.y},${f.z}`; if (removed.has(k)) return { name: 'air', boundingBox: 'empty', position: f }; if (f.y === 63 && f.x === 0 && f.z === 0) return { name: 'bedrock', boundingBox: 'block', position: f }; return { name: f.y < 64 ? 'end_stone' : 'air', boundingBox: f.y < 64 ? 'block' : 'empty', position: f }; };
+  bot.entities[20].position = new Vec3(60, 90, 0); bot.entities[20].yaw = Math.PI / 2; bot.entities[20].health = 186;
+  bot.entities[20].metadata[registry.entitiesByName.ender_dragon.metadataKeys.indexOf('phase')] = 0;
+  delete bot.entities[30];
+  bot.inventory.items = () => [{ name: 'diamond_sword', count: 1, durabilityUsed: 0, maxDurability: 1561 }, { name: 'iron_pickaxe', count: 1 }, { name: 'cobblestone', count: 20 }];
+  goal.endCombat = { steps: 0, shots: [{ target: 'ender_dragon', at: 5, dragonBefore: 200, dragonAfter: 190 }], destroyedCrystals: [], visits: {}, noProgress: 0, arenaCenter: { x: 0, y: 64, z: 0 }, landings: 4, holeHead: { tries: 2, dugIn: 1, swings: 10 }, dragonShots: { chosen: 90, loosed: 3, ended: {} } };
+  const dug = [];
+  const dig = async (b, t, p) => { dug.push(p.clone()); removed.add(`${p.x},${p.y},${p.z}`); if (p.x === 7 && p.z === 0) bot.entity.position = new Vec3(7.5, p.y, 0.5); };
+  bot.attack = () => {}; bot.setControlState = () => {};
+  const navigate = async (b, t, g) => { bot.entity.position = new Vec3(g.x + .5, g.y, g.z + .5); };
+  let seen = null;
+  const client = { systemOne: async ({ questions }) => { seen = questions.branch_0.criteria; return { answers: { branch_0: { choice: 'observe' } } }; } };
+  await fightEndStep(bot, task, goal, () => {}, { navigate, dig, place: async () => {} }, client);
+  assert.ok(seen && seen.hole_under_head, `offered while the dragon flies with no crystal standing: ${Object.keys(seen || {}).join(',')}`);
+  assert.equal(seen.hole_under_head.dragonNow, 'flying, no crystal standing');
+  assert.match(seen.hole_under_head.whyNow, /^no crystal stands: the dragon comes down to the fountain at the end of every circuit from here on, and it is 60 blocks from the fountain now, at 186 health; this fight it has come down 4 times; from the hole 7 from the middle the perched head is within the sword's reach, and the hole dug now is the wait for the next landing\. This fight: 1 hole dug under the head, 10 swings at it from one; 3 arrows at the dragon took 10 of its health\.$/);
+  assert.equal(seen.hole_under_head.landingNow, undefined, 'not a landing');
+});
