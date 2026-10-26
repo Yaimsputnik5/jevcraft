@@ -284,7 +284,11 @@ async function recoverBoat(bot, task, boat, itemName, waterY) {
   await bot.lookAt(boat.position.offset(0, .3, 0), true);
   for (let n = 0; n < 12 && bot.entities[boat.id] === boat; n++) { task.check(); bot.attack(boat); await sleep(300); }
   if (bot.entities[boat.id] === boat) throw new Error('Empty boat is still blocking the exit; waiting before walking');
-  await floatAfterBoat(bot, task, waterY);
+  // The float only where the boat sat on water (note 2247): a boat set down on ground (the End's seat, note 2207) has no
+  // water to float in, and the float's check threw 'Cannot swim safely to the surface after leaving the boat' before the
+  // drop was walked to; the stage trials of 2026-10-26 lost the boat after 11 of 13 seats (Fable 17:30Z).
+  const onWater = /water/.test(bot.blockAt(boat.position.floored())?.name || '') || /water/.test(bot.blockAt(boat.position.floored().offset(0, -1, 0))?.name || '');
+  if (onWater) await floatAfterBoat(bot, task, waterY);
   const drop = Object.values(bot.entities).find(e => e.getDroppedItem?.()?.name === itemName && e.position.distanceTo(boat.position) < 3);
   if (drop) {
     await navigate(bot, task, new goals.GoalNear(drop.position.x, waterY, drop.position.z, 1), { timeoutMs: 6000, stallMs: 3000 });
