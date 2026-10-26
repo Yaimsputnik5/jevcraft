@@ -55,7 +55,8 @@ test('the retreat says its footing is in the ghast\'s line, and prices the fifte
   assert.match(r, /The footing is not out of their sight: the ghast has a line to it from where it is now, and its shots go on there as here: about (\d+(\.\d)?) damage from the shooters in the next fifteen seconds this way, the run included, from 7\.4 health\./);
   const all = Number(/about (\d+(?:\.\d)?) damage from the shooters in the next fifteen seconds/.exec(r)[1]);
   const run = Number(/About (\d+(?:\.\d)?) damage from the shooters in range over those seconds/.exec(r)[1]);
-  assert.ok(all > run * 3, `the fire after the run counted: ${run} over the run, ${all} in fifteen seconds`);
+  // The run's seconds by the measured pace (note 2162) are a larger share of the fifteen than at a sprint's 5.6.
+  assert.ok(all > run, `the fire after the run counted: ${run} over the run, ${all} in fifteen seconds`);
   // The spot out of its line two blocks off is on offer beside it.
   assert.match(options.out_of_sight?.description || '', /Walk 2 blocks to a spot .* that no line from the ghast reaches/);
 });

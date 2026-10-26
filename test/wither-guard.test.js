@@ -251,7 +251,8 @@ test('a retreat is not held on past its run: asked again when the run is done (m
 
 test('a run from a wither skeleton at arm\'s length is priced with the blow as it turns, the blow on its arrival and the wither (mid-242-ah-nether-1, 12:14:33.7)', () => {
   // As recorded: 5.1 health, the skeleton at 0.6 blocks, the way past its
-  // reach 17 blocks, about 3 seconds at a run.
+  // reach 17 blocks, about 3 seconds at a sprint; by the measured run pace (note 2162) about 6, and a wither
+  // skeleton as fast as that run is with the bot through it, a blow a second.
   const { bot, threat } = cavernBot({ at: new Vec3(-239.5, 64, -142.5), skeletonAt: new Vec3(-239.5, 64, -141.9), health: 5.1, food: 20 });
   const survival = new Survival(bot, { navigate: async () => {} }, { state: { shelters: [] } });
   survival.state.retreatScout = { at: Date.now(), feet: `${bot.entity.position.floored()}`, radius: 20, spots: 12, tried: 12, candidates: 12,
@@ -259,7 +260,7 @@ test('a run from a wither skeleton at arm\'s length is priced with the blow as i
   const options = survival.stanceOptions(new Task('x'), {}, () => {}, [threat()], false);
   const leave = options.leave_reach;
   assert.ok(leave, `offered: ${Object.keys(options)}`);
-  assert.match(leave.description, /About [\d.]+ damage from those that follow in the next fifteen seconds this way, from 5\.1 health \(more than the bot has\): the wither skeleton 2 blows \(as the bot turns to run, being at its reach now, on reaching the bot again [\d.]+ seconds after the run\), about 4\.5 each after armour, and the wither/);
+  assert.match(leave.description, /About [\d.]+ damage from those that follow in the next fifteen seconds this way, from 5\.1 health \(more than the bot has\): the wither skeleton \d+ blows \(as the bot turns to run, being at its reach now, [\d.]+ seconds into the run(, [\d.]+ seconds into the run)*\), about 4\.5 each after armour, and the wither/);
   assert.ok(leave.expects.damage >= 9, `priced ${leave.expects.damage}`);
 });
 

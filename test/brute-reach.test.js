@@ -85,7 +85,7 @@ test('with no run past every mob, the way past the brute\'s reach is offered, wi
   assert.ok(options.leave_reach, Object.keys(options).join(','));
   assert.match(options.retreat.description, /No way out/);
   const o = options.leave_reach;
-  assert.match(o.description, /Run past the reach of what bites, taking the shooters' fire on the way: 18 blocks to footing 24 from the piglin brute \(it follows a player to 12\), nearer the bot than any of them, by a route that passes none of those that bite \(the shooters are not kept clear of\), about 3\.2 seconds at a run\./);
+  assert.match(o.description, /Run past the reach of what bites, taking the shooters' fire on the way: 18 blocks to footing 24 from the piglin brute \(it follows a player to 12\), nearer the bot than any of them, by a route that passes none of those that bite \(the shooters are not kept clear of\), about 6\.2 seconds at a run\./);
   assert.match(o.description, /the piglin brute 7 blocks off at about 5\.3 blocks a second/);
   assert.ok(o.description.includes(`By the game's rule, ${GIVES_UP.piglin_brute}.`));
   assert.match(GIVES_UP.piglin_brute, /within 12 blocks of it and in its sight .* walks back to the spot in its bastion it was made at; brutes come only with a bastion/);

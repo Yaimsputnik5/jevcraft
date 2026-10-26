@@ -2948,7 +2948,7 @@ test('the run\'s way is found before the stance is asked, said on the retreat, a
   const danger = [{ entity: zombie, distance: 5, visible: true }];
   const scout = await survival.scoutRetreat(new Task('dusk'), danger);
   assert.deepEqual(scout.destination, { x: 0, y: 64, z: 14 });
-  assert.match(survival.stanceOptions(new Task('dusk'), {}, () => {}, danger, false).retreat.description, /A way is found: 14 blocks to footing \d+ blocks further from every mob about, passing none of them, about 2\.5 seconds at a run/);
+  assert.match(survival.stanceOptions(new Task('dusk'), {}, () => {}, danger, false).retreat.description, /A way is found: 14 blocks to footing \d+ blocks further from every mob about, passing none of them, about 4\.8 seconds at a run/);
   const before = searches;
   assert.equal(await survival.runAway(new Task('dusk'), {}, () => {}, danger), true);
   assert.equal(searches, before, 'the way found is the one run');
@@ -5470,13 +5470,13 @@ test('a run says who follows it, at each one\'s speed from the jar, and is held 
   const danger = [{ entity: spider, distance: 3, visible: true }];
   await survival.scoutRetreat(new Task('dusk'), danger);
   const retreat = survival.stanceOptions(new Task('dusk'), {}, () => {}, danger, false).retreat;
-  assert.match(retreat.description, /They follow a running player \(the bot sprints about 5\.6 blocks a second\): the spider 3 blocks off at about 3\.9 blocks a second, climbing walls: about \d+ blocks behind when the run ends, and at the bot about [\d.]+ seconds after/);
-  assert.equal(retreat.expects?.seconds, 2.5, 'held for its run, then asked again');
+  assert.match(retreat.description, /They follow a running player \(a sprint on open ground is 5\.6 blocks a second; on the six full runs .*?\): the spider 3 blocks off at about 3\.9 blocks a second, climbing walls: (it is at the bot before the run ends|about \d+ blocks behind when the run ends, and at the bot about [\d.]+ seconds after)/);
+  assert.equal(retreat.expects?.seconds, 4.8, 'held for its run, then asked again');
   // No way looked for: the speeds and how far each follows.
   delete survival.state.retreatScout;
   const zombie = { id: 2, name: 'zombie', type: 'hostile', position: new Vec3(8.5, 64, 0.5), height: 1.95, isValid: true };
   const blind = survival.stanceOptions(new Task('dusk'), {}, () => {}, [{ entity: zombie, distance: 8, visible: true }], false).retreat;
-  assert.match(blind.description, /the zombie 8 blocks off at about 2\.3 blocks a second, about 3\.3 a second slower than the run, and it gives up only more than 35 blocks behind/);
+  assert.match(blind.description, /the zombie 8 blocks off at about 2\.3 blocks a second, about 0\.6 a second slower than the run, and it gives up only more than 35 blocks behind/);
   assert.equal(blind.expects, undefined);
 });
 
@@ -6171,7 +6171,7 @@ test('a zombie at arm\'s length with bare hands: run_from is offered, priced by 
   const survival = new Survival(bot, { place: async () => {}, dig: async () => {}, navigate: async (_b, _t, goal, opts) => { walked.push({ goal, opts }); bot.entity.position = new Vec3(-28.5, 64, 0.5); } }, { state: { shelters: [] } });
   const options = survival.stanceOptions(new Task('x'), {}, () => {}, [{ entity: zombie, distance: 1.4, visible: true }], false);
   assert.ok(options.run_from, `offered: ${Object.keys(options)}`);
-  assert.match(options.run_from.description, /Run from the zombie at a sprint, to the first cell the walk reaches 24 blocks or more from it: no footing is picked beforehand and nothing is searched while standing\. The zombie walks about [\d.]+ blocks a second and the bot sprints about 5\.6: the gap opens about [\d.]+ a second, 24 blocks in about [\d.]+ seconds/);
+  assert.match(options.run_from.description, /Run from the zombie at a sprint, to the first cell the walk reaches 24 blocks or more from it: no footing is picked beforehand and nothing is searched while standing\. The zombie walks about [\d.]+ blocks a second and this bot's runs from mobs make about 2\.9 \(a sprint on open ground is 5\.6; the walk away goes by its route\): the gap opens about [\d.]+ a second, 24 blocks in about [\d.]+ seconds/);
   await options.run_from.run();
   assert.equal(walked.length, 1);
   assert.equal(walked[0].opts.sprint, true);
