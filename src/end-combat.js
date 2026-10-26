@@ -856,7 +856,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
   };
   const centreOnColumn = async (tolerance = 0.1, opts = {}) => { const u = bot._pillarUp; if (!u) return false; return centreOn(u.x, u.z, tolerance, opts); };
   const digDownColumn = async ({ limit = 64 } = {}) => {
-    let passes = 0, aborts = 0;
+    let passes = 0, aborts = 0, offCells = 0;
     const digFromY = Math.floor(bot.entity.position.y), digFromHealth = bot.health;
     // The column's blocks: what the climb lays, end stone among them (note
     // 1438): 25588 (dragon-21, 2026-10-13 08:17Z), its cobblestone gone and
@@ -1004,7 +1004,17 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
       // The drop comes late (the server's block update, then the fall): up to
       // three seconds for it. The drill of 2026-10-13 (05:12Z) was called
       // 'not dropped into' after one second and stood a block lower after.
-      for (let i = 0; i < 30 && Math.floor(bot.entity.position.y) >= yBefore; i++) { check(); await sleep(100); }
+      // The drop waited for on the column's cell only (note 2232): dragon-330 (25589, 2026-10-26 16:21Z) dug the block under its feet at (31, 81, -23) with a fireball's cloud at the feet under the cage's iron bars (no one up), and in the second of the dig the body drifted 1.7 blocks west off its cell onto the pillar's top with no key held, so the wait for a drop that could not come ran its three seconds in the cloud, 17 to 11 to 5 to none, and nothing was said. Off the cell the wait ends, how the body stood is said, and it is walked back to the cell for the block again (the hole, where the block went, takes it down).
+      let offCell = false;
+      for (let i = 0; i < 30 && Math.floor(bot.entity.position.y) >= yBefore; i++) { check(); await sleep(100); const uu = bot._pillarUp; if (uu && (Math.floor(bot.entity.position.x) !== uu.x || Math.floor(bot.entity.position.z) !== uu.z)) { offCell = true; break; } }
+      if (offCell) {
+        bot.setControlState?.('sneak', false);
+        const uu = bot._pillarUp, p = bot.entity.position, keys = bot.controlState ? Object.keys(bot.controlState).filter(k => bot.controlState[k]) : [];
+        console.log(`[end combat] the dig down at (${uu.x}, ${uu.z}) left its cell during the block: the body at ${p.floored()}, ${Math.round(Math.hypot(uu.x + .5 - p.x, uu.z + .5 - p.z) * 100) / 100} off the middle, keys ${keys.join('+') || 'none'}, controller ${bot._controller?.name || 'none'}, pathing ${bot.pathfinder?.isMoving?.() ?? '?'}, the block under the cell ${bot.blockAt(underFoot)?.name || '?'}, ${bot.health.toFixed(1)} health`);
+        let back = false; if (offCells++ < 3) { try { back = await backToColumn(); } catch (err) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(err.name)) throw err; } }
+        if (back) { n--; continue; }
+        break;
+      }
       for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50);
       // On the island already (the column's last block on the ground): done.
       if (Math.floor(bot.entity.position.y) >= yBefore && bot.blockAt(underFoot.offset(0, -1, 0))?.boundingBox === 'block' && !scaffold.test(bot.blockAt(underFoot.offset(0, -1, 0))?.name || '', underFoot.y - 1)) { n++; break; }
