@@ -11,7 +11,7 @@ test('the corpse run says its record: the run\'s own as it accrues, the fleet\'s
   assert.deepEqual([FLEET_RECORD.deaths, FLEET_RECORD.setOut, FLEET_RECORD.back, FLEET_RECORD.some], [288, 74, 0, 0]);
   const bot = { _survivalState: { deaths: [{}, {}, {}] } };
   const fresh = recordSays(bot, {});
-  assert.match(fresh, /^ On this run: 3 deaths and no walk back set out yet\. On the 7 full runs of 2026-10-19 to 2026-10-25: 288 deaths, 74 walks back set out, the kit back whole 0 times and in part 0; 18 found nothing where the bot died \(7 of them within three minutes of the death\), 14 ended in a death on the way/);
+  assert.match(fresh, /^ On this run: 3 deaths and no walk back set out yet\. On the 7 full runs of 2026-10-19 to 2026-10-25: 288 deaths and 74 walks back set out; 14 of the walks ended in a death on the way \(about 7 minutes out, about 350 blocks off\) and 18 found nothing where the bot died \(7 of them within three minutes of the death\); how many of the other 42 got the kit back that record does not say \(it was read from the server logs, which do not see a pickup\)\./);
   assert.match(fresh, /an item lying within 176 blocks of a player is gone five minutes after it fell there \(farther off it waits\); zombies and skeletons may pick up armour and weapons they walk over/);
   const goal = { corpseRecord: { begun: 4, done: 0, partial: 0, gone: 2, diedOnWay: 1, left: 3, despawned: 1 } };
   assert.match(recordSays(bot, goal), /^ On this run: 3 deaths, 4 walks back set out, 0 got everything back, 0 some of it, 2 found nothing where it died, 1 ended in a death on the way, 3 left the drops, 1 gone before the bot came\./);
