@@ -320,7 +320,7 @@ async function kitChoice(bot, task, goal, save, actions, missing, { client, mob,
   const sig = dimension(bot), was = goal.combatKit;
   const held = was?.sig === sig && now - was.at < KIT_CHOICE_HOLD_MS && missing.every(d => was.missing?.includes(d)) ? was : null;
   const still = list => (list || []).filter(p => missing.includes(p.destination));
-  let pick = held && (held.pick !== 'make_kit_here' || still(held.here).length) ? held.pick : null, here = still(held?.here), away = still(held?.away), one = held?.one || null;
+  let pick = held && (held.pick !== 'make_kit_here' || still(held.here).length) ? held.pick : null, here = still(held?.here), away = still(held?.away), one = held?.one || null, arms = still(held?.arms);
   if (!pick) {
     const k = kitPieces(bot, missing);
     ({ here, away } = k);
@@ -342,6 +342,19 @@ async function kitChoice(bot, task, goal, save, actions, missing, { client, mob,
       const ce = require('./combat-estimate'), worn = [5, 6, 7, 8].map(i => bot.inventory?.slots?.[i]?.name).filter(Boolean);
       const before = ce.armourOf(worn).points, after = ce.armourOf([...worn, one.item]).points;
       tree.make_one_here = { description: `Make ${words(one.item)} alone here first and wear it: ${ONE_IRON[one.item]} iron ingots (${carriedIron} carried), armour points ${before} to ${after}, the most armour for its iron of the pieces short.${ironNearSays(bot, ONE_IRON[one.item] - carriedIron)} The other pieces are left for half an hour, then offered again.` };
+    }
+    // The sword and the shield alone, beside one armour piece and the whole
+    // kit (note 2141): three iron ingots and six planks against a blaze's
+    // 20 health and its fireballs, where the whole kit is 27 and one
+    // chestplate 8. Against a blaze this question was answered none good 17
+    // of 28 times tonight (2026-10-26 01:00 to 04:10Z), the bot bare with a
+    // stone pickaxe or a stone sword and nothing between the fist and the
+    // whole kit on offer.
+    arms = here.filter(p => /^(iron_sword|shield)$/.test(p.item));
+    if (arms.length && here.length > arms.length) {
+      const iron = arms.reduce((n, p) => n + (p.item === 'iron_sword' ? 2 : 1), 0), planks = arms.some(p => p.item === 'shield') ? ' and six planks' : '';
+      const swordNow = (bot.inventory?.items?.() || []).some(i => /_sword$/.test(i.name));
+      tree.make_arms_here = { description: `Make ${listed(arms.map(p => words(p.item)))} alone here first: ${iron} iron ingot${iron === 1 ? '' : 's'} (${carriedIron} carried)${planks}, the armour left for later. An iron sword takes 6 of a blaze's 20 health a swing (a stone sword 5, the fist 1), and a shield raised takes a fireball whole and its fire with it; ${swordNow ? 'a sword is carried now' : 'no sword is carried now'}.${k.hereIron ? ironNearSays(bot, iron - carriedIron) : ''}` };
     }
     const leather = leatherPieces(bot, missing);
     if (leather.length) {
@@ -397,7 +410,7 @@ async function kitChoice(bot, task, goal, save, actions, missing, { client, mob,
       // 2026-10-06, leather offered six times and never chosen.
       if (![5, 6, 7, 8].some(i => bot.inventory?.slots?.[i]) && missing.some(d => ['head', 'torso', 'legs', 'feet'].includes(d))) {
         let says = ''; try { says = ' ' + require('./kit-record').bareSays(bot.game?.dimension); } catch (_) { says = ''; }
-        for (const key of ['fight_with_carried', 'make_kit_here', 'make_one_here', 'make_leather_here', 'return_for_kit']) if (tree[key]) tree[key].description += says;
+        for (const key of ['fight_with_carried', 'make_kit_here', 'make_one_here', 'make_arms_here', 'make_leather_here', 'return_for_kit']) if (tree[key]) tree[key].description += says;
       }
       // The End next (end-supplies.js sets preparingEnd): the dragon's hits
       // through what is worn, and what the rehearsals wore (note 1340).
@@ -416,7 +429,7 @@ async function kitChoice(bot, task, goal, save, actions, missing, { client, mob,
       if (decision.stale) return false;
       pick = decision.path.at(-1);
     }
-    goal.combatKit = { pick, sig, missing, at: now, here, away, ...(pick === 'make_one_here' ? { one } : {}) }; save();
+    goal.combatKit = { pick, sig, missing, at: now, here, away, ...(pick === 'make_one_here' ? { one } : {}), ...(pick === 'make_arms_here' ? { arms } : {}) }; save();
   }
   if (pick === 'fight_with_carried') {
     // For the fight at hand, not the half hour (note 1997): the pieces are
@@ -445,6 +458,18 @@ async function kitChoice(bot, task, goal, save, actions, missing, { client, mob,
     }
     goal.step = { action: 'prepare_combat_equipment', destination: one.destination, item: one.item }; save();
     await actions.acquireStep(bot, task, one.item, countOf(bot, one.item) + 1, goal, save);
+    return false;
+  }
+  if (pick === 'make_arms_here') {
+    const next = (arms || []).find(p => missing.includes(p.destination));
+    // Both made: the armour is gone without for now, as chosen.
+    if (!next) {
+      for (const destination of missing) setAside(goal, 'rung', PIECE_RUNG[destination][0], 'Jev chose the sword and shield and to fight with what is carried', 1800000);
+      delete goal.combatKit; save();
+      return true;
+    }
+    goal.step = { action: 'prepare_combat_equipment', destination: next.destination, item: next.item }; save();
+    await actions.acquireStep(bot, task, next.item, countOf(bot, next.item) + 1, goal, save);
     return false;
   }
   if (pick === 'make_leather_here') {

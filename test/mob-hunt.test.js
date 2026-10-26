@@ -2477,3 +2477,18 @@ test('a far site for string is walked in legs of 64 blocks, and a leg that made 
   assert.ok(Math.abs(legs[0].x - (start + 64)) <= 1, `the leg ends 64 on, at ${legs[0].x}`);
   assert.equal(isSetAside(goal, 'mineshaft_webs', '300,0'), false, 'ground made: not set aside');
 });
+
+test('with the sword and shield among the pieces short, they are offered alone beside one piece and the whole kit, and made (note 2141)', async () => {
+  const { bot, slots, goal, task } = fixture('skeleton');
+  bot.game.dimension = 'overworld';
+  for (const slot of [5, 6, 7, 8, 45]) slots[slot] = null;
+  slots[36] = { name: 'stone_sword', slot: 36, count: 1, type: registry.itemsByName.stone_sword.id, durabilityUsed: 0 };
+  slots[20] = { name: 'stone_pickaxe', slot: 20, count: 1, type: registry.itemsByName.stone_pickaxe.id, durabilityUsed: 0 };
+  const asked = [], fetched = [];
+  const client = { systemOne: async ({ questions }) => { asked.push(questions.branch_0.criteria); return { answers: { branch_0: { choice: 'make_arms_here', confidence: 0.9 } } }; } };
+  const actions = { acquireStep: async (b, t, item) => { fetched.push(item); } };
+  assert.equal(await prepareCombatGear(bot, task, goal, () => {}, actions, { client }), false);
+  assert.match(asked[0].make_arms_here, /^Make iron sword and shield alone here first: 3 iron ingots \(0 carried\) and six planks, the armour left for later\. An iron sword takes 6 of a blaze's 20 health a swing \(a stone sword 5, the fist 1\), and a shield raised takes a fireball whole and its fire with it; a sword is carried now\./);
+  assert(asked[0].make_one_here && asked[0].make_kit_here);
+  assert.deepEqual(fetched, ['iron_sword']);
+});
