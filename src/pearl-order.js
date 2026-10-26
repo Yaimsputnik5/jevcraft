@@ -263,7 +263,8 @@ async function ask(bot, task, goal, save, actions = {}, { now = Date.now() } = {
   const { tree: options, overlap: shared } = tree(bot, goal, r, now);
   const prev = goal.pearlOrder;
   if (prev) record.settle(goal, prev, { pearls: count(bot, 'ender_pearl'), deaths: deathsSince(goal, prev.at, now), now });
-  const state = { dimension: dimensionOf(bot), askedBecause: because || 'not asked before', ...shared, health: Math.round((bot.health ?? 20) * 10) / 10, hunger: bot.food ?? 20,
+  let stints = ''; try { stints = require('./nether-record').stintsSays(bot, goal, now); } catch (_) { stints = ''; }
+  const state = { dimension: dimensionOf(bot), askedBecause: because || 'not asked before', ...shared, ...(stints ? { netherStays: stints } : {}), health: Math.round((bot.health ?? 20) * 10) / 10, hunger: bot.food ?? 20,
     holds: 'the answer holds half an hour; a pearl way is the step while it stays real from here, the rods again after; asked again when a way not on offer now becomes real, after a death, or when the half hour is out' };
   // The rods carried asked on their own first (rod-bank.js askBank, note
   // 871), here too (note 894): a pearl way holds half an hour, and 25593

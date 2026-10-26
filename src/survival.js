@@ -10909,6 +10909,8 @@ class Survival {
     const bot = this.bot;
     // A death Jev chose to start over (respawn-fresh.js, note 2173): the survival layer stands down for it.
     if (require('./respawn-fresh').standing(goal)) return false;
+    // The Nether stays kept as they happen (note 2245): said on the questions that spend Nether time.
+    try { require('./nether-record').noteStint(bot, goal); } catch (_) { /* no record */ }
     // The survival layer has the turn: what the watchdogs held for it is met.
     takeTurn(bot, 'survival', 'step');
     bot._airAbort = false; bot._threatAbort = false;
