@@ -12681,6 +12681,8 @@ class Survival {
           o.description += ` ${other.choice.replaceAll('_', ' ')} was answered here ${Math.max(1, Math.round((Date.now() - other.at) / 1000))} seconds ago; this answer goes the other way from it.`;
       }
     }
+    // This respawn point's record (respawn-record.js, note 2210): how the lives that began at the bed went.
+    { const rr = require('./respawn-record').respawnSays(this.state); if (rr) state.respawnRecord = rr; }
     // Next to no armour on at night in the Overworld: each answer says what it came to in the record (night-record.js, note 1228).
     if (night(bot) && /overworld/.test(String(bot.game?.dimension || 'overworld'))) {
       const nr = require('./night-record');
@@ -12814,15 +12816,19 @@ function bedAfterSleepTree(bot, state, now = Date.now(), { bedNow = null, goal =
   // This run's own nights (night-ahead.js runNightsSays, note 2180); the fleet's paragraph (note 2145) is dropped
   // (note 2185, Fable 10-26: the options ran to 600 characters and a small model does not read that).
   let nights = ''; try { nights = require('./night-ahead').runNightsSays(goal); } catch (_) { nights = ''; }
+  // The bed's own record as the respawn (respawn-record.js, note 2210), on every way.
+  let respawnRecord = ''; try { respawnRecord = require('./respawn-record').respawnSays(state, now) || ''; } catch (_) { respawnRecord = ''; }
   // The order (note 2185): the way that changes nothing about the respawn first, then the carried bed, then leaving
   // it; and the carried bed's text says the run's upside, not the one night's downside alone: slept in each night, the
   // respawn follows the work. take_bed_along was offered 6 times on 2026-10-26 morning and taken 0; full-3 waited 21.8
   // hours of nights out with its bed standing far off.
-  return {
+  const tree = {
     ...(bedNow ? { second_bed: { description: `Leave this bed standing as the respawn and make another to carry, from what is carried (${bedNow.from}), crafts alone, a few seconds: nothing about the respawn changes now, and the next night is slept in the carried bed wherever it comes. A bed slept in becomes the respawn, so from that night on the respawn is where the bot last slept, near the work.${nights}`, run: async () => {} } } : {}),
     take_bed_along: { description: `Take the bed up and carry it: the next night is slept in it wherever it comes, no more wool needed, and a bed slept in becomes the respawn, so carried and slept in each night the respawn follows the work: over a run that is the nearer respawn, not the farther. Until it is next slept in the respawn is the world spawn${toSpawn != null ? `, ${toSpawn} blocks from here` : ''}: a death before that comes back there with nothing. This run's deaths in the last two hours: ${recent}.${nights}`, run: async () => {} },
     leave_as_respawn: { description: `Leave the bed standing here as the respawn: a death comes back to life here however far the work goes, and the walk back is from here. ${next[0].toUpperCase()}${next.slice(1)}. Left here, each night away from it is waited out awake, not slept.${nights}${(() => { try { return require('./death-places').deathsNearSays(bot, p, { what: 'this bed' }); } catch (_) { return ''; } })()}`, run: async () => {} },
   };
+  if (respawnRecord) for (const o of Object.values(tree)) if (o && typeof o.description === 'string') o.description += ` ${respawnRecord}`;
+  return tree;
 }
 function underRock(bot, refuge = null) {
   if (bot.game?.dimension !== 'overworld' || !bot.entity?.position) return false;
