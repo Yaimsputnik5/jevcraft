@@ -2488,7 +2488,7 @@ test('with the sword and shield among the pieces short, they are offered alone b
   const client = { systemOne: async ({ questions }) => { asked.push(questions.branch_0.criteria); return { answers: { branch_0: { choice: 'make_arms_here', confidence: 0.9 } } }; } };
   const actions = { acquireStep: async (b, t, item) => { fetched.push(item); } };
   assert.equal(await prepareCombatGear(bot, task, goal, () => {}, actions, { client }), false);
-  assert.match(asked[0].make_arms_here, /^Make iron sword and shield alone here first: 3 iron ingots \(0 carried\) and six planks, the armour left for later\. An iron sword takes 6 of a blaze's 20 health a swing \(a stone sword 5, the fist 1\), and a shield raised takes a fireball whole and its fire with it; a sword is carried now\./);
+  assert.match(asked[0].make_arms_here, /^Make iron sword and shield alone here first: 3 iron ingots \(0 carried\) and six planks, the armour left for later\. An iron sword takes 6 of a skeleton's 20 health a swing \(a stone sword 5, the fist 1\), and a shield raised takes an arrow whole; a sword is carried now\./);
   assert(asked[0].make_one_here && asked[0].make_kit_here);
   assert.deepEqual(fetched, ['iron_sword']);
 });

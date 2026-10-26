@@ -354,7 +354,12 @@ async function kitChoice(bot, task, goal, save, actions, missing, { client, mob,
     if (arms.length && here.length > arms.length) {
       const iron = arms.reduce((n, p) => n + (p.item === 'iron_sword' ? 2 : 1), 0), planks = arms.some(p => p.item === 'shield') ? ' and six planks' : '';
       const swordNow = (bot.inventory?.items?.() || []).some(i => /_sword$/.test(i.name));
-      tree.make_arms_here = { description: `Make ${listed(arms.map(p => words(p.item)))} alone here first: ${iron} iron ingot${iron === 1 ? '' : 's'} (${carriedIron} carried)${planks}, the armour left for later. An iron sword takes 6 of a blaze's 20 health a swing (a stone sword 5, the fist 1), and a shield raised takes a fireball whole and its fire with it; ${swordNow ? 'a sword is carried now' : 'no sword is carried now'}.${k.hereIron ? ironNearSays(bot, iron - carriedIron) : ''}` };
+      // The mob at hand named with its health (note 2152): full-6 (2026-10-26
+      // 05:03:44Z) read 'a blaze's 20 health' against a spider.
+      let mobHealth = null; try { mobHealth = mob ? require('./combat-estimate').MOBS[mob]?.health ?? null : null; } catch (_) { mobHealth = null; }
+      const swingSays = mob && mobHealth ? `An iron sword takes 6 of a ${words(mob)}'s ${mobHealth} health a swing (a stone sword 5, the fist 1)` : 'An iron sword takes 6 health a swing (a stone sword 5, the fist 1)';
+      const shieldSays = mob === 'blaze' ? 'a shield raised takes a fireball whole and its fire with it' : mob === 'skeleton' ? 'a shield raised takes an arrow whole' : mob === 'creeper' ? 'a shield raised takes the blast' : 'a shield raised takes a blow whole from the side it faces';
+      tree.make_arms_here = { description: `Make ${listed(arms.map(p => words(p.item)))} alone here first: ${iron} iron ingot${iron === 1 ? '' : 's'} (${carriedIron} carried)${planks}, the armour left for later. ${swingSays}, and ${shieldSays}; ${swordNow ? 'a sword is carried now' : 'no sword is carried now'}.${k.hereIron ? ironNearSays(bot, iron - carriedIron) : ''}` };
     }
     const leather = leatherPieces(bot, missing);
     if (leather.length) {
