@@ -53,6 +53,21 @@ const IDLE_OPTIONS = [
 // lava: 895 asks and 432 plan changes on 172 portal rungs, 199 of them the
 // fetch's own (2026-09-30T17:00Z to 2026-10-01T04:58Z).
 define({
+  id: 'mining_depth', area: 'resources', parent: 'rung_progress', kind: 'mining', primitive: 'choice', stakes: 'low', tree: true,
+  question: 'Ore is wanted and some is in view well above the depth the game puts most of it at: mine the nearest in view, or dig down to the depth first and tunnel there?',
+  trigger: 'At the mine step for an ore with a depth of its own (iron, diamonds, and the rest the plan gives a depth), six or more wanted, ore in view within 48 blocks, and the bot more than 24 blocks above that depth; the answer holds twenty minutes for the ore (note 2121).',
+  source: 'src/work.js (mineAtSource, miningDepthChoice), src/ore-depth.js',
+  instructions: {
+    task: 'The bot wants a good many of an ore. Choose whether it mines what is in view where it stands or goes down to the depth the ore is thickest at first.',
+    guidance: 'Each way says what is in view and where, how far above the ore\'s depth the bot stands, the digging down and the climb back in seconds, this run\'s own ore found per hour of mining by depth where it has mined, the fresh runs\' record otherwise, and the game\'s placement of the ore by height. The goal is the fastest dragon kill: weigh the ore an hour against the digging and the climb.',
+  },
+  options: [
+    { key: 'nearest_ore', label: 'mine the nearest ore in view and on through what is in view up here', when: 'always; said with the nearest\'s distance and height, how many are in view by depth band, and the records', level: 'root' },
+    { key: 'down_to_depth', label: 'dig down to the ore\'s depth first and tunnel for it there', when: 'always; said with the blocks down, the seconds digging and climbing back, the climbs of the last hour, and the records', level: 'root' },
+  ],
+});
+
+define({
   overworldOnly: true,
   id: 'portal_plan', area: 'work', parent: 'rung_progress', kind: 'strategy', primitive: 'choice', stakes: 'medium', tree: true,
   question: 'The plan for the portal into the Nether: which whole route, each with where the frame stands, the lava it is cast from and how that lava is got there, the buckets and the water, priced end to end; or a frame of obsidian, or a remembered ruined portal finished?',

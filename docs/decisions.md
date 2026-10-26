@@ -8,7 +8,7 @@ One rule holds for every question about playing the game (`src/decisions/unchang
 
 Three more rules from note 749 (`src/decisions/loops.js`, `src/decisions/keys.js`, `src/intention.js`). A key names its thing: every dynamic option says what its key names (`names`: by name, by where it is, by entity id), never its place in the list, so what came of an option is said on the same thing at the next asking. A question asked round and round goes up: its askings each within a minute of the one before are its spell, said from the third (`spellSoFar`: how many, what was answered, how far the bot walked and how far it is from where they began, whether anything new is carried, how often none of the options was good); when none good was Jev's likeliest at three of its last five askings, or six askings over ninety seconds or more have left the bot within 48 blocks of where they began with nothing new carried, the answers it gave rest from there and the question above is asked with that said (not the stance, the body's way, the shield or the routing, which are said only). And a trip holds: an answer to a question about the plan whose option walks to a target, or whose catalogue entry says where it goes (`trip`), is the intention until it arrives, is done, fails, the dimension changes, health falls a blow's worth, a walk brings nothing for three minutes or ten minutes pass; its own question asked again offers only it. A rung set aside holds the same way (`src/decisions/asides.js`): an option that would take it back (`takeBack` on its node) is not offered for five minutes unless the bot is 16 blocks from where it was set aside, carries a new kind of thing or its health band changes (`asideHolds`). An answer thrown away as stale that keeps on with what is under way is kept, and from the second stale answer in a row within 30 seconds a question is watched a second first and not sent while its facts are still changing.
 
-118 questions: 68 decision trees and 50 batched questions.
+119 questions: 69 decision trees and 50 batched questions.
 
 ## Batches
 
@@ -947,77 +947,23 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | `keep_here` | root | put the eyes in a chest here, then the errand | always here; said with the chest, what a death does to what is carried, when they are taken out again and the record of eyes lost |
 | `carry_on` | root | go on the errand with the eyes in the pack | always here; said with what a death takes and the record of eyes lost |
 
-## work
-
-### `portal_plan`
-
-**The plan for the portal into the Nether: which whole route, each with where the frame stands, the lava it is cast from and how that lava is got there, the buckets and the water, priced end to end; or a frame of obsidian, or a remembered ruined portal finished?**
-
-- When: In the Overworld on the way to the Nether, with no lit portal known: asked when no plan is held, and again only when a named fact changes, said in askedAgainBecause: the route held failed (the walks to its lava came no nearer, its frame cannot be got back to, the frame fails at its site, the staircase to its lava rests, its pool is found with no lava or its way rests, its lava layer's headings fail from here, the portal's own steps trade the turn, or a stall's answer said so: replan_portal), lava is found that was not known when it was chosen and lies nearer the frame (or the bot, none begun) than its lava, the frame begun loses obsidian or is gone, buckets are lost, a death comes, or its own stated minutes are worked through with no portal lit. Kept or repaired at a frame failing at its site, the answer holds through the next failures of the same kind until a block goes in, a failure of another kind comes or three minutes pass (commit.js, note 767). While a plan is held the lava fetch goes only to the plan's lava (obsidian.js collectLava).
-- Decision tree, choice; stakes medium; ledger kind `strategy`
-- Bar: none
-- Jev unreachable: no fallback: nothing is decided by code; the bot holds, says once that it is waiting for Jev, asks again with a backoff, and asks it fresh when Jev answers
-- Options built in: src/work.js (portalMethod, planRoutes, routeSays, planDueNow), src/portal-plan.js (priceCast, planDue, planFailed), src/obsidian.js (collectLava, lavaPickNow)
-- Asked only on the Overworld (its words speak of the day, the night, beds or the surface; asked elsewhere, the tests fail: note 677)
-- Nothing left to try: asks `rung_progress` next up, with this one's failure said
-
-| Option | Level | What it is | Offered when |
-| --- | --- | --- | --- |
-| `here_(pool_[0-9]+\|deep\|sight)` (pattern: names the frame begun (or, none begun, a frame near where the bot stands) and its lava: a pool by the number given when first offered (keys.js), the lava layer, or the lava in sight) | root | cast the frame here (the frame begun, or near where the bot stands), its lava carried from the lava named | for each lava offered: the two pools known (not spent, the way into them not resting, within 512 blocks) whose route is shortest, the pool the plan holds, the lava in sight not a pool's, and the lava layer by the first heading down open from here; each said with the frame's site, the lava and how it is got there (walked, or a staircase dug where its walk did not get there), the buckets (carried, and more made first from the iron carried where that shortens the route, both said), the water, the price end to end (getting there, each trip there and back from the frame at the record's pace or as the trips made so far took, the buckets made, the cast at about twelve seconds a block), the blocks dug, the risk, and the lava's record and the plan's failures on it |
-| `beside_(pool_[0-9]+\|deep\|sight)` (pattern: names the lava the frame is cast beside, as here_) | root | cast a frame beside the lava named, the frame begun (if any) left as it stands | the lava more than sixteen blocks from the frame begun (or the bot, none begun), or the lava layer more than sixteen below; said as here_, the getting there walked or dug, each trip a scoop and a few blocks' walk, and what a frame begun left throws away |
-| `new_site_(pool_[0-9]+\|deep\|sight)` (pattern: names the lava, as here_) | root | leave the frame begun as it stands and cast a new one at another site near here, its lava from the lava named | a frame begun that fails at its site or cannot be got back to; said as here_, with the blocks cast there that are lava buckets again here |
-| `clear_blocker` | root | keep the route and repair this site: dig out what blocks the line into the slot it failed at | a cast frame with obsidian in it failed at its site at a slot, and blocks stand between the open cells beside that slot and its open top (portal-cast.js blockersFor); said with each block (note 767). Chosen, it holds through the next failures of the same kind until a block goes in or three minutes pass (commit.js) |
-| `other_stand` | root | keep the route and repair this site: pour into the slot it failed at from another stand than the ones tried | a cast frame with obsidian in it failed at its site at a slot where stands were tried, and with those passed over a stand remains, or one to make or dig out; said with the stands tried and the ways left (note 767). Holds as clear_blocker does |
-| `into_cave` | root | keep the route and go down into the cave the staircase to its lava stopped over, and go on from its floor | the staircase to the lava held rests over a cave under its next stair, and the fall to its floor or water costs less than half the health (note 490) |
-| `look_for_pool` | root | look for a lava pool at the surface before going down for the deep lava | in the Overworld with no lava known but the deep layer's and no ruined portal known, ground not yet walked within reach, and fewer than four such looks made; one leg of exploring (the climb back to open sky first where the bot is under rock), a pool or a ruined portal seen on the way noted, and the plan asked again after it (note 1083) |
-| `build_new` | root | build a frame of its own from ten obsidian | always; said as the steps it is: obsidian made at lava and mined with a diamond pickaxe, the trip, and the cast's trips beside it |
-| `ruin_\d+` (pattern: names the ruined portal, by the number it was given when first offered, kept for it (keys.js)) | root | finish and light a remembered ruined portal | a ruined portal remembered within 512 blocks, not found frameless (and the one held, however far) |
-
-### `portal_way`
-
-**The portal the bot is making for cannot be reached from here: the walk, the boat and the staircase have failed. Make a portal here, go back the way the bot came in, climb to its height, go round another way, dig a tunnel straight at it through the rock, cross straight at it (with blocks mined first where short), take the boat again, or other work until the staircase's rest ends?**
-
-- When: On the way to a remembered portal or one in view (the crossing into the Nether, or the way back from it), when the walk made no ground and the staircase toward it rests or stalls; asked once for each rest from each place (its eight-block area and height), the answer kept (said as every way resting when met again). A way chosen from a place that moved the bot under four blocks and no nearer is not offered from there again for five minutes in that rest, and is said (triedFromHereToNothing); with every way so tried, the way rests and is not asked.
-- Decision tree, choice; stakes medium; ledger kind `strategy`
-- Bar: none
-- Jev unreachable: no fallback: nothing is decided by code; the bot holds, says once that it is waiting for Jev, asks again with a backoff, and asks it fresh when Jev answers
-- Options built in: src/work.js (walkToKnownPortal, portalWay, lineSays)
-- Nothing left to try: asks `rung_progress` next up, with this one's failure said
-
-| Option | Level | What it is | Offered when |
-| --- | --- | --- | --- |
-| `portal_here` | root | make a portal here instead, the one remembered passed over | in the Overworld, always (the way it is made is then asked: portal_plan); in the Nether, ten obsidian, a lighter and three blocks carried |
-| `climb_here` | root | pillar straight up to the portal's height near where the bot stands, and the way across asked again from the top | the portal is three or more blocks up, a column within five blocks has no lava or water in or beside it, and blocks to lay are carried; said with the height, the blocks against those carried, how far across the portal is from the top, and the fall a push would be |
-| `around_left` | root | a leg of thirty-two blocks on foot to the left of the heading, and the way asked again from there | always |
-| `around_right` | root | a leg of thirty-two blocks on foot to the right of the heading, and the way asked again from there | always |
-| `floor_way` | root | go down to the floor below and walk it toward the portal, bridging only across lava and open air on it | in the Nether, ground four or more below under eight or more of the sixty-four columns round the bot, a way down to it found within thirty-two blocks (walked, dropped no more than a body takes at half its health, or stepped down through rock with a pickaxe), and eight or more cells of floor on the line toward the portal; said with the way down (steps, drops and their damage, rock dug, seconds), the floor on that line (floor to walk, rises, drops, lava on it, open air, wall, blocks to lay against those carried, the mobs by it) and the height back up to the portal |
-| `blocks_then_cross` (trip: netherrack dug about here, then the crossing) | root | mine netherrack for blocks here first, then cross straight at the portal at this height with them | in the Nether, a pickaxe carried, the block gather not resting, the crossing straight at the portal not resting from here, and its next stretch laying more blocks than are carried; said with the blocks it lays against those carried, the reserve mined, and the crossing with them (its cells, rock dug, blocks laid over air and over lava, seconds, and where it stops) |
-| `tunnel_home` (trip: the tunnel dug toward the portal) | root | dig a tunnel straight at the portal through the rock, two high, stepping down or up to its level, a floor laid over open air, round any lava met; up to 96 blocks a go | in the Nether, more than six blocks from the portal across; by hand where no pickaxe is carried, said with its pace, the blocks carried for the floor, and the arena's measure (bridging.js tunnelStraight, note 860) |
-| `walk_open` | root | walk to the portal by the pathfinder's ordinary rules for twenty minutes, the rods' own walking rules set aside | in the Nether with blaze rods carried and the rods' rules on; said with the portal's distance, the walk's minutes, what the rules were from, and the run's own deaths and minutes a rod (note 2110) |
-| `dig_across` | root | straight at the portal now at this height, rock dug (by hand with no pickaxe) and a block laid over open air, as far as a stretch goes, then the way asked again | in the Nether, the crossing straight at the portal not resting and making a block or more of ground; said with the crossing's cells, rock, blocks and seconds (note 751b) |
-| `pickaxe_first` | root | get the pickaxe the staircase to the portal wants first, from wood not carried, then the staircase | in the Nether, no pickaxe carried or to be made from the pockets and the staircase too long to dig by hand; said with the stems known and the way there, or that none is known and the search is blind; before it, the way back went for wood unasked (25598, note 751b) |
-| `the_way_in` | root | back the way the bot came in: the cells it stood on since it came through the portal (loops cut) and its own laid spans, walked in legs of twelve cells by the pathfinder | in the Nether with blaze rods carried, a cell of the way kept within eight blocks, and the way back along it not resting from a stop in the last two minutes (note 762); said with its cells, those on its own laid blocks, how far off the nearest is, whether it begins at the portal, the blocks it runs, and its cells beside lava or a drop |
-| `boat_again` | root | the boat again, its failure or the walk chosen over it set aside | in the Overworld, the boat failed or was declined here and rests |
-| `wait_rest` | root | other work until the staircase's rest ends, the minutes said | the staircase toward the portal rests until a time; a wait: it names what it waits for and when (src/waits.js), and is not offered where that cannot come or its coming changes nothing, said in waitsForNothing (note 698) |
-
-### `sculk_work`
-
-**The work is within reach of sculk (a sensor that hears the bot, or a shrieker that calls a warden): carry on as now, carry on crouched, or take the work out of its reach?**
-
-- When: Between work steps in the Overworld, with Jev reachable, when the bot is within a sculk sensor's hearing (eight blocks) or sixteen blocks of a shrieker that can call a warden; once per patch, the answer held five minutes.
-- Decision tree, choice; stakes high; ledger kind `upkeep`
-- Bar: none: Jev's pick is taken at any confidence: every answer is held only five minutes, so a close call is soon asked again, and the warden is not a rule code can weigh for it
-- Jev unreachable: no fallback: nothing is decided by code; the bot holds, says once that it is waiting for Jev, asks again with a backoff, and asks it fresh when Jev answers
-- Options built in: src/work.js (sculkStep)
-- Nothing left to try: the stall's question, as before (nothing above it)
-
-| Option | Level | What it is | Offered when |
-| --- | --- | --- | --- |
-| `carry_on` | root | carry on here as now | always |
-| `work_crouched` | root | carry on here, walking crouched | always; five minutes crouched, a third of walking speed, digging and placing still heard |
-| `move_away` | root | take the work out of the sculk's reach | a standing place out of every sensor's hearing within thirty-two blocks; its lava and remembered places within sixteen blocks passed over for thirty minutes |
-
 ## resources
+
+### `mining_depth`
+
+**Ore is wanted and some is in view well above the depth the game puts most of it at: mine the nearest in view, or dig down to the depth first and tunnel there?**
+
+- When: At the mine step for an ore with a depth of its own (iron, diamonds, and the rest the plan gives a depth), six or more wanted, ore in view within 48 blocks, and the bot more than 24 blocks above that depth; the answer holds twenty minutes for the ore (note 2121).
+- Decision tree, choice; stakes low; ledger kind `mining`
+- Bar: none
+- Jev unreachable: no fallback: nothing is decided by code; the bot holds, says once that it is waiting for Jev, asks again with a backoff, and asks it fresh when Jev answers
+- Options built in: src/work.js (mineAtSource, miningDepthChoice), src/ore-depth.js
+- Nothing left to try: asks `rung_progress` next up, with this one's failure said
+
+| Option | Level | What it is | Offered when |
+| --- | --- | --- | --- |
+| `nearest_ore` | root | mine the nearest ore in view and on through what is in view up here | always; said with the nearest's distance and height, how many are in view by depth band, and the records |
+| `down_to_depth` | root | dig down to the ore's depth first and tunnel for it there | always; said with the blocks down, the seconds digging and climbing back, the climbs of the last hour, and the records |
 
 ### `resource_source`
 
@@ -1373,6 +1319,76 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | --- | --- | --- | --- |
 | `buy_[a-z_]+_\d+` (pattern: names the trade, by the item bought and its place in the villager's own list of trades (fixed for that villager)) | root | buy this item with emeralds | the output is something the run needs (pearls, arrows, a bow, better armour or tools, food when short) and the emeralds are carried |
 | `sell_[a-z_]+_\d+` (pattern: names the trade, by the item sold and its place in the villager's own list of trades (fixed for that villager)) | root | sell spare items for emeralds | the input is carried beyond what is kept back, and fewer than forty emeralds are carried |
+
+## work
+
+### `portal_plan`
+
+**The plan for the portal into the Nether: which whole route, each with where the frame stands, the lava it is cast from and how that lava is got there, the buckets and the water, priced end to end; or a frame of obsidian, or a remembered ruined portal finished?**
+
+- When: In the Overworld on the way to the Nether, with no lit portal known: asked when no plan is held, and again only when a named fact changes, said in askedAgainBecause: the route held failed (the walks to its lava came no nearer, its frame cannot be got back to, the frame fails at its site, the staircase to its lava rests, its pool is found with no lava or its way rests, its lava layer's headings fail from here, the portal's own steps trade the turn, or a stall's answer said so: replan_portal), lava is found that was not known when it was chosen and lies nearer the frame (or the bot, none begun) than its lava, the frame begun loses obsidian or is gone, buckets are lost, a death comes, or its own stated minutes are worked through with no portal lit. Kept or repaired at a frame failing at its site, the answer holds through the next failures of the same kind until a block goes in, a failure of another kind comes or three minutes pass (commit.js, note 767). While a plan is held the lava fetch goes only to the plan's lava (obsidian.js collectLava).
+- Decision tree, choice; stakes medium; ledger kind `strategy`
+- Bar: none
+- Jev unreachable: no fallback: nothing is decided by code; the bot holds, says once that it is waiting for Jev, asks again with a backoff, and asks it fresh when Jev answers
+- Options built in: src/work.js (portalMethod, planRoutes, routeSays, planDueNow), src/portal-plan.js (priceCast, planDue, planFailed), src/obsidian.js (collectLava, lavaPickNow)
+- Asked only on the Overworld (its words speak of the day, the night, beds or the surface; asked elsewhere, the tests fail: note 677)
+- Nothing left to try: asks `rung_progress` next up, with this one's failure said
+
+| Option | Level | What it is | Offered when |
+| --- | --- | --- | --- |
+| `here_(pool_[0-9]+\|deep\|sight)` (pattern: names the frame begun (or, none begun, a frame near where the bot stands) and its lava: a pool by the number given when first offered (keys.js), the lava layer, or the lava in sight) | root | cast the frame here (the frame begun, or near where the bot stands), its lava carried from the lava named | for each lava offered: the two pools known (not spent, the way into them not resting, within 512 blocks) whose route is shortest, the pool the plan holds, the lava in sight not a pool's, and the lava layer by the first heading down open from here; each said with the frame's site, the lava and how it is got there (walked, or a staircase dug where its walk did not get there), the buckets (carried, and more made first from the iron carried where that shortens the route, both said), the water, the price end to end (getting there, each trip there and back from the frame at the record's pace or as the trips made so far took, the buckets made, the cast at about twelve seconds a block), the blocks dug, the risk, and the lava's record and the plan's failures on it |
+| `beside_(pool_[0-9]+\|deep\|sight)` (pattern: names the lava the frame is cast beside, as here_) | root | cast a frame beside the lava named, the frame begun (if any) left as it stands | the lava more than sixteen blocks from the frame begun (or the bot, none begun), or the lava layer more than sixteen below; said as here_, the getting there walked or dug, each trip a scoop and a few blocks' walk, and what a frame begun left throws away |
+| `new_site_(pool_[0-9]+\|deep\|sight)` (pattern: names the lava, as here_) | root | leave the frame begun as it stands and cast a new one at another site near here, its lava from the lava named | a frame begun that fails at its site or cannot be got back to; said as here_, with the blocks cast there that are lava buckets again here |
+| `clear_blocker` | root | keep the route and repair this site: dig out what blocks the line into the slot it failed at | a cast frame with obsidian in it failed at its site at a slot, and blocks stand between the open cells beside that slot and its open top (portal-cast.js blockersFor); said with each block (note 767). Chosen, it holds through the next failures of the same kind until a block goes in or three minutes pass (commit.js) |
+| `other_stand` | root | keep the route and repair this site: pour into the slot it failed at from another stand than the ones tried | a cast frame with obsidian in it failed at its site at a slot where stands were tried, and with those passed over a stand remains, or one to make or dig out; said with the stands tried and the ways left (note 767). Holds as clear_blocker does |
+| `into_cave` | root | keep the route and go down into the cave the staircase to its lava stopped over, and go on from its floor | the staircase to the lava held rests over a cave under its next stair, and the fall to its floor or water costs less than half the health (note 490) |
+| `look_for_pool` | root | look for a lava pool at the surface before going down for the deep lava | in the Overworld with no lava known but the deep layer's and no ruined portal known, ground not yet walked within reach, and fewer than four such looks made; one leg of exploring (the climb back to open sky first where the bot is under rock), a pool or a ruined portal seen on the way noted, and the plan asked again after it (note 1083) |
+| `build_new` | root | build a frame of its own from ten obsidian | always; said as the steps it is: obsidian made at lava and mined with a diamond pickaxe, the trip, and the cast's trips beside it |
+| `ruin_\d+` (pattern: names the ruined portal, by the number it was given when first offered, kept for it (keys.js)) | root | finish and light a remembered ruined portal | a ruined portal remembered within 512 blocks, not found frameless (and the one held, however far) |
+
+### `portal_way`
+
+**The portal the bot is making for cannot be reached from here: the walk, the boat and the staircase have failed. Make a portal here, go back the way the bot came in, climb to its height, go round another way, dig a tunnel straight at it through the rock, cross straight at it (with blocks mined first where short), take the boat again, or other work until the staircase's rest ends?**
+
+- When: On the way to a remembered portal or one in view (the crossing into the Nether, or the way back from it), when the walk made no ground and the staircase toward it rests or stalls; asked once for each rest from each place (its eight-block area and height), the answer kept (said as every way resting when met again). A way chosen from a place that moved the bot under four blocks and no nearer is not offered from there again for five minutes in that rest, and is said (triedFromHereToNothing); with every way so tried, the way rests and is not asked.
+- Decision tree, choice; stakes medium; ledger kind `strategy`
+- Bar: none
+- Jev unreachable: no fallback: nothing is decided by code; the bot holds, says once that it is waiting for Jev, asks again with a backoff, and asks it fresh when Jev answers
+- Options built in: src/work.js (walkToKnownPortal, portalWay, lineSays)
+- Nothing left to try: asks `rung_progress` next up, with this one's failure said
+
+| Option | Level | What it is | Offered when |
+| --- | --- | --- | --- |
+| `portal_here` | root | make a portal here instead, the one remembered passed over | in the Overworld, always (the way it is made is then asked: portal_plan); in the Nether, ten obsidian, a lighter and three blocks carried |
+| `climb_here` | root | pillar straight up to the portal's height near where the bot stands, and the way across asked again from the top | the portal is three or more blocks up, a column within five blocks has no lava or water in or beside it, and blocks to lay are carried; said with the height, the blocks against those carried, how far across the portal is from the top, and the fall a push would be |
+| `around_left` | root | a leg of thirty-two blocks on foot to the left of the heading, and the way asked again from there | always |
+| `around_right` | root | a leg of thirty-two blocks on foot to the right of the heading, and the way asked again from there | always |
+| `floor_way` | root | go down to the floor below and walk it toward the portal, bridging only across lava and open air on it | in the Nether, ground four or more below under eight or more of the sixty-four columns round the bot, a way down to it found within thirty-two blocks (walked, dropped no more than a body takes at half its health, or stepped down through rock with a pickaxe), and eight or more cells of floor on the line toward the portal; said with the way down (steps, drops and their damage, rock dug, seconds), the floor on that line (floor to walk, rises, drops, lava on it, open air, wall, blocks to lay against those carried, the mobs by it) and the height back up to the portal |
+| `blocks_then_cross` (trip: netherrack dug about here, then the crossing) | root | mine netherrack for blocks here first, then cross straight at the portal at this height with them | in the Nether, a pickaxe carried, the block gather not resting, the crossing straight at the portal not resting from here, and its next stretch laying more blocks than are carried; said with the blocks it lays against those carried, the reserve mined, and the crossing with them (its cells, rock dug, blocks laid over air and over lava, seconds, and where it stops) |
+| `tunnel_home` (trip: the tunnel dug toward the portal) | root | dig a tunnel straight at the portal through the rock, two high, stepping down or up to its level, a floor laid over open air, round any lava met; up to 96 blocks a go | in the Nether, more than six blocks from the portal across; by hand where no pickaxe is carried, said with its pace, the blocks carried for the floor, and the arena's measure (bridging.js tunnelStraight, note 860) |
+| `walk_open` | root | walk to the portal by the pathfinder's ordinary rules for twenty minutes, the rods' own walking rules set aside | in the Nether with blaze rods carried and the rods' rules on; said with the portal's distance, the walk's minutes, what the rules were from, and the run's own deaths and minutes a rod (note 2110) |
+| `dig_across` | root | straight at the portal now at this height, rock dug (by hand with no pickaxe) and a block laid over open air, as far as a stretch goes, then the way asked again | in the Nether, the crossing straight at the portal not resting and making a block or more of ground; said with the crossing's cells, rock, blocks and seconds (note 751b) |
+| `pickaxe_first` | root | get the pickaxe the staircase to the portal wants first, from wood not carried, then the staircase | in the Nether, no pickaxe carried or to be made from the pockets and the staircase too long to dig by hand; said with the stems known and the way there, or that none is known and the search is blind; before it, the way back went for wood unasked (25598, note 751b) |
+| `the_way_in` | root | back the way the bot came in: the cells it stood on since it came through the portal (loops cut) and its own laid spans, walked in legs of twelve cells by the pathfinder | in the Nether with blaze rods carried, a cell of the way kept within eight blocks, and the way back along it not resting from a stop in the last two minutes (note 762); said with its cells, those on its own laid blocks, how far off the nearest is, whether it begins at the portal, the blocks it runs, and its cells beside lava or a drop |
+| `boat_again` | root | the boat again, its failure or the walk chosen over it set aside | in the Overworld, the boat failed or was declined here and rests |
+| `wait_rest` | root | other work until the staircase's rest ends, the minutes said | the staircase toward the portal rests until a time; a wait: it names what it waits for and when (src/waits.js), and is not offered where that cannot come or its coming changes nothing, said in waitsForNothing (note 698) |
+
+### `sculk_work`
+
+**The work is within reach of sculk (a sensor that hears the bot, or a shrieker that calls a warden): carry on as now, carry on crouched, or take the work out of its reach?**
+
+- When: Between work steps in the Overworld, with Jev reachable, when the bot is within a sculk sensor's hearing (eight blocks) or sixteen blocks of a shrieker that can call a warden; once per patch, the answer held five minutes.
+- Decision tree, choice; stakes high; ledger kind `upkeep`
+- Bar: none: Jev's pick is taken at any confidence: every answer is held only five minutes, so a close call is soon asked again, and the warden is not a rule code can weigh for it
+- Jev unreachable: no fallback: nothing is decided by code; the bot holds, says once that it is waiting for Jev, asks again with a backoff, and asks it fresh when Jev answers
+- Options built in: src/work.js (sculkStep)
+- Nothing left to try: the stall's question, as before (nothing above it)
+
+| Option | Level | What it is | Offered when |
+| --- | --- | --- | --- |
+| `carry_on` | root | carry on here as now | always |
+| `work_crouched` | root | carry on here, walking crouched | always; five minutes crouched, a third of walking speed, digging and placing still heard |
+| `move_away` | root | take the work out of the sculk's reach | a standing place out of every sensor's hearing within thirty-two blocks; its lava and remembered places within sixteen blocks passed over for thirty minutes |
 
 ## build
 

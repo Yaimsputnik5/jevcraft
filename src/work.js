@@ -1962,6 +1962,40 @@ function searchFor(goal, resource, here) {
 // the target is close or a stair gets nowhere.
 const { descentTargets } = require('./tunneling');
 const STAIRS_AT_A_TIME = 6;
+// Which depth to mine at, Jev's answer held for the stint (note 2121):
+// the nearest ore in view, or down to the ore's depth. -> 'nearest_ore' |
+// 'down_to_depth'
+const MINING_DEPTH_HOLD_MS = 20 * 60000;
+async function miningDepthChoice(bot, task, goal, save, step, candidates, now = Date.now()) {
+  const feet = bot.entity.position, depth = step.depth, above = Math.round(feet.y - depth);
+  if (above <= ORE_ABOVE) return 'nearest_ore';
+  const held = goal.miningDepth;
+  if (held && held.drops === step.drops && held.until > now) return held.pick;
+  const od = require('./ore-depth');
+  const nearest = candidates.slice().sort((a, b) => a.distanceTo(feet) - b.distanceTo(feet))[0];
+  const byBand = {};
+  for (const c of candidates) { const b = od.bandOf(c.y).label; byBand[b] = (byBand[b] || 0) + 1; }
+  const inView = Object.entries(byBand).map(([b, n]) => `${n} at ${b}`).join(', ');
+  const blockName = String(bot.blockAt(nearest)?.name || step.block).replaceAll('_', ' ');
+  const dropWord = String(step.drops || '').replaceAll('_', ' ');
+  const digSecs = Math.round(above * 1.5), climbSecs = Math.round(above * 3);
+  let climbed = null; try { climbed = climbsLatelySays(goal, now); } catch (_) { climbed = null; }
+  const record = od.runSays(goal, step.drops) || od.fleetSays();
+  const game = od.gameSays(step.drops);
+  const tree = {
+    nearest_ore: { description: `Mine the ${blockName} in view nearest, ${Math.round(nearest.distanceTo(feet))} blocks off at y ${nearest.y}, and on through what is in view: ${candidates.length} ${String(step.block).replaceAll('_', ' ')} within 48 blocks (${inView}). The bot stands at y ${Math.floor(feet.y)}, ${above} above the depth the game puts most ${dropWord} at (y ${depth}).${record}${game}`,
+      target: { x: nearest.x, y: nearest.y, z: nearest.z } },
+    down_to_depth: { description: `Dig down to y ${depth} first, about ${above} blocks, and tunnel for ${dropWord} there: about ${digSecs} seconds of digging down at the live tunnels' pace (about 40 blocks a minute with a pickaxe), the ore in view up here left, and a climb back of about ${above} blocks after (about ${climbSecs} seconds at the stair steps' 3 seconds a block).${climbed ? ` ${climbed}` : ''}${record}${game}` },
+  };
+  const decision = await decide('mining_depth', { client: task.opportunityClient, bot, task, goal, save, tree, target: tree.nearest_ore.target,
+    state: { ore: step.block, wanted: step.count ?? 1, standingAt: Math.floor(feet.y), depth, aboveDepth: above, inView: candidates.length, health: bot.health, food: bot.food,
+      holds: 'the answer holds twenty minutes for this ore, or until the bot is within 24 blocks of the depth' } });
+  if (decision.stale) return 'nearest_ore';
+  const pick = decision.path?.at(-1) === 'down_to_depth' ? 'down_to_depth' : 'nearest_ore';
+  goal.miningDepth = { pick, drops: step.drops, depth, at: now, until: now + MINING_DEPTH_HOLD_MS }; save?.();
+  if (pick === 'down_to_depth') bot.chat?.(`Down to y ${depth} for ${dropWord}: it is thicker there than up here.`);
+  return pick;
+}
 async function tunnelOrSetAside(bot, task, goal, save, target, resource, ore = null) {
   try {
     for (let i = 0; i < STAIRS_AT_A_TIME; i++) {
@@ -2829,7 +2863,17 @@ function oreToTunnel(found, feet, depth, count = Infinity) {
   return found.find(p => p.y <= depth + ORE_BAND) || null;
 }
 async function mineAtSource(bot, task, step, goal, save, selected) {
-  const candidates = selected ? [selected] : await miningCandidates(bot, task, step, goal);
+  let candidates = selected ? [selected] : await miningCandidates(bot, task, step, goal);
+  // The depth is Jev's (mining_depth, note 2121): with ore in view well above the ore's own depth and a good many
+  // wanted, the nearest in view or down to the depth, said with this run's ore per hour by depth and the game's
+  // placement. The nearest in view was the rule: the fresh runs mined iron at the surface at 31 to 71 an hour and at
+  // y 17 to 40 at 212 to 256, and spent 110 to 252 minutes in the slow bands against 22 to 36 in the rich one.
+  if (!selected && candidates.length && Number.isFinite(step.depth) && (step.count ?? 1) >= ORE_MANY && /_ore$/.test(String(step.block || ''))) {
+    try {
+      const pick = await miningDepthChoice(bot, task, goal, save, step, candidates);
+      if (pick === 'down_to_depth') candidates = [];
+    } catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
+  }
   if (!candidates.length) {
     // Not dug for where it is not: iron is not in the Nether. mid-242-f's
     // armour, fetched in the Nether, set a staircase down toward the iron's

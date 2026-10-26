@@ -714,6 +714,8 @@ function noteTrail(bot, goal, now = Date.now()) {
     const tally = ((goal.rungBuckets ||= {})[phase] ||= {});
     tally[bucket] = (tally[bucket] || 0) + step;
   }
+  // The ore found and the mining minutes by depth (ore-depth.js, note 2121).
+  try { require('./ore-depth').note(bot, goal, counted, trail.length ? Math.min(60000, now - trail.at(-1).at) : 0, now); } catch (_) { /* a tally only */ }
   trail.push({ at: now, x: Math.floor(p.x), y: Math.floor(p.y), z: Math.floor(p.z), doing: doing || null });
   if (trail.length > TRAIL_KEEP) trail.splice(0, trail.length - TRAIL_KEEP);
 }
