@@ -30,7 +30,7 @@ test('a rest held offers the wait itself; chosen, no work is reported and the st
     worked = await breakStillness(bot, new Task('still'), goal, () => {}, { client, reason: 'step:smelt', until, holding: { minutes: 2, why: '11 mutton cooking in the furnace at (104, 51, 505), taken out when done' },
       answers: { wood_reserve: { description: 'Gather wood for sticks and a table.', run: async () => {} } } });
   } finally { console.log = log; }
-  assert.equal(worked, false, 'the wait is no work done: the hold waits to the end');
+  assert.equal(worked, 'wait', 'the wait is its own answer: the hold waits to the end');
   assert.ok(asked, 'asked with two ways on offer');
   const text = asked.criteria.wait_it_out;
   assert.match(text, /^Wait here for the smelt's rest to end, about (79|80) seconds \(at \d\d:\d\d:\d\dZ\), set for: 11 mutton cooking in the furnace at \(104, 51, 505\), taken out when done; the step waiting smelts 11 cooked mutton in the furnace at \(104, 51, 505\), 1 blocks? from here: 3 of 11 done, about 80 seconds for the rest; set aside or walked from, they stay in the furnace, not carried\. Standing still spends no hunger; nothing is asked meanwhile but a threat that shows, and the work is taken up when the rest ends\. On 5 fresh runs \(2026-10-26 01:00 to 03:15Z\) this question came round 103 times while a batch smelted/);
@@ -59,6 +59,20 @@ test('on a smelt\'s hold the wait is offered though the hold is not idle (note 2
     worked = await breakStillness(bot, new Task('still'), goal, () => {}, { client, reason: 'smelt:cooked_mutton', until: Date.now() + 80000, holding: { minutes: 2, why: '11 mutton cooking', idle: false },
       answers: { wood_reserve: { description: 'Gather wood for sticks and a table.', run: async () => {} } } });
   } finally { console.log = log; }
-  assert.equal(worked, false);
+  assert.equal(worked, 'wait');
   assert.ok(asked?.criteria?.wait_it_out, 'the wait is on the smelt\'s hold');
+});
+
+test('the wait chosen holds the rest to its end and asks nothing above again (note 2146)', async () => {
+  const { holdForRest } = require('../src/work');
+  const { bot, goal } = world();
+  let asks = 0;
+  const client = { model: 'jev', systemOne: async ({ questions }) => { asks++; return { answers: Object.fromEntries(Object.keys(questions).map(k => [k, { choice: 'wait_it_out', confidence: 0.8 }])) }; } };
+  const logs = [], log = console.log; console.log = (...a) => logs.push(a.join(' '));
+  const t0 = Date.now(); let done;
+  try { done = await holdForRest(bot, new Task('hold'), goal, () => {}, { client, reason: 'smelt:cooked_mutton', until: Date.now() + 1500, why: '11 mutton cooking', idle: false, answers: undefined }); }
+  finally { console.log = log; }
+  assert.equal(done, true, 'the rest was held to its end');
+  assert.ok(Date.now() - t0 >= 1400, 'waited the rest out');
+  assert.ok(!logs.some(l => /has run out; the question above is asked again/.test(l)), logs.join('\n'));
 });

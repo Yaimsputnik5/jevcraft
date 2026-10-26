@@ -8375,6 +8375,9 @@ async function breakStillness(bot, task, goal, save, { client, survival, onStep 
     tree.wait_it_out = { description: `Wait here for the ${what}'s rest to end, about ${secs} second${secs === 1 ? '' : 's'} (at ${new Date(until).toISOString().slice(11, 19)}Z)${holding.why ? `, set for: ${String(holding.why).slice(0, 160)}` : ''}${job ? `; ${job}` : ''}. Standing still spends no hunger; nothing is asked meanwhile but a threat that shows, and the work is taken up when the rest ends. ${WAIT_IT_OUT_RECORD.says}`,
       waits: require('./waits').timer(`the ${what}'s rest to end`, until - now), run: async () => { waitedOut = true; } };
   }
+  // The wait alone on offer is nothing on offer: taken unasked it is not
+  // Jev's choice, and the hold says 'waiting for' as before (note 2146).
+  if (Object.keys(tree).length === 1 && tree.wait_it_out) return false;
   const options = Object.keys(tree);
   const stats = survival?.state || goal.survival || goal;
   // Work while a rest runs out is not the work standing still.
@@ -8455,8 +8458,8 @@ async function breakStillness(bot, task, goal, save, { client, survival, onStep 
     // one way included.
     await decideAction(bot, task, goal, save, client, onStep, tree, context, id, { above });
   } finally { goal.step = step; save(); }
-  // The wait chosen is no work done: the hold (holdForRest) waits to the end.
-  return !waitedOut;
+  // The wait chosen is its own answer: the hold (holdForRest) waits to the end (note 2146).
+  return waitedOut ? 'wait' : true;
 }
 const WAIT_IT_OUT_RECORD = Object.freeze({ says: 'On 5 fresh runs (2026-10-26 01:00 to 03:15Z) this question came round 103 times while a batch smelted, a median 9 seconds apart, each detour over at once, and was answered none good 51 times.' });
 
@@ -8543,9 +8546,18 @@ async function holdForRest(bot, task, goal, save, { client, survival, onStep = (
       task.check();
       const started = Date.now(), minutes = Math.max(1, Math.ceil((until - started) / 60000));
       // `none`: nothing was on offer (a detour tried and failed is not that).
-      let worked = false, none = false;
-      try { worked = await breakStillness(bot, task, goal, save, { client, survival, onStep, reason, now: started, until, holding: { minutes, why, idle }, above }); none = !worked; }
+      // `waited`: the wait itself chosen (wait_it_out, note 2146): held to
+      // the rest's end a quarter second at a time, not the question above
+      // asked again. full-1 (2026-10-26 04:31:48Z) chose it for 150 seconds
+      // of smelting and was asked while_cooking again in the same second.
+      let worked = false, none = false, waited = false;
+      try { const r = await breakStillness(bot, task, goal, save, { client, survival, onStep, reason, now: started, until, holding: { minutes, why, idle }, above }); waited = r === 'wait'; worked = !!r && !waited; none = !r; }
       catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled', 'Stalled'].includes(err.name)) throw err; }
+      if (waited) {
+        if (!waitSaid) { waitSaid = true; const says = restWaitSays(reason, until, why); console.log(`[wait] Jev chose the wait: ${says}`); goal.step = { action: 'detour', choice: 'wait_it_out', from: reason, waitingFor: says }; save(); onStep(goal); }
+        for (const end = until; Date.now() < end;) { await sleep(Math.min(250, end - Date.now())); task.check(); }
+        continue;
+      }
       if (none && !idle) {
         console.log(`[wait] the work on offer while ${String(reason).replace(/^\w+:/, '').replaceAll('_', ' ')} rests has run out; the question above is asked again`);
         if (goal.restHeld?.until === until) { delete goal.restHeld; save(); }
