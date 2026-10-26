@@ -12668,9 +12668,14 @@ function bedAfterSleepTree(bot, state, now = Date.now()) {
   const toSpawn = p && sp ? Math.round(Math.hypot(sp.x - p.x, sp.z - p.z)) : null;
   const recent = (state?.deaths || []).filter(d => d.at && now - Date.parse(d.at) <= 2 * 3600000).length;
   const next = beds ? `another bed is carried already` : `the next night needs another bed: ${wool} wool${string ? ` and ${string} string (four a wool)` : ''} carried, three wool a bed`;
+  // What the nights cost with and without a bed at hand (kit-record.js, note
+  // 2145): neither way said it, and take_bed_along was offered 6 times
+  // tonight (2026-10-26 01:00 to 04:30Z) and taken 0; the 145-hour runs
+  // waited 16 to 21 hours of nights out with 20 minutes asleep in all.
+  let nights = ''; try { nights = ` ${require('./kit-record').fullBedSays()}.`; } catch (_) { nights = ''; }
   return {
-    leave_as_respawn: { description: `Leave the bed standing here as the respawn point: a death comes back to life here. ${next[0].toUpperCase()}${next.slice(1)}.${(() => { try { return require('./death-places').deathsNearSays(bot, p, { what: 'this bed' }); } catch (_) { return ''; } })()}`, run: async () => {} },
-    take_bed_along: { description: `Take the bed up and carry it: the next night is slept in it wherever it comes, no more wool needed. The respawn goes back to the world spawn${toSpawn != null ? `, ${toSpawn} blocks from here` : ''}: a death comes back to life there, with nothing, that far from the work. This run's deaths in the last two hours: ${recent}.`, run: async () => {} },
+    leave_as_respawn: { description: `Leave the bed standing here as the respawn point: a death comes back to life here. ${next[0].toUpperCase()}${next.slice(1)}. Left here, the next night away from it is waited out, not slept.${nights}${(() => { try { return require('./death-places').deathsNearSays(bot, p, { what: 'this bed' }); } catch (_) { return ''; } })()}`, run: async () => {} },
+    take_bed_along: { description: `Take the bed up and carry it: the next night is slept in it wherever it comes, no more wool needed.${nights} The respawn goes back to the world spawn${toSpawn != null ? `, ${toSpawn} blocks from here` : ''}: a death comes back to life there, with nothing, that far from the work. This run's deaths in the last two hours: ${recent}.`, run: async () => {} },
   };
 }
 function underRock(bot, refuge = null) {
