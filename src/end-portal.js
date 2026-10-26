@@ -108,7 +108,12 @@ async function enterEnd(bot, task, goal, save, actions, { confirmationMs = 3000,
       const from = here.clone();
       try { await actions.navigate(bot, task, leg, { timeoutMs: 45000, stallMs: 8000 }); }
       catch (err) { task.check(); if (['Cancelled', 'NeedsAir', 'NeedsSafety'].includes(err.name)) throw err; }
-      if (bot.entity.position.distanceTo(from) >= 8) return;
+      // A leg that ended in the water with the ring still far is not ground gained (note 2197): the body's rule swims it
+      // back to the bank and the next leg walks in again. 25598 (2026-10-26 10:18 to 10:50Z) swam 8 to 40 blocks into
+      // the sea on each leg and was returned each time, fighting drowned in between, and the far way (note 2191) was
+      // never asked because every leg had 'gained' its eight blocks.
+      const endedInWater = /water/.test(bot.blockAt(bot.entity.position.floored())?.name || '');
+      if (bot.entity.position.distanceTo(from) >= 8 && !(endedInWater && flat > UNDER_FAR)) return;
       // Water across the way (note 1408): the boat, Jev's to choose with the
       // swim it saves, else the swim along the bearing, as the stronghold's
       // walk goes (note 1122). The stronghold stage of 2026-10-07 (25595,
