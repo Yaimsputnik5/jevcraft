@@ -168,14 +168,15 @@ const SWEEP_ASK_MIN = 10;
 // runs' pearls came from endermen met at night work: stalking 21 and 42
 // minutes and the fights at the slot 11 and 19 (their play clocks at
 // 2026-10-22 10:00Z).
-const OVERWORLD_HUNT_RECORD = ' The two runs that lit their portals had their pearls this way, from endermen met at night work: about 21 and 42 minutes stalking them and 11 and 19 fighting them from a slot, against no minutes on the sweep that found a forest.';
+// The routes' yield by the hour (note 2254; Fable, 2026-10-26 19:50Z, from the fresh runs' logs; the user, 19:30Z: 'Focus on the pearl phase next'): the old records gave minutes, never pearls, and praised the Overworld hunt; pearl_route was answered overworld_hunt 357 times to warped_forest 12 on full-1 (253 to 23 on full-4, 69 to 7 on full-7), where the Overworld gave 0.4 to 0.5 pearls an hour.
+const OVERWORLD_HUNT_RECORD = ' Measured on the fresh runs to 2026-10-26: the Overworld hunt gave about 0.4 to 0.5 pearls an hour of pearl time (full-1 about 15 in 35 hours, full-4 about 11 in 24), with 13 deaths on full-1 meanwhile.';
 const shelterSays = goal => { const m = clockMin(goal, 'obtain_ender_pearls: wait_in_shelter') + clockMin(goal, 'obtain_ender_pearls: wait_for_dawn'); return m >= 30 ? ` This run has spent ${m} minutes of the pearls' time sealed in through nights, the hours endermen spawn.` : ''; };
 // The four full runs' pearls by way (note 2025), from their play clocks at
 // 2026-10-22 08:10Z: the two whose End portals were lit had hunted endermen
 // where they met them (stalking and fighting) 39 and 86 minutes and swept
 // for a warped forest 1 and 0; the two holding no pearl had swept 81 and 33
 // minutes and hunted 6 and 2.
-const ROUTE_RECORD = ' In the four full runs (to 2026-10-22 08:10Z), the two that made their twelve eyes and lit their portals had hunted endermen where they met them for 39 and 86 minutes and swept for a warped forest 1 and 0; the two holding no pearl had swept 81 and 33 minutes and hunted endermen 6 and 2.';
+const ROUTE_RECORD = ' Measured on the fresh runs to 2026-10-26: in the Nether, endermen fought from a slot in a warped forest gave 16 to 21 pearls an hour of slot time (52 slot fights, 54 endermen, 26 pearls, no health lost in any), and about 3 pearls an hour over all the Nether pearl time with the walks (full-6: 13 in 4.5 hours); the Overworld hunt gave about 0.4 to 0.5 an hour (full-1 about 15 in 35 hours). Twelve pearls are about an hour of forest slot time.';
 const clockMin = (goal, key) => Math.round((goal.gameProgress?.clock?.byDoing?.[key] || 0) / 60000);
 const routeAsked = goal => clockMin(goal, 'obtain_ender_pearls: warped_search') >= SWEEP_ASK_MIN;
 function routeTree(bot, goal) {

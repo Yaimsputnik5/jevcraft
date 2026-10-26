@@ -18,8 +18,8 @@ test('the Overworld asks which way to the pearls once the sweep has had its time
   assert.deepEqual(Object.keys(tree), ['warped_forest', 'overworld_hunt']);
   assert.match(tree.warped_forest.description, /about 131 minutes of play, 73 of them on sweeps for a warped forest and 0 on the Overworld's endermen/);
   assert.match(tree.overworld_hunt.description, /It is day in the Overworld now/);
-  assert.match(tree.overworld_hunt.description, /The patrol takes on any enderman in view.*The two runs that lit their portals had their pearls this way/);
-  assert.match(tree.warped_forest.description, /the two holding no pearl had swept 81 and 33 minutes and hunted endermen 6 and 2\./);
+  assert.match(tree.overworld_hunt.description, /The patrol takes on any enderman in view.*the Overworld hunt gave about 0\.4 to 0\.5 pearls an hour/);
+  assert.match(tree.warped_forest.description, /endermen fought from a slot in a warped forest gave 16 to 21 pearls an hour of slot time.*Twelve pearls are about an hour of forest slot time\./);
   const task = new Task('pearls');
   task.opportunityClient = { systemOne: async ({ questions }) => ({ answers: Object.fromEntries(Object.keys(questions).map(k => [k, { choice: 'overworld_hunt', confidence: 0.6 }])) }) };
   await routes.askRoute(b, task, g, () => {});
