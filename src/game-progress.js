@@ -123,7 +123,7 @@ function preparationStage(bot, goal = {}) {
 // option, hit by hit, for the mobs there.
 const ARMOUR_PIECES = ['iron_armour', 'iron_helmet', 'iron_chestplate', 'iron_leggings', 'iron_boots'];
 // The crossing's kit may wait too (crossing-kit.js kitRungs, note 673).
-const DEFERRABLE = new Set(['bed', 'home_site', 'home_level', 'home_stash', 'home_bed', 'home_water', 'home_plot', 'home_pen', 'shield', 'leather_armour', 'fishing_rod', 'iron_sword', 'bucket', 'golden_boots', 'bow', 'arrows', 'diamond_pickaxe', 'diamond_sword', ...ARMOUR_PIECES, 'nether_pickaxe', 'nether_blocks', 'nether_food', 'nether_chest']);
+const DEFERRABLE = new Set(['bed', 'home_site', 'home_level', 'home_stash', 'home_bed', 'home_water', 'home_plot', 'home_pen', 'shield', 'leather_armour', 'fishing_rod', 'iron_sword', 'bucket', 'water_bucket', 'golden_boots', 'bow', 'arrows', 'diamond_pickaxe', 'diamond_sword', ...ARMOUR_PIECES, 'nether_pickaxe', 'nether_blocks', 'nether_food', 'nether_chest']);
 const RUNG_BUDGET_MS = 20 * 60 * 1000, RUNG_WAIT_MS = 30 * 60 * 1000;
 function preparationRung(bot, goal = {}, now = Date.now()) {
   const resting = attemptsFor(goal).of('rung', now);
@@ -470,6 +470,8 @@ function ladderRung(bot, goal, waiting, { allOptional = false } = {}) {
   if (!carried.includes('fishing_rod') && count(bot, 'string') >= 2 && ready({ phase: 'fishing_rod' })) return { phase: 'fishing_rod', action: 'acquire', item: 'fishing_rod', count: 1 };
   if (best('sword') < 3 && ready({ phase: 'iron_sword' })) return another('iron_sword');
   if (!carried.includes('bucket') && !carried.includes('water_bucket') && ready({ phase: 'bucket' })) return { phase: 'bucket', action: 'acquire', item: 'bucket', count: 1 };
+  // A water bucket in the kit, kept filled (note 2253; the user, 2026-10-26 19:05Z: 'Yes, add a water bucket to the kit'): an empty bucket is filled at water in the Overworld, a rung of its own after the bucket's; both stay deferrable, so a Nether first Jev chooses still goes on without them (the suite's ladder tests, 9 bounced when they were not). The burns of 2026-10-26 with no water to put the fire out: full-6 knocked into lava by a zombie at y -20 (19:00Z, out of the lava at 10.8 and burned to none), the fortress stage out of surface lava at 9 (18:23Z); the fire question offers douse_bucket when one is carried (vitals.js). Water poured in the Nether boils away, so there the bucket waits filled from the Overworld.
+  if (carried.includes('bucket') && !carried.includes('water_bucket') && /overworld/.test(String(bot.game?.dimension || '')) && ready({ phase: 'water_bucket' })) return { phase: 'water_bucket', action: 'acquire', item: 'water_bucket', count: 1 };
   // The home base is not a rung: it is a side trip offered with what it
   // buys and what it takes (strategy.js homeOption). It had stood here,
   // seven steps ahead of the armour, as "the walkthrough order every
