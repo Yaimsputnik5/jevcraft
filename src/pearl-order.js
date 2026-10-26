@@ -262,7 +262,7 @@ async function ask(bot, task, goal, save, actions = {}, { now = Date.now() } = {
   const pick = decision.path.at(-1);
   const at = Date.now();
   goal.pearlOrder = { pick, at, until: at + (decision.noneGood ? NONE_GOOD_MS : HOLD_MS), ...(decision.noneGood ? { noneGood: true } : {}), offered: kinds, pearlsAt: count(bot, 'ender_pearl'), deathsAt: 0, because: because || null };
-  if (KIND[pick]) bot.chat?.(({ hunt_enderman: 'An enderman in reach: its pearl first, the rods after.', warped_forest: 'To the warped forest for pearls, then the rods.', barter_gold: 'Bartering for pearls, then the rods.' })[pick]);
+  if (KIND[pick]) bot.chat?.(({ hunt_enderman: 'An enderman in reach: its pearl first, the rods after.', warped_forest: 'To the warped forest for pearls, then the rods.', barter_gold: 'Bartering for pearls, then the rods.', bastion_gold: 'To the bastion for gold, then a barter for pearls, then the rods.' })[pick]);
   save();
   return pick;
 }
