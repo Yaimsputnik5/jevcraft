@@ -50,6 +50,18 @@ Some code still chose for Jev without asking. The routine meal ate whatever the 
 
 Several prices came from our own small samples or from trials a month old. A barter was said to cost nine gold ingots a pearl, from one lucky measure; the server's own loot table says about 15.6 (note 2106). The rods' risk was quoted from trials that died ten times as often as today's (note 2105). What a bed does to the dragon was "not measured" until it was read from the server's code: 46 to 60 damage beside the head, about one bed a perch (note 2108). Where the game has a number, Jev is now told the game's number, and our own records beside it.
 
+### "None of these" taken as a choice
+
+When Jev answered that none of the options was good, the code took the likeliest one and carried on. Some of those fallbacks recorded themselves as Jev's choice: "Jev chose to fight with what is carried" set the armour, sword and shield aside for five minutes, and a minute later the strategy question offered no armour at all, so Jev said none good again (note 2142). A fallback is not a choice. Where it stands in for one, it should change nothing that outlives the moment.
+
+### A question that comes back every nine seconds
+
+The loudest "none good" of the night came from one question, the stall's detour, asked 117 times while furnaces smelted: Jev had chosen to work while the batch cooked, each small job was over in seconds, and the question came round again with only walks away on it (notes 2130, 2140, 2146). The fix was not a better description; it was the missing option, to wait the rest out, and then making the choice actually hold. Two more holds broke the same way: the food taken up at the Nether crossing was dropped whenever any other option flickered on or off the list (notes 2133, 2147), and the climb for sheep was asked again at every stair (note 2149). An audit of "the same question back within a minute of an answer" finds these faster than reading deaths: 83% of the sheep climbs and 82% of the food take-ups were re-asked within sixty seconds.
+
+### How soon the next death comes
+
+All nine deaths with nothing worn one night came 11 to 28 minutes after the run's previous death; the deaths in armour came about two hours apart. The spell after a death is where the next one comes, and no question said so until it was put beside the list of recent deaths (note 2137), with the move a player makes first at a respawn, a stone sword and a shield, added to the walk-back question (note 2148).
+
 ### A second opinion from an LLM
 
 A generative LLM reviewing recovery decisions agreed with Jev, took 14 seconds per decision, and cost about a hundred times more. We removed it.
