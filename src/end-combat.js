@@ -3657,7 +3657,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         const facing = [Math.round(-Math.sin(yaw)) || 0, Math.round(-Math.cos(yaw)) || 0];
         const sides = [facing, [1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => dx || dz);
         const open = c => { const b = bot.blockAt(c); return !!b && b.boundingBox !== 'block' && !/water|lava/.test(b.name || ''); };
-        for (const [dx, dz] of sides) { const near = f.offset(dx, 0, dz), far = f.offset(dx * 2, 0, dz * 2); if (open(near) && open(near.offset(0, 1, 0)) && bot.blockAt(far.offset(0, -1, 0))?.boundingBox === 'block' && open(far) && open(far.offset(0, 1, 0))) return { cell: far, side: dx === 1 ? 'east' : dx === -1 ? 'west' : dz === 1 ? 'south' : 'north', floor: bot.blockAt(far.offset(0, -1, 0)).name }; }
+        // The far cell's floor level with the feet, a step up or a step down (note 2227): level only, trials 324 and 325
+        // (25590/25592, 15:00 to 15:25Z) carried the boat twenty minutes on the island's rough ground and the seat was
+        // offered 0 times (22 to 84 offers a trial before 2220). The boat sits on that floor; the body boards from two cells.
+        for (const [dx, dz] of sides) for (const dy of [0, -1, 1]) { const near = f.offset(dx, 0, dz), far = f.offset(dx * 2, dy, dz * 2); if (open(near) && open(near.offset(0, 1, 0)) && bot.blockAt(far.offset(0, -1, 0))?.boundingBox === 'block' && open(far) && open(far.offset(0, 1, 0))) return { cell: far, side: `${dx === 1 ? 'east' : dx === -1 ? 'west' : dz === 1 ? 'south' : 'north'}${dy ? (dy > 0 ? ', a step up' : ', a step down') : ''}`, floor: bot.blockAt(far.offset(0, -1, 0)).name }; }
         return null;
       })();
       const closing = (() => { if (!dragon || !live(bot, dragon)) return null; const m = state.dragonTrack?.velocity || null; const p = bot.entity.position, v = dragon.velocity; const speed = v ? Math.hypot(v.x, v.z) * 20 : null; const toward = v ? -((dragon.position.x - p.x) * v.x + (dragon.position.z - p.z) * v.z) / (flat || 1) * 20 : null; return Number.isFinite(toward) ? { speed: Math.round(speed), toward: Math.round(toward), seconds: toward > 0.5 ? Math.round(flat / toward * 10) / 10 : null } : null; })();
