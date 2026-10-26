@@ -175,7 +175,7 @@ const GAMEPLAY_AREAS = new Set(['combat', 'endgame', 'home', 'idle', 'resources'
 const DEATH_TIME = 'The goal is the fastest dragon kill; a death costs only the time it loses.';
 const REAL_TIME = `The player counts real time: a Minecraft day is twenty real minutes, a night about eleven. ${DEATH_TIME} Waiting, hiding, going back cost time too.`;
 const RISK = 'riskNow is how likely a death is now; deathWouldCost, what a death now would lose.';
-const DEATHS = 'recentDeaths are the deaths of the last two hours and what was chosen last before each; the same answer in the same place seldom ends differently.';
+const DEATHS = 'recentDeaths are the deaths of the last two hours and what was chosen last before each; the same answer in the same place seldom ends differently. deathSpells is how soon this run\'s deaths followed the death before, with nothing worn against in armour.';
 // A sense of pace said as a fact, not a limit: what the minutes played
 // compare with.
 const CLOCK = 'runClock is the run so far. A practiced player with iron reaches the Nether within the first hour and has the rods and pearls within the next two; minutes spent are spent, and what counts is what each option still costs.';
@@ -292,6 +292,29 @@ function recentDeaths(bot, goal, now = Date.now()) {
     ...(Number.isFinite(d.food) ? { hunger: d.food } : {}),
     ...(d.lastChoice ? { lastChoice: `${d.lastChoice.choice.replaceAll('_', ' ')} (${d.lastChoice.question.replaceAll('_', ' ')}, ${d.lastChoice.secondsBefore} seconds before)` } : {}),
   }));
+}
+
+// How soon this run's deaths followed the death before, bare against in
+// armour (note 2137): tonight (2026-10-26 00:00 to 04:00Z, six fresh runs)
+// all 9 deaths with nothing worn came 11 to 28 minutes after the run's
+// previous death, and the 9 in armour a median two hours apart. Said with
+// recentDeaths on every gameplay question: the spell after a death is where
+// the next one comes.
+const SPELLS_KEPT_MS = 24 * 3600000;
+function deathSpells(goal, now = Date.now()) {
+  const all = (goal?.survival?.deaths || []).filter(d => d.at && now - Date.parse(d.at) < SPELLS_KEPT_MS).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  if (all.length < 2) return null;
+  const bare = [], armed = [];
+  for (let i = 1; i < all.length; i++) {
+    const d = all[i]; if (!Array.isArray(d.worn)) continue;
+    const gap = Math.round((Date.parse(d.at) - Date.parse(all[i - 1].at)) / 60000);
+    (d.worn.some(n => /_(helmet|chestplate|leggings|boots)$/.test(n)) ? armed : bare).push(gap);
+  }
+  if (!bare.length && !armed.length) return null;
+  const median = xs => { const s = [...xs].sort((a, b) => a - b); return s[Math.floor((s.length - 1) / 2)]; };
+  const mins = m => m >= 120 ? `${Math.round(m / 60)} hours` : `${m} minutes`;
+  const part = (xs, what) => xs.length ? `the ${xs.length} ${what} ${xs.length === 1 ? 'came' : 'came a median'} ${mins(median(xs))} after the death before${xs.length > 1 ? ` (${mins(Math.min(...xs))} to ${mins(Math.max(...xs))})` : ''}` : `none ${what}`;
+  return `Of this run's ${all.length} deaths in the last 24 hours, ${part(bare, 'with no armour worn')}; ${part(armed, 'in armour')}.`;
 }
 
 // The option taken when Jev says none of them is good: the likeliest by
@@ -896,7 +919,7 @@ async function decide(id, { client, bot, task, goal, save = () => {}, tree, stat
   // any of them (the user's suggestion, 2026-09-26).
   if (bot && state && typeof state === 'object' && GAMEPLAY_AREAS.has(spec.area) && !state.recentDeaths) {
     const deaths = recentDeaths(bot, goal);
-    if (deaths.length) state = { ...state, recentDeaths: deaths };
+    if (deaths.length) { const spells = deathSpells(goal); state = { ...state, recentDeaths: deaths, ...(spells ? { deathSpells: spells } : {}) }; }
   }
   // Nights without sleep, with every such question: phantoms come for a
   // player on the third, and mid-231-e was killed by them at seven hunger,
@@ -1372,7 +1395,7 @@ function confident(id, answer, { threshold, missing = true } = {}) {
 
 const all = () => [...QUESTIONS.values()];
 
-module.exports = { pickWhenNoneGood, EXPOSED_S, escalate, withRealTime, ownInstructions, stateFor, WAIT_ANSWERS, parentOf, recentDeaths, define, question, decide, endsWhenStopped, walk, ask, confident, all, decideTree, firstOption, useStandIn, SAFETY_RULED, NONE_GOOD_KEY };
+module.exports = { deathSpells, pickWhenNoneGood, EXPOSED_S, escalate, withRealTime, ownInstructions, stateFor, WAIT_ANSWERS, parentOf, recentDeaths, define, question, decide, endsWhenStopped, walk, ask, confident, all, decideTree, firstOption, useStandIn, SAFETY_RULED, NONE_GOOD_KEY };
 
 // The area modules register their questions when this directory is loaded.
 require('./survival'); require('./work'); require('./combat'); require('./travel'); require('./intake');
