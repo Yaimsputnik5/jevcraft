@@ -304,7 +304,7 @@ test('the food plan Jev chose is said on the stall\'s answers that are not a way
   const survival = { state: goal.survival, canNightMine: () => false, foodHunt: () => {} };
   await answerStall(bot, new Task('stall'), goal, () => {}, { key: 'step:return_to_portal', layer: 'work', strikes: 2, error: 'No way back to the nether portal' }, { client, survival }).catch(() => {});
   const offered = asked[0];
-  assert.match(offered.keep_on, /The food plan stands: food first \(return for food\), chosen \d+ seconds? ago at pocket next at hunger 15 and health 7, holds until food is eaten or carried/);
+  assert.match(offered.keep_on, /The food plan stands: food first \(return for food\), chosen \d+ seconds? ago at pocket next at hunger 15 and health 7, holds until food is eaten or enough is carried/);
   assert.doesNotMatch(offered.restock_food, /The food plan stands/, 'a way to food carries it on');
 });
 

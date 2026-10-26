@@ -61,7 +61,7 @@ test('the food plan holds food over the work until food is eaten or carried, hun
   begin();
   assert.equal(holder.foodChoice.ms, 180000, 'twice the minutes to the food');
   assert.equal(fp.holding(holder, bot, { goal, supply: 0, now: now + 1000 })?.choice, 'food');
-  assert.match(fp.says(holder.foodChoice, now + 1000), /^food first \(seen food 0\), chosen 1 second ago at survival priority at hunger 18 and health 20, holds until food is eaten or carried, hunger falls under eighteen, health falls a band of four, the way chosen fails, or 3 minutes pass$/);
+  assert.match(fp.says(holder.foodChoice, now + 1000), /^food first \(seen food 0\), chosen 1 second ago at survival priority at hunger 18 and health 20, holds until food is eaten or enough is carried \(the floor kept, or the hunger filled\), hunger falls under eighteen, health falls a band of four, the way chosen fails, or 3 minutes pass$/);
   // Carried.
   assert.equal(fp.holding(holder, bot, { goal, supply: 3, now: now + 2000 }), null);
   assert.equal(holder.foodChoiceEnded.why, 'food is carried: 0 to 3 food points');

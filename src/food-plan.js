@@ -19,7 +19,7 @@
 // stated, read by every place that asked it:
 //   food   (a way to food chosen: survival_priority's obtain_food, the
 //          turn given to the survival claim for food, pocket_next's
-//          go_for_food) holds until food is eaten or carried (hunger up, or
+//          go_for_food) holds until food is eaten or enough is carried (the floor kept, or the hunger filled) (hunger up, or
 //          more safe food carried than when chosen), hunger falls under a
 //          line it was above (18, where health comes back; 6), health falls
 //          a band of four, the way chosen fails (its ledger entry blocked:
@@ -200,7 +200,7 @@ function price(bot, goal, { children = {}, supply = 0, now = Date.now() } = {}) 
   const workHoldSays = `Chosen over food, ${WORK_HOLDS} ${d.says}`;
   return { facts, foodSays, workSays: workHoldSays, nearest, drain: d };
 }
-const FOOD_HOLDS = 'the way to food holds (neither the work nor another way asked) until food is eaten or carried, hunger falls under a line it is above (eighteen, six), health falls a band of four, the way fails, or twice its minutes to the food pass (two to ten).';
+const FOOD_HOLDS = 'the way to food holds (neither the work nor another way asked) until food is eaten or enough is carried (the floor kept, or the hunger filled), hunger falls under a line it is above (eighteen, six), health falls a band of four, the way fails, or twice its minutes to the food pass (two to ten).';
 const WORK_HOLDS = 'the work holds and no food is asked until hunger falls two from now (or under eighteen, or to six), health falls four, the food carried falls under the reserve kept (where it is at or over it now), the night needs a shelter, or the minutes the drain takes hunger two lower pass (two to ten).';
 
 // Begin the plan: Jev's answer to food or the work, kept on `holder` (the
@@ -227,7 +227,7 @@ function setWay(holder, key, minutesMs, now = Date.now()) {
 const reserveHolds = p => (p.facts.floor ?? 1) > 1 && (p.facts.supply ?? 0) >= p.facts.floor;
 function untilSays(p) {
   return p.choice === 'food'
-    ? `food is eaten or carried, hunger falls under ${p.facts.food >= HEALS_AT ? 'eighteen' : 'six'}, health falls a band of four, the way chosen fails, or ${mins(p.ms)} pass`
+    ? `food is eaten or enough is carried (the floor kept, or the hunger filled), hunger falls under ${p.facts.food >= HEALS_AT ? 'eighteen' : 'six'}, health falls a band of four, the way chosen fails, or ${mins(p.ms)} pass`
     : `hunger falls to ${Math.max(0, p.facts.food - 2)}${p.facts.food >= HEALS_AT ? ' (or under eighteen)' : ''}, health falls four, ${reserveHolds(p) ? `the food carried falls under the ${p.facts.floor} points kept, ` : ''}the night needs a shelter, or ${mins(p.ms)} pass`;
 }
 
@@ -251,7 +251,14 @@ function endOf(p, bot, { supply = 0, goal = null, needsShelter = false, now = Da
     return null;
   }
   if (food > p.facts.food) return `food was eaten: hunger ${p.facts.food} to ${food}`;
-  if (supply > p.facts.supply) return `food is carried: ${p.facts.supply} to ${supply} food points`;
+  // Enough carried, not any (note 2153): the plan ended on the first point
+  // carried (a berry, a seed's worth) and the question came back for the
+  // rest; tonight (2026-10-26 01:00-05:00Z) 40 plans ended 'food is carried:
+  // 0 to 2 food points' and survival_priority was asked again within half a
+  // minute of an obtain_food answer 56 times. It ends when what is carried
+  // meets the floor kept here, or fills the hunger.
+  const enough = Math.max(1, p.facts.floor ?? 1);
+  if (supply > p.facts.supply && (supply >= enough || supply >= 20 - food)) return `food is carried: ${p.facts.supply} to ${supply} food points`;
   if ((p.facts.food >= HEALS_AT && food < HEALS_AT) || (p.facts.food > SPRINT_AT && food <= SPRINT_AT)) return `hunger fell from ${p.facts.food} to ${food}`;
   const a = healthBand(p.facts.health), b = healthBand(hp);
   if (a != null && b != null && b < a) return `health fell from ${Math.round(p.facts.health)} to ${Math.round(hp)}`;
