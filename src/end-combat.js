@@ -2216,6 +2216,19 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         // Not from a pit (note 1890): a body with walls at the head's height on two sides or more runs at a wall, and the cloud's box is half a block high, one block up being clear of it (note 1889's drill). 25588's dragon-247 (2026-10-19 02:2xZ, two crystals) in a pit at (5, 56, 41): 'the straight run stalled ... taken again with a jump, 0.5 from the start', 15.8 to 4.0 in 1.6 s, dead. From a pit the stub goes up at once.
         const pitWalls = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => bot.blockAt(bot.entity.position.floored().offset(dx, 1, dz))?.boundingBox === 'block').length;
         if (inBreath() && pitWalls >= 2 && !(state.pitStubSaid > Date.now() - 5000)) { state.pitStubSaid = Date.now(); console.log(`[end combat] no run out of the cloud from the pit at ${bot.entity.position.floored()} (${pitWalls} walls at the head's height): the stub at once`); }
+        if (inBreath() && actions.navigate && pitWalls < 2) {
+          const h0 = bot.health, p0 = bot.entity.position.floored();
+          goal.step = { action: 'run_out_of_breath_first', health: bot.health }; save();
+          try {
+            await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) && safeFromHostiles(bot, p, endMobs(bot)), timeoutMs: 700, dig: actions.dig });
+            console.log(`[end combat] the run out of the cloud first from ${p0}: now at ${bot.entity.position.floored()}, ${h0.toFixed(1)} to ${bot.health.toFixed(1)} health${inBreath() ? ', still in it' : ''}`);
+            if (!inBreath()) return;
+          } catch (err) {
+            if (err.name !== 'NoEscape') throw err;
+            console.log(`[end combat] no run out of the cloud from ${p0}: ${String(err.message || err).slice(0, 90)}; the stub instead`);
+          }
+        }
+        // After the run, not before it (note 2250): a cloud half a block over the feet is on the body already, and two blocks dug with a stone pickaxe were 3.7 s in it; 25589's stronghold-1-dragon-341 (2026-10-26 18:01Z) had run 4.1 blocks out of one cloud to (-18, 61, 35), took the dig under the next, 'under the cloud: 2 of 2 dug down in 3688 ms ... 17.0 to 6.0 health, still in it', and died on the next dig. The dig under the cloud is for a body the run could not take out.
         // Down under a cloud lying over the feet (note 2233): a body in a hole one deep is 1.8 tall, and a fireball's cloud on the ground beside the hole lies on the body's upper half; the stub would rise into it (note 1867), the run from the hole goes nowhere, and the two down of note 1692 is for a body with no blocks. 25592's stronghold-1-dragon-333 (2026-10-26 16:32Z) dug a hole one deep at (35, 60, 4) against the dragon's charge, took the fireball's cloud 0.8 over its feet, 5.3 wide ('no stub ... the stub would rise into it'), ran 0.7 blocks in 1.1 s, 20 to 14 to 9 to none. Dug down until the body's top is under the cloud's base, two at most, on ground four thick off the void.
         if (inBreath() && cloudOver && !(actions.dig && pickCarried() && !inWater()) && !(state.underCloudSkipSaid > Date.now() - 5000)) { state.underCloudSkipSaid = Date.now(); console.log(`[end combat] no dig under the cloud over the feet at ${bot.entity.position.floored()}: ${!actions.dig ? 'no dig here' : !pickCarried() ? 'no pickaxe carried' : 'the body in water'}`); }
         if (inBreath() && cloudOver && actions.dig && pickCarried() && !inWater()) {
@@ -2233,18 +2246,6 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             // Back to the top after a block dug (note 2241): the branches below read the body's old cell. 25592's dragon-337 (2026-10-26 17:11Z) dug one under a cloud two over its feet, a fresh fireball's cloud landed at its new feet during the dig, and the run and stub branches that followed judged from the old cell ('no run out of the cloud from a pit', the stub refused), 15 to 9 to none; read fresh, the cloud a block over the feet is one more block dug.
             if (dug) return;
           } else if (!(state.underCloudSaid > Date.now() - 5000)) { state.underCloudSaid = Date.now(); console.log(`[end combat] no dig under the cloud over the feet at ${f1}: ${thick1 ? 'the void within four' : 'the ground under the feet is not two thick'}`); }
-        }
-        if (inBreath() && actions.navigate && pitWalls < 2) {
-          const h0 = bot.health, p0 = bot.entity.position.floored();
-          goal.step = { action: 'run_out_of_breath_first', health: bot.health }; save();
-          try {
-            await evadeDragon(bot, task, goal, save, { allowed: p => policy.allowedPoint(p) && safeFromHostiles(bot, p, endMobs(bot)), timeoutMs: 700, dig: actions.dig });
-            console.log(`[end combat] the run out of the cloud first from ${p0}: now at ${bot.entity.position.floored()}, ${h0.toFixed(1)} to ${bot.health.toFixed(1)} health${inBreath() ? ', still in it' : ''}`);
-            if (!inBreath()) return;
-          } catch (err) {
-            if (err.name !== 'NoEscape') throw err;
-            console.log(`[end combat] no run out of the cloud from ${p0}: ${String(err.message || err).slice(0, 90)}; the stub instead`);
-          }
         }
         if (inBreath() && blocksCarried(bot) >= 1 && !onObsidianTop() && !stubEdge && !ballClose && !cloudOver) {
           goal.step = { action: 'up_out_of_breath_first', health: bot.health }; save();
