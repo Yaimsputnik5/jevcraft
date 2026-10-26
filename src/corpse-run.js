@@ -210,7 +210,13 @@ async function wearRecovered(bot) {
 // What is taken up first at the spot: what the goal is made of, then the
 // kit, then the rest.
 const FIRST = [/^ender_eye$/, /^(ender_pearl|blaze_rod|blaze_powder)$/, /^diamond/, /^(netherite|iron)_(helmet|chestplate|leggings|boots)$/, /^(bow|shield|arrow|iron_sword|iron_pickaxe|water_bucket|bucket)$/];
-const rank = name => { const i = FIRST.findIndex(r => r.test(name)); return i < 0 ? FIRST.length : i; };
+// Worth-while things rank after FIRST, and the cheap (cobblestone, dirt,
+// the stone tools) last: the dying client's list of its drops is said and
+// kept in this order (note 2127). full-6 (2026-10-26 02:51Z) died in full
+// iron with a diamond pickaxe and was told 'cobblestone at (46, 39, 175),
+// cobblestone at (48, 39, 175), 2 cobblestone ..., and more'.
+const rank = name => { const i = FIRST.findIndex(r => r.test(name)); return i < 0 ? (Object.keys(worth({ [name]: 1 })).length ? FIRST.length : FIRST.length + 1) : i; };
+const byRank = drops => [...drops].sort((a, b) => rank(a.name) - rank(b.name));
 const lying = (bot, spot, name = null, seen = []) => Object.values(bot.entities || {}).filter(e => { const it = e?.position && e.isValid !== false ? e.getDroppedItem?.() : null; return it && (!name || it.name === name) && (e.position.distanceTo(spot) <= 12 || seen.some(d => Math.hypot(d.x - e.position.x, d.y - e.position.y, d.z - e.position.z) <= 6)); });
 // What the dying client saw of its drops, said on the way back (note 2117).
 function dropsSeenSays(run) {
@@ -220,7 +226,8 @@ function dropsSeenSays(run) {
   const far = Math.max(...run.drops.map(d => Math.hypot(d.x - p.x, d.z - p.z)));
   const low = Math.min(...run.drops.map(d => d.y)), high = Math.max(...run.drops.map(d => d.y));
   const holders = (run.mobsAtDeath || []).filter(m => m.holds?.length);
-  return ` As it died the bot saw ${run.drops.length} stack${run.drops.length === 1 ? '' : 's'} of its drops lying within ${Math.ceil(far)} block${Math.ceil(far) === 1 ? '' : 's'} of the death cell${high - low >= 3 ? `, from y ${Math.floor(low)} to ${Math.floor(high)}` : ''}: ${run.drops.slice(0, 6).map(d => `${d.count > 1 ? `${d.count} ` : ''}${d.name.replaceAll('_', ' ')} at (${Math.round(d.x)}, ${Math.round(d.y)}, ${Math.round(d.z)})`).join(', ')}${run.drops.length > 6 ? ', and more' : ''}; the walk back searches there.${holders.length ? ` Mobs about it then held things: ${holders.map(m => `the ${m.name.replaceAll('_', ' ')} ${m.distance} blocks off ${m.holds.map(h => h.replaceAll('_', ' ')).join(' and ')}`).join('; ')}; a zombie or skeleton picks up armour and weapons it walks over and drops them when killed.` : ''}`;
+  const drops = byRank(run.drops), rest = drops.slice(6), restNames = [...new Set(rest.map(d => d.name.replaceAll('_', ' ')))];
+  return ` As it died the bot saw ${run.drops.length} stack${run.drops.length === 1 ? '' : 's'} of its drops lying within ${Math.ceil(far)} block${Math.ceil(far) === 1 ? '' : 's'} of the death cell${high - low >= 3 ? `, from y ${Math.floor(low)} to ${Math.floor(high)}` : ''}: ${drops.slice(0, 6).map(d => `${d.count > 1 ? `${d.count} ` : ''}${d.name.replaceAll('_', ' ')} at (${Math.round(d.x)}, ${Math.round(d.y)}, ${Math.round(d.z)})`).join(', ')}${rest.length ? `, and ${rest.length} more stack${rest.length === 1 ? '' : 's'} of ${restNames.slice(0, 4).join(', ')}${restNames.length > 4 ? ' and the like' : ''}` : ''}; the walk back searches there.${holders.length ? ` Mobs about it then held things: ${holders.map(m => `the ${m.name.replaceAll('_', ' ')} ${m.distance} blocks off ${m.holds.map(h => h.replaceAll('_', ' ')).join(' and ')}`).join('; ')}; a zombie or skeleton picks up armour and weapons it walks over and drops them when killed.` : ''}`;
 }
 
 // A death in the Nether, the bot back to life in the Overworld: the kit lies
@@ -454,6 +461,12 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
     // about 49.
     const pace = rec?.walkBlocksAMinute ? rec.walkBlocksAMinute / 60 : 4.3;
     const minutes = Math.max(1, Math.round((flatWalk / pace + climbSeconds) / 60));
+    // Under 100 blocks the walk is said in seconds against the seconds the
+    // drops have left (note 2127): full-6 was told '44 blocks off, at y 37.
+    // About 281 seconds before they vanish' with the walk and 27-block climb
+    // (about 200 seconds at the record's pace) unsaid.
+    const walkSeconds = Math.round(flatWalk / pace + climbSeconds);
+    const walkLeft = left === null || far >= 100 ? '' : walkSeconds >= left ? ` The way there is about ${walkSeconds} seconds at the pace the bot's walks and climbs have made, stalls counted: more than are left.` : ` The way there is about ${walkSeconds} seconds of them, at the pace the bot's walks and climbs have made, stalls counted.`;
     const under = /overworld/.test(run.dimension) && spot.y < 50;
     const carriesWeapon = (bot.inventory?.items?.() || []).filter(i => /_(sword|axe)$/.test(i.name)).map(i => i.name.replaceAll('_', ' '))[0] || null;
     const underSays = under ? ` The place is under the ground (y ${Math.round(spot.y)}, ${Math.round(Math.abs(dy))} blocks ${dy < 0 ? 'down' : 'up'} from here): the hour does not reach it, and what was about it at the death does not burn at dawn; the bot goes there with ${carriesWeapon ? `a ${carriesWeapon}` : 'no sword or axe'} and ${wornNow.length ? wornNow.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'}.` : '';
@@ -462,7 +475,7 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
     // The kit in the chest beside the bed first (bed-kit.js, note 2032).
     let bedKit = null; try { bedKit = kitActions ? require('./bed-kit').bedKitChores(bot, goal).take_bed_kit : null; } catch (_) { bedKit = null; }
     const tree = {
-      go_back: { description: `Go back for ${listed(run.items)}: ${far} blocks off${far >= 100 ? `, about ${minutes} minute${minutes > 1 ? 's' : ''}' ${climbSeconds ? 'walk and climb' : 'walk'}${rec?.walkBlocksAMinute ? ` at the ${rec.walkBlocksAMinute} blocks a minute the bot's walks have made, stalls and detours counted` : ''}` : ''}${Math.abs(spot.y - bot.entity.position.y) > 4 ? `, at y ${Math.round(spot.y)}` : ''}. ${left === null ? 'They last until the bot comes within ${TICKING} blocks, then five minutes.' : `About ${left} seconds before they vanish.`} ${death.cause ? `The bot ${death.cause} there; when it died, ` : 'When the bot died there, '}${about ? `about it were ${about}` : 'nothing hostile was in view'}; it wore ${death.worn?.length ? death.worn.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} then and wears ${wornNow.length ? wornNow.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} now. ${hour}${underSays}${stalled}${earlier}${eyesSay}${ringSays}${walkFoodSays}${alsoLying}` },
+      go_back: { description: `Go back for ${listed(run.items)}: ${far} blocks off${far >= 100 ? `, about ${minutes} minute${minutes > 1 ? 's' : ''}' ${climbSeconds ? 'walk and climb' : 'walk'}${rec?.walkBlocksAMinute ? ` at the ${rec.walkBlocksAMinute} blocks a minute the bot's walks have made, stalls and detours counted` : ''}` : ''}${Math.abs(spot.y - bot.entity.position.y) > 4 ? `, at y ${Math.round(spot.y)}` : ''}. ${left === null ? 'They last until the bot comes within ${TICKING} blocks, then five minutes.' : `About ${left} seconds before they vanish.${walkLeft}`} ${death.cause ? `The bot ${death.cause} there; when it died, ` : 'When the bot died there, '}${about ? `about it were ${about}` : 'nothing hostile was in view'}; it wore ${death.worn?.length ? death.worn.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} then and wears ${wornNow.length ? wornNow.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} now. ${hour}${underSays}${stalled}${earlier}${eyesSay}${ringSays}${walkFoodSays}${alsoLying}` },
       leave_them: { description: `Leave them and go on with what is carried: ${listed(worth(Object.fromEntries(bot.inventory.items().map(i => [i.name, i.count])))) || 'nothing worth listing'}. What was dropped is made again, or found, later${again ? `: ${again}` : ''}.${ironRemakeSays(run.items)}${took}${keptSays}` },
     };
     if (quick) for (const k of Object.keys(tree)) tree[k].description += quick;
@@ -705,4 +718,4 @@ function dropsWaitSays(bot, goal, now = Date.now()) {
   if (off > TICKING) return ` Given the turn, the work asks first about going back for what the last death dropped, ${off} blocks off: ${what}. Drops age only while their ground is loaded, so they keep until the bot comes near.`;
   return '';
 }
-module.exports = { dropsSeenSays, recordSays, FLEET_RECORD, TICKING, triedDeathsSays, dropsWaitSays, quickDeathsSays, TOLD, tripCameToNothing, KIT_ERRAND, kitTrip, corpseRun, corpseRunStep, worth, madeAgain, ironRemakeSays, IRON_MINUTES, underWay };
+module.exports = { dropsSeenSays, byRank, recordSays, FLEET_RECORD, TICKING, triedDeathsSays, dropsWaitSays, quickDeathsSays, TOLD, tripCameToNothing, KIT_ERRAND, kitTrip, corpseRun, corpseRunStep, worth, madeAgain, ironRemakeSays, IRON_MINUTES, underWay };

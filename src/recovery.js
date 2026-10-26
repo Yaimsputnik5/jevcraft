@@ -57,6 +57,8 @@ function recordDeath(bot, state, now = Date.now()) {
         mobsHolding.push({ name: e.name, distance: Math.round(e.position.distanceTo(here)), ...(held.length ? { holds: held } : {}) });
       }
     }
+    // The kit before the cobblestone when the list is capped (note 2127).
+    try { dropsSeen = require('./corpse-run').byRank(dropsSeen); } catch (_) {}
     dropsSeen = dropsSeen.slice(0, 40); mobsHolding = mobsHolding.slice(0, 8);
   } catch (_) { dropsSeen = []; mobsHolding = []; }
   // How it died, in the game's own words, and what Jev had last chosen:
