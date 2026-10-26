@@ -97,6 +97,19 @@ function pearlRoutes(bot, goal, { now = Date.now(), save = () => {}, actions = {
       options.pearls_search = { description: `Sweep the Nether for another warped forest, legs of sixty-four blocks on a heading at a time, walking and digging through the netherrack, ${carried}. The sweep rests ${plural(minutesLeft(entry.until, now), 'minute')} more (${entry.why}); chosen, the rest is lifted and the sweep starts afresh from here.`,
         run: async () => { attemptsFor(goal).clear('rung', 'warped_search'); attemptsFor(goal).clear('rung', 'warped_pearls'); delete goal.warpedSearch; delete goal.pearlRoute; save(); } };
     }
+    // The endermen here (note 2223; Fable, 2026-10-26 14:30Z): 25596's pearls today (2.9 an hour, the fleet's 0.9) came
+    // from endermen met in the open Nether by the hunt step, and no way to the pearls from the stall named them: the
+    // sweep for a forest, the barter and the Overworld were the offers. Offered while one is within forty-eight; chosen,
+    // the ladder's pearl order is the hunt (pearl-order.js stageFor hunt_enderman), held half an hour or until none is left.
+    {
+      const endermen = Object.values(bot.entities || {}).filter(e => e.name === 'enderman' && e.isValid !== false && e.position && e.position.distanceTo(here) <= 48).sort((a, b) => a.position.distanceTo(here) - b.position.distanceTo(here));
+      if (endermen.length && goal.pearlOrder?.pick !== 'hunt_enderman') {
+        const near = endermen[0], d = Math.round(near.position.distanceTo(here));
+        options.pearls_endermen_here = { target: { x: Math.round(near.position.x), y: Math.round(near.position.y), z: Math.round(near.position.z) },
+          description: `Hunt the ${endermen.length === 1 ? 'enderman' : `${endermen.length} endermen`} here, the nearest ${d} blocks off: struck with the sword and never looked in the eye (a sword's blow does not make it teleport; an arrow does), about half drop a pearl, 40 health each; the hunt holds while one is within forty-eight blocks. ${require('./pearl-record').endermanSays()}${require('./pearl-record').runSays(goal, 'hunt_enderman')}`,
+          run: async () => { goal.pearlOrder = { pick: 'hunt_enderman', at: now, until: now + 30 * 60000, offered: ['enderman'], pearlsAt: count(bot, 'ender_pearl'), deathsAt: (goal.survival?.deaths || []).length, because: 'chosen at the stall: endermen here' }; delete goal.pearlRoute; save(); } };
+      }
+    }
     // A barter: gold to throw, and piglins about but none near enough for
     // the ladder's own barter (which needs one within 32).
     // Gold to throw is gold left once a gold piece is worn: three ingots

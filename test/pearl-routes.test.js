@@ -122,3 +122,17 @@ test('the Overworld\'s endermen chosen for the pearls: back through the portal f
   for (const r of require('../src/crossing-kit').KIT_PHASES) setAside(goal, 'rung', r, 'Jev chose the Nether first', 1800000);
   assert.equal(nextGameStage(bot, goal).action, 'enter_nether');
 });
+
+test('endermen in the open Nether: the hunt here is a way to the pearls from the stall, and chosen it is the ladder\'s pearl order (note 2223)', async () => {
+  const { pearlRoutes } = require('../src/pearl-routes');
+  const { bot, goal } = recorded();
+  bot.entities[9] = { id: 9, name: 'enderman', position: new Vec3(-20, 35, 90), isValid: true };
+  setAsides(goal, T0);
+  const routes = pearlRoutes(bot, goal, { now: T0, save: () => {} });
+  assert.ok(routes.options.pearls_endermen_here, Object.keys(routes.options).join(','));
+  assert.match(routes.options.pearls_endermen_here.description, /^Hunt the enderman here, the nearest 19 blocks off: struck with the sword and never looked in the eye/);
+  await routes.options.pearls_endermen_here.run(new Task('t'));
+  assert.equal(goal.pearlOrder.pick, 'hunt_enderman');
+  const again = pearlRoutes(bot, goal, { now: T0, save: () => {} });
+  assert.equal(again.options.pearls_endermen_here, undefined, 'held: not offered again while the order is the hunt');
+});
