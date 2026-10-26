@@ -263,7 +263,8 @@ function hungerRecordSays(bot, hunger) {
 const HIT_OF = { blaze: 5, ghast: 6 };
 function hitsLeftSays(bot, health) {
   const ce = require('./combat-estimate');
-  let near; try { near = require('./danger').threats(bot, 16).filter(t => t.distance <= 16); } catch (_) { return null; }
+  // Shooters count from 24 blocks (note 2214): full-6 (25596, 2026-10-26 13:32Z) fought blazes shooting from beyond sixteen and the fact fell silent for the fight's last minute, 20 to none in the fire.
+  let near; try { const { shooter } = require('./mob-policy'); near = require('./danger').threats(bot, 24).filter(t => t.distance <= (shooter(t.entity) ? 24 : 16)); } catch (_) { return null; }
   if (!near?.length) return null;
   const worn = ce.armourOf([5, 6, 7, 8].map(slot => bot.inventory?.slots?.[slot]?.name).filter(Boolean));
   const priced = near.map(t => ({ name: t.entity.name, hit: HIT_OF[t.entity.name] ?? ce.MOBS[t.entity.name]?.hit })).filter(x => Number.isFinite(x.hit))
