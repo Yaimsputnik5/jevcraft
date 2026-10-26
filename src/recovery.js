@@ -39,6 +39,26 @@ function recordDeath(bot, state, now = Date.now()) {
   let about = [];
   try { about = require('./danger').threats(bot, 24).slice(0, 8).map(t => ({ name: t.entity.name, distance: Math.round(t.distance) })); } catch (_) { about = []; }
   const worn = recent && observed.worn ? [...observed.worn] : wornNow(bot);
+  // The drops as the dying client sees them (note 2117): where each stack
+  // landed, and what the mobs about hold. The arena drills of 2026-10-26 (die
+  // in iron, quit and rejoin as the bot does, respawn 40 or 150 blocks off)
+  // saw every stack at once, 2.4 to 6.7 blocks from the death cell, and picked
+  // up every one; in play no walk back of 74 this week got the kit. The run
+  // back searches where the stacks were seen, and says what was seen.
+  let dropsSeen = [], mobsHolding = [];
+  try {
+    const here = bot.entity.position;
+    for (const e of Object.values(bot.entities || {})) {
+      if (!e?.position || e.isValid === false) continue;
+      let it = null; try { it = e.getDroppedItem?.(); } catch (_) { it = null; }
+      if (it && e.position.distanceTo(here) <= 24) { dropsSeen.push({ name: it.name, count: it.count || 1, x: Math.round(e.position.x * 10) / 10, y: Math.round(e.position.y * 10) / 10, z: Math.round(e.position.z * 10) / 10 }); continue; }
+      if ((e.type === 'hostile' || e.type === 'mob') && e.position.distanceTo(here) <= 16) {
+        const held = (e.equipment || []).filter(Boolean).map(i => i.name);
+        mobsHolding.push({ name: e.name, distance: Math.round(e.position.distanceTo(here)), ...(held.length ? { holds: held } : {}) });
+      }
+    }
+    dropsSeen = dropsSeen.slice(0, 40); mobsHolding = mobsHolding.slice(0, 8);
+  } catch (_) { dropsSeen = []; mobsHolding = []; }
   // How it died, in the game's own words, and what Jev had last chosen:
   // said with every question after (decisions/index.js recentDeaths).
   const cause = bot._deathMessage && now - bot._deathMessage.at < 5000 ? bot._deathMessage.text : null;
@@ -56,7 +76,7 @@ function recordDeath(bot, state, now = Date.now()) {
   if (bot) delete bot._stance;
   state.recovery = { status: 'pending', at: new Date(now).toISOString(), position: { ...bot.entity.position },
     dimension: bot.game.dimension, inventoryBeforeDeath: recent ? { ...observed.items } : stock(bot),
-    inventoryObservedAt: new Date(recent ? observed.at : now).toISOString(), recovered: {}, attempts: 0 };
+    inventoryObservedAt: new Date(recent ? observed.at : now).toISOString(), recovered: {}, attempts: 0, dropsSeen, mobsHolding };
 }
 
 // Restrict retrieval to observed routes: no digging, scaffolding, swimming or

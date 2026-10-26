@@ -124,6 +124,7 @@ function corpseRun(bot, goal, now = Date.now()) {
     for (const [name, count] of Object.entries(recovery.recovered || {})) if (items[name] && (items[name] -= count) <= 0) delete items[name];
     const where = dim(death.dimension);
     goal.corpseRun = { deathAt: death.at, position: { ...death.position }, dimension: where, items, passes: 0, stuck: 0,
+      ...(Array.isArray(recovery.dropsSeen) ? { drops: recovery.dropsSeen, mobsAtDeath: recovery.mobsHolding || [] } : {}),
       status: where === 'end' ? 'void' : death.lava ? 'burned' : Object.keys(items).length ? 'open' : 'nothing',
       respawn: dim(bot.game?.dimension) === where ? { ...bot.entity.position } : null };
   }
@@ -210,7 +211,17 @@ async function wearRecovered(bot) {
 // kit, then the rest.
 const FIRST = [/^ender_eye$/, /^(ender_pearl|blaze_rod|blaze_powder)$/, /^diamond/, /^(netherite|iron)_(helmet|chestplate|leggings|boots)$/, /^(bow|shield|arrow|iron_sword|iron_pickaxe|water_bucket|bucket)$/];
 const rank = name => { const i = FIRST.findIndex(r => r.test(name)); return i < 0 ? FIRST.length : i; };
-const lying = (bot, spot, name = null) => Object.values(bot.entities || {}).filter(e => { const it = e?.position && e.isValid !== false ? e.getDroppedItem?.() : null; return it && (!name || it.name === name) && e.position.distanceTo(spot) <= 12; });
+const lying = (bot, spot, name = null, seen = []) => Object.values(bot.entities || {}).filter(e => { const it = e?.position && e.isValid !== false ? e.getDroppedItem?.() : null; return it && (!name || it.name === name) && (e.position.distanceTo(spot) <= 12 || seen.some(d => Math.hypot(d.x - e.position.x, d.y - e.position.y, d.z - e.position.z) <= 6)); });
+// What the dying client saw of its drops, said on the way back (note 2117).
+function dropsSeenSays(run) {
+  if (!Array.isArray(run?.drops)) return '';
+  const p = run.position;
+  if (!run.drops.length) return ' As it died the bot saw none of its drops lying (none within 24 blocks in the moment before it left the world): where they fell is not known beyond the death cell.';
+  const far = Math.max(...run.drops.map(d => Math.hypot(d.x - p.x, d.z - p.z)));
+  const low = Math.min(...run.drops.map(d => d.y)), high = Math.max(...run.drops.map(d => d.y));
+  const holders = (run.mobsAtDeath || []).filter(m => m.holds?.length);
+  return ` As it died the bot saw ${run.drops.length} stack${run.drops.length === 1 ? '' : 's'} of its drops lying within ${Math.ceil(far)} block${Math.ceil(far) === 1 ? '' : 's'} of the death cell${high - low >= 3 ? `, from y ${Math.floor(low)} to ${Math.floor(high)}` : ''}: ${run.drops.slice(0, 6).map(d => `${d.count > 1 ? `${d.count} ` : ''}${d.name.replaceAll('_', ' ')} at (${Math.round(d.x)}, ${Math.round(d.y)}, ${Math.round(d.z)})`).join(', ')}${run.drops.length > 6 ? ', and more' : ''}; the walk back searches there.${holders.length ? ` Mobs about it then held things: ${holders.map(m => `the ${m.name.replaceAll('_', ' ')} ${m.distance} blocks off ${m.holds.map(h => h.replaceAll('_', ' ')).join(' and ')}`).join('; ')}; a zombie or skeleton picks up armour and weapons it walks over and drops them when killed.` : ''}`;
+}
 
 // A death in the Nether, the bot back to life in the Overworld: the kit lies
 // where it fell, not a second older (nobody is within the ticking 176 blocks of it), and
@@ -485,7 +496,7 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
         tree.through_nether = { description: `Go back for them through the Nether: ${mine.d} blocks to the portal at (${mine.q.x}, ${mine.q.y}, ${mine.q.z}), about ${inNether} blocks across the Nether, and out by the portal at (${theirs.q.x}, ${theirs.q.y}, ${theirs.q.z}), ${theirs.d} blocks from them, in place of ${far} blocks over the ground. They last until the bot comes within 128 blocks, then five minutes; the Nether's mobs and lava are on the way.` };
       }
     }
-    { const rec = recordSays(bot, goal); for (const k of Object.keys(tree)) tree[k].description += rec; }
+    { const rec = recordSays(bot, goal), seen = dropsSeenSays(run); for (const k of Object.keys(tree)) tree[k].description += seen + rec; }
     const decision = await require('./decisions').decide('corpse_run', { client, bot, task, goal, save, tree,
       state: { distance: far, secondsLeft: left, aboutAtDeath: death.about || [], wornAtDeath: death.worn || [], wornNow, night, ...(until !== null ? { [night ? 'minutesToDawn' : 'minutesToNight']: until } : {}), ...(run.stalled ? { walksThatGotNoNearer: run.stalled } : {}), ...(kept ? { inAChest: kept } : {}) } });
     if (decision.stale) return false;
@@ -623,12 +634,15 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
   for (const name of Object.keys(run.items).sort((a, b) => rank(a) - rank(b))) {
     for (let tries = 0; tries < 4 && run.items[name] > 0; tries++) {
       task.check();
-      if (lying(bot, spot, name).length) {
+      if (lying(bot, spot, name, run.drops || []).length) {
         try { if (!await makeRoom(name)) full = true; }
         catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
       }
       const had = countOf(bot, name);
-      try { await collect(bot, task, name, { origin: spot, radius: 12, timeoutMs: 12000, allowExcavation: true }); }
+      // Searched where the stack was seen to land as the bot died (note 2117), else at the death cell.
+      const seenAt = (run.drops || []).find(d => d.name === name);
+      const origin = seenAt ? new Vec3(seenAt.x, seenAt.y, seenAt.z) : spot;
+      try { await collect(bot, task, name, { origin, radius: 12, timeoutMs: 12000, allowExcavation: true }); }
       catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
       const gained = countOf(bot, name) - had;
       if (gained <= 0) break;
@@ -641,7 +655,7 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
   if (!Object.keys(run.items).length) { run.status = 'done'; note(goal, 'done'); bot.chat?.('Got my things back.'); }
   // Not closed while something on the list is still seen lying there and
   // the game's five minutes are not out: the next pass is for it.
-  else if (Object.keys(run.items).some(name => lying(bot, spot, name).length) && run.passes < 8) {
+  else if (Object.keys(run.items).some(name => lying(bot, spot, name, run.drops || []).length) && run.passes < 8) {
     if (full) bot.chat?.('My pockets are full and my things are still lying here. Making room.');
   }
   else if (!got || run.passes >= 2) {
@@ -656,7 +670,7 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
       const all = Object.values(bot.entities || {}).filter(e => e?.position && e.isValid !== false), here = bot.entity.position;
       const drops = all.map(e => { let it = null; try { it = e.getDroppedItem?.(); } catch (_) { it = null; } return it ? { name: it.name, n: it.count, d: Math.round(e.position.distanceTo(spot)) } : null; }).filter(Boolean).sort((a, b) => a.d - b.d);
       const within = r => drops.filter(x => x.d <= r).length;
-      console.log(`[corpse] ${run.status} at ${Math.round(here.distanceTo(spot))} blocks from the spot, ${Math.round((Date.now() - Date.parse(run.deathAt)) / 1000)} s after the death: ${all.length} entities in the list, ${drops.length} of them items (${within(12)} within 12 of the spot, ${within(32)} within 32, ${within(96)} within 96)${drops.length ? `; nearest ${drops.slice(0, 6).map(x => `${x.name}x${x.n}@${x.d}`).join(' ')}` : ''}; wanted ${listed(run.items)}; mobs about ${all.filter(e => e.type === 'hostile' || e.type === 'mob').map(e => `${e.name}@${Math.round(e.position.distanceTo(spot))}`).slice(0, 6).join(' ') || 'none'}`);
+      console.log(`[corpse] ${run.status} at ${Math.round(here.distanceTo(spot))} blocks from the spot, ${Math.round((Date.now() - Date.parse(run.deathAt)) / 1000)} s after the death: ${all.length} entities in the list, ${drops.length} of them items (${within(12)} within 12 of the spot, ${within(32)} within 32, ${within(96)} within 96)${drops.length ? `; nearest ${drops.slice(0, 6).map(x => `${x.name}x${x.n}@${x.d}`).join(' ')}` : ''}; wanted ${listed(run.items)}; mobs about ${all.filter(e => e.type === 'hostile' || e.type === 'mob').map(e => `${e.name}@${Math.round(e.position.distanceTo(spot))}${(e.equipment || []).filter(Boolean).length ? `[${(e.equipment || []).filter(Boolean).map(i => i.name).join(',')}]` : ''}`).slice(0, 6).join(' ') || 'none'}; seen at the death: ${Array.isArray(run.drops) ? `${run.drops.length} stacks` : 'not recorded'}`);
     } catch (_) { /* said only */ }
     bot.chat?.(got ? `Got some of it back. The rest is gone: ${listed(run.items)}.` : `Nothing left where I died. Lava or time took it.`);
     tripCameToNothing(bot, goal, run, save);
@@ -691,4 +705,4 @@ function dropsWaitSays(bot, goal, now = Date.now()) {
   if (off > TICKING) return ` Given the turn, the work asks first about going back for what the last death dropped, ${off} blocks off: ${what}. Drops age only while their ground is loaded, so they keep until the bot comes near.`;
   return '';
 }
-module.exports = { recordSays, FLEET_RECORD, TICKING, triedDeathsSays, dropsWaitSays, quickDeathsSays, TOLD, tripCameToNothing, KIT_ERRAND, kitTrip, corpseRun, corpseRunStep, worth, madeAgain, ironRemakeSays, IRON_MINUTES, underWay };
+module.exports = { dropsSeenSays, recordSays, FLEET_RECORD, TICKING, triedDeathsSays, dropsWaitSays, quickDeathsSays, TOLD, tripCameToNothing, KIT_ERRAND, kitTrip, corpseRun, corpseRunStep, worth, madeAgain, ironRemakeSays, IRON_MINUTES, underWay };
