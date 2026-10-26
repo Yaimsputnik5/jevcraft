@@ -6420,17 +6420,19 @@ test('the spawn bed is home for the night where no base is kept, within the reac
 // 14 seconds" beside a fight at 10.4; it ran four times and was bitten to nothing (note 2012).
 test('a run from a biter at arm\'s length is priced by what such runs have cost, and said', () => {
   const { runFromRecord, RUN_FROM_RECORD } = require('../src/survival');
-  assert.equal(runFromRecord(1.4), RUN_FROM_RECORD.near);
-  assert.equal(runFromRecord(3.1), RUN_FROM_RECORD.far);
-  assert.equal(runFromRecord(6), null);
+  assert.equal(runFromRecord(1.4), RUN_FROM_RECORD.flat.near);
+  assert.equal(runFromRecord(3.1), RUN_FROM_RECORD.flat.mid);
+  assert.equal(runFromRecord(6), RUN_FROM_RECORD.flat.far);
+  assert.equal(runFromRecord(6, true), RUN_FROM_RECORD.climb.far);
+  assert.equal(runFromRecord(9), null);
   const bot = creeperBot({ wall: false, creeper: null, weapon: 'dirt', health: 20 });
   const spider = { id: 7, name: 'spider', type: 'hostile', position: new Vec3(1.9, 64, 0.5), height: 0.9, width: 1.4, isValid: true };
   bot.entities = { 7: spider };
   const survival = new Survival(bot, { place: async () => {}, dig: async () => {}, navigate: async () => {} }, { state: { shelters: [] } });
   const options = survival.stanceOptions(new Task('x'), {}, () => {}, [{ entity: spider, distance: 1.4, visible: true }], false);
   assert.ok(options.run_from, `offered: ${Object.keys(options)}`);
-  assert.ok(options.run_from.expects.damage >= RUN_FROM_RECORD.near.median, `priced ${options.run_from.expects.damage}`);
-  assert.match(options.run_from.description, /within 2 blocks begun at 6 health or more: 75 in the records, the health lost in the 14 seconds after 6\.5 on the median, 12 or more in one run in four, and the bot dead within them in 24/);
+  assert.ok(options.run_from.expects.damage >= RUN_FROM_RECORD.flat.near.median, `priced ${options.run_from.expects.damage}`);
+  assert.match(options.run_from.description, /from a mob that bites within 2 blocks, over (flat ground|a climb or drop of four blocks or more): (7|13) in the records, the health lost in the 14 seconds after (3|1\.7) on the median/);
 });
 
 // full-3 (2026-10-21 21:22 to 21:27Z): a shaft pocket 15 blocks under its bed and 12 across offered no bed (note 2014).

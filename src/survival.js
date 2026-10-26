@@ -514,11 +514,59 @@ const SPRINT = 5.6, SCOUT_MS = 300, RUN_FROM = 24;
 // 2 blocks, was told the run was "about 0 damage over about 14 seconds"
 // beside a fight at 10.4, chose it four times, and was bitten from 18 to
 // nothing as each walk stalled or found no route.
+// The runs of the full runs full-1 and full-3 to full-7 (2026-10-20 to 25;
+// the bots' own logs, the health in the 14 seconds after, note 2114), by how
+// near the nearest biter was and by the ground the run went over: flat, or a
+// climb or drop of four blocks or more in those seconds (a stair, a shaft, a
+// slope), where the run goes at the pace of the steps, about a block a
+// second, not a sprint, and the biter follows. full-6 (2026-10-25 23:50Z),
+// bare in a one-wide staircase with a zombie 8 blocks behind it, was told
+// 'about 0 damage over about 7 seconds' (the flat figure at that distance),
+// climbed ten blocks in ten seconds and was bitten to nothing, eight blows.
 const RUN_FROM_RECORD = Object.freeze({
-  near: { within: 2, runs: 75, median: 6.5, quarter: 12, dead: 24 },
-  far: { within: 4, runs: 104, median: 1.4, quarter: 4.4, dead: 8 },
+  from: '2026-10-20', to: '2026-10-25',
+  flat: {
+    near: { within: 2, runs: 7, median: 3, quarter: 4.8, sixOrMore: 0, dead: 0 },
+    mid: { within: 4, runs: 117, median: 3, quarter: 3, sixOrMore: 9, dead: 0 },
+    far: { within: 8, runs: 117, median: 0, quarter: 0, sixOrMore: 0, dead: 0 },
+  },
+  climb: {
+    near: { within: 2, runs: 13, median: 1.7, quarter: 10, sixOrMore: 46, dead: 0 },
+    mid: { within: 4, runs: 36, median: 0, quarter: 5.5, sixOrMore: 22, dead: 2 },
+    far: { within: 8, runs: 33, median: 0, quarter: 1.5, sixOrMore: 21, dead: 0 },
+  },
 });
-const runFromRecord = d => d <= RUN_FROM_RECORD.near.within ? RUN_FROM_RECORD.near : d <= RUN_FROM_RECORD.far.within ? RUN_FROM_RECORD.far : null;
+function runFromRecord(d, climbing = false) {
+  const t = RUN_FROM_RECORD[climbing ? 'climb' : 'flat'];
+  return d <= t.near.within ? t.near : d <= t.mid.within ? t.mid : d <= t.far.within ? t.far : null;
+}
+// The ground the run would go over, read round the feet (note 2114): how
+// many of the eight cells beside them can be stood on (a passage one wide
+// has two), and whether the way off from the biter steps up or down within
+// three cells. -> { open, steps, climbing, says }
+function runGroundOf(bot, awayFrom) {
+  const feet = require('./terrain').feetCell(bot);
+  const b = (x, y, z) => bot.blockAt(new Vec3(x, y, z));
+  const standable = (x, y, z) => { const f = b(x, y - 1, z), a = b(x, y, z), h = b(x, y + 1, z); return !!f && f.boundingBox === 'block' && !!a && a.boundingBox === 'empty' && !!h && h.boundingBox === 'empty'; };
+  let open = 0;
+  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if ((dx || dz) && [-1, 0, 1].some(dy => standable(feet.x + dx, feet.y + dy, feet.z + dz))) open++;
+  // Along the way off: the cell three off from the biter, where it stands.
+  let steps = 0;
+  if (awayFrom) {
+    const dx = Math.sign(Math.round(feet.x + 0.5 - awayFrom.x)), dz = Math.sign(Math.round(feet.z + 0.5 - awayFrom.z));
+    let y = feet.y;
+    for (let k = 1; k <= 3 && (dx || dz); k++) {
+      const x = feet.x + dx * k, z = feet.z + dz * k;
+      const dy = [0, 1, -1, 2, -2].find(d => standable(x, y + d, z));
+      if (dy === undefined) break;
+      y += dy; steps += dy;
+    }
+  }
+  const passage = open <= 3;
+  const climbing = passage || Math.abs(steps) >= 2;
+  const says = `${passage ? `The bot stands in a passage: ${open} of the 8 cells beside its feet can be stood on` : `${open} of the 8 cells beside the bot's feet can be stood on`}${steps ? `, and the way off from it ${steps > 0 ? 'climbs' : 'drops'} ${Math.abs(steps)} in the next three cells` : ''}. ${climbing ? 'A run along steps goes at their pace, about a block a second (full-6, 2026-10-25 23:50Z: ten blocks up in ten seconds), not the sprint\'s 5.6, and a biter that walks 2.3 keeps up.' : 'Open ground: a sprint outruns anything that walks.'}`;
+  return { open, steps, climbing, says };
+}
 // A creeper this near ends the shield guard faced elsewhere (note 813).
 const GUARD_CREEPER_REACH = 5;
 // The retreat's scout with nothing close (no biter within 4, no creeper
@@ -5443,8 +5491,9 @@ class Survival {
         const secs = Math.round(RUN_FROM / (SPRINT - speed) * 10) / 10;
         const others = danger.filter(t => shooter(t.entity) && t.visible).length;
         const runC = runFromCreeper(bot, runCreepers, fleeFrom(lead.entity, runCreepers), RUN_FROM, runWorn);
-        const nearest = Math.min(...biters.map(t => t.distance)), rec = runFromRecord(nearest);
-        const recSays = rec ? `Runs like this one, from a mob that bites within ${rec.within} blocks begun at 6 health or more: ${rec.runs} in the records, the health lost in the 14 seconds after ${rec.median} on the median, ${rec.quarter} or more in one run in four, and the bot dead within them in ${rec.dead}; the biter strikes as the run turns, and a walk out of a corridor or a dug pocket stalls. ` : '';
+        let ground = null; try { ground = runGroundOf(bot, lead.entity.position); } catch (_) { ground = null; }
+        const nearest = Math.min(...biters.map(t => t.distance)), rec = runFromRecord(nearest, !!ground?.climbing);
+        const recSays = rec ? `${ground ? `${ground.says} ` : ''}Runs like this one on the full runs (${RUN_FROM_RECORD.from} to ${RUN_FROM_RECORD.to}), from a mob that bites within ${rec.within} blocks, ${ground?.climbing ? 'over a climb or drop of four blocks or more' : 'over flat ground'}: ${rec.runs} in the records, the health lost in the 14 seconds after ${rec.median} on the median, ${rec.quarter} or more in one run in four, 6 or more in ${rec.sixOrMore} of 100, and the bot dead within them in ${rec.dead}${ground?.climbing ? '' : `; over a climb or drop instead, 6 or more in ${runFromRecord(nearest, true)?.sixOrMore ?? 0} of 100`}. ` : '';
         // The turn (note 2078): each that bites at arm's length as the run
         // begins lands about a blow while the body turns and gets up to a
         // sprint, its wither on top, the record's median the least of it.
@@ -5455,7 +5504,7 @@ class Survival {
         const turnBlows = Math.round(atArm.reduce((n, t) => n + ce.afterArmour(ce.MOBS[t.entity.name].hit, runWorn), 0) * 10) / 10;
         const turnWither = atArm.some(t => ce.MOBS[t.entity.name]?.withers) ? 5 : 0;
         const turnSays = atArm.length ? ` At arm's length now: ${atArm.length === 1 ? `the ${atArm[0].entity.name.replaceAll('_', ' ')}` : `${atArm.length} that bite`}, each with about a blow as the run turns and gets up to a sprint, about ${turnBlows} through the armour worn${turnWither ? `, and its wither after, about ${turnWither} more over ten seconds that armour does not stop` : ''}.` : '';
-        const runDamage = Math.max(rec?.median || 0, turnBlows + turnWither);
+        const runDamage = Math.max(rec ? (ground?.climbing ? rec.quarter : rec.median) : 0, turnBlows + turnWither);
         options.run_from = { expects: { damage: Math.round((runShotCost(secs) + runC.damage + runDamage) * 10) / 10, seconds: Math.max(1, secs), oneHit },
           description: runC.says.trim() + (runC.says ? ' ' : '') + recSays + turnSays.trim() + (turnSays ? ' ' : '') + `Run from ${biters.length === 1 ? `the ${lead.entity.name.replaceAll('_', ' ')}` : `the ${biters.length} that bite`} at a sprint, to the first cell the walk reaches ${RUN_FROM} blocks or more from ${biters.length === 1 ? 'it' : 'every one of them'}: no footing is picked beforehand and nothing is searched while standing. The ${lead.entity.name.replaceAll('_', ' ')} walks about ${speed} blocks a second and the bot sprints about ${SPRINT}: the gap opens about ${Math.round((SPRINT - speed) * 10) / 10} a second, ${RUN_FROM} blocks in about ${secs} seconds, the back to ${biters.length === 1 ? 'it' : 'them'} and the shield down while it runs${others ? `; ${others} that shoot keep shooting` : ''}.${noWayOut || ' Where it ends is open ground, and what follows is asked of there.'}`,
           run: async () => {
@@ -12957,4 +13006,4 @@ function claim(bot, goal = {}, survival = null) {
   return made;
 }
 
-module.exports = { bedAfterSleepTree, sealedWaitCostSays, bedLoopOf, caveBedSaysFor, wardenBoom, LEAVES_THE_BOOM, PUSH_RECORD, pushRecordOn, blockRecord, BLOCK_RECORD, bedClimbable, BED_CLIMB, pricedRunCell, runFromRecord, RUN_FROM_RECORD, spawnBedNear, homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
+module.exports = { runGroundOf, bedAfterSleepTree, sealedWaitCostSays, bedLoopOf, caveBedSaysFor, wardenBoom, LEAVES_THE_BOOM, PUSH_RECORD, pushRecordOn, blockRecord, BLOCK_RECORD, bedClimbable, BED_CLIMB, pricedRunCell, runFromRecord, RUN_FROM_RECORD, spawnBedNear, homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
