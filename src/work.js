@@ -9041,7 +9041,14 @@ async function crossingKitReady(bot, task, goal, save, client = task.opportunity
   // A choice held is for the crossing it was made at (note 1933): one that turned back for food, or a death, since it was made asks again. full-1 (2026-10-19) chose cross_now at 21:49 with 0 of 80 food, turned back for food at 21:58, and at 22:34 crossed again unasked on the same held choice with no food carried, the kit's worked minutes still under the hold.
   const since = Number.isFinite(kit.choice?.wall) ? kit.choice.wall : 0;
   const undone = !!kit.choice && (goal.foodTurnBack?.at > since || (goal.survival?.deaths || []).some(d => Date.parse(d.at) > since));
-  const held = kit.choice && !undone && kit.choice.keys === keys && kit.workedMs - kit.choice.at < KIT_HOLD_MS && tree[kit.choice.pick];
+  // The food taken up holds while the food is still empty, whatever other
+  // top-ups come and go (note 2147): the hold was keyed on the exact option
+  // set, and a shield made or sticks crafted between passes (top_up_shield,
+  // top_up_sticks off the list) asked the crossing again at once. One run
+  // (2026-10-26 04:32:11, 04:32:56, 04:33:03, 04:33:48Z, 0 food) was asked
+  // four times in two minutes after note 2133 held the choice.
+  const sameSet = kit.choice?.keys === keys || (kit.choice?.pick === 'take_up_food' && !!tree.take_up_food);
+  const held = kit.choice && !undone && sameSet && kit.workedMs - kit.choice.at < KIT_HOLD_MS && tree[kit.choice.pick];
   let pick = held ? kit.choice.pick : null;
   if (!pick) {
     const worn = k => { const i = short.find(s => `top_up_${s.key}` === k); return i && kit.spent[i.key]?.ms >= KIT_FALLBACK_MS && i.carried > 0; };
