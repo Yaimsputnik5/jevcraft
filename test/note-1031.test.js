@@ -36,7 +36,10 @@ test('behind a wall from the mouth, in sight two cells out: that cell, its path 
   // Note 1040: none gone out for with one within twelve blocks of the mouth, and never to a cell beside a drop.
   const crowd = world(new Vec3(24.5, 64, 0.5));
   crowd.bot.entities[6] = { id: 6, name: 'enderman', position: new Vec3(6.5, 64, -6.5), isValid: true, metadata: [] };
-  assert.equal(slot.outSpot(crowd.bot, crowd.site, Object.values(crowd.bot.entities)), null, 'one eight blocks from the mouth');
+  // Note 2255: a calm one within twelve no longer stops the going out; a turned one does.
+  assert.ok(slot.outSpot(crowd.bot, crowd.site, Object.values(crowd.bot.entities)), 'a calm one eight blocks from the mouth does not stop it');
+  crowd.bot.entities[6].metadata = { 17: true };
+  assert.equal(slot.outSpot(crowd.bot, crowd.site, Object.values(crowd.bot.entities)), null, 'a turned one eight blocks from the mouth does');
   const ledge = world(new Vec3(24.5, 64, 0.5)), was = ledge.bot.blockAt;
   // The floor east of x 1 is gone (a drop) on both sides of the mouth's row.
   ledge.bot.blockAt = p => { const c = p.floored(); return c.x >= 1 && c.x <= 3 && c.z !== 0 && c.y <= 63 && c.y >= 50 ? { position: c, name: 'air', boundingBox: 'empty', shapes: [] } : was(p); };

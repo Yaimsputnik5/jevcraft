@@ -89,11 +89,14 @@ function slotFrom(bot, f) {
 // the mouth, 9 endermen killed in all: the slot is dug where the rock is,
 // and the endermen walk where it is open.
 // -> { cell, path, e, steps, gap } or null
-const OUT_STEPS = 4, OUT_TRIES = 3, BOT_RUN = 4.3, BACK_START = 0.5, OUT_CLEAR = 12;
+const OUT_STEPS = 4, OUT_TRIES = 8, BOT_RUN = 4.3, BACK_START = 0.5, OUT_CLEAR = 12;
 function outSpot(bot, site, list) {
-  // Not with one within OUT_CLEAR of the mouth, turned or not: it is at the bot before the look is done.
+  // Not with a turned one within OUT_CLEAR of the mouth: it is at the bot before the look is done. A calm one near does not come
+  // unless looked at (note 2255): counted calm or turned, in a warped forest with 8 to 18 endermen within 40 there was always one
+  // within twelve, and not one '[slot] out' line was logged on four fresh runs; 19 of full-6's 22 slot sessions ended 'none left in
+  // line from the mouth' after one kill (Fable, 2026-10-26 19:50Z).
   const mid0 = site.mouth.offset(0.5, 0, 0.5);
-  if (list.some(x => x.position.distanceTo(mid0) <= OUT_CLEAR)) return null;
+  if (list.some(x => angry(x) && x.position.distanceTo(mid0) <= OUT_CLEAR)) return null;
   const at = c => bot.blockAt(c), solid = b => !!b && b.boundingBox === 'block', open = b => !!b && b.boundingBox === 'empty' && !/lava|water|fire/.test(b.name);
   const stands = c => open(at(c)) && open(at(c.offset(0, 1, 0))) && solid(at(c.offset(0, -1, 0))) && !/magma|fire/.test(at(c.offset(0, -1, 0)).name);
   // No drop beside it: each of the eight cells round it is rock, or open with a floor under it or one step down.
@@ -321,7 +324,11 @@ async function fight(bot, task, site, { navigate, seconds = 60, want = 1, item =
           if (angry(spot.e)) { noLineSince = null; turnedAt = Date.now(); }
           continue;
         }
-        if (Date.now() - noLineSince > NO_LINE_MS) { out.ended = dead ? 'none left in line from the mouth' : `none of the ${all.length} about has a line to the mouth${all.some(level) ? '' : ` (all more than ${LEVEL} blocks over or under it)`}`; break; }
+        // Held while endermen are about within forty (note 2255): the slot is the one place the bot takes no hurt from them (52
+        // fights, none hurt), and a session ended at twelve seconds without a line was asked again and dug anew 12 to 20 s later;
+        // the stand goes on to its deadline, looking from the mouth and going out to the ones in sight.
+        const near40 = all.some(x => x.position.distanceTo(bot.entity.position) <= 40);
+        if (Date.now() - noLineSince > NO_LINE_MS && (!near40 || Date.now() > deadline - 2000)) { out.ended = dead ? 'none left in line from the mouth' : `none of the ${all.length} about has a line to the mouth${all.some(level) ? '' : ` (all more than ${LEVEL} blocks over or under it)`}`; break; }
         await bot.lookAt(site.mouth.offset(0.5, 0, 0.5), true);
         await sleep(200); continue;
       }
