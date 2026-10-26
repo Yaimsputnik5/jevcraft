@@ -23,13 +23,13 @@ const blaze = (id, x) => ({ id, name: 'blaze', type: 'hostile', position: new Ve
 test('25599: 4.1 health in an iron chestplate, a blaze 4 blocks off: the fireball is about 4.3 through the armour, no more hits, the next one ends it', () => {
   const b = bot({ health: 4.1, worn: { torso: 'iron_chestplate' }, entities: { 2: blaze(2, 4.5) } });
   const says = hitsLeftSays(b, 4.1);
-  assert.equal(says, "the hardest hit about, the blaze's, is about 4.3 through what is worn: at 4.1 health the body takes 0 more such hits, and the next one ends it; a fireball that lands sets the body alight too, about a health a second for five seconds");
+  assert.equal(says, "the hardest hit about, the blaze's, is about 4.3 through what is worn and about 5 more of burning after it (a fireball that lands sets the body alight for five seconds, a health a second, through any armour): at 4.1 health the body takes 0 more such hits counting the burn, and the next one ends it");
   assert.equal(healingSays(b, {}).hitsLeft, says, 'carried on the healing facts every fight question has');
 });
 
-test('full health with nothing worn and a wither skeleton beside a blaze: the hardest hit named, four more before the one after ends it', () => {
+test('full health with nothing worn and a wither skeleton beside a blaze: the blaze\'s fireball with its burn (10) is the hardest, over the wither skeleton\'s 8 (note 2234)', () => {
   const b = bot({ health: 20, entities: { 2: blaze(2, 6.5), 3: { id: 3, name: 'wither_skeleton', type: 'hostile', position: new Vec3(3.5, 64, 0.5), isValid: true, height: 2.4 } } });
-  assert.match(hitsLeftSays(b, 20), /^the hardest hit about, the wither skeleton's, is about 8 through what is worn \(nothing worn\): at 20 health the body takes 2 more such hits, and the one after ends it$/);
+  assert.match(hitsLeftSays(b, 20), /^the hardest hit about, the blaze's, is about 5 through what is worn \(nothing worn\) and about 5 more of burning after it .*: at 20 health the body takes 1 more such hit counting the burn, and the one after ends it$/);
 });
 
 test('nothing hostile about: nothing said', () => {

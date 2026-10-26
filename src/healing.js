@@ -268,17 +268,19 @@ function hitsLeftSays(bot, health) {
   if (!near?.length) return null;
   const worn = ce.armourOf([5, 6, 7, 8].map(slot => bot.inventory?.slots?.[slot]?.name).filter(Boolean));
   const priced = near.map(t => ({ name: t.entity.name, hit: HIT_OF[t.entity.name] ?? ce.MOBS[t.entity.name]?.hit })).filter(x => Number.isFinite(x.hit))
-    .map(x => ({ ...x, through: ce.MOBS[x.name]?.ignoresArmour ? x.hit : ce.afterArmour(x.hit, worn) }));
+    .map(x => ({ ...x, through: ce.MOBS[x.name]?.ignoresArmour ? x.hit : ce.afterArmour(x.hit, worn), burn: x.name === 'blaze' ? 5 : 0 }));
   if (!priced.length) return null;
-  const worst = priced.reduce((a, b) => b.through > a.through ? b : a);
-  const left = x => { const more = Math.max(0, Math.ceil(health / x.through) - 1); return `at ${health} health the body takes ${more} more such hit${more === 1 ? '' : 's'}, and the ${more ? 'one after' : 'next one'} ends it`; };
+  // The blaze's burn counted with its fireball (note 2234): the fireball sets the body alight for five seconds, about a health a second, and the armour stops none of it. full-6 (25596, 2026-10-26 16:23Z) at 5.9 health in armour read 'the blaze ... lands about 2.7: ... takes 1 more such hit' and picked rail_and_fight, shield_guard, keep_working and out_of_sight; the fireball took it to 3.2 and the burn the rest, 3.2 to 2.2 to 1.2 to 0.2 to none.
+  const whole = x => x.through + (x.burn || 0);
+  const worst = priced.reduce((a, b) => whole(b) > whole(a) ? b : a);
+  const left = x => { const more = Math.max(0, Math.ceil(health / whole(x)) - 1); return `at ${health} health the body takes ${more} more such hit${more === 1 ? '' : 's'}${x.burn ? ' counting the burn' : ''}, and the ${more ? 'one after' : 'next one'} ends it`; };
   // The one landing hits named beside the hardest (note 2211): with a creeper anywhere within sixteen the hardest hit is its
   // 24, and full-7 (25597, 2026-10-26 12:52 to 12:57Z) read 'the next one ends it' on eight questions while a skeleton's
   // arrows, about 3 through nothing worn, took it from 20 to 8 to none; the kind that hit the bot within twenty seconds
   // (bot._hurtBy) is said with its own count where it is not the hardest.
   const hurtBy = bot._hurtBy || {}, now = Date.now();
-  const hitting = priced.filter(x => x.name !== worst.name && hurtBy[x.name] > now - 20000).reduce((a, b) => !a || b.through > a.through ? b : a, null);
-  return `the hardest hit about, the ${worst.name.replace(/_/g, ' ')}'s, is about ${round(worst.through)} through what is worn${worn.points ? '' : ' (nothing worn)'}: ${left(worst)}${worst.name === 'blaze' ? '; a fireball that lands sets the body alight too, about a health a second for five seconds' : ''}${hitting ? `. The one hitting the bot now, the ${hitting.name.replace(/_/g, ' ')} (its last hit ${Math.max(1, Math.round((now - hurtBy[hitting.name]) / 1000))} s ago), lands about ${round(hitting.through)}: ${left(hitting)}` : ''}`;
+  const hitting = priced.filter(x => x.name !== worst.name && hurtBy[x.name] > now - 20000).reduce((a, b) => !a || whole(b) > whole(a) ? b : a, null);
+  return `the hardest hit about, the ${worst.name.replace(/_/g, ' ')}'s, is about ${round(worst.through)} through what is worn${worn.points ? '' : ' (nothing worn)'}${worst.burn ? ` and about ${worst.burn} more of burning after it (a fireball that lands sets the body alight for five seconds, a health a second, through any armour)` : ''}: ${left(worst)}${hitting ? `. The one hitting the bot now, the ${hitting.name.replace(/_/g, ' ')} (its last hit ${Math.max(1, Math.round((now - hurtBy[hitting.name]) / 1000))} s ago), lands about ${round(hitting.through)}${hitting.burn ? ` and about ${hitting.burn} more of burning` : ''}: ${left(hitting)}` : ''}`;
 }
 // The standing fact: health and hunger, whether health comes back, the food
 // carried and the nearest known, the time to daylight, and what standing
