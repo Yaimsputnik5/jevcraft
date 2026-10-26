@@ -3699,10 +3699,16 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
               check();
               const d = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e)); if (!d) break;
               const ph = metadata(bot, d, 'phase'); if ([5, 6, 7, 9, 10].includes(ph)) { why = `the dragon perched (phase ${ph})`; break; }
+              // Seated while the dragon is within forty flat and not going away (note 2226): the hold's height test (thirty up
+              // is no pass) had the body up after 0 s in dragon-328 and 319 (14:50 to 15:10Z) with the dragon 35 and 2 blocks
+              // off above it, and a dragon above dives; the seat costs nothing while the pass is in doubt.
               const q = bot.entity.position, f0 = Math.hypot(d.position.x - q.x, d.position.z - q.z);
-              if (f0 > 40 || Math.abs(d.position.y - q.y) > 30) { why = `the dragon ${Math.round(f0)} blocks off`; break; }
+              if (f0 > 40) { why = `the dragon ${Math.round(f0)} blocks off`; break; }
               if (Date.now() - t1 > 25000) { why = `25 s passed with the dragon still about, ${Math.round(f0)} blocks off`; break; }
               await sleep(250);
+              const d2 = Object.values(bot.entities).find(e => e.name === 'ender_dragon' && live(bot, e)); if (!d2) break;
+              const f1 = Math.hypot(d2.position.x - q.x, d2.position.z - q.z), closing = (f0 - f1) / 0.25;
+              if (f1 > 28 && closing < -2 && Date.now() - t1 > 3000) { why = `the dragon ${Math.round(f1)} blocks off, going away at ${Math.round(-closing)} a second`; break; }
             }
             const seatedFor = Date.now() - t1;
             try { await boats.leaveBoat(bot); } catch (_) { /* left on the next pass */ }
