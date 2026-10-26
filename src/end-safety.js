@@ -463,6 +463,16 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
         console.log(`[end safety] no block up out of the cloud at ${f}: ${[carried < 1 ? 'no block carried' : null, !headClear ? `a block two over the head (${bot.blockAt(f.offset(0, 2, 0))?.name})` : null, ballNear ? 'a fireball within 14' : null].filter(Boolean).join(', ')}; ${bot.health.toFixed(1)} health`);
       }
       if (carried >= 1 && headClear && !ballNear) {
+        // Onto the block that holds the body first (note 2249): a body on a block's edge stands in a cell with air under it, and the climb, which lays its block from the cell's floor, refused at once. 25592's stronghold-1-dragon-342 (2026-10-26 17:59Z) at (61, 46, -23) and dragon-343 (18:00Z) at (58, 44, 4), on the island's low east rim (the region read: no block under (58, 43, 4), end stone under the cell beside), each logged 'not up in 1 to 3 ms' and died in the cloud. The nearest cell beside with a block under it and room for the body is stepped onto, sneaking, before the climb.
+        if (bot.blockAt(f.offset(0, -1, 0))?.boundingBox !== 'block') {
+          const p0 = bot.entity.position, ts = Date.now(), solid = c => bot.blockAt(c)?.boundingBox === 'block', open = c => bot.blockAt(c)?.boundingBox !== 'block';
+          const cell = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]].map(([dx, dz]) => f.offset(dx, 0, dz)).filter(c => solid(c.offset(0, -1, 0)) && open(c) && open(c.offset(0, 1, 0)))
+            .sort((a, b) => Math.hypot(a.x + .5 - p0.x, a.z + .5 - p0.z) - Math.hypot(b.x + .5 - p0.x, b.z + .5 - p0.z))[0];
+          if (cell) {
+            try { await move(bot, { check: () => task.check(), get cancelled() { return task.cancelled; }, label: task.label }, { label: 'onto_the_holding_block', keys: ['forward'], sneak: true, look: cell.offset(.5, 1.6, .5), maxMs: 700, tick: 25, until: () => Math.floor(bot.entity.position.x) === cell.x && Math.floor(bot.entity.position.z) === cell.z }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+          }
+          console.log(`[end safety] air under the feet's cell at ${f} with the body on a block's edge: ${cell ? `onto ${cell} in ${Date.now() - ts} ms, now at ${bot.entity.position.floored()}` : 'no cell beside with a block under it'} before the one block up`);
+        }
         const h0 = bot.health, t0 = Date.now();
         goal.step = { action: 'one_up_out_of_the_cloud', health: bot.health }; save();
         // The climb's own refusal said (note 2248): 25592's stronghold-1-dragon-342 (2026-10-26 17:59Z) at (61, 46, -23) with 47 blocks and the sky open logged 'not up in 1 ms' and died in the cloud, the reason swallowed.
