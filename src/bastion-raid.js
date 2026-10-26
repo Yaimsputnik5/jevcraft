@@ -264,6 +264,21 @@ function foodRoute(bot, goal, { navigate = null, loot = null, now = Date.now() }
     } };
 }
 
+// A food raid chosen and on (foodRoute's run begins it with one leg) goes on from any later pass (note 2196): the walk
+// to the bastion, the chests looted on arrival, the raid closed when none is left. -> true while it ran something.
+// 25596 (2026-10-26 10:39:43Z) chose raid_bastion at hunger 12 with nothing to eat, walked one leg, and then stood in
+// recover_before_combat seven minutes at 12 health, no regeneration possible, the raid never walked again.
+async function continueFoodRaid(bot, task, goal, save, { navigate = null, loot = null, now = Date.now() } = {}) {
+  const held = goal?.bastionRaid;
+  if (!navigate || !held || held.via !== 'food' || held.pick !== 'raid_chests' || held.ended || held.raided || now - held.at > HOLD_MS) return false;
+  if (!raidOn(goal, now)) return false;
+  goal.step = { action: 'raid_bastion_for_food', bastion: held.key, since: held.at }; save?.();
+  const arrived = await require('./exploration').goToLandmark(bot, task, goal, save, ['bastion'], { navigate, reach: REACH, arrive: 20 });
+  if (arrived && loot && await loot(bot, task, goal, save)) return true;
+  if (arrived && !require('./looting').lootableChests(bot, goal, { reach: RAID_REACH }).length) { closeRaid(goal); save?.(); }
+  return true;
+}
+
 // A raid ends: what it took, or that it came to nothing. Called when no
 // chest is left to open at the bastion (or none could be reached); the
 // record is kept for the next time the question is asked.
@@ -284,4 +299,4 @@ function closeRaid(goal, { now = Date.now() } = {}) {
   return entry || null;
 }
 
-module.exports = { foodRoute, beginTrip, FOOD, RECORD, CHESTS, HOLDS, LID, REACH, RAID_REACH, HOLD_MS, offer, facts, options, chooseTrip, raidOn, heldFor, closeRaid, settle, rememberRaid, goldWorn, seenNow };
+module.exports = { foodRoute, continueFoodRaid, beginTrip, FOOD, RECORD, CHESTS, HOLDS, LID, REACH, RAID_REACH, HOLD_MS, offer, facts, options, chooseTrip, raidOn, heldFor, closeRaid, settle, rememberRaid, goldWorn, seenNow };

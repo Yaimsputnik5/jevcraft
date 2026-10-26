@@ -1542,7 +1542,7 @@ const coverKept = state => (state.cover || []).filter(c => c.until > Date.now())
 // fight: back for food, or on without it, as Jev chooses (leave_nether).
 // null when the question went stale.
 // What the food ways carry out with, from the hunt's own actions.
-const foodActions = (bot, task, goal, save, actions) => ({ navigate: actions.navigate, returnOverworld: actions.returnOverworld, acquire: actions.acquireStep, client: actions.client,
+const foodActions = (bot, task, goal, save, actions) => ({ navigate: actions.navigate, returnOverworld: actions.returnOverworld, acquire: actions.acquireStep, client: actions.client, loot: actions.loot || null,
   mineOne: actions.mineAt ? (p, block) => actions.mineAt(bot, task, goal, save, p, block, block) : null });
 // The food kit of the stay, asked inside the Nether the first time a Nether
 // question is due (nether-food.js askStayKit): true when a way was chosen and
@@ -1752,6 +1752,14 @@ async function prepareMobHunt(bot, task, step, goal, save, actions) {
     }
     if (keepOn && bot.food < 18 && !hasFood(bot) && handler.dimension === 'nether' && dimension(bot) === 'nether' && actions.tunnel && !threats(bot, 16).some(t => t.visible)) {
       await findFortressStep(bot, task, goal, save, actions); return;
+    }
+    // A food raid Jev chose goes on before any waiting (bastion-raid.js continueFoodRaid, note 2196): with hunger under
+    // eighteen and nothing to eat the wait below brings nothing back.
+    if (bot.food < 18 && !hasFood(bot) && actions.navigate) {
+      let went = false;
+      try { went = await require('./bastion-raid').continueFoodRaid(bot, task, goal, save, { navigate: actions.navigate, loot: actions.loot || null }); }
+      catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
+      if (went) return;
     }
     goal.step = { action: 'recover_before_combat', health: bot.health, food: bot.food, neededHealth: handler.passive ? 10 : 14, neededFood: handler.passive ? 6 : 14 }; save();
     // Something already at arm's length, still hitting: not a hazard to
