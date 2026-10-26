@@ -38,6 +38,9 @@ const HOLD_MS = 10 * 60 * 1000, SIDE_REST_MS = 10 * 60 * 1000, SIDE_FAIL_MS = 30
 const TO_THE_NETHER = /^(nether_first|stage_reach_nether)$/;
 const fatal = err => ['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err?.name);
 const label = phase => phase.replaceAll('_', ' ');
+// The win's own record of the End's re-kitting (note 2131): full-2 (2026-10-20 to 10-24, the dragon killed) spent
+// about 23 of its 109 hours kitting again in the Overworld after deaths in the End.
+const ENDS_RECORD = Object.freeze({ hours: 23, of: 109, says: " On full-2, the run that killed the dragon (2026-10-20 to 10-24), about 23 of its 109 hours went to kitting again in the Overworld after deaths in the End." });
 const { spoken, Spoken } = require('./spoken');
 
 const RUNG_WHY = {
@@ -597,9 +600,37 @@ function strategyOptions(bot, goal, stage, sides = {}, planFor = null) {
       run: async () => { for (const p of left) setAside(goal, 'rung', p, 'Jev chose the Nether first', 1800000); if (left.includes('nether_food')) delete goal.foodTrip; delete goal.rungOptIn; },
     };
   };
+  // The End first, where the Nether holds nothing more (note 2131): past
+  // the stronghold with the ring known, a death puts the kit's rungs back
+  // on the ladder and this question offered them alone. full-3 (2026-10-26
+  // 01:14 to 03:23Z, its portal lit and the End entered once) was offered
+  // the bow, the diamond pickaxe, spare armour and side trips 17 times, 643
+  // blocks from its ring, and answered none good 11 times; full-2's win
+  // spent about 23 of its 109 hours kitting again after deaths in the End.
+  const endFirst = all => {
+    const m = goal.gameProgress?.milestones || {}, ep = goal.endPortal;
+    if (!m.stronghold_located || !ep?.center || require('./eye-need').eyeTarget(goal) !== 0) return null;
+    const resting = attemptsFor(goal).of('rung');
+    const left = all.filter(p => !GOING_WITHOUT.test(resting[p]?.why || ''));
+    if (!left.length) return null;
+    const here = bot.entity?.position, off = here ? Math.round(Math.hypot(here.x - ep.center.x, here.z - ep.center.z)) : null;
+    const L = require('./levels'), secs = off === null ? null : L.walkSeconds(off);
+    const walk = secs === null ? '' : `, about ${secs < 90 ? `${Math.max(5, Math.round(secs / 5) * 5)} seconds` : `${Math.round(secs / 60)} minutes`}' walk at the ${L.LEVEL_RECORD.walkBlocksAMinute} blocks a minute the bot's walks have made, stalls and detours counted`;
+    const frames = Array.isArray(ep.frames) ? ep.frames : [], lit = ep.litAt || (frames.length && frames.every(f => f.eye));
+    let kit = '';
+    try { const short = require('./end-supplies').kitItems(bot, goal).filter(i => i.short); kit = short.length ? ` The kit as it stands is short of ${short.map(i => `${i.item ? label(i.item) : i.key} (${i.carried ?? 0} of ${i.wants ?? 1})`).join(', ')}: at the ring the End kit question says each and prices topping it up, and the End is entered as Jev chooses there.` : ' The kit as it stands wants nothing the End kit question asks for.'; } catch (_) { kit = ''; }
+    return {
+      description: `Leave ${left.map(label).join(', ')} for later and go to the End portal now, with the kit carried now: the ring at (${Math.round(ep.center.x)}, ${Math.round(ep.center.y)}, ${Math.round(ep.center.z)})${off === null ? '' : `, ${off} blocks off${walk}`}, ${lit ? 'lit' : 'its eyes set as the ladder has them'}.${kit}${ENDS_RECORD.says} ${left.map(p => `Without the ${label(p)}: ${WITHOUT[p] || RUNG_WHY[p] || 'it waits'}.`).join(' ')}`,
+      says: `I'll leave the ${left.map(label).join(' and the ')} for later`,
+      chat: `I'll leave the ${left.map(label).join(' and the ')} for later and go to the End portal now.`,
+      side: true, aside: true,
+      run: async () => { for (const p of left) setAside(goal, 'rung', p, 'Jev chose the End first', 1800000); delete goal.rungOptIn; },
+    };
+  };
   if (rungs.length && rungs[0].phase === stage.phase && dimension(bot) === 'overworld' && rungs.every(r => DEFERRABLE.has(r.phase))) {
     const first = netherFirst(rungs.map(r => r.phase));
     if (first) options.nether_first = first;
+    else { const end = endFirst(rungs.map(r => r.phase)); if (end) options.end_first = end; }
   }
   // Past the preparation ladder (pearls, the stronghold, the crossing): the
   // ladder's stage and the side trips. The dream run spent an afternoon

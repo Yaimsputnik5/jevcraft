@@ -218,7 +218,7 @@ function optionalRungs(bot, goal = {}, now = Date.now()) {
 }
 const kitResting = resting => Object.keys(resting).filter(k => require('./crossing-kit').KIT_PHASES.has(k));
 // The Overworld's endermen chosen first (note 831) is going without them too.
-const GOING_WITHOUT = /Nether first|fight with what is carried|for the pearls first/;
+const GOING_WITHOUT = /Nether first|End first|fight with what is carried|for the pearls first/;
 const goingWithout = resting => new Set(Object.keys(resting).filter(k => GOING_WITHOUT.test(resting[k].why || '')));
 // The rungs Jev set aside to go without, in ladder order, each with when it
 // comes back on its own: what the ladder would hand back were they lifted.
