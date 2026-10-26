@@ -168,6 +168,16 @@ function chaseSays(bot, danger, { apartIds = new Set(), destination = null, runS
 // way, 11.5 health to none (note 1135).
 const paceOf = t => t.entity.vehicle ? Math.max(blocksPerSecond(t.entity.name), SPRINT) : blocksPerSecond(t.entity.name);
 const RUN_START = 0.3;
+// The cover the bot stands in from shooters (note 2164): one or more within 48 blocks, none with a line to the bot
+// here. -> { count, kinds, nearest, says } or null. `threats` injectable for the tests.
+function shooterCover(bot, { threats = require('./danger').threats } = {}) {
+  const { shooter } = require('./mob-policy');
+  const shooters = threats(bot, 48).filter(t => t.entity && shooter(t.entity));
+  if (!shooters.length || shooters.some(t => t.visible)) return null;
+  const kinds = [...new Set(shooters.map(t => t.entity.name.replaceAll('_', ' ')))].join(', ');
+  const nearest = Math.round(Math.min(...shooters.map(t => t.distance)));
+  return { count: shooters.length, kinds, nearest, says: ` In cover now: none of the ${shooters.length} shooter${shooters.length === 1 ? '' : 's'} within 48 blocks (${kinds}; the nearest ${nearest} blocks off) has a line to the bot here, and every way to food begins by stepping out of it into their lines.` };
+}
 function chaseCost(bot, danger, { apartIds = new Set(), destination = null, runSeconds = null, seconds = 15, pace = null } = {}) {
   if (!destination || !runSeconds) return { damage: 0, says: '' };
   // The run's pace as measured (run-pace.js, note 2162): a mob as fast as it is with the bot through the run.
@@ -12421,6 +12431,30 @@ class Survival {
         (night(bot) && underground ? ` Food is mostly on the surface, and it is night there until dawn, about ${minutesToDawn(bot)} real minutes off; the climb up comes out among its mobs. ${Math.round(bot.health * 10) / 10} health now${healing ? ', not coming back' : ''}${nightEnds(bot)}.` : ''),
       children: offWorld && this.actions.returnOverworld ? this.offWorldFood(task, goal, save) : await forageChoices(bot, task, goal, save, this.actions, this.state, { target: desiredFood }) };
     if (tree.obtain_food && !Object.keys(tree.obtain_food.children).length) delete tree.obtain_food;
+    // In cover from shooters off the Overworld (note 2164): full-7 (2026-10-26 07:10:31Z), 7.6 health behind two
+    // blocks where none of 19 blazes had a line, was asked for food (hunger 17, nothing carried) with the portal, a
+    // hoglin and a bastion the only ways, each beginning with a step out of the cover; it took one, was hit from 7.6 to
+    // 4.2 and died at 07:10:38Z. Of 8 such asks in 24 hours (three or more shooters within 48, none with a line), 2
+    // were followed by a death within a minute. Staying in the cover is a way, said with what it holds and what not.
+    if (offWorld && tree.obtain_food) {
+      const cover = shooterCover(bot);
+      if (cover) {
+        tree.obtain_food.description += cover.says;
+        const self = this;
+        tree.stay_covered = { description: `Stay in this cover, still, out of every shooter's line: ${cover.count} (${cover.kinds}) within 48 blocks, none with a line to the bot here, the nearest ${cover.nearest} blocks off. ${(bot.food ?? 20) >= 18 ? 'Health comes back meanwhile, about one each four seconds while hunger stays at eighteen or more.' : `No health comes back meanwhile: hunger ${bot.food}, under eighteen${foodSupply(bot) === 0 ? ', and nothing carried is food' : ''}.`} The shooters drift and their lines change. Held up to 30 seconds; asked again sooner if a line opens or a mob comes within 5 blocks.`,
+          waits: require('./waits').mobsMoveOff(`the ${cover.count} shooter${cover.count === 1 ? '' : 's'}`),
+          run: async () => {
+            self.report(goal, save, { action: 'stay_covered', shooters: cover.count, health: bot.health });
+            const { threats } = require('./danger'), { shooter } = require('./mob-policy');
+            for (const until = Date.now() + 30000; Date.now() < until;) {
+              task.check(); checkThreats(bot);
+              const now = threats(bot, 48);
+              if (now.some(t => shooter(t.entity) && t.visible) || now.some(t => !shooter(t.entity) && t.distance <= 5)) break;
+              await sleep(250);
+            }
+          } };
+      }
+    }
     // Food or the work, priced from the record (note 784): each way's
     // minutes to the food with what such ways got where the bot is, the ways
     // that failed here said as facts on themselves, the hunger drain to the
@@ -13110,4 +13144,4 @@ function claim(bot, goal = {}, survival = null) {
   return made;
 }
 
-module.exports = { runGroundOf, bedAfterSleepTree, sealedWaitCostSays, bedLoopOf, caveBedSaysFor, wardenBoom, LEAVES_THE_BOOM, PUSH_RECORD, pushRecordOn, blockRecord, BLOCK_RECORD, bedClimbable, BED_CLIMB, pricedRunCell, runFromRecord, RUN_FROM_RECORD, spawnBedNear, homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
+module.exports = { shooterCover, runGroundOf, bedAfterSleepTree, sealedWaitCostSays, bedLoopOf, caveBedSaysFor, wardenBoom, LEAVES_THE_BOOM, PUSH_RECORD, pushRecordOn, blockRecord, BLOCK_RECORD, bedClimbable, BED_CLIMB, pricedRunCell, runFromRecord, RUN_FROM_RECORD, spawnBedNear, homeBedReach, fleeFrom, furnaceFood, runFromCreeper, deadlyEdgeWalk, sprintByHeading, nightEnds, sealThreatNear, scoutBudget, SCOUT_MS, SCOUT_FAR_MS, mealSays, nightMinePickSays, bedSafetyAt, healWaitSays, WAITS_IN, wearGoldOf, piglinGoldClause, blowsLead, pastFollowOf, sealedWaitSaysFor: (bot, opts) => sealedWaitSays(bot, opts), lavaExitCost, nookSaysFor: (bot, nook, opts) => nookSays(bot, nook, opts), nightMineHolds, NIGHT_MINE_IDLE_MS, underRock, sleepRefusalSays, shellUnfinishedSays, spawnerMob, routeOf, shotsDue, shotChanceNow, routeEdge, pushCarries, pushFooting, blastPushesOver, blastOverSays, pushAtSays, shotPushers, BLAST_THROW, wallCells, wallStock, searchBudget, lavaTop, lavaFill, swimReach, pocketPlan, pocketRestsOf, pocketBiters, farBiters, piglinGoldSays, claim, chaseSays, chaseCost, groundBeside, onPillarTop, eatApple, LAVA_BLOCKS_A_SECOND, effectsSay, spawnerAbout, unseenBiters, fartherShootersSay, mobSourceAbout, shieldFacing, biterAtArm, pickaxeReserve, chargeSays, creeperSays, costSays, openCells, eatSays, mealHelps, EAT_AFTER, PILLAR_SECONDS, BLOCK_SECONDS, EAT_SECONDS, CLIMBERS, MOVING_STANCES, chargeStopsAt, usesToClimbOut, SLEEP_DEBT_TICKS, Survival, inLava, inWater, lavaExit, besideDrop, firmGround, night, shelterNeeded, lavaBeside, bedSite, bedNook, monstersByBed, monstersAtBed, refusalSays, nearbyHomeBed, observedBed, sleepable, SLEEP_FROM, keepShieldForStance, SHIELD_STANCES, ORE_YIELD, nightMineOn };
