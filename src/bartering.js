@@ -102,9 +102,35 @@ async function barterStep(bot, task, goal, save, actions = {}) {
       const want = Math.min(9, Math.max(1, Math.floor(near * 4 / 9)));
       goal.step = { action: 'barter_mine_gold', ores: near, ingotsWanted: want }; save();
       bot.chat?.(`Gold ore in sight: mining it to barter with the piglins.`);
-      const until = Date.now() + 120000;
-      try { for (let n = 0; n < 24 && Date.now() < until && ingots(bot) < want; n++) { task.check(); if (await actions.acquireStep(bot, task, 'gold_ingot', ingots(bot) + 1, goal, save) === false) break; } }
-      catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
+      // The nether gold ore itself, dug block by block (note 2187): asked for gold ingots, the planner's way was the
+      // Overworld's gold ore, and mid-231-dk-nether-1 (25600, 2026-10-26 10:07Z) chose this way with 64 nether gold
+      // ores within 32 blocks and went back through its portal to mine gold ore at y 16.
+      const { goals } = require('mineflayer-pathfinder');
+      const id = bot.registry.blocksByName.nether_gold_ore.id, tried = new Set(), until = Date.now() + 120000;
+      let dug = 0;
+      try {
+        while (Date.now() < until && dug < 40 && nuggets(bot) + 9 * ingots(bot) < 9 * want) {
+          task.check(); checkAir(bot);
+          const here = bot.entity.position;
+          const ore = bot.findBlocks({ matching: id, maxDistance: 32, count: 16 }).filter(p => !tried.has(`${p}`)).sort((a, b) => a.distanceTo(here) - b.distanceTo(here))[0];
+          if (!ore) break;
+          tried.add(`${ore}`);
+          try { await actions.navigate(bot, task, new goals.GoalNear(ore.x, ore.y, ore.z, 2), { timeoutMs: 15000, stallMs: 5000 }); }
+          catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; continue; }
+          const block = bot.blockAt(ore);
+          if (block?.name !== 'nether_gold_ore' || block.position.distanceTo(bot.entity.position) > 5) continue;
+          const pick = bot.inventory.items().find(i => /_pickaxe$/.test(i.name));
+          if (!pick) break;
+          await bot.equip(pick, 'hand');
+          try { await bot.dig(block); dug++; } catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; continue; }
+          await sleep(700);
+        }
+      } catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
+      console.log(`[barter] dug ${dug} nether gold ore: ${nuggets(bot)} nuggets and ${ingots(bot)} ingots carried`);
+      if (nuggets(bot) >= 9) {
+        goal.step = { action: 'barter_make_ingots', nuggets: nuggets(bot) }; save();
+        try { await actions.acquireStep(bot, task, 'gold_ingot', ingots(bot) + Math.floor(nuggets(bot) / 9), goal, save); } catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
+      }
     }
   }
   if (!ingots(bot)) throw new Error('No gold to barter with');
