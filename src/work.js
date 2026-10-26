@@ -3941,7 +3941,7 @@ async function smelt(bot, task, step, goal, save = () => {}) {
       // copper and left that batch too, three batches in eighteen seconds).
       let leaveCameBackEmpty = false;
       const ownNow = () => !leave && goal?.smelting && !leaveCameBackEmpty && !(bot._cookHold?.until > Date.now()) ? { at: block.position, rungsWant: goal.smelting.rungsWant || 0, forRungs: goal.smelting.forRungs || [] } : null;
-      const ask = spent => whileCooking(bot, task, goal, save, { cooking: cooking(), oreInReach, walkTarget, what: String(step.from || step.item).replace(/_/g, ' '), count: needed - taken, spent: spent.filter(k => k !== 'leave_cooking'), leave, walks: walks(), sides, own: ownNow(), item: step.item, ...(leaveCameBackEmpty ? { ownWhy: 'left once this batch already, and the work on offer then ran out at once' } : {}) });
+      const ask = spent => whileCooking(bot, task, goal, save, { cooking: cooking(), oreInReach, walkTarget, what: String(step.from || step.item).replace(/_/g, ' '), count: needed - taken, spent: spent.filter(k => k !== 'leave_cooking' || leaveCameBackEmpty), leave, walks: walks(), sides, own: ownNow(), item: step.item, ...(leaveCameBackEmpty ? { ownWhy: 'left once this batch already, and the work on offer then ran out at once' } : {}) });
       let plan = await ask([]);
       const spent = [];
       const allow = key => !plan || plan === key;
@@ -3958,7 +3958,10 @@ async function smelt(bot, task, step, goal, save = () => {}) {
           try {
             worked = await holdForRest(bot, task, goal, save, { client: task.opportunityClient, survival: null, reason: `smelt:${step.item}`, until, why: `${needed - taken} ${what} cooking in the furnace at (${block.position.x}, ${block.position.y}, ${block.position.z}), taken out when done`, idle: false });
           } finally { goal.step = step0; delete bot._cookHold; save(); }
-          if (worked === false && Date.now() - leftAt < 10000) leaveCameBackEmpty = true;
+          // Left and back within ten seconds with nothing worked (note 2212): leave_cooking is not offered again for this batch.
+          // It was kept on offer after being spent (note 692), and the audit of 2026-10-26 12:00 to 13:20Z had while_cooking asked
+          // again within sixty seconds of leave_cooking 39 times of 47 ('leave cooking was chosen 1 second ago and changed nothing').
+          if (worked === false && Date.now() - leftAt < 10000) { leaveCameBackEmpty = true; console.log(`[cook] left to work meanwhile and back in ${Math.round((Date.now() - leftAt) / 100) / 10} s with nothing to work on from here: leave_cooking not offered again for this batch`); }
           let back = null;
           try { back = await approachWorkstation(bot, task, 'furnace', [block.position]); }
           catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; back = null; }
