@@ -646,6 +646,18 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
   }
   else if (!got || run.passes >= 2) {
     run.status = got ? 'partial' : 'gone'; note(goal, run.status);
+    // What the entity list held at the verdict (note 2116): in 288 deaths this
+    // month no walk back got the kit, and the arena drill of 2026-10-26 (die
+    // in iron, respawn 40 blocks off, on flat ground and on a pillar) saw every
+    // drop at once and picked up every one. full-5 (2026-10-25 11:19:00Z) stood
+    // 3 blocks from where it died 64 seconds before and saw none: the next such
+    // verdict says what was in the list, by distance from the spot.
+    try {
+      const all = Object.values(bot.entities || {}).filter(e => e?.position && e.isValid !== false), here = bot.entity.position;
+      const drops = all.map(e => { let it = null; try { it = e.getDroppedItem?.(); } catch (_) { it = null; } return it ? { name: it.name, n: it.count, d: Math.round(e.position.distanceTo(spot)) } : null; }).filter(Boolean).sort((a, b) => a.d - b.d);
+      const within = r => drops.filter(x => x.d <= r).length;
+      console.log(`[corpse] ${run.status} at ${Math.round(here.distanceTo(spot))} blocks from the spot, ${Math.round((Date.now() - Date.parse(run.deathAt)) / 1000)} s after the death: ${all.length} entities in the list, ${drops.length} of them items (${within(12)} within 12 of the spot, ${within(32)} within 32, ${within(96)} within 96)${drops.length ? `; nearest ${drops.slice(0, 6).map(x => `${x.name}x${x.n}@${x.d}`).join(' ')}` : ''}; wanted ${listed(run.items)}; mobs about ${all.filter(e => e.type === 'hostile' || e.type === 'mob').map(e => `${e.name}@${Math.round(e.position.distanceTo(spot))}`).slice(0, 6).join(' ') || 'none'}`);
+    } catch (_) { /* said only */ }
     bot.chat?.(got ? `Got some of it back. The rest is gone: ${listed(run.items)}.` : `Nothing left where I died. Lava or time took it.`);
     tripCameToNothing(bot, goal, run, save);
   }

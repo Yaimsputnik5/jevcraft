@@ -9415,6 +9415,11 @@ function gameHandlers(bot, decisionClient) {
 const lootActions = () => ({ approach: approachWorkstation, open: openChest, navigate });
 
 async function runIdle(bot, task, goal, store, { survival, decisionClient, recoveryAdviser, onStep = () => {}, until = () => false, backoffMs = 3000 } = {}) {
+  // The idle run's task carries the decision client as runGoal's does (issue #3, note 2116): a furnace hold in idle
+  // work asked stillness_detour with no client, which is held as Jev unreachable and asked again without end; one
+  // run held 35 minutes until it was restarted. The questions that read task.opportunityClient (the gold passed on
+  // a walk, the wood while up, a trade) are Jev's in idle work too.
+  task.opportunityClient = decisionClient;
   survival ||= createSurvival(bot, { state: goal.survival, client: decisionClient });
   goal.survival = survival.state;
   const save = () => store.save(goal);

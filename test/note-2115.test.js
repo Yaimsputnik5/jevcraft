@@ -16,3 +16,16 @@ test('the corpse run says its record: the run\'s own as it accrues, the fleet\'s
   const goal = { corpseRecord: { begun: 4, done: 0, partial: 0, gone: 2, diedOnWay: 1, left: 3, despawned: 1 } };
   assert.match(recordSays(bot, goal), /^ On this run: 3 deaths, 4 walks back set out, 0 got everything back, 0 some of it, 2 found nothing where it died, 1 ended in a death on the way, 3 left the drops, 1 gone before the bot came\./);
 });
+
+// Issue #3 (note 2116): the idle run's task carries the decision client, as runGoal's does.
+test('runIdle gives its task the decision client, so a hold in idle work is asked of Jev, not held as Jev down', async () => {
+  const { runIdle } = require('../src/work');
+  const { Task } = require('../src/skills');
+  const client = { systemOne: async () => ({ answers: {} }) };
+  const task = new Task('idle', 'idle');
+  const bot = { entity: { position: { x: 0, y: 64, z: 0 } }, game: { dimension: 'overworld' }, inventory: { items: () => [], slots: [] }, on() {}, once() {}, off() {}, removeListener() {}, emit() {}, listenerCount: () => 0, pathfinder: { movements: {}, setGoal() {} }, entities: {}, blockAt: () => null };
+  const survival = { state: {}, step: async () => false, stanceHeld: () => null };
+  let calls = 0;
+  try { await runIdle(bot, task, { kind: 'idle' }, { save() {} }, { survival, decisionClient: client, backoffMs: 1, until: () => ++calls > 1 }); } catch (_) { /* the stub bot ends the loop one way or another */ }
+  assert.equal(task.opportunityClient, client);
+});
