@@ -858,7 +858,12 @@ function strategyState(bot, goal, stage, extra = {}) {
     // 04:14Z, 145 hours played) held 15 pearls and 4 rods in its chests, three
     // rods from the eyes, and chose between a shield rung and 'the Nether'
     // with no word of it on this question.
-    ...(() => { try { const n = require('./eye-need').need(bot, goal); return n.rods + n.pearls + n.eyes + n.powder > 0 || goal.gameProgress?.milestones?.nether_entered ? { goalStill: require('./eye-need').says(bot, goal) } : {}; } catch (_) { return {}; } })(),
+    ...(() => { try {
+      const E = require('./eye-need'), n = E.need(bot, goal);
+      // Past the eyes (the ring lit, note 2151): said as that, not 'wants 0 blaze rods for 0 eyes'.
+      if (E.eyeTarget(goal) === 0) return { goalStill: `The End portal's frames are all filled: no blaze rod or ender pearl is wanted any more; what is left of the goal is the End and the dragon${goal.endPortal?.center ? `, the ring at (${Math.round(goal.endPortal.center.x)}, ${Math.round(goal.endPortal.center.y)}, ${Math.round(goal.endPortal.center.z)})` : ''}.` };
+      return n.rods + n.pearls + n.eyes + n.powder > 0 || goal.gameProgress?.milestones?.nether_entered ? { goalStill: E.says(bot, goal) } : {};
+    } catch (_) { return {}; } })(),
     ...extra,
     // The day where there is one (note 677).
     ...(/overworld/.test(String(bot.game?.dimension || 'overworld')) ? { timeOfDay: t, daylightMinutesRemaining: Math.round(Math.max(0, DAY.DUSK - t) / 1200 * 10) / 10 } : {}),
