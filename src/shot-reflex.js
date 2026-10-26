@@ -676,9 +676,16 @@ function shotOptions(bot, warned) {
   // lava (note 1099).
   const pushSays = (() => {
     try {
-      if (!warned.some(e => e.name === 'ghast')) return '';
       const drop = require('./terrain').dropNear(bot, bot.entity.position.floored(), 2);
       if (!drop || !(drop.into === 'lava' || drop.damage >= (bot.health ?? 20))) return '';
+      // An arrow's push too (note 2155): full-7 (2026-10-26 05:26:36Z) held a
+      // span over lava in the Nether at 20 health, was told of keeping on only
+      // 'the skeleton's arrow, about 1.4 health a landing', kept on at 0.65, and
+      // the next arrow put it off the span into the lava.
+      if (!warned.some(e => e.name === 'ghast')) {
+        if (!warned.some(e => /^(skeleton|stray|bogged|pillager|drowned|piglin)$/.test(e.name))) return '';
+        return ` A shot that lands also throws the bot about half a block (more in the air or at a sprint): ${drop.blocksAway ? `the drop ${drop.blocksAway} block${drop.blocksAway === 1 ? '' : 's'} off` : 'the drop under the bot'} is ${drop.fallBlocks} block${drop.fallBlocks === 1 ? '' : 's'}${drop.into === 'lava' ? ' into lava' : ''}, so a landing here is priced by that fall, not by its hurt alone; a shield raised toward the shooter takes the arrow and its push.`;
+      }
       return ` A fireball that lands also throws the bot (1.7 blocks half the time, up to 4.2 nine times in ten): ${drop.blocksAway ? `the drop ${drop.blocksAway} block${drop.blocksAway === 1 ? '' : 's'} off` : 'the drop under the bot'} is ${drop.fallBlocks} block${drop.fallBlocks === 1 ? '' : 's'}${drop.into === 'lava' ? ' into lava' : ''}, so a landing here is priced by that fall, not by its hurt; a fireball struck as it comes does not land.`;
     } catch (_) { return ''; }
   })();
