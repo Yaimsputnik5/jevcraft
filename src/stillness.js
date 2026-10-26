@@ -377,6 +377,10 @@ function airWatch(bot, now = Date.now()) {
   if ((bot.oxygenLevel ?? 20) > 10) return;
   const recent = bot._survivalGoal?.survivalAction;
   if (recent?.action === 'surface' && now - Date.parse(recent.at || 0) < 8000) return;
+  // The End's own air rescue is a rescue (note 2216): airInTheEnd marks itself on the bot while it digs and swims, and this
+  // watch had stopped its roof dig three times over ('Digging aborted') while dragon-315 (25590, 2026-10-26 13:53Z) drowned
+  // under its own flooded hole at (-8, 57, 4), 13 air to 0 in 13 s.
+  if (bot._airRescueAt > now - 4000) return;
   if (bot._airAbortAt > now - 5000) return;
   bot._airAbortAt = now; bot._airAbort = true;
   try { bot.pathfinder?.setGoal?.(null); } catch (_) { /* nothing to stop */ }

@@ -459,6 +459,8 @@ async function airInTheEnd(bot, task, goal, save) {
   const t0 = Date.now(), a0 = air(), p0 = feetCell(), alive = () => bot.health > 0 && bot.isAlive !== false && /end$/.test(String(bot.game?.dimension || ''));
   goal.step = { action: 'air_in_the_end', air: a0, at: { x: p0.x, y: p0.y, z: p0.z } }; save();
   bot._airAbort = false; bot.pathfinder?.setGoal?.(null); bot.clearControlStates?.();
+  bot._airRescueAt = Date.now();
+  const mark = setInterval(() => { bot._airRescueAt = Date.now(); }, 500);
   const how = [];
   // An empty bucket on a source at the head or the feet: the cell empties and the air comes with it.
   try {
@@ -497,6 +499,7 @@ async function airInTheEnd(bot, task, goal, save) {
     bot.setControlState?.('jump', true); stillSince = Date.now(); lastY = bot.entity.position.y;
   }
   bot.setControlState?.('jump', false);
+  clearInterval(mark);
   console.log(`[end combat] air in the End at ${p0}: ${a0} air, ${how.join(', ') || 'swam up'}; now ${air()} air at ${feetCell()}, the head ${wet(headCell()) ? 'still under' : 'out'}, ${Math.round((Date.now() - t0) / 100) / 10} s`);
   return true;
 }
