@@ -223,7 +223,8 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
     if (!rested && /water/.test(bot.blockAt(feet)?.name || '') && bot.inventory.items().some(i => i.name === 'bucket')) {
       try {
         const { sourceWater, fillWaterBucket } = require('./water');
-        const src = bot.findBlocks({ matching: bot.registry.blocksByName.water.id, maxDistance: 4, count: 8, useExtraInfo: sourceWater }).map(p => p.floored()).filter(p => Math.abs(p.y - feet.y) <= 1 && Math.abs(p.x - feet.x) <= 2 && Math.abs(p.z - feet.z) <= 2).sort((a, b) => a.distanceTo(feet) - b.distanceTo(feet))[0];
+    // The source within the bucket's reach, not within two (note 2208): the pool poured three cells from the column's foot ran into it, and dragon-318 (25589, 2026-10-26 12:05 to 12:19Z) was refused the climb eight times, 'water at the feet', no source within two and no dry cell beside in the trench, stood at the foot fifteen minutes and died in the breath; dragon-301 nine refusals, 312 seven.
+        const src = bot.findBlocks({ matching: bot.registry.blocksByName.water.id, maxDistance: 5, count: 12, useExtraInfo: sourceWater }).map(p => p.floored()).filter(p => Math.abs(p.y - feet.y) <= 1 && Math.abs(p.x - feet.x) <= 3 && Math.abs(p.z - feet.z) <= 3 && feet.offset(.5, 1.62, .5).distanceTo(p.offset(.5, .5, .5)) <= 4.3).sort((a, b) => a.distanceTo(feet) - b.distanceTo(feet))[0];
         if (src) {
           const t0 = Date.now(); await fillWaterBucket(bot, task, src, { timeoutMs: 1500 });
           for (let i = 0; i < 30 && /water/.test(bot.blockAt(feet)?.name || ''); i++) await new Promise(r => setTimeout(r, 50));
