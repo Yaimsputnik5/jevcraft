@@ -636,7 +636,18 @@ async function netherGather(bot, task, goal, save, resource, { navigate, returnO
             }
             await returnOverworld(bot, task, goal, save);
           } };
-      } else facts.portal = `${says} Neither the walk${stair ? ', the stair' : ''} nor the crossing with the blocks carried reaches it from here${refused ? ` (and no crossing now: ${refused.says})` : ''}, so going back through it is not offered.`;
+      } else {
+        // No way from here reaches it with what is carried (note 2172): the trip back is offered all the same, as
+        // far as the ground goes, the way on asked from where it ends (portal_way: the legs round, a tunnel dug by
+        // hand, the wait). full-7 (2026-10-26 02:33 to 02:49Z and 41 asks of 43 in the day), no pickaxe and no block
+        // in the Nether, was offered legs that 'cannot be done with what is carried' and no way home, and answered
+        // none good; the portal was said in the state as not offered.
+        const notReached = `Neither the walk${stair ? ', the stair' : ''} nor the crossing with the blocks carried reaches it from here${refused ? ` (and no crossing now: ${refused.says})` : ''}`;
+        options.portal_trip = { description: `Go back toward the portal to the Overworld for wood, as far as the ground goes, the way on asked from where the walk ends (the legs round, a tunnel dug by hand, or a rest waited out). ${says} ${notReached}. ${overworldWoodSays(goal, portal)} The work here waits till the bot comes back through.`,
+          target: portal, partial: true,
+          run: async () => { await returnOverworld(bot, task, goal, save); } };
+        facts.portal = `${says} ${notReached}: the trip back goes as far as the ground allows, the way on asked there.`;
+      }
     } else facts.portal = 'no nether portal known in the Nether';
   }
 

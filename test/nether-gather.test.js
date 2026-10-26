@@ -73,10 +73,11 @@ test('from the recorded span the stem search is the Nether\'s: the wood within r
   // The planks in the way are its own, dug through (note 953).
   assert.match(crimson, /Straight across at y 72, crouched: 76 cells, 90 of rock to dig \(dug by hand, no pickaxe being carried: netherrack so dug drops nothing, about \d+ seconds\) and 47 of open air or lava to lay a block over \(40 over lava\).*0 blocks carried: they take it 1 cell, 1 block nearer/);
   assert(state.knownPlaces.some(p => /^\d+ warped stems known at \(-77, 65, 26\), 53 blocks west and 7 down\..*Straight across at y 72, crouched: 67 cells.*0 blocks carried: it stops at the first cell needing one\. The bot has not stood within 32 blocks of it\. No way from here makes ground toward it, so it is not offered\.$/.test(p)), state.knownPlaces.join('\n'));
-  // No crossing is offered with nothing to lay, nor the portal the bot cannot reach.
+  // No crossing is offered with nothing to lay; the portal the bot cannot reach is offered as the trip back as far as
+  // the ground goes, the way on asked there (note 2172).
   assert.deepEqual(Object.keys(options).filter(k => /^cross_to_/.test(k)), []);
-  assert.equal(options.portal_trip, undefined);
-  assert.match(state.portal, /^The nether portal at \(17, 58, 1\), 66 blocks across and 14 below\. On foot: the pathfinder finds no route there.*where nether bricks in the way stops it\..* Neither the walk nor the crossing with the blocks carried reaches it from here, so going back through it is not offered\.$/);
+  assert.match(options.portal_trip, /^Go back toward the portal to the Overworld for wood, as far as the ground goes, the way on asked from where the walk ends \(the legs round, a tunnel dug by hand, or a rest waited out\)\. The nether portal at \(17, 58, 1\), 66 blocks across and 14 below\./);
+  assert.match(state.portal, /^The nether portal at \(17, 58, 1\), 66 blocks across and 14 below\. On foot: the pathfinder finds no route there.*where nether bricks in the way stops it\..* Neither the walk nor the crossing with the blocks carried reaches it from here: the trip back goes as far as the ground allows, the way on asked there\.$/);
   // Every leg needs a block laid within its first cells, and none is carried.
   assert.equal(state.legsClosed.length, 4, state.legsClosed.join('\n'));
   assert.deepEqual(Object.keys(options).filter(k => /^leg_/.test(k)), []);
