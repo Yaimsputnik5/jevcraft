@@ -432,6 +432,13 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
         for (let i = 0; i < 10 && /water/.test(bot.blockAt(f)?.name || ''); i++) await new Promise(r => setTimeout(r, 50));
         console.log(`[end safety] the water at the feet at ${f} taken up before the one block up: ${/water/.test(bot.blockAt(f)?.name || '') ? 'still wet' : 'dry'} in ${Date.now() - t1} ms`);
       }
+      // Why the one up is not taken, said (note 2215): dragon-316 (25592, 2026-10-26 13:35 to 13:44Z) climbed one block out of
+      // a cloud four times at (49, 57, -1), 0.4 s each and nothing lost, and the fifth cloud at the same cell took it 20 to none
+      // with no line between; the gate's three refusals (no block carried, a block two over the head, a fireball within 14) were silent.
+      if (!(carried >= 1 && headClear && !ballNear) && !(bot._oneUpRefusedSaid > Date.now() - 3000)) {
+        bot._oneUpRefusedSaid = Date.now();
+        console.log(`[end safety] no block up out of the cloud at ${f}: ${[carried < 1 ? 'no block carried' : null, !headClear ? `a block two over the head (${bot.blockAt(f.offset(0, 2, 0))?.name})` : null, ballNear ? 'a fireball within 14' : null].filter(Boolean).join(', ')}; ${bot.health.toFixed(1)} health`);
+      }
       if (carried >= 1 && headClear && !ballNear) {
         const h0 = bot.health, t0 = Date.now();
         goal.step = { action: 'one_up_out_of_the_cloud', health: bot.health }; save();
