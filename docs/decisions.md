@@ -1929,7 +1929,7 @@ Questions that ride in one call together (the intake batch is one call per chat 
 
 **Code has checked a water crossing: take a boat, or keep walking and swimming?**
 
-- When: A travel leg meets a level water route of useful length with a safe shore at each end.
+- When: A travel leg meets a level water route of useful length with a safe shore at each end; or, swimming for a shore sixteen blocks and more off with a boat carried, from the water (shore.js, note 2175). Health and hunger are facts on it, not gates (note 2175).
 - Batched question, choice; stakes low; ledger kind `travel`
 - Bar: none
 - Jev unreachable: the bot holds and asks again with a backoff (jev-down.js); an answer after an outage is not used, and the crossing is surveyed and asked fresh

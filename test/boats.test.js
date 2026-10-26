@@ -27,7 +27,8 @@ test('survey finds a long crossing with safe shores but rejects a puddle and dam
   const trip = await surveyBoatTrip(bot, task, new Vec3(48.5, 65, .5));
   assert(trip?.length >= 30); assert(trip.landing.x >= 43);
   assert.equal(await surveyBoatTrip(lake(5), task, new Vec3(48.5, 65, .5)), null);
-  bot.health = 8; assert.equal(await surveyBoatTrip(bot, task, new Vec3(48.5, 65, .5)), null);
+  // Health is a fact on the question, not a gate (note 2175).
+  bot.health = 8; assert.ok(await surveyBoatTrip(bot, task, new Vec3(48.5, 65, .5)));
 });
 
 test('boats cross source water containing aquatic plants but never waterlogged solids', () => {

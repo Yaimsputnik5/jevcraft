@@ -49,18 +49,50 @@ function dockNear(bot, water, waterY) {
   return null;
 }
 
-async function surveyBoatTrip(bot, task, destination) {
-  if (!bot.blockAt || bot.game?.dimension?.includes('nether') || bot.vehicle ||
-    bot.health < 16 || bot.food < 10 || immediateThreat(bot)) return null;
+// The water route from a cell of boat water, breadth first over level boat
+// water, to a landing (boat water with a dock beside it) that `accept(landing,
+// distance, node)` takes, scored by `score`. -> { path, landing, length, ... } or null.
+async function boatRoute(bot, task, from, y, { accept, score, start = from, minimum = LIMITS.minimumWater }) {
+  const key = p => `${Math.floor(p.x)},${Math.floor(p.z)}`;
+  const queue = [{ p: from, parent: -1, distance: 0 }], visited = new Set([key(from)]);
+  let selected;
+  for (let i = 0; i < queue.length && i < LIMITS.nodes; i++) {
+    if (i % 128 === 0) { task.check(); await sleep(0); }
+    const node = queue[i];
+    if (node.distance >= minimum) {
+      const landing = dockNear(bot, node.p, y);
+      const taken = landing && safeFromHostiles(bot, node.p) ? accept(landing, node.distance, node.p) : null;
+      if (taken) { const sc = score(taken, node.distance); if (!selected || sc > selected.score) selected = { index: i, landing, score: sc, ...taken }; }
+    }
+    for (const [dx, dz] of directions) {
+      const next = node.p.offset(dx, 0, dz), k = key(next);
+      if (visited.has(k)) continue;
+      visited.add(k);
+      if (flatDistance(next, start) > LIMITS.radius || !boatWater(bot, next, y)) continue;
+      queue.push({ p: next, parent: i, distance: node.distance + 1 });
+    }
+  }
+  if (!selected) return null;
+  const path = []; for (let i = selected.index; i >= 0; i = queue[i].parent) path.unshift(queue[i].p);
+  return { ...selected, path, length: path.length - 1, waterY: y };
+}
+
+// Health and food were gates here (under 16 health or 10 food, no boat); now
+// facts on the question (note 2175): a hurt or hungry bot swam instead, the
+// slower and more exposed way. `report(why)` says why there is no trip.
+async function surveyBoatTrip(bot, task, destination, report = () => {}) {
+  if (!bot.blockAt || bot.game?.dimension?.includes('nether') || bot.vehicle) return report('not here'), null;
+  if (immediateThreat(bot)) return report('a mob at the bot'), null;
   const start = bot.entity.position, target = point(destination);
-  if (flatDistance(start, target) < LIMITS.minimumWater) return null;
+  if (flatDistance(start, target) < LIMITS.minimumWater) return report('the target within 16 blocks'), null;
   const levels = [...new Set([Math.floor(start.y) - 1, Math.floor(start.y), Math.floor(start.y) - 2])];
-  let best;
+  let best, sawWater = false;
   for (const y of levels) {
     const candidates = [];
     for (let dx = -6; dx <= 6; dx++) for (let dz = -6; dz <= 6; dz++) {
       const p = new Vec3(Math.floor(start.x) + dx + .5, y, Math.floor(start.z) + dz + .5);
       if (flatDistance(p, start) <= 7 && boatWater(bot, p, y)) {
+        sawWater = true;
         const dock = dockNear(bot, p, y);
         if (dock && dock.distanceTo(start) < 9) candidates.push({ water: p, dock });
       }
@@ -69,35 +101,36 @@ async function surveyBoatTrip(bot, task, destination) {
     for (const entry of candidates.slice(0, 2)) {
       const route = await surveyRoute(bot, task, bot.pathfinder.movements, new goals.GoalBlock(entry.dock.x, entry.dock.y, entry.dock.z), 300);
       if (route.status !== 'success' || route.path?.some(p => p.toBreak?.length || p.toPlace?.length)) continue;
-      const key = p => `${Math.floor(p.x)},${Math.floor(p.z)}`;
-      const queue = [{ p: entry.water, parent: -1, distance: 0 }], visited = new Set([key(entry.water)]);
-      let selected;
-      for (let i = 0; i < queue.length && i < LIMITS.nodes; i++) {
-        if (i % 128 === 0) { task.check(); await sleep(0); }
-        const node = queue[i];
-        if (node.distance >= LIMITS.minimumWater) {
-          const landing = dockNear(bot, node.p, y), progress = landing && flatDistance(start, target) - flatDistance(landing, target);
-          if (landing && progress >= 12 && node.distance <= progress * 2 + 12 && safeFromHostiles(bot, node.p) &&
-            (!selected || progress - node.distance * .15 > selected.score)) selected = { index: i, landing, score: progress - node.distance * .15, progress };
-        }
-        for (const [dx, dz] of directions) {
-          const next = node.p.offset(dx, 0, dz), k = key(next);
-          if (visited.has(k)) continue;
-          visited.add(k);
-          if (flatDistance(next, start) > LIMITS.radius || !boatWater(bot, next, y)) continue;
-          queue.push({ p: next, parent: i, distance: node.distance + 1 });
-        }
-      }
-      if (selected) {
-        const path = []; for (let i = selected.index; i >= 0; i = queue[i].parent) path.unshift(queue[i].p);
-        const trip = { entry: entry.dock, landing: selected.landing, waterY: y, path, length: path.length - 1, progress: selected.progress };
-        if (!best || selected.score > best.score) best = { ...trip, score: selected.score };
+      const found = await boatRoute(bot, task, entry.water, y, { start,
+        accept: (landing, distance) => { const progress = flatDistance(start, target) - flatDistance(landing, target); return progress >= 12 && distance <= progress * 2 + 12 ? { progress } : null; },
+        score: (taken, distance) => taken.progress - distance * .15 });
+      if (found) {
+        const trip = { entry: entry.dock, landing: found.landing, waterY: y, path: found.path, length: found.length, progress: found.progress };
+        if (!best || found.score > best.score) best = { ...trip, score: found.score };
       }
       if (best) break;
     }
     if (best) break;
   }
+  if (!best) report(sawWater ? 'no water route toward the target from the water within 7 blocks' : 'no boat water within 7 blocks');
   return best || null;
+}
+
+// What the question is told of a trip (note 2175): the swim and the boat as
+// seconds (a swimmer about two blocks a second, a boat about eight), what
+// boat is carried or what one takes to make, health and food, the mobs about.
+function tripFacts(bot, goal, trip, { fromWater = false } = {}) {
+  const items = bot.inventory?.items?.() || [];
+  const carried = items.find(i => boatItem(i.name))?.name || null;
+  const planks = items.filter(i => /_planks$/.test(i.name)).reduce((a, i) => a + i.count, 0), logs = items.filter(i => /_log$|_wood$|_stem$|_hyphae$/.test(i.name)).reduce((a, i) => a + i.count, 0);
+  const table = !!bot.findBlock?.({ matching: b => b?.name === 'crafting_table', maxDistance: 16 });
+  return { request: goal.request, waterBlocks: trip.length, progressBlocks: trip.progress ?? null,
+    swimSecondsWithoutBoat: Math.round(trip.length / 2), boatSeconds: Math.round(trip.length / 8) + 4,
+    fromTheWater: fromWater ? 'the bot is in the water now: the boat is placed on the water beside it and boarded from the water; swimming on is the other way' : undefined,
+    carriedBoat: carried, boatToMake: carried ? null : { planksWanted: 5, planksCarried: planks, logsCarried: logs, craftingTableWithin16: table, says: fromWater ? 'no boat carried; one is made at a crafting table on land, not in the water' : `no boat carried; five planks at a crafting table make one (${planks} planks and ${logs} logs carried${table ? ', a table within 16 blocks' : ', no table in view'})` },
+    health: bot.health, food: bot.food, healthSays: `${bot.health} health and ${bot.food} hunger; a swimmer is slow and in reach of drowned, and a boat's rider is hit as a walker is`,
+    timeOfDay: bot.time?.timeOfDay, threats: (() => { try { return require('./danger').threats(bot, 16).slice(0, 6).map(t => ({ name: t.entity.name, distance: Math.round(t.distance), visible: t.visible })); } catch (_) { return []; } })(),
+    inventory: Object.fromEntries(items.map(i => [i.name, i.count])), safeShoreAtBothEnds: !fromWater };
 }
 
 async function chooseBoat(client, state, hold = null) {
@@ -243,6 +276,86 @@ async function paddle(bot, task, boat, trip, report = () => {}) {
   } finally { bot._client.removeListener('vehicle_move', correction); }
 }
 
+// The empty boat broken and picked up after a trip (the hull would otherwise
+// stand in the walk). -> true when the item is back in the pockets.
+async function recoverBoat(bot, task, boat, itemName, waterY) {
+  if (!(bot.entities[boat.id] === boat && !(boat.passengers || []).length && boat.position.distanceTo(bot.entity.position) < 4)) return false;
+  const before = countOf(bot, itemName);
+  await bot.lookAt(boat.position.offset(0, .3, 0), true);
+  for (let n = 0; n < 12 && bot.entities[boat.id] === boat; n++) { task.check(); bot.attack(boat); await sleep(300); }
+  if (bot.entities[boat.id] === boat) throw new Error('Empty boat is still blocking the exit; waiting before walking');
+  await floatAfterBoat(bot, task, waterY);
+  const drop = Object.values(bot.entities).find(e => e.getDroppedItem?.()?.name === itemName && e.position.distanceTo(boat.position) < 3);
+  if (drop) {
+    await navigate(bot, task, new goals.GoalNear(drop.position.x, waterY, drop.position.z, 1), { timeoutMs: 6000, stallMs: 3000 });
+    try { await awaitState(task, () => countOf(bot, itemName) > before, 2000); } catch (_) { /* the drop may float off */ }
+  }
+  bot._ownedBoats?.delete(boat.uuid);
+  return countOf(bot, itemName) > before;
+}
+
+// A carried boat launched from the water (note 2175; the user, 2026-10-26):
+// swimming for a shore sixteen blocks and more off with a boat in the
+// pockets, the boat is placed on the water beside the bot, boarded from the
+// water and paddled to the nearest landing `accept` takes; Jev's choice
+// (boat_crossing, the swim's seconds against the boat's). Over the six full
+// runs' day to 2026-10-26 08:00Z the bots swam 494 minutes and were asked
+// about a boat 0 times: the survey wanted a dock within nine blocks of dry
+// feet, and the swim for shore (shore.js) never looked for one.
+// -> 'landed' | 'declined' | 'none' (no boat carried, no route) | 'failed'.
+async function boatFromWater(bot, task, goal, save, { waterY, accept, client = task.opportunityClient, nearestSwim = null }) {
+  if (!client || bot.vehicle || bot.game?.dimension?.includes('nether') || !bot.inventory?.items) return 'none';
+  const itemName = bot.inventory.items().find(i => boatItem(i.name))?.name;
+  if (!itemName) return 'none';
+  if (isSetAside(goal, 'boat', 'from_water')) return 'none';
+  const here = bot.entity.position;
+  // The cell the boat goes on: the bot's own, else one beside it, boat water.
+  let from = null;
+  for (const [dx, dz] of [[0, 0], ...directions, [1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+    const p = new Vec3(Math.floor(here.x) + dx + .5, waterY, Math.floor(here.z) + dz + .5);
+    if (boatWater(bot, p, waterY)) { from = p; break; }
+  }
+  if (!from) return 'none';
+  const route = await boatRoute(bot, task, from, waterY, { minimum: 4, accept: (landing, distance) => accept(landing) ? { swimBlocks: Math.round(flatDistance(here, landing)) } : null, score: (taken, distance) => -distance });
+  if (!route) return 'none';
+  const trip = { entry: null, landing: route.landing, waterY, path: route.path, length: route.length, progress: null };
+  const state = goal.boatTravel ||= { attempts: 0 };
+  const response = await chooseBoat(client, { ...tripFacts(bot, goal, trip, { fromWater: true }), swimSecondsWithoutBoat: Math.round((nearestSwim ?? route.swimBlocks) / 2), nearestShoreBlocks: nearestSwim ?? route.swimBlocks }, { bot, goal, task });
+  task.check();
+  if (response.stale) return 'declined';
+  state.fromWater = { at: new Date().toISOString(), ...response.answers.travel, swim: nearestSwim ?? route.swimBlocks, boatBlocks: route.length }; save();
+  if (response.answers.travel.choice !== 'boat') { setAside(goal, 'boat', 'from_water', 'Jev chose to swim', 60000); return 'declined'; }
+  let boat;
+  try {
+    const item = bot.inventory.items().find(i => i.name === itemName);
+    await bot.equip(item, 'hand');
+    const ids = new Set(Object.keys(bot.entities));
+    await bot.lookAt(from.offset(0, .5, 0), true);
+    await sleep(200); task.check();
+    bot.activateItem();
+    await awaitState(task, () => { boat = Object.values(bot.entities).find(e => !ids.has(String(e.id)) && boatItem(e.name) && flatDistance(e.position, from) < 3); return boat; });
+    state.placed = { uuid: boat.uuid, entityId: boat.id, item: itemName, position: { ...boat.position }, dimension: bot.game.dimension, fromWater: true }; save();
+    (bot._ownedBoats ||= new Set()).add(boat.uuid);
+    bot.pathfinder.setGoal(null); bot.clearControlStates(); bot.mount(boat);
+    await awaitState(task, () => bot.vehicle === boat);
+    goal.step = { action: 'boat_travel', destination: { ...trip.landing }, waterBlocks: trip.length, fromWater: true }; save();
+    try { await paddle(bot, task, boat, trip, data => { state.progress = data; save(); }); }
+    finally { await leaveBoat(bot); bot.clearControlStates(); }
+    task.check();
+    if (await recoverBoat(bot, task, boat, itemName, waterY)) delete state.placed;
+    await navigate(bot, task, new goals.GoalBlock(trip.landing.x, trip.landing.y, trip.landing.z), { timeoutMs: 12000, stallMs: 4000 });
+    state.completed = { at: new Date().toISOString(), landing: { ...bot.entity.position }, item: itemName, fromWater: true }; save();
+    return 'landed';
+  } catch (error) {
+    const interrupted = ['Cancelled', 'NeedsAir', 'NeedsSafety'].includes(error.name);
+    state.lastError = error.message; save();
+    if (bot.vehicle) await leaveBoat(bot);
+    if (interrupted) throw error;
+    setAside(goal, 'boat', 'from_water', error, 120000);
+    return 'failed';
+  }
+}
+
 function preferredBoat(bot) {
   const items = bot.inventory.items();
   const carried = items.find(i => boatItem(i.name));
@@ -261,7 +374,7 @@ async function boatTravelStep(bot, task, goal, save, destination, actions, clien
   // Two failures rested boats for half an hour; once that rest is over,
   // they get a fresh budget rather than staying retired for the whole goal.
   if (state.failures >= 2) state.failures = 0;
-  const trip = await surveyBoatTrip(bot, task, destination);
+  const trip = await surveyBoatTrip(bot, task, destination, why => { state.lastSurvey = { at: new Date().toISOString(), why }; });
   if (!trip) return false;
   const area = `${Math.floor(trip.entry.x / 8)},${Math.floor(trip.entry.z / 8)}`;
   if (state.declinedArea === area && state.declinedUntil > Date.now()) return false;
@@ -270,10 +383,7 @@ async function boatTravelStep(bot, task, goal, save, destination, actions, clien
       // The swim the boat would save, said as time (the decision audit,
       // 2026-09-25): a swimmer goes about two blocks a second, and drowned
       // come up at night.
-      const response = await chooseBoat(client, { request: goal.request, waterBlocks: trip.length, progressBlocks: trip.progress,
-        swimSecondsWithoutBoat: Math.round(trip.length / 2), timeOfDay: bot.time?.timeOfDay, threats: (() => { try { return require('./danger').threats(bot, 16).slice(0, 6).map(t => ({ name: t.entity.name, distance: Math.round(t.distance), visible: t.visible })); } catch (_) { return []; } })(),
-        carriedBoat: bot.inventory.items().find(i => boatItem(i.name))?.name || null,
-        inventory: Object.fromEntries(bot.inventory.items().map(i => [i.name, i.count])), safeShoreAtBothEnds: true }, { bot, goal, task });
+      const response = await chooseBoat(client, tripFacts(bot, goal, trip), { bot, goal, task });
       task.check();
       // Held through an outage (note 707): surveyed and asked fresh next pass.
       if (response.stale) return true;
@@ -314,22 +424,8 @@ async function boatTravelStep(bot, task, goal, save, destination, actions, clien
     // Dismount can put the player on the boat. Remove our empty boat before
     // walking; otherwise Mineflayer's player physics walks through its hull
     // and the server repeatedly corrects that collision.
-    let recovered = false;
-    if (bot.entities[boat.id] === boat && !(boat.passengers || []).length && boat.position.distanceTo(bot.entity.position) < 4) {
-      const before = countOf(bot, itemName);
-      await bot.lookAt(boat.position.offset(0, .3, 0), true);
-      for (let n = 0; n < 12 && bot.entities[boat.id] === boat; n++) { task.check(); bot.attack(boat); await sleep(300); }
-      if (bot.entities[boat.id] === boat) throw new Error('Empty boat is still blocking the exit; waiting before walking');
-      await floatAfterBoat(bot, task, trip.waterY);
-      const drop = Object.values(bot.entities).find(e => e.getDroppedItem?.()?.name === itemName && e.position.distanceTo(boat.position) < 3);
-      if (drop) {
-        await navigate(bot, task, new goals.GoalNear(drop.position.x, trip.waterY, drop.position.z, 1), { timeoutMs: 6000, stallMs: 3000 });
-        await awaitState(task, () => countOf(bot, itemName) > before, 2000);
-        delete state.placed; recovered = true; save();
-      }
-      if (countOf(bot, itemName) > before) { delete state.placed; recovered = true; }
-      bot._ownedBoats.delete(boat.uuid);
-    }
+    const recovered = await recoverBoat(bot, task, boat, itemName, trip.waterY);
+    if (recovered) delete state.placed;
     await navigate(bot, task, new goals.GoalBlock(trip.landing.x, trip.landing.y, trip.landing.z), { timeoutMs: 12000, stallMs: 4000 });
     state.completed = { at: new Date().toISOString(), landing: { ...bot.entity.position }, item: itemName, recovered };
     // A finished crossing is evidence that boats work here. Clear the failure
@@ -358,4 +454,4 @@ async function boatTravelStep(bot, task, goal, save, destination, actions, clien
   }
 }
 
-module.exports = { LIMITS, boatItem, boatWater, dockNear, surveyBoatTrip, chooseBoat, boatTick, paddle, leaveBoat, leaveStrandedVehicle, clearOwnedBoatAtFeet, floatAfterBoat, preferredBoat, boatTravelStep };
+module.exports = { LIMITS, boatRoute, tripFacts, recoverBoat, boatFromWater, boatItem, boatWater, dockNear, surveyBoatTrip, chooseBoat, boatTick, paddle, leaveBoat, leaveStrandedVehicle, clearOwnedBoatAtFeet, floatAfterBoat, preferredBoat, boatTravelStep };

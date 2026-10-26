@@ -132,6 +132,15 @@ async function reachShore(bot, task, goal, save, { move = navigate, surface = fl
     // to 0.3, three a second.
     const nearSwim = fight && !shooters.length ? land.find(p => p.distanceTo(bot.entity.position) <= 24 && openSwim(bot, p, waterY) && !shoreHot(bot, p, { path: false })) : null;
     if (nearSwim && await swimStraight(nearSwim) !== 'failed') return true;
+    // A long swim with a boat carried: the boat from the water, Jev's choice (boats.js boatFromWater, note 2175).
+    if (client && !fight) {
+      const nearestLand = land.find(p => !badShore(goal, p) && !shoreHot(bot, p, { path: false }));
+      const nearestSwim = nearestLand ? Math.round(Math.hypot(nearestLand.x - bot.entity.position.x, nearestLand.z - bot.entity.position.z)) : null;
+      if (nearestSwim === null || nearestSwim >= require('./boats').LIMITS.minimumWater) {
+        const went = await require('./boats').boatFromWater(bot, task, goal, save, { waterY, client, nearestSwim, accept: landing => safe(landing) && !badShore(goal, landing) && !shoreHot(bot, landing, { path: false }) });
+        if (went === 'landed') { state.landed = { position: { ...bot.entity.position }, at: new Date().toISOString(), boat: true }; save(); return true; }
+      }
+    }
     const checked = new Set(), unrouted = [];
     let attempts = 0;
     for (const p of land) {

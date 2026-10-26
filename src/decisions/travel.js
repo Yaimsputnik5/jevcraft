@@ -159,11 +159,11 @@ module.exports = {};
 define({
   id: 'boat_crossing', area: 'travel', kind: 'travel', primitive: 'choice', stakes: 'low',
   question: 'Code has checked a water crossing: take a boat, or keep walking and swimming?',
-  trigger: 'A travel leg meets a level water route of useful length with a safe shore at each end.',
+  trigger: 'A travel leg meets a level water route of useful length with a safe shore at each end; or, swimming for a shore sixteen blocks and more off with a boat carried, from the water (shore.js, note 2175). Health and hunger are facts on it, not gates (note 2175).',
   source: 'src/boats.js (boatTravelStep)',
   unreachable: 'the bot holds and asks again with a backoff (jev-down.js); an answer after an outage is not used, and the crossing is surveyed and asked fresh',
   build: () => require('../typesafe').choice(
-    'Choose how to travel for this request. Code has verified a level water route, boat clearance and a safe shore at each end. Boats are useful for long river/lake crossings; small puddles are already excluded. Prefer a boat when this makes meaningful progress and saves a long swim. Respect an explicit request to swim, stay on land or avoid crafting. A boat already in inventory costs no crafting. New boats cost five planks plus access to a crafting table. Do not abandon the main task for an unnecessary boat.', {
+    'Choose how to travel for this request. Code has verified a level water route and a landing with a dock at the far end. The state says the water\'s length in blocks, the swim\'s seconds without a boat (about two blocks a second) and the boat\'s (about eight), what boat is carried or what one takes to make, health and hunger, the time of day, the mobs about, and, from the water, how far the nearest shore is to swim to. Respect an explicit request to swim or to walk.', {
       boat: 'Use a carried boat, or make a wooden boat, for this water crossing.',
       walk_or_swim: 'Continue ordinary walking/swimming without a boat.',
     }),

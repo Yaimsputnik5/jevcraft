@@ -2137,12 +2137,15 @@ async function explore(bot, task, goal, save, resource, { surfaceOnly = isSurfac
       target = kept || observed[0];
       search.observedTarget = { ...target };
     }
+    // The boat before the swim (note 2175): on the surface, or where the walks got nowhere and water lies across the
+    // heading; the swim across had come first, and the boat only on surface searches.
+    const stuckAtWater = frontier && !observed.length && (search.walksWithoutProgress || 0) >= 2 && search.frontier?.heading != null;
+    if ((surfaceOnly || stuckAtWater) && await boatTravelStep(bot, task, goal, save, target, { acquireStep })) return;
     // Walks that got nowhere on the chosen heading, water across it: swim.
-    if (frontier && !observed.length && (search.walksWithoutProgress || 0) >= 2 && search.frontier?.heading != null) {
+    if (stuckAtWater) {
       try { if (await require('./exploration').swimAcross(bot, task, goal, save, search.frontier.heading)) { search.walksWithoutProgress = 0; search.progressLeg = null; save(); return; } }
       catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
     }
-    if (surfaceOnly && await boatTravelStep(bot, task, goal, save, target, { acquireStep })) return;
     // Nothing but sea and islets about: swim for the land remembered, or for
     // the resource itself when one is remembered across the water (the live
     // run's search kept "seeing" oak logs it could not reach from its bar).
