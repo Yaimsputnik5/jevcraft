@@ -740,7 +740,7 @@ async function netherGather(bot, task, goal, save, resource, { navigate, returnO
   facts.blocksCarried = blocksCarried(bot);
   // No pickaxe and no block: said plainly as what the ways here can and
   // cannot do (note 751, 25595 at 8 health pacing between two walls).
-  if (!facts.blocksCarried && !(bot.inventory?.items?.() || []).some(i => /_pickaxe$/.test(i.name))) facts.withNeither = 'No pickaxe and no block carried: rock dug by hand drops nothing and no gap or lava can be spanned, so from here the bot goes only where the ground is walkable; a way that needs a block laid or rock kept ends where the walkable ground does.';
+  if (!facts.blocksCarried && !(bot.inventory?.items?.() || []).some(i => /_pickaxe$/.test(i.name))) facts.withNeither = 'No pickaxe and no block carried: rock dug by hand drops nothing and no gap or lava can be spanned, so from here the bot goes only where the ground is walkable; a way that needs a block laid or rock kept ends where the walkable ground does.' + ' ' + require('./respawn-fresh').spellsSays();
   facts.pickaxe = (bot.inventory?.items?.() || []).filter(i => /_pickaxe$/.test(i.name)).map(i => words(i.name)).join(', ') || 'none: rock is dug by hand, slowly, and netherrack dug by hand drops nothing';
   if (forItem) facts.for = words(forItem);
   facts.health = bot.health; facts.food = bot.food;

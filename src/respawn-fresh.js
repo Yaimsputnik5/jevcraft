@@ -9,6 +9,10 @@
 // respawn is at the bed last slept in or the world spawn, and the full runs'
 // record puts the time from a death to the kit worn and held again at 73
 // minutes (49 of 115 bot-hours in the day to 2026-10-26 08:00Z, 40 deaths).
+// What the same spot has come to on the full runs (the decision records of 2026-10-25 06:00Z to 10-26 09:00Z): the
+// spells in the Nether with no pickaxe and no block, read from the asks whose state said so, ten minutes apart at most.
+const SPELLS = Object.freeze({ window: '2026-10-25 06:00Z to 10-26 09:00Z', count: 19, minutes: 239, median: 9, longest: 115, longestNoneGood: 60, died: 1, otherwise: 18 });
+const spellsSays = () => `On the full runs (${SPELLS.window}) a bot stood in the Nether with no pickaxe and no block ${SPELLS.count} times, ${SPELLS.minutes} minutes in all (the median spell about ${SPELLS.median} minutes, the longest ${SPELLS.longest}, with ${SPELLS.longestNoneGood} 'none good' answers in it): ${SPELLS.died} of the ${SPELLS.count} ended in a death, ${SPELLS.otherwise} in a pickaxe or blocks got, or the portal reached, on the ground the bot could walk.`;
 const REKIT = Object.freeze({ window: '2026-10-25 06:00Z to 10-26 08:00Z', deaths: 40, minutesEach: 73, shareOfTime: 43 });
 const DEATH_WAIT_MS = 90000;
 const words = s => String(s || '').replaceAll('_', ' ');
@@ -33,7 +37,7 @@ function says(bot, goal, { lava }) {
   const bed = goal?.survival?.spawnBed?.foot;
   const respawn = bed ? `the bed at (${bed.x}, ${bed.y}, ${bed.z}) in the Overworld` : sp ? `the world spawn at (${Math.round(sp.x)}, ${Math.round(sp.y)}, ${Math.round(sp.z)}) in the Overworld, with nothing` : 'the world spawn, with nothing';
   let worth = ''; try { worth = goal?.kind === 'win' ? ` ${require('./eye-need').says(bot, goal, { brief: true })}` : ''; } catch (_) { worth = ''; }
-  return `Die here on purpose and come back to life at ${respawn}: walk into the lava ${lava.distance} blocks off at (${lava.at.x}, ${lava.at.y}, ${lava.at.z}) and stay in it. Everything carried, ${stacks} stack${stacks === 1 ? '' : 's'}${valued.length ? ` (${valued.join(', ')} among them)` : ''}, drops here and vanishes about five minutes later; nothing is got back. The Nether portal and this place are left as they are. On the full runs (${REKIT.window}) the time from a death to the kit worn and held again was about ${REKIT.minutesEach} minutes a death (${REKIT.deaths} deaths, ${REKIT.shareOfTime}% of the day's time); a bot with no pickaxe and no block here has no way to dig or span, only the ground it can walk.${worth}`;
+  return `Die here on purpose and come back to life at ${respawn}: walk into the lava ${lava.distance} blocks off at (${lava.at.x}, ${lava.at.y}, ${lava.at.z}) and stay in it. Everything carried, ${stacks} stack${stacks === 1 ? '' : 's'}${valued.length ? ` (${valued.join(', ')} among them)` : ''}, drops here and vanishes about five minutes later; nothing is got back. The Nether portal and this place are left as they are. On the full runs (${REKIT.window}) the time from a death to the kit worn and held again was about ${REKIT.minutesEach} minutes a death (${REKIT.deaths} deaths, ${REKIT.shareOfTime}% of the day's time); a bot with no pickaxe and no block here has no way to dig or span, only the ground it can walk. ${spellsSays()}${worth}`;
 }
 
 // Carried out: the flag that stands the body's lava rule and the survival layer down for a minute and a half, the
@@ -55,4 +59,4 @@ async function run(bot, task, goal, save, { lava, navigate, move }) {
 // Whether the flag stands now (the lava rule and the survival step read it).
 const standing = (goal, now = Date.now()) => !!goal?.deliberateDeath && now - goal.deliberateDeath.at < DEATH_WAIT_MS;
 
-module.exports = { offered, says, run, standing, REKIT, DEATH_WAIT_MS };
+module.exports = { offered, says, run, standing, spellsSays, SPELLS, REKIT, DEATH_WAIT_MS };
