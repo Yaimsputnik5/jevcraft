@@ -567,6 +567,12 @@ function tripCost(bot, goal = {}) {
     says: `${wayUp} blocks up to open sky${over}. ${first}${way === 'straight_up' ? 'straight up the column' : 'a staircase'}${heldSays}, ${duration(estimate[way])}.${wear}${otherSays} After it, ${back}.` };
 }
 
+// The pickaxes of `before` (a sorted, comma-joined list, or 'hand') that `now` no longer has, by name and count; '' when none.
+function pickaxesLost(before, now) {
+  const count = s => { const c = {}; for (const n of String(s || '').split(',').filter(x => x && x !== 'hand')) c[n] = (c[n] || 0) + 1; return c; };
+  const b = count(before), n = count(now);
+  return Object.keys(b).filter(k => (n[k] || 0) < b[k]).join(',');
+}
 function surfaceMovement(bot) {
   const movements = bot.pathfinder.movements;
   const previous = { canDig: movements.canDig, allow1by1towers: movements.allow1by1towers,
@@ -882,7 +888,12 @@ async function chooseClimb(bot, task, goal, save, state, target, { landing = fal
   const feet = bot.entity.position.floored(), here = `${feet.x},${feet.z}`;
   const tools = pickaxesCarried(bot).map(p => p.name).sort().join(',') || 'hand';
   const column = state.climb?.failedColumn === here ? null : straightUpColumn(bot, feet, { throughFalls: true });
-  const kept = state.climb?.method && state.climb.tools === tools && (state.climb.method !== 'straight_up' || column?.cells) && (state.climb.method !== 'walk_then_up' || state.climb.walkTo);
+  // A pickaxe gained does not end the climb (note 2182): the bot made its own spare mid-climb and the climb ended
+  // on 'the pickaxes carried changed', the rung re-planned, and the End kit was asked again (25593, 2026-10-26
+  // 08:00 to 08:22Z, end_kit answered enter_now 22 times within a minute of the time before). A pickaxe lost does.
+  const toolsLost = state.climb?.method ? pickaxesLost(state.climb.tools, tools) : null;
+  if (state.climb?.method && !toolsLost && state.climb.tools !== tools) state.climb.tools = tools;
+  const kept = state.climb?.method && !toolsLost && (state.climb.method !== 'straight_up' || column?.cells) && (state.climb.method !== 'walk_then_up' || state.climb.walkTo);
   const offered = state.climb?.offered || [];
   const woodFirstFailed = state.woodFirstFailed && Date.now() - state.woodFirstFailed.at < WOOD_FIRST_REST_MS ? state.woodFirstFailed : null;
   const { options, estimate, state: facts } = climbOptions(bot, target, column, { landing, rests, walkedAway: state.walkedAway || [], goal, woodFirstFailed });
@@ -924,7 +935,7 @@ async function chooseClimb(bot, task, goal, save, state, target, { landing = fal
   // straight_up at 14:37:26Z and walk_then_up fourteen seconds later, when
   // that way came on offer, and staircase after.
   if (goal.intention?.q === 'climb_out' && state.climb?.method) {
-    const why = state.climb.tools !== tools ? `the pickaxes carried changed (${state.climb.tools} then, ${tools} now)`
+    const why = toolsLost ? `a pickaxe was lost (${toolsLost.replaceAll('_', ' ')}: ${state.climb.tools} then, ${tools} now)`
       : state.climb.method === 'straight_up' && !column?.cells ? 'the column overhead would not rise'
         : state.climb.method === 'walk_then_up' && !state.climb.walkTo ? 'the walk to the column did not arrive'
           : overdue ? facts.climbSoFar : still ? `it has not risen a block in ${seconds(stillMs)}` : state.climb.method === 'staircase' && rests ? 'the staircase came to rest' : null;
@@ -1066,4 +1077,4 @@ function lidExit(bot, { origin = bot.entity.position.floored(), maxHeight = 3 } 
   return lid;
 }
 
-module.exports = { surfaceCandidatesYielding, openSkyOver, climbToSurface, climbMinutes, climbStraightMinutes, straightUpColumn, climbOptions, climbStraightUp, chooseClimb, heldClimb, stairwayCost, walkedColumns, walkedColumn, tripCost, lidExit, hasSurface, surfaceObserver, surfaceMovement, descendCanopy, returnToSurface, beginSurfaceAscent, surfaceReturnComplete, handDiggableExit, HAND_DIGGABLE, surfaceCandidates };
+module.exports = { pickaxesLost, surfaceCandidatesYielding, openSkyOver, climbToSurface, climbMinutes, climbStraightMinutes, straightUpColumn, climbOptions, climbStraightUp, chooseClimb, heldClimb, stairwayCost, walkedColumns, walkedColumn, tripCost, lidExit, hasSurface, surfaceObserver, surfaceMovement, descendCanopy, returnToSurface, beginSurfaceAscent, surfaceReturnComplete, handDiggableExit, HAND_DIGGABLE, surfaceCandidates };
