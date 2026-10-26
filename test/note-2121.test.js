@@ -29,6 +29,6 @@ test('the ore tally lays mining minutes and ore picked up to the depth band stoo
 test('the mining_depth question is defined with the two ways', () => {
   const { question } = require('../src/decisions');
   const q = question('mining_depth');
-  assert.deepEqual(q.options.map(o => o.key), ['nearest_ore', 'down_to_depth']);
+  assert.deepEqual(q.options.map(o => o.key), ['nearest_ore', 'down_to_depth', 'stock_first']);
   assert.equal(q.parent, 'rung_progress');
 });

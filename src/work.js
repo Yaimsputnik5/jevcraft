@@ -1987,10 +1987,30 @@ async function miningDepthChoice(bot, task, goal, save, step, candidates, now = 
       target: { x: nearest.x, y: nearest.y, z: nearest.z } },
     down_to_depth: { description: `Dig down to y ${depth} first, about ${above} blocks, and tunnel for ${dropWord} there: about ${digSecs} seconds of digging down at the live tunnels' pace (about 40 blocks a minute with a pickaxe), the ore in view up here left, and a climb back of about ${above} blocks after (about ${climbSecs} seconds at the stair steps' 3 seconds a block).${climbed ? ` ${climbed}` : ''}${record}${game}` },
   };
+  // The hunger the work below costs against the food carried (food-horizon.js, note 2165), and the animals in view
+  // taken first as a way: full-1 (2026-10-26 06:32Z) went down 35 blocks for 20 raw iron with nothing to eat, a sheep
+  // 42 blocks off and three cows at 94 in view, and the food came back as a climb; full-4 climbed for food five times
+  // in a day; return_to_surface stood at 66 to 129 minutes a run in the last 24 hours of the 145-hour runs.
+  let horizon = null; try { horizon = require('./food-horizon').horizon(bot, goal, { drop: step.drops, wanted: step.count ?? 1, digSecs, climbSecs, depth, now }); } catch (_) { horizon = null; }
+  if (horizon && (horizon.prey.length || horizon.seen.length) && horizon.target > horizon.carried) {
+    const first = horizon.prey[0] || null;
+    const walk = first ? ` About ${Math.max(5, Math.round(require('./levels').walkSeconds(first.distance) / 5) * 5)} seconds to the nearest at the measured walk.` : '';
+    tree.stock_first = { description: `Take food first, up here, to about ${horizon.target} points carried (the ${horizon.carried} carried and the ${horizon.hunger} the work below drains), from ${first ? `the animals in view (the ${first.name.replaceAll('_', ' ')} ${first.distance} blocks off first)` : `the animals seen earlier (${horizon.seen[0].says})`}; then this question again from here, the ore in view and the depth as they are.${walk} The food question says which animal, and the mark holds fifteen minutes or until it is carried.` };
+  }
   const decision = await decide('mining_depth', { client: task.opportunityClient, bot, task, goal, save, tree, target: tree.nearest_ore.target,
     state: { ore: step.block, wanted: step.count ?? 1, standingAt: Math.floor(feet.y), depth, aboveDepth: above, inView: candidates.length, health: bot.health, food: bot.food,
+      ...(horizon ? { foodBelow: horizon.says } : {}),
       holds: 'the answer holds twenty minutes for this ore, or until the bot is within 24 blocks of the depth' } });
   if (decision.stale) return 'nearest_ore';
+  if (decision.path?.at(-1) === 'stock_first' && horizon) {
+    // The mark the food errand works to (food-enough.js keepTo, food-reserve.js wanted): the survival layer claims the
+    // turn for the food, and this question comes again once it is carried or the mark lapses.
+    goal.survival ||= {};
+    goal.survival.foodKeepTo = { at: now, until: now + require('./food-enough').KEEP_MS, points: horizon.target, why: 'stock first, before the dig down (mining depth)' };
+    goal.miningDepth = { pick: 'stock_first', drops: step.drops, depth, at: now, until: now + 2 * 60000 }; save?.();
+    bot.chat?.(`Food first, up here, before I dig down: about ${horizon.hunger} hunger goes on the work below and I carry ${horizon.carried}.`);
+    return 'stock_first';
+  }
   const pick = decision.path?.at(-1) === 'down_to_depth' ? 'down_to_depth' : 'nearest_ore';
   goal.miningDepth = { pick, drops: step.drops, depth, at: now, until: now + MINING_DEPTH_HOLD_MS }; save?.();
   if (pick === 'down_to_depth') bot.chat?.(`Down to y ${depth} for ${dropWord}: it is thicker there than up here.`);
@@ -2887,6 +2907,8 @@ async function mineAtSource(bot, task, step, goal, save, selected) {
     try {
       const pick = await miningDepthChoice(bot, task, goal, save, step, candidates);
       if (pick === 'down_to_depth') candidates = [];
+      // Food first (note 2165): the turn goes to the food the mark asks for; the step waits where it is.
+      if (pick === 'stock_first') { goal.step = { action: 'stock_food_first', item: step.drops, points: goal.survival?.foodKeepTo?.points }; save(); return; }
     } catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
   }
   if (!candidates.length) {

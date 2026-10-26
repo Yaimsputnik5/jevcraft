@@ -64,6 +64,7 @@ define({
   options: [
     { key: 'nearest_ore', label: 'mine the nearest ore in view and on through what is in view up here', when: 'always; said with the nearest\'s distance and height, how many are in view by depth band, and the records', level: 'root' },
     { key: 'down_to_depth', label: 'dig down to the ore\'s depth first and tunnel for it there', when: 'always; said with the blocks down, the seconds digging and climbing back, the climbs of the last hour, and the records', level: 'root' },
+    { key: 'stock_first', label: 'take food first up here, to the points the work below drains, then this question again', when: 'animals in view or seen within 128 blocks, and the food carried under what the work below drains (food-horizon.js, note 2165); said with the target, the nearest animal and the walk to it; chosen, the food mark holds fifteen minutes and the food question says which animal', level: 'root' },
   ],
 });
 

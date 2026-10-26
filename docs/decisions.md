@@ -987,6 +987,7 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | --- | --- | --- | --- |
 | `nearest_ore` | root | mine the nearest ore in view and on through what is in view up here | always; said with the nearest's distance and height, how many are in view by depth band, and the records |
 | `down_to_depth` | root | dig down to the ore's depth first and tunnel for it there | always; said with the blocks down, the seconds digging and climbing back, the climbs of the last hour, and the records |
+| `stock_first` | root | take food first up here, to the points the work below drains, then this question again | animals in view or seen within 128 blocks, and the food carried under what the work below drains (food-horizon.js, note 2165); said with the target, the nearest animal and the walk to it; chosen, the food mark holds fifteen minutes and the food question says which animal |
 
 ### `resource_source`
 
