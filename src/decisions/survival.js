@@ -489,11 +489,12 @@ define({
   source: 'src/survival.js (sleepStep, bedAfterSleepTree)',
   instructions: {
     task: 'The bot has just slept the night in the bed it carried. Choose whether it leaves the bed standing as its respawn point or takes it up to carry.',
-    guidance: 'Each way says what it costs: left, a death comes back to life here and the next night needs another bed (the wool for it carried or not); taken, no more wool is needed and a death comes back to life at the world spawn, that far from the work.',
+    guidance: 'Each way says what it costs: left, a death comes back to life here and the next night needs another bed (the wool for it carried or not); taken, no more wool is needed and a death comes back to life at the world spawn until the carried bed is next slept in; a second bed made from what is carried keeps this one as the respawn and carries the other for the nights.',
   },
   options: [
     { key: 'leave_as_respawn', label: 'leave the bed standing as the respawn point', when: 'always' },
     { key: 'take_bed_along', label: 'take the bed up and carry it for the next night', when: 'always' },
+    { key: 'second_bed', label: 'leave this bed as the respawn and make another from what is carried to carry', when: 'a bed can be made from what is carried with crafts alone (three wool of one colour, or wool dyed white, and planks)' },
   ],
 });
 

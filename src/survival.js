@@ -9786,20 +9786,30 @@ class Survival {
       // Left as the respawn or taken along is Jev's (note 2063; the user, 2026-10-24: 'Get rid of my rules if they're
       // not helping ... make choices that give jev more agency and better info'): every bed slept in had stayed (notes
       // 1944, 1948), so each night slept took a bed of its own, and the bed rung opened again after every night.
-      let leaveAsSpawn = false;
+      let leaveAsSpawn = false, secondBed = null;
       if (!placed && slept && [site.foot, site.head].every(p => isBed(bot.blockAt(p)))) {
         let pick = 'leave_as_respawn';
-        try { pick = (await this.decide(task, goal, save, { id: 'bed_after_sleep', tree: bedAfterSleepTree(bot, this.state), state: { health: bot.health, food: bot.food } }))?.path?.[0] || pick; }
+        let bedNow = null; try { bedNow = require('./work').bedFromPockets(bot); } catch (_) { bedNow = null; }
+        try { pick = (await this.decide(task, goal, save, { id: 'bed_after_sleep', tree: bedAfterSleepTree(bot, this.state, Date.now(), { bedNow }), state: { health: bot.health, food: bot.food } }))?.path?.[0] || pick; }
         catch (err) { if (err?.name === 'Cancelled') throw err; this.report(goal, save, { action: 'bed_after_sleep_unasked', reason: String(err?.message || err).slice(0, 160) }); }
-        leaveAsSpawn = pick === 'leave_as_respawn';
+        leaveAsSpawn = pick === 'leave_as_respawn' || pick === 'second_bed';
+        secondBed = pick === 'second_bed' ? bedNow : null;
       }
       if (slept && [site.foot, site.head].every(p => isBed(bot.blockAt(p)))) {
         const was = this.state.spawnBed;
         this.state.spawnBed = { name: item || bot.blockAt(site.foot)?.name || 'bed', foot: { x: site.foot.x, y: site.foot.y, z: site.foot.z }, head: { x: site.head.x, y: site.head.y, z: site.head.z }, at: new Date().toISOString() };
         if (leaveAsSpawn) {
           this.report(goal, save, { action: 'spawn_bed_left', bed: item, at: { ...site.foot }, ...(was && (was.foot.x !== site.foot.x || was.foot.y !== site.foot.y || was.foot.z !== site.foot.z) ? { before: { ...was.foot } } : {}) });
-          bot.chat?.(`This bed stays here as my respawn point; I'll make another to carry.`);
+          bot.chat?.(secondBed ? `This bed stays here as my respawn point; making another to carry.` : `This bed stays here as my respawn point.`);
         }
+      }
+      // The second bed, crafted from the pockets (note 2159); one not made is said, and the bed rung has it.
+      if (secondBed && this.actions?.acquireStep) {
+        try {
+          for (let i = 0; i < 6 && countOf(bot, secondBed.item) < 1; i++) { task.check(); if (await this.actions.acquireStep(bot, task, secondBed.item, 1, goal, save) === true) break; }
+          if (countOf(bot, secondBed.item) < 1) this.report(goal, save, { action: 'second_bed_not_made', item: secondBed.item });
+          else this.report(goal, save, { action: 'second_bed_made', item: secondBed.item });
+        } catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; this.report(goal, save, { action: 'second_bed_not_made', item: secondBed.item, reason: String(err?.message || err).slice(0, 160) }); }
       }
       if (!placed && !leaveAsSpawn) {
         const bed = item;
@@ -12671,7 +12681,11 @@ function sealedWaitCostSays(bot, goal) {
 }
 // The bed slept in, on waking: left standing as the respawn or taken up and carried (note 2063), each said with what it
 // costs: the wool for the next bed, or the world spawn a death comes back to.
-function bedAfterSleepTree(bot, state, now = Date.now()) {
+// `bedNow`: a bed the pockets make with crafts alone (work.js bedFromPockets), offered as a second bed to carry
+// while this one stays as the respawn (note 2159): with only leave or take on offer, Jev left the bed 51 times of 51
+// (2026-10-25 06:00Z to 10-26 06:00Z, take_bed_along at 0.2 to 0.42), and the runs then sat 103 to 139 minutes of
+// nights sealed in that day each, 3 sheep climbs a run for the wool of the next bed.
+function bedAfterSleepTree(bot, state, now = Date.now(), { bedNow = null } = {}) {
   const items = bot.inventory?.items?.() || [], has = re => items.filter(i => re.test(i.name)).reduce((k, i) => k + i.count, 0);
   const wool = has(/_wool$/), string = has(/^string$/), beds = has(/_bed$/);
   const p = bot.entity?.position, sp = bot.spawnPoint;
@@ -12685,7 +12699,9 @@ function bedAfterSleepTree(bot, state, now = Date.now()) {
   let nights = ''; try { nights = ` ${require('./kit-record').fullBedSays()}.`; } catch (_) { nights = ''; }
   return {
     leave_as_respawn: { description: `Leave the bed standing here as the respawn point: a death comes back to life here. ${next[0].toUpperCase()}${next.slice(1)}. Left here, the next night away from it is waited out, not slept.${nights}${(() => { try { return require('./death-places').deathsNearSays(bot, p, { what: 'this bed' }); } catch (_) { return ''; } })()}`, run: async () => {} },
-    take_bed_along: { description: `Take the bed up and carry it: the next night is slept in it wherever it comes, no more wool needed.${nights} The respawn goes back to the world spawn${toSpawn != null ? `, ${toSpawn} blocks from here` : ''}: a death comes back to life there, with nothing, that far from the work. This run's deaths in the last two hours: ${recent}.`, run: async () => {} },
+    take_bed_along: { description: `Take the bed up and carry it: the next night is slept in it wherever it comes, no more wool needed.${nights} Taken up, the respawn is the world spawn${toSpawn != null ? `, ${toSpawn} blocks from here` : ''}, until the carried bed is next slept in: a death before then comes back to life there, with nothing, that far from the work; a sleep in the bed set down at the next bedtime makes that place the respawn, so from then the respawn follows the work. This run's deaths in the last two hours: ${recent}.`, run: async () => {} },
+    // Both at once (note 2159): this bed stays as the respawn and another is made to carry.
+    ...(bedNow ? { second_bed: { description: `Leave this bed standing as the respawn point and make another to carry, from what is carried (${bedNow.from}), crafts alone, a few seconds: a death comes back to life here, and the next night is slept in the carried bed wherever it comes, no climb for wool. The respawn stays here until the carried bed is slept in: sleeping in a bed moves the respawn to it, so from that night on the respawn is where the bot last slept.${nights}`, run: async () => {} } } : {}),
   };
 }
 function underRock(bot, refuge = null) {

@@ -308,6 +308,7 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | --- | --- | --- | --- |
 | `leave_as_respawn` | root | leave the bed standing as the respawn point | always |
 | `take_bed_along` | root | take the bed up and carry it for the next night | always |
+| `second_bed` | root | leave this bed as the respawn and make another from what is carried to carry | a bed can be made from what is carried with crafts alone (three wool of one colour, or wool dyed white, and planks) |
 
 ### `body_way`
 
