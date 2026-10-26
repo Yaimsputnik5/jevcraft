@@ -188,7 +188,8 @@ function hangingFloor(at, floor, { deepest = 48 } = {}) {
     // The column comes down on what holds, and the body onto the column.
     if (holds(c)) { into = 'ground'; fall = floor.y - (bottom.y - dy) - blocks; break; }
   }
-  return { bottom, blocks, name: top.name, under: under.name, into, fall, damage: into === 'ground' ? Math.max(0, fall - 3) : 0 };
+  const landing = into === 'ground' ? at({ x: bottom.x, y: floor.y - fall - blocks, z: bottom.z })?.name || null : null;
+  return { bottom, blocks, name: top.name, under: under.name, into, fall, landing, damage: fallDamage(fall, into, landing) };
 }
 const FACES = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, -1]];
 // Whether laying or digging the block at `changed` drops the floor at
@@ -221,6 +222,21 @@ const atOf = bot => p => bot.blockAt(new Vec3(p.x, p.y, p.z));
 // lava sea (note 600).
 const LAVA_NAME = /^(flowing_)?lava$/;
 const FALLING_NAME = /^(sand|red_sand|gravel|suspicious_sand|suspicious_gravel)$|_concrete_powder$/;
+// What a fall costs by the game's own rules (note 2124; LivingEntity
+// calculateFallDamage, PointedDripstoneBlock fallOn in the 26.1.2 jar): onto
+// ground, the blocks past three; into water, nothing; onto the point of a
+// stalagmite (pointed dripstone), the fall plus two and a half, less three,
+// twice over: 2 x fall - 1, so a drop of two hurts 3 and one of three 5,
+// where plain ground hurts nothing. full-4 (2026-10-25 23:26Z and 10-26
+// 00:43Z, at 3.6 health) was told a drop of three cost nothing and died on
+// the point twice.
+const STALAGMITE = 'pointed_dripstone';
+function fallDamage(fall, into = 'ground', landing = null) {
+  if (into === 'water' || !(fall > 0)) return 0;
+  if (landing === STALAGMITE) return Math.max(0, Math.ceil((fall + 2.5 - 3) * 2));
+  return Math.max(0, fall - 3);
+}
+const stalagmiteSays = fall => ` onto the point of a stalagmite (pointed dripstone): a fall onto it costs twice the fall past half a block, about ${fallDamage(fall, 'ground', STALAGMITE)} health for these ${fall}, where plain ground costs ${fallDamage(fall)}`;
 function fallFrom(at, cell, { deepest = 64 } = {}) {
   for (let n = 0; n <= deepest; n++) {
     const c = { x: cell.x, y: cell.y - n, z: cell.z }, b = at(c);
@@ -410,7 +426,8 @@ function dropNear(bot, feet, radius = 3, deepest = 48) {
           if (under.boundingBox === 'block') { fall = dy - 1; if (inLavaAt(bot, c.offset(0, 1 - dy, 0))) into = 'lava'; break; }
           fall = dy;
         }
-        const damage = into === 'water' ? 0 : Math.max(0, fall - 3);
+        const landingName = into === 'ground' || into === 'unknown' ? bot.blockAt(c.offset(0, -fall - 1, 0))?.name || null : null;
+        const damage = fallDamage(fall, into, landingName);
         if (!worst || damage > worst.damage || (damage === worst.damage && r < worst.blocksAway)) worst = { blocksAway: r, fallBlocks: fall, into, damage, cell: { x: c.x, y: c.y, z: c.z } };
         break;
       }
@@ -577,4 +594,4 @@ function bodyInLava(bot) {
   return false;
 }
 
-module.exports = { travelHazards, LAVA_SWIM_BLOCKS_A_SECOND, LAVA_SWIM_RECORD, feetCell, fallFrom, digExposes, hangingFloor, floorDrops, floorDropDeadly, floorDropSays, atOf, standsInLava, lavaTouch, lavaTouchSays, hotFloor, hotUnderfoot, HOT_FLOOR, onSpan, holdOffEdge, edgeHeld, EDGE_REACH, dropNear, dropNote, dropFacts, lavaFate, lavaFateSays, lavaShore, LAVA_SHORE_RADIUS, bodyInLava, besideDrop, dropWithin, KNOCKBACK, dropAt, dryPassable, dryLeaf, dryBodySpace, supportCell, restingCell, damagingTerrain, swimmingBlocks, swimmableWater, waterLevel };
+module.exports = { fallDamage, stalagmiteSays, STALAGMITE, travelHazards, LAVA_SWIM_BLOCKS_A_SECOND, LAVA_SWIM_RECORD, feetCell, fallFrom, digExposes, hangingFloor, floorDrops, floorDropDeadly, floorDropSays, atOf, standsInLava, lavaTouch, lavaTouchSays, hotFloor, hotUnderfoot, HOT_FLOOR, onSpan, holdOffEdge, edgeHeld, EDGE_REACH, dropNear, dropNote, dropFacts, lavaFate, lavaFateSays, lavaShore, LAVA_SHORE_RADIUS, bodyInLava, besideDrop, dropWithin, KNOCKBACK, dropAt, dryPassable, dryLeaf, dryBodySpace, supportCell, restingCell, damagingTerrain, swimmingBlocks, swimmableWater, waterLevel };

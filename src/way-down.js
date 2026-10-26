@@ -57,7 +57,7 @@ function landsInLava(view, feet) {
   };
   return require('./terrain').standsInLava(at, feet);
 }
-const damageOf = (fall, into) => into === 'water' ? 0 : Math.max(0, fall - SAFE_FALL);
+const damageOf = (fall, into, landing = null) => require('./terrain').fallDamage(fall, into, landing);
 
 // The top: the cells a walk reaches from `feet` without digging or laying a
 // block (level, a step up, a drop of three at most), and each side of them
@@ -146,7 +146,7 @@ function digColumn(view, from, { pickaxe = null, pickaxeUses = 0, maxDigs = 80 }
     const under = fallUnder(seen, floor);
     if (under.into === 'lava') return stop(under.beside ? `lava beside where the feet come down, under the ${said(floorName)} at ${floor.y}: the body stands in it there` : `lava ${under.n + 1} under the ${said(floorName)} at ${floor.y}`);
     if (under.into === 'unknown') return stop('the column under the feet runs into what is not loaded');
-    const fall = under.n + 1, hurt = damageOf(fall, under.into);
+    const fall = under.n + 1, hurt = damageOf(fall, under.into, under.landing);
     if (hurt > 0) return digs.length ? done({ stopsOver: { fall, damage: hurt, at: floor.y, name: floorName } }) : { from, blocked: `a fall of ${fall} under the ${said(floorName)} underfoot`, over: { fall, damage: hurt } };
     const withPick = stony(floorName) && pickaxe && uses > 0;
     const s = digSeconds(floorName, withPick ? pickaxe : null);

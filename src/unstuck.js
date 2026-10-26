@@ -263,18 +263,19 @@ function dropInto(view, cell, { reach = 24 } = {}) {
     if (name == null) return { n, into: 'unknown' };
     if (isWater(name)) return { n, into: 'water' };
     if (isLava(name)) return { n, into: 'lava' };
-    if (!open(name)) return { n, into: 'ground' };
+    if (!open(name)) return { n, into: 'ground', landing: name };
   }
   return { n, into: 'none' };
 }
 function dropBelow(view, cell, { reach = 24, extra = 0 } = {}) {
-  const { n, into } = dropInto(view, cell, { reach });
+  const { n, into, landing } = dropInto(view, cell, { reach });
   if (into === 'lava') return `${n ? `a drop of ${n} block${n === 1 ? '' : 's'} into lava under it` : 'lava right under it'}: a fall there is into the lava${view.lavaTouch ? ` (${view.lavaTouch})` : ''}`;
   if (!n) return null;
   if (into === 'unknown') return `a drop of ${n}+ blocks under it, the rest not loaded`;
   if (into === 'water') return `a drop of ${n} block${n === 1 ? '' : 's'} into water under it`;
   if (into === 'none') return `no floor within ${reach} blocks under it: a fall that costs ${reach + extra - 3} health or more${ofHealth(view, reach + extra - 3)}`;
-  const fall = n + extra;
+  const fall = n + extra, { fallDamage, stalagmiteSays, STALAGMITE } = require('./terrain');
+  if (landing === STALAGMITE) { const hurt = fallDamage(fall, into, landing); return `a drop of ${n} block${n === 1 ? '' : 's'} under it${stalagmiteSays(fall)}${ofHealth(view, hurt)}`; }
   return `a drop of ${n} block${n === 1 ? '' : 's'} under it${fall > 3 ? `: falling ${fall} blocks costs about ${fall - 3} health${ofHealth(view, fall - 3)}` : ''}`;
 }
 // A fall's cost against the health the bot has, as a touch of lava is
@@ -917,7 +918,7 @@ function describeMove(m, { offWorld = false } = {}) {
   if (m.effects?.length) facts.push(m.effects.join('; '));
   if (m.to) {
     facts.push(m.rises > 0 ? `rises ${m.rises}` : m.rises < 0 ? `goes down ${-m.rises}` : 'same level');
-    if (m.onDripstone) facts.push('ends on the point of a pointed dripstone: landing on a stalagmite hurts as a fall does and more, two health a block fallen on top of the fall, and the jump onto it is a fall onto the point');
+    if (m.onDripstone) facts.push('ends on the point of a pointed dripstone: a fall onto a stalagmite costs twice the fall past half a block (2 x blocks - 1: a drop of one hurts 1, of two 3, of three 5), where plain ground costs nothing under four.');
     else if (m.dryFooting) facts.push('ends on dry ground');
     if (m.lavaBeside) facts.push('lava beside the cell it ends on (level with the feet or the floor, a block to the side or corner to corner): a misstep or a push there is into the lava');
     if (m.breathes === true) facts.push('the head comes out into air there');
