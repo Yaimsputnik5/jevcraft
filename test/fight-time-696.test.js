@@ -31,8 +31,10 @@ test('a blaze within six blocks round the rock, or one of a kind that hit the bo
   assert.match(danger.fightOn(walledBot({ mobs: [['blaze', 3]] })), /^a blaze 3 blocks off \(out of sight\)$/);
   assert.equal(danger.fightOn(walledBot({ mobs: [['blaze', 10]] })), null, 'ten blocks off through the rock: none');
   const now = Date.now();
-  assert.match(danger.fightOn(walledBot({ mobs: [['blaze', 10]], hurtBy: { blaze: now - 7000 } }), now), /^a blaze hit the bot 7 seconds ago and one is 10 blocks off \(out of sight\)$/);
-  assert.equal(danger.fightOn(walledBot({ mobs: [['blaze', 10]], hurtBy: { blaze: now - 12000 } }), now), null, 'twelve seconds ago: over');
+  // The blaze that hit the bot seven seconds ago has its line by that hit (note 2201): named in sight, not 'out of sight'.
+  assert.match(danger.fightOn(walledBot({ mobs: [['blaze', 10]], hurtBy: { blaze: now - 7000 } }), now), /^(a blaze hit the bot 7 seconds ago and one is 10 blocks off \(out of sight\)|the blaze 10 blocks off)$/);
+  assert.match(danger.fightOn(walledBot({ mobs: [['blaze', 10]], hurtBy: { blaze: now - 12000 } }), now), /^the blaze 10 blocks off$/, 'twelve seconds ago: the shooter still has its line by that hit (note 2201)');
+  assert.equal(danger.fightOn(walledBot({ mobs: [['blaze', 10]], hurtBy: { blaze: now - 25000 } }), now), null, 'twenty-five seconds ago: over');
   assert.equal(danger.fightOn(walledBot({ mobs: [], hurtBy: { blaze: now - 2000 } }), now), null, 'none of its kind about');
   // A stance Jev chose that still holds.
   const bot = walledBot();

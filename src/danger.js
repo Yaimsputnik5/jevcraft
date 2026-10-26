@@ -124,6 +124,7 @@ function hostileEntities(bot, radius = 24) {
 }
 
 const ATTRIBUTE_MS = 5000;
+const SHOOTER_HITS_MS = 20000;
 // The mobs about that a list built from those in sight leaves out, said:
 // every stance was told of the visible ones only, and a creeper behind a
 // corner was in no option (the decision audit, 2026-09-25).
@@ -229,6 +230,18 @@ function threats(bot, radius = 24) {
     if (now - bot._hurtBy[kind] > ATTRIBUTE_MS || list.some(t => t.entity.name === kind && t.visible)) continue;
     const attacker = list.find(t => t.entity.name === kind);
     if (attacker) Object.assign(attacker, { visible: true, attributed: true });
+  }
+  // Shooters out of the client's sight whose kind has landed a hit within the last twenty seconds are priced as
+  // shooting, every one of them within its fire's reach, not the nearest alone within five seconds (note 2201):
+  // the server's line of fire is the truth and the client's ray the guess. full-1 (25591, 2026-10-26 11:33Z) stood a
+  // block from a blaze spawner with seven blazes within eleven blocks, every one 'out of sight' to the ray, took
+  // seven hits in twenty seconds (12.4 to 2.3 health; the server named the source of two) and was asked its stance
+  // with every way priced 'about 0 damage over about 15 seconds' (the estimate counts no unseen shooter): fight at
+  // the spawner at 0, back to wall at 0, leave and heal at 0; it took the fight and died nine seconds later.
+  for (const kind of Object.keys(bot._hurtBy || {})) {
+    if (now - bot._hurtBy[kind] > SHOOTER_HITS_MS) continue;
+    const { FIRE_REACH } = require('./combat-estimate');
+    for (const t of list) if (!t.visible && t.entity.name === kind && shooter(t.entity) && t.distance <= (FIRE_REACH[kind] || 16)) Object.assign(t, { visible: true, attributed: true, hitting: true });
   }
   // The mob being fought is not forgotten when it steps below a ledge's
   // edge: in the replay of trial 57's ledge the bot turned to building a

@@ -2306,7 +2306,10 @@ test('hit by a blaze with none in sight, the nearest blaze is the one: seen, as 
   bot._hurtBy = { blaze: Date.now() };
   const t = threats(bot)[0];
   assert.equal(t.visible, true); assert.equal(t.attributed, true);
+  // A shooter's kind that landed a hit within twenty seconds is still shooting (note 2201); past that, nobody is named.
   bot._hurtBy = { blaze: Date.now() - 10000 };
+  assert.equal(threats(bot)[0].visible, true, 'a blaze that hit the bot ten seconds ago still has its line');
+  bot._hurtBy = { blaze: Date.now() - 25000 };
   assert.equal(threats(bot)[0].visible, false, 'an old hit names nobody');
 });
 
