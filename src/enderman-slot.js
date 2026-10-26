@@ -99,6 +99,9 @@ function builtSlotFrom(bot, f) {
     const need = [...walls, ...roof].filter(c => !solid(at(c)));
     if (need.some(c => !open(at(c)) && !/air/.test(at(c)?.name || '') && at(c)?.boundingBox !== 'empty')) continue;
     if (need.length > Math.min(BUILD_MAX, carried.count)) continue;
+    // Each wall block laid at the feet' level has ground under it to be laid on (note 2263): full-7 (2026-10-26 22:4xZ) chose a
+    // site at (14, 66, 84) whose side cells stood over a drop, 'Cannot place cobblestone ... no adjacent solid', 5 of 13 laid.
+    if (need.some(c => c.y === f.y && !solid(at(c.offset(0, -1, 0))))) continue;
     const near = c => [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0]].some(([x, y, z]) => /lava/.test(at(c.offset(x, y, z))?.name || ''));
     if ([f, a, b].some(near)) continue;
     // Laid low first, then the roof that rests on the walls' tops.
