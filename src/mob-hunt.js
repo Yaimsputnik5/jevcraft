@@ -3325,7 +3325,7 @@ async function chooseLeg(bot, task, goal, save, actions, state, fortress = null)
   if (swordThere) { if (options.fetch_stems) options.fetch_stems.description += ` ${swordThere.leaves}`; if (options.make_pickaxe) options.make_pickaxe.description += ` ${swordThere.makes}`; }
   const tree = Object.fromEntries(Object.entries(lead ? bs.pickaxeFirstOrder(options) : options).map(([k, o]) => [k, { description: o.description, ...(o.target ? { target: o.target } : {}), ...(o.waits ? { waits: o.waits } : {}) }]));
   const blazesSeen = blazesSeenFacts(bot, goal);
-  const facts = { ...(lead ? { withoutAPickaxe: lead } : {}), ...(blazesSeen ? { blazesSeen } : {}), height: y, fortressHeights: 'corridors and bridges mostly between y 48 and 75, over the lava sea at y 31; bricks are seen within 128 blocks, and only through open air',
+  const facts = { ...(lead ? { withoutAPickaxe: lead } : {}), ...(blazesSeen ? { blazesSeen } : {}), netherRecord: require('./nether-record').says(goal), height: y, fortressHeights: 'corridors and bridges mostly between y 48 and 75, over the lava sea at y 31; bricks are seen within 128 blocks, and only through open air',
     legsSoFar: state.legs || 0, minutesSearching: state.since ? Math.round((Date.now() - state.since) / 60000) : 0,
     lastLeg: Number.isInteger(state.lastHeading) ? (() => { const seeking = state.legMode === 'descend', h = state.legHistory?.[legKey(state.lastHeading, state.legMode)];
       return `${seeking ? 'a staircase toward the fortress heights ' : state.legMode === 'floor' ? 'down to the floor and along it ' : state.legMode === 'round' ? 'round what stopped the line ' : ''}${HEADING_NAMES[state.lastHeading]}${h ? `, ended no nearer: ${h.ended}` : ''}`; })() : null,
@@ -4311,7 +4311,8 @@ async function approachFortress(bot, task, goal, save, actions, state, nearest, 
   // now may be nearer than the place asked about (note 570).
   const blazesSeen = blazesSeenFacts(bot, goal);
   // The rods line goes after the rest: read first it moved recorded answers (eye-need.js).
-  const facts = { ...(blazesSeen ? { blazesSeen } : {}), ...approaches.facts, ...rodsFact(bot, goal) };
+  // What the Nether has cost, on the approach (nether-record.js, note 2167).
+  const facts = { ...(blazesSeen ? { blazesSeen } : {}), ...approaches.facts, ...rodsFact(bot, goal), netherRecord: require('./nether-record').says(goal) };
   if (stretch) {
     const what = stretch.what || 'a stretch of the fortress\'s floors';
     facts.stretch = `${what}, ${Math.round(flatTo(nearest, bot.entity.position))} blocks off; the walk there on foot failed: ${stretch.why}`;

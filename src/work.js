@@ -9097,7 +9097,7 @@ async function crossingKitReady(bot, task, goal, save, client = task.opportunity
     const oldOrder = KIT_ORDER.find(k => tree[k] && !worn(k)) || 'cross_now';
     const decision = await decide('crossing_kit', { client, bot, task, goal, save, tree, context: { oldOrder },
       state: { kit: Object.fromEntries(items.map(i => [i.key, `${i.carried} carried, the code would take ${i.wants}`])), health: bot.health, hunger: bot.food,
-        minutesAtCrossing: Math.round(kit.workedMs / 60000), riskNow: require('./risk').riskNow(bot) } });
+        minutesAtCrossing: Math.round(kit.workedMs / 60000), riskNow: require('./risk').riskNow(bot), netherRecord: require('./nether-record').says(goal) } });
     if (decision.stale) return false;
     pick = decision.path.at(-1);
     kit.choice = { pick, keys, at: kit.workedMs, wall: Date.now() }; save();
