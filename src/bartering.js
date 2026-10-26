@@ -94,6 +94,19 @@ async function barterStep(bot, task, goal, save, actions = {}) {
     goal.step = { action: 'barter_make_ingots', nuggets: nuggets(bot) }; save();
     await actions.acquireStep(bot, task, 'gold_ingot', ingots(bot) + Math.floor(nuggets(bot) / 9), goal, save);
   }
+  // The Nether's gold ore mined for the barter (note 2185): with no gold to throw, ore within 32 and a pickaxe, up to
+  // nine ingots' worth of ore is mined (acquireStep plans the ore, the nuggets and the ingot), two minutes at most.
+  if (!ingots(bot) && nuggets(bot) < 9 && actions.acquireStep && bot.inventory.items().some(i => /_pickaxe$/.test(i.name))) {
+    let near = 0; try { const id = bot.registry?.blocksByName?.nether_gold_ore?.id; near = id !== undefined && typeof bot.findBlocks === 'function' ? bot.findBlocks({ matching: id, maxDistance: 32, count: 64 }).length : 0; } catch (_) { near = 0; }
+    if (near) {
+      const want = Math.min(9, Math.max(1, Math.floor(near * 4 / 9)));
+      goal.step = { action: 'barter_mine_gold', ores: near, ingotsWanted: want }; save();
+      bot.chat?.(`Gold ore in sight: mining it to barter with the piglins.`);
+      const until = Date.now() + 120000;
+      try { for (let n = 0; n < 24 && Date.now() < until && ingots(bot) < want; n++) { task.check(); if (await actions.acquireStep(bot, task, 'gold_ingot', ingots(bot) + 1, goal, save) === false) break; } }
+      catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
+    }
+  }
   if (!ingots(bot)) throw new Error('No gold to barter with');
   if (!await wearGold(bot, task, goal, save, actions)) throw new Error('No gold to wear: piglins will not barter with a player in no gold');
   const pearlsBefore = countOf(bot, 'ender_pearl'), potionsBefore = firePotions(bot);

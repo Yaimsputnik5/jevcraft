@@ -12794,14 +12794,17 @@ function bedAfterSleepTree(bot, state, now = Date.now(), { bedNow = null, goal =
   // 2145): neither way said it, and take_bed_along was offered 6 times
   // tonight (2026-10-26 01:00 to 04:30Z) and taken 0; the 145-hour runs
   // waited 16 to 21 hours of nights out with 20 minutes asleep in all.
-  let nights = ''; try { nights = ` ${require('./kit-record').fullBedSays()}.`; } catch (_) { nights = ''; }
-  // And this run's own nights (night-ahead.js runNightsSays, note 2180).
-  try { nights += require('./night-ahead').runNightsSays(goal); } catch (_) { /* the fleet's record alone */ }
+  // This run's own nights (night-ahead.js runNightsSays, note 2180); the fleet's paragraph (note 2145) is dropped
+  // (note 2185, Fable 10-26: the options ran to 600 characters and a small model does not read that).
+  let nights = ''; try { nights = require('./night-ahead').runNightsSays(goal); } catch (_) { nights = ''; }
+  // The order (note 2185): the way that changes nothing about the respawn first, then the carried bed, then leaving
+  // it; and the carried bed's text says the run's upside, not the one night's downside alone: slept in each night, the
+  // respawn follows the work. take_bed_along was offered 6 times on 2026-10-26 morning and taken 0; full-3 waited 21.8
+  // hours of nights out with its bed standing far off.
   return {
-    leave_as_respawn: { description: `Leave the bed standing here as the respawn point: a death comes back to life here. ${next[0].toUpperCase()}${next.slice(1)}. Left here, the next night away from it is waited out, not slept.${nights}${(() => { try { return require('./death-places').deathsNearSays(bot, p, { what: 'this bed' }); } catch (_) { return ''; } })()}`, run: async () => {} },
-    take_bed_along: { description: `Take the bed up and carry it: the next night is slept in it wherever it comes, no more wool needed.${nights} Taken up, the respawn is the world spawn${toSpawn != null ? `, ${toSpawn} blocks from here` : ''}, until the carried bed is next slept in: a death before then comes back to life there, with nothing, that far from the work; a sleep in the bed set down at the next bedtime makes that place the respawn, so from then the respawn follows the work. This run's deaths in the last two hours: ${recent}.`, run: async () => {} },
-    // Both at once (note 2159): this bed stays as the respawn and another is made to carry.
-    ...(bedNow ? { second_bed: { description: `Leave this bed standing as the respawn point and make another to carry, from what is carried (${bedNow.from}), crafts alone, a few seconds: a death comes back to life here, and the next night is slept in the carried bed wherever it comes, no climb for wool. The respawn stays here until the carried bed is slept in: sleeping in a bed moves the respawn to it, so from that night on the respawn is where the bot last slept.${nights}`, run: async () => {} } } : {}),
+    ...(bedNow ? { second_bed: { description: `Leave this bed standing as the respawn and make another to carry, from what is carried (${bedNow.from}), crafts alone, a few seconds: nothing about the respawn changes now, and the next night is slept in the carried bed wherever it comes. A bed slept in becomes the respawn, so from that night on the respawn is where the bot last slept, near the work.${nights}`, run: async () => {} } } : {}),
+    take_bed_along: { description: `Take the bed up and carry it: the next night is slept in it wherever it comes, no more wool needed, and a bed slept in becomes the respawn, so carried and slept in each night the respawn follows the work: over a run that is the nearer respawn, not the farther. Until it is next slept in the respawn is the world spawn${toSpawn != null ? `, ${toSpawn} blocks from here` : ''}: a death before that comes back there with nothing. This run's deaths in the last two hours: ${recent}.${nights}`, run: async () => {} },
+    leave_as_respawn: { description: `Leave the bed standing here as the respawn: a death comes back to life here however far the work goes, and the walk back is from here. ${next[0].toUpperCase()}${next.slice(1)}. Left here, each night away from it is waited out awake, not slept.${nights}${(() => { try { return require('./death-places').deathsNearSays(bot, p, { what: 'this bed' }); } catch (_) { return ''; } })()}`, run: async () => {} },
   };
 }
 function underRock(bot, refuge = null) {

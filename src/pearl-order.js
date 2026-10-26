@@ -36,7 +36,7 @@ const record = require('./pearl-record');
 
 const HOLD_MS = 30 * 60000, NONE_GOOD_MS = 5 * 60000;
 const ENDERMAN_REACH = 24, HUNT_SIGHT = 48, FOREST_REACH = 512;
-const KIND = { hunt_enderman: 'enderman', warped_forest: 'forest', barter_gold: 'barter', bastion_gold: 'bastion' };
+const KIND = { hunt_enderman: 'enderman', warped_forest: 'forest', barter_gold: 'barter', bastion_gold: 'bastion', mine_gold_for_barter: 'gold ore' };
 const PICKS = new Set(['rods_first', ...Object.keys(KIND)]);
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const count = (bot, name) => (bot.inventory?.items?.() || []).filter(i => i.name === name).reduce((n, i) => n + i.count, 0);
@@ -78,6 +78,21 @@ function routes(bot, goal, now = Date.now()) {
     let b = null; try { b = require('./exploration').knownLandmarks(bot, goal, 'bastion', 384)[0] || null; } catch (_) { b = null; }
     if (b) out.bastion = b;
   }
+  // The Nether's own gold ore, mined for the barter (note 2185; Fable 10-26): no pearl route mined it, and the barter
+  // was offered only with gold already carried (5 picks of 53 asks in 25 h, no gold to throw). With a pickaxe and
+  // nether gold ore within 32, the ores in view are said as ingots and pearls' worth.
+  if (!out.barter && !isSetAside(goal, 'rung', 'mine_gold_for_barter', now) && (bot.inventory?.items?.() || []).some(i => /_pickaxe$/.test(i.name))) {
+    try {
+      const id = bot.registry?.blocksByName?.nether_gold_ore?.id;
+      const ores = id !== undefined && typeof bot.findBlocks === 'function' ? bot.findBlocks({ matching: id, maxDistance: 32, count: 64 }) : [];
+      if (ores.length) {
+        const here = bot.entity.position;
+        const nearest = ores.map(q => Math.hypot(q.x - here.x, q.y - here.y, q.z - here.z)).sort((a, b) => a - b)[0];
+        const piglinsNear = Object.values(bot.entities || {}).filter(e => e?.name === 'piglin' && e.isValid !== false && e.position && e.position.distanceTo(here) <= 32).length;
+        out.goldOre = { count: ores.length, nearest: Math.round(nearest), piglinsNear };
+      }
+    } catch (_) { /* no ore said */ }
+  }
   return out;
 }
 
@@ -118,7 +133,7 @@ function orderStage(bot, goal, { count: want = 1, now = Date.now(), phase = 'obt
   const because = askAgainBecause(bot, goal, kinds, now);
   return because ? { phase, action: 'pearl_order', item: 'blaze_rod', because } : null;
 }
-const endedWhy = pick => ({ hunt_enderman: 'no enderman left within 48 blocks', warped_forest: 'the forest\'s walk or its hunt rests', barter_gold: 'no gold to throw or no piglin within 32', bastion_gold: 'the bastion\'s gold rests or none is known' })[pick];
+const endedWhy = pick => ({ hunt_enderman: 'no enderman left within 48 blocks', warped_forest: 'the forest\'s walk or its hunt rests', barter_gold: 'no gold to throw or no piglin within 32', bastion_gold: 'the bastion\'s gold rests or none is known', mine_gold_for_barter: 'no gold ore within 32 and no gold to throw' })[pick];
 
 function stageFor(bot, goal, pick, r, want, now) {
   const base = { phase: 'obtain_ender_pearls', item: 'ender_pearl', via: 'pearl_order' };
@@ -127,6 +142,8 @@ function stageFor(bot, goal, pick, r, want, now) {
   if (pick === 'barter_gold') return r.barter ? { ...base, action: 'barter', count: want } : null;
   // The bastion's gold, then the barter with its piglins once gold is to throw.
   if (pick === 'bastion_gold') return r.barter ? { ...base, action: 'barter', count: want } : r.bastion ? { ...base, action: 'bastion_gold', item: 'gold_ingot' } : null;
+  // The ore mined first, then the barter: both the barter step's (bartering.js barterStep mines when the gold is short and ore is near).
+  if (pick === 'mine_gold_for_barter') return r.barter || r.goldOre ? { ...base, action: 'barter', count: want, mineGold: true } : null;
   return null;
 }
 
@@ -183,6 +200,11 @@ function tree(bot, goal, r, now = Date.now()) {
   }
   if (r.barter) {
     out.barter_gold = { description: `Barter with the piglins in reach now: ${o.gold}. A piglin turns on a player in no gold, so a gold piece is worn first. Held while gold is left to throw and a piglin is within 32, then the rods again. ${record.routeSays('barter_gold', goal)} Pearls ${o.pearls}.` };
+  }
+  if (r.goldOre) {
+    const g = r.goldOre, ingots = Math.round(g.count * 4 / 9 * 10) / 10, pearls = Math.round(ingots / 9 * 10) / 10;
+    let rec = ''; try { rec = ` ${record.routeSays('mine_gold_for_barter', goal)}`; } catch (_) { rec = ''; }
+    out.mine_gold_for_barter = { description: `Mine the ${g.count} nether gold ore${g.count === 1 ? '' : 's'} within 32 blocks (the nearest ${g.nearest} off) and barter the gold with the piglins: an ore drops two to six nuggets (about four), nine nuggets make an ingot, so about ${ingots} ingot${ingots === 1 ? '' : 's'} from these, and the measured barter is nine ingots a pearl (every throw a roll: a pearl drop is four to eight), about ${pearls} pearl${pearls === 1 ? '' : 's'}' worth; an ore is a few seconds with any pickaxe, the first ingots go on a gold piece if none is worn (four for boots). ${g.piglinsNear ? `${g.piglinsNear} piglin${g.piglinsNear === 1 ? '' : 's'} within 32 now.` : 'No piglin within 32 now: the gold is carried until one is, and the barter is asked then.'} Pearls ${o.pearls}.${rec}` };
   }
   if (r.bastion) {
     const l = r.bastion.landmark;

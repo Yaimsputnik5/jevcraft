@@ -315,6 +315,23 @@ async function prepareEndSupplies(bot, task, goal, save, actions, client = task.
     const home = homeByPortal(bot, goal);
     if (home && home.beds && home.off <= HOME_NEAR) tree.home_by_portal = { description: `Stay by the portal's ring (${home.off} blocks off) until bedtime${bedtimeSays(bot)} and sleep in the carried bed here; the bed slept in stays the respawn. ${home.bedOff != null ? `The bed slept in last is ${home.bedOff} blocks from the portal, and a death before then comes back there.` : 'No bed has been slept in yet.'} Nothing else is done meanwhile.` };
     else if (home) tree.home_by_portal = { description: `Make the portal home first: ${home.beds ? `carry the bed${home.beds === 1 ? '' : 's'} carried` : home.atBed ? `take up the bed slept in last, ${home.atBed.d} blocks off here, and carry it` : 'make a bed (three wool, three planks) and carry it'} to the portal's ring, ${home.off} blocks off (about ${Math.max(1, Math.round(home.off / WALK_PACE / 60))} real minutes at the bot's walking pace of ${WALK_PACE} blocks a second, nights apart), and sleep in it there the next night; the bed slept in stays the respawn.${!home.beds && home.atBed ? ` Taken up, no bed stands for the respawn until that night: a death on the way comes back at the world spawn${home.worldSpawnOff != null ? `, ${home.worldSpawnOff} blocks from the portal` : ''}.` : ''} ${home.bedOff != null ? `The bed slept in last is ${home.bedOff} blocks from the portal: a death now comes back there, everything carried left where it fell, and the walk back to the ring is the ${home.bedOff} blocks again.` : 'No bed has been slept in yet: a death now comes back at the world spawn.'} Beside the ring a death comes back within reach of the portal and its chest, and the kit's errands go out from there.${sinceLitSays(home)}` };
+    // The kit chest beside the bed at the ring (bed-kit.js, note 2185; Fable 10-26: a death in the End then costs
+    // minutes, not the 73 of a kit made again): with the bed slept in last standing within reach, its chores are the
+    // End kit's first options, said as what they are for here. And home_by_portal before the top-ups.
+    let chores = {};
+    try {
+      const bk = require('./bed-kit'), sb = spawnBedOf(bot), ep = goal.endPortal;
+      const bedNearRing = sb && ep?.center && Math.hypot(sb.x - ep.center.x, sb.z - ep.center.z) <= HOME_FAR;
+      if (bedNearRing) {
+        for (const [k, v] of Object.entries(bk.bedKitChores(bot, goal))) {
+          if (!['kit_by_bed', 'stock_bed_kit', 'spare_armour_by_bed'].includes(k)) continue;
+          chores[k] = { ...v, description: `${v.description} A death in the End comes back to life at this bed, ${Math.round(Math.hypot(sb.x - ep.center.x, sb.z - ep.center.z))} blocks from the portal's ring, with nothing carried: what is in the chest here is on the bot again in minutes, and what is not is made again (the full runs' re-kit after a death: about 73 minutes, 40 deaths to 2026-10-26 08:00Z; full-3 died 50 times between entering the End and the kill).` };
+        }
+      }
+    } catch (_) { chores = {}; }
+    const ordered = { ...(tree.home_by_portal ? { home_by_portal: tree.home_by_portal } : {}), ...Object.fromEntries(Object.entries(chores).map(([k, v]) => [k, { description: v.description }])), ...tree };
+    for (const k of Object.keys(tree)) delete tree[k];
+    Object.assign(tree, ordered);
     // The old order, for the tests' stand-in only (note 707).
     const oldOrder = `top_up_${(short.find(i => !['food', 'health'].includes(i.key)) || short[0]).key}`;
     const decision = await decide('end_kit', { client, bot, task, goal, save, tree, context: { oldOrder },
@@ -325,6 +342,15 @@ async function prepareEndSupplies(bot, task, goal, save, actions, client = task.
     kit.choice = { pick, at: now, sig, ...(pick === 'enter_now' ? { counts } : {}), ...(item?.target != null ? { target: item.target } : {}) }; save();
   }
   if (pick === 'enter_now' || pick === 'fill_frame_first') { delete goal.preparingEnd; save(); return true; }
+  // The bed's chest chores (note 2185), carried out as bed-kit.js runs them.
+  if (['kit_by_bed', 'stock_bed_kit', 'spare_armour_by_bed'].includes(pick)) {
+    let chore = null; try { chore = require('./bed-kit').bedKitChores(bot, goal)[pick] || null; } catch (_) { chore = null; }
+    if (!chore) { delete kit.choice; save(); return false; }
+    goal.step = { action: 'prepare_end_supplies', item: pick }; save();
+    try { await chore.run(bot, task, goal, save, actions); } catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
+    delete kit.choice; save();
+    return false;
+  }
   if (pick === 'home_by_portal') {
     const home = homeByPortal(bot, goal);
     if (!home) { delete kit.choice; save(); return false; }

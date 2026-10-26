@@ -94,6 +94,8 @@ const OLD_ORDER = {
   crossing_kit: (children, path, context = {}) => children[context.oldOrder] ? context.oldOrder : 'cross_now',
   dragon_fight: (children, path, context = {}) => endFallback(context.safe)(children),
   end_kit: (children, path, context = {}) => children[context.oldOrder] ? context.oldOrder : 'enter_now',
+  // The old order's answer (note 2185 put the carried bed first): the bed slept in stays as the respawn.
+  bed_after_sleep: children => children.leave_as_respawn ? 'leave_as_respawn' : Object.keys(children)[0],
   dug_into_liquid: () => 'plug',
   empty_spawner: children => {
       if (children.stash_rods) return 'stash_rods';
