@@ -116,7 +116,10 @@ function says(bot, list = [], { now = Date.now(), ms = RECENT_MS } = {}) {
   const r1 = v => Math.round(v * 10) / 10;
   const risingDrops = ds.filter(d => d.rising).length;
   const fell = ds.length > named ? ` Health fell ${ds.length} times in the last ${Math.round(ms / 1000)} seconds, ${r1(ds[0].from)} to ${r1(ds.at(-1).to)} health${ds.every(d => d.shield) ? ', every one with the shield up' : ds.some(d => d.shield) ? `, ${ds.filter(d => d.shield).length} with the shield up` : ''}${risingDrops ? `, ${risingDrops === ds.length ? 'every one' : risingDrops} with the shield rising, before it blocks` : ''}${named ? `; the server named the source of ${named}` : ''}.` : '';
-  if (!hs.length) return fell ? `Hitting the bot now:${fell}` : '';
+  // The pace (note 2240): hits priced one at a time say nothing of how fast they come. 25599's fortress-1 (2026-10-26 17:04Z) read 'the zombie's ... about 1.5 through what is worn: 8 more such hits' and held shield_guard nine asks running while a zombie landed one a second beside a skeleton's arrows, fourteen hits in 45 seconds, 20 to none. Health lost over the window and the seconds it took, and the seconds left at that pace.
+  const lost = ds.reduce((n, d) => n + Math.max(0, d.from - d.to), 0), span = ds.length >= 2 ? (ds.at(-1).at - ds[0].at) / 1000 : 0;
+  const pace = ds.length >= 2 && span >= 1 && lost > 0 && Number.isFinite(bot.health) ? ` Lost ${r1(lost)} health in ${Math.round(span)} seconds, about ${r1(lost / span)} a second: at that pace ${Math.max(1, Math.round(bot.health / (lost / span)))} seconds from ${r1(bot.health)} to none.` : '';
+  if (!hs.length) return fell ? `Hitting the bot now:${fell}${pace}` : '';
   const each = hs.slice(0, 3).map(h => {
     const where = h.t ? `${Math.round(h.t.distance * 10) / 10} blocks off${h.t.visible === false ? ', out of sight' : ''}` : 'not in view now';
     const sides = h.sides.size ? `, from ${[...h.sides].join(' and ')}` : '';
@@ -127,7 +130,7 @@ function says(bot, list = [], { now = Date.now(), ms = RECENT_MS } = {}) {
   });
   const shieldedBehind = recent(bot, { now, ms }).filter(h => h.shield && h.side && h.side !== 'in front');
   const second = shieldedBehind.length ? ` A hit landed with the shield up from ${[...new Set(shieldedBehind.map(h => h.side))].join(' and ')}: the shield covers only the side the bot faces, so something there is striking too.` : '';
-  return `Hitting the bot now: ${each.join('; ')}.${fell}${second}`;
+  return `Hitting the bot now: ${each.join('; ')}.${fell}${second}${pace}`;
 }
 
 module.exports = { install, note, noteDrop, drops, dropsAt, recent, hitters, says, sideOf, shieldAt, RECENT_MS };

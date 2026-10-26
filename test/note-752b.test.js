@@ -135,3 +135,12 @@ test('a creeper parked 7.3 blocks off for a minute, not walking at the bot, stan
   assert.equal(danger.immediateThreat(bot)?.entity.name, 'creeper');
   assert(arbiter.observeReflexes(bot).some(r => r.key === 'creeper'));
 });
+
+test('the pace of the hits (note 2240): health lost over the window, per second, and the seconds left at that pace', () => {
+  const HL = require('../src/hit-log');
+  const bot = { health: 10, entity: { position: { x: 0.5, y: 64, z: 0.5 } }, _dropLog: [], _hitLog: [] };
+  const t0 = 1000000;
+  HL.noteDrop(bot, 20, 15, t0); HL.noteDrop(bot, 15, 10, t0 + 5000);
+  const s = HL.says(bot, [], { now: t0 + 6000 });
+  assert.match(s, /Lost 10 health in 5 seconds, about 2 a second: at that pace 5 seconds from 10 to none\.$/);
+});
