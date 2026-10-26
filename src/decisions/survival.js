@@ -488,7 +488,7 @@ define({
 define({
   id: 'bed_after_sleep', area: 'survival', parent: null, kind: 'survival', primitive: 'choice', stakes: 'medium', tree: true,
   overworldOnly: true,
-  question: 'The night passed in the carried bed: leave it standing here as the respawn point, or take it up and carry it for the next night?',
+  question: 'The night passed in the carried bed: it stays standing here as the respawn point. Make a second bed to carry now, or leave it at that, or put spares in a chest beside it?',
   trigger: 'On waking from a night slept in a carried bed put down (not the base\'s), the bed standing (note 2063).',
   source: 'src/survival.js (sleepStep, bedAfterSleepTree)',
   instructions: {
@@ -500,7 +500,6 @@ define({
     { key: 'stock_bed_kit', label: 'put spares in the chest beside this bed', when: 'on waking with the chest standing and spares carried (note 2186)', level: 'root' },
     { key: 'spare_armour_by_bed', label: 'make a spare armour piece and leave it in the chest beside this bed', when: 'on waking with the chest standing and the iron for a piece carried (note 2186)', level: 'root' },
     { key: 'leave_as_respawn', label: 'leave the bed standing as the respawn point', when: 'always' },
-    { key: 'take_bed_along', label: 'take the bed up and carry it for the next night', when: 'always' },
     { key: 'second_bed', label: 'leave this bed as the respawn and make another from what is carried to carry', when: 'a bed can be made from what is carried with crafts alone (three wool of one colour, or wool dyed white, and planks)' },
   ],
 });

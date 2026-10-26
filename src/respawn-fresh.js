@@ -37,12 +37,13 @@ function says(bot, goal, { lava }) {
   const bed = goal?.survival?.spawnBed?.foot;
   const respawn = bed ? `the bed at (${bed.x}, ${bed.y}, ${bed.z}) in the Overworld` : sp ? `the world spawn at (${Math.round(sp.x)}, ${Math.round(sp.y)}, ${Math.round(sp.z)}) in the Overworld, with nothing` : 'the world spawn, with nothing';
   let worth = ''; try { worth = goal?.kind === 'win' ? ` ${require('./eye-need').says(bot, goal, { brief: true })}` : ''; } catch (_) { worth = ''; }
-  return `Die here on purpose and come back to life at ${respawn}: walk into the lava ${lava.distance} blocks off at (${lava.at.x}, ${lava.at.y}, ${lava.at.z}) and stay in it. Everything carried, ${stacks} stack${stacks === 1 ? '' : 's'}${valued.length ? ` (${valued.join(', ')} among them)` : ''}, drops here and vanishes about five minutes later; nothing is got back. The Nether portal and this place are left as they are. On the full runs (${REKIT.window}) the time from a death to the kit worn and held again was about ${REKIT.minutesEach} minutes a death (${REKIT.deaths} deaths, ${REKIT.shareOfTime}% of the day's time); a bot with no pickaxe and no block here has no way to dig or span, only the ground it can walk. ${spellsSays()}${worth}`;
+  return `Die here on purpose and come back to life at ${respawn}: walk into the lava ${lava.distance} blocks off at (${lava.at.x}, ${lava.at.y}, ${lava.at.z}) and stay in it. Everything of worth carried (the armour taken off, the tools, iron, gold, diamonds, rods, pearls, eyes, food) goes into a chest here first where wood for one is carried; the rest carried, ${stacks} stack${stacks === 1 ? '' : 's'}${valued.length ? ` (${valued.join(', ')} among them)` : ''}, drops here and vanishes about five minutes later; nothing is got back. The Nether portal and this place are left as they are. On the full runs (${REKIT.window}) the time from a death to the kit worn and held again was about ${REKIT.minutesEach} minutes a death (${REKIT.deaths} deaths, ${REKIT.shareOfTime}% of the day's time); a bot with no pickaxe and no block here has no way to dig or span, only the ground it can walk. ${spellsSays()}${worth}`;
 }
 
 // Carried out: the flag that stands the body's lava rule and the survival layer down for a minute and a half, the
 // walk to the lava, the step in, and the wait for the death. -> true when the bot died.
 async function run(bot, task, goal, save, { lava, navigate, move }) {
+  { const kept = await stashFirst(bot, task, goal, save); console.log(`[respawn fresh] the goal's items before the chosen death: ${kept}`); }
   goal.deliberateDeath = { at: Date.now(), why: 'Jev chose to come back to life fresh (respawn_fresh)' }; save?.();
   bot.chat?.('Nothing to dig or span with here. Starting over from the bed.');
   const { goals } = require('mineflayer-pathfinder');
@@ -77,9 +78,10 @@ function saysEnd(bot, goal, { edge }, { dragonHealth = null } = {}) {
   const bed = goal?.survival?.spawnBed?.foot;
   const respawn = bed ? `the bed at (${bed.x}, ${bed.y}, ${bed.z}) in the Overworld` : sp ? `the world spawn at (${Math.round(sp.x)}, ${Math.round(sp.y)}, ${Math.round(sp.z)}) in the Overworld` : 'the world spawn in the Overworld';
   const health = Number(bot.health ?? 0).toFixed(1), hunger = bot.food ?? 20;
-  return `Die here on purpose and come back to life at ${respawn}: walk off the island's edge ${edge.distance} blocks ${edge.side} at (${edge.at.x}, ${edge.at.z}) into the void. Everything carried, ${stacks} stack${stacks === 1 ? '' : 's'}${valued ? ` (${valued})` : ''}, is lost at once in the void. With no pickaxe and nothing to eat here, health ${health} at hunger ${hunger} does not come back and no hole can be dug; the End has no food but chorus fruit on the outer islands. The stronghold's portal stays open for the way back, and the dragon keeps its health${dragonHealth != null ? ` (${Math.round(dragonHealth)} of 200)` : ''}. On the full runs the time from a death to the kit worn and held again was about ${REKIT.minutesEach} minutes (${REKIT.deaths} deaths, ${REKIT.window}). Never run unasked: Jev's choice, as the Nether's lava way is.`;
+  return `Die here on purpose and come back to life at ${respawn}: walk off the island's edge ${edge.distance} blocks ${edge.side} at (${edge.at.x}, ${edge.at.z}) into the void. Everything of worth carried (the armour taken off, the tools, iron, gold, diamonds, rods, pearls, eyes, food) goes into a chest here first where wood for one is carried; the rest carried, ${stacks} stack${stacks === 1 ? '' : 's'}${valued ? ` (${valued})` : ''}, is lost at once in the void. With no pickaxe and nothing to eat here, health ${health} at hunger ${hunger} does not come back and no hole can be dug; the End has no food but chorus fruit on the outer islands. The stronghold's portal stays open for the way back, and the dragon keeps its health${dragonHealth != null ? ` (${Math.round(dragonHealth)} of 200)` : ''}. On the full runs the time from a death to the kit worn and held again was about ${REKIT.minutesEach} minutes (${REKIT.deaths} deaths, ${REKIT.window}). Never run unasked: Jev's choice, as the Nether's lava way is.`;
 }
 async function runEnd(bot, task, goal, save, { edge, navigate, move }) {
+  { const kept = await stashFirst(bot, task, goal, save); console.log(`[respawn fresh] the goal's items before the chosen death: ${kept}`); }
   goal.deliberateDeath = { at: Date.now(), why: 'Jev chose to come back to life fresh from the End (respawn_fresh)' }; save?.();
   bot.chat?.('No pickaxe and nothing to eat here. Starting over from the bed.');
   const { goals } = require('mineflayer-pathfinder');
@@ -94,6 +96,29 @@ async function runEnd(bot, task, goal, save, { edge, navigate, move }) {
     if (bot.entity.position.y < y - 3) { for (let i = 0; i < 400 && (bot.health ?? 0) > 0 && bot.isAlive !== false; i++) await new Promise(r => setTimeout(r, 100)); break; }
   }
   return (bot.health ?? 0) <= 0 || bot.isAlive === false;
+}
+
+// The goal's items put in a chest where the bot stands before the chosen death (note 2251; the user, 2026-10-26:
+// 'Jev could even make a chest to store stuff before dying to save time'): rods, powder, pearls and eyes dropped at a
+// death in lava or the void are gone at once, and a chest beside the spot keeps them for the walk back (rod-stash.js
+// collects them). Made from wood carried; none carried, it is said and the death goes on as chosen.
+async function stashFirst(bot, task, goal, save) {
+  const RS = require('./rod-stash'), W = require('./work');
+  // Everything of worth, not the goal's items alone (the user, 2026-10-26: 'It should probably stash anything valuable?'):
+  // the armour taken off first (worn, it drops at the death too), then what the run would remake after a death.
+  for (const slot of ['head', 'torso', 'legs', 'feet']) { try { await bot.unequip?.(slot); } catch (_) { /* kept on */ } }
+  const VALUED = /^(blaze_rod|blaze_powder|ender_pearl|ender_eye|diamond|emerald|obsidian|flint_and_steel|bow|crossbow|arrow|shield|bucket|water_bucket|lava_bucket|golden_apple|golden_carrot|bread|cake)$|^(iron|gold|raw_iron|raw_gold|copper)_(ingot|block|nugget)$|^raw_(iron|gold)$|^(diamond|iron|netherite|golden|chainmail|stone)_(helmet|chestplate|leggings|boots|sword|pickaxe|axe|shovel)$|^netherite_|_bed$|^cooked_|^enchanted_/;
+  const names = [...new Set((bot.inventory?.items?.() || []).map(i => i.name).filter(n => VALUED.test(n)))];
+  const what = names.map(n => ({ item: n, count: RS.countOf(bot, n) })).filter(w => w.count > 0);
+  if (!what.length) return 'nothing to keep';
+  const site = RS.chestCell(bot, { underFire: true }), making = RS.chestMaking(bot);
+  if (!site) return 'no cell for a chest within reach';
+  if (!making) return 'no chest carried and not wood enough for one';
+  try {
+    const ok = await RS.stashRods(bot, task, goal, save, { acquireStep: W.acquireStep, place: W.place }, { site, making, what, names }, { step: 'stash_before_respawn', rest: ['respawn_stash', 'here'], chat: (items, where) => `Left ${items} in a chest at ${where} before starting over.` });
+    if (ok) { const e = (goal.rodStashes || []).find(x => x.position && x.position.x === site.cell.x && x.position.y === site.cell.y && x.position.z === site.cell.z); if (e) { e.all = true; save?.(); } }
+    return ok ? `kept in a chest at (${site.cell.x}, ${site.cell.y}, ${site.cell.z})` : 'the chest was not filled';
+  } catch (err) { task?.check?.(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; return String(err.message || err).slice(0, 80); }
 }
 
 // Whether the flag stands now (the lava rule and the survival step read it).

@@ -8,8 +8,7 @@ test('the bed question: second_bed first, the carried bed says the run-long upsi
   const bot = { inventory: { items: () => [{ name: 'white_wool', count: 3 }] }, entity: { position: { x: 0, y: 64, z: 0 } }, spawnPoint: { x: 100, y: 64, z: 0 } };
   const goal = { gameProgress: { clock: { playedMs: 10 * 3600000, byDoing: { wait_in_shelter: 3600000 } } } };
   const tree = bedAfterSleepTree(bot, { deaths: [] }, Date.now(), { bedNow: { from: '3 wool and 3 planks', item: 'white_bed' }, goal });
-  assert.deepEqual(Object.keys(tree), ['second_bed', 'take_bed_along', 'leave_as_respawn']);
-  assert.match(tree.take_bed_along.description, /carried and slept in each night the respawn follows the work: over a run that is the nearer respawn, not the farther/);
+  assert.deepEqual(Object.keys(tree), ['second_bed', 'leave_as_respawn'], 'no carrying the only bed (note 2251)');
   assert.match(tree.second_bed.description, /^Leave this bed standing as the respawn and make another to carry.*nothing about the respawn changes now/);
   for (const k of Object.keys(tree)) { assert.ok(!/fresh trials 2026-09-30/.test(tree[k].description), `${k} carries the fleet paragraph`); assert.ok(tree[k].description.length < 700, `${k} is ${tree[k].description.length} chars`); }
   assert.match(tree.leave_as_respawn.description, /This run so far: 60 minutes sealed in waiting/);

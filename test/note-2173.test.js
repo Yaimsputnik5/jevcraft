@@ -16,7 +16,7 @@ test('offered only in the Nether with no pickaxe, no block and lava known; said 
   assert.equal(RF.offered(botWith([], 'overworld'), {}, { lava }), null, 'not the Overworld');
   assert.equal(RF.offered(bare, {}, { lava: null }), null, 'no lava known');
   const s = RF.says(bare, { survival: { spawnBed: { foot: { x: 5, y: 63, z: 9 } } } }, { lava });
-  assert.match(s, /^Die here on purpose and come back to life at the bed at \(5, 63, 9\) in the Overworld: walk into the lava 12 blocks off at \(10, 63, 4\) and stay in it\. Everything carried, 3 stacks \(2 blaze rods, 1 iron sword among them\), drops here and vanishes about five minutes later; nothing is got back\./);
+  assert.match(s, /^Die here on purpose and come back to life at the bed at \(5, 63, 9\) in the Overworld: walk into the lava 12 blocks off at \(10, 63, 4\) and stay in it\. Everything of worth carried \(the armour taken off, the tools, iron, gold, diamonds, rods, pearls, eyes, food\) goes into a chest here first where wood for one is carried; the rest carried, 3 stacks \(2 blaze rods, 1 iron sword among them\), drops here and vanishes about five minutes later; nothing is got back\./);
   assert.match(s, /about 73 minutes a death \(40 deaths, 43% of the day's time\)/);
   assert.match(RF.says(bare, {}, { lava }), /the world spawn at \(100, 64, 200\) in the Overworld, with nothing/);
   assert.equal(RF.standing({ deliberateDeath: { at: Date.now() - 1000 } }), true);
@@ -34,6 +34,6 @@ test('the End (note 2236): offered with no pickaxe and nothing to eat and the ed
   assert.equal(RF.offeredEnd(bare, {}, { edge: null }), null, 'no edge known');
   assert.equal(RF.offeredEnd(botWith([], 'the_nether'), {}, { edge }), null, 'not the Nether');
   const s = RF.saysEnd(bare, { survival: { spawnBed: { foot: { x: 5, y: 63, z: 9 } } } }, { edge }, { dragonHealth: 200 });
-  assert.match(s, /^Die here on purpose and come back to life at the bed at \(5, 63, 9\) in the Overworld: walk off the island's edge 7 blocks east at \(30, -12\) into the void\. Everything carried, 3 stacks \(1 bow, 54 arrow, 1 white bed\), is lost at once in the void\. With no pickaxe and nothing to eat here, health 1\.3 at hunger 11 does not come back/);
+  assert.match(s, /^Die here on purpose and come back to life at the bed at \(5, 63, 9\) in the Overworld: walk off the island's edge 7 blocks east at \(30, -12\) into the void\. Everything of worth carried \(the armour taken off, the tools, iron, gold, diamonds, rods, pearls, eyes, food\) goes into a chest here first where wood for one is carried; the rest carried, 3 stacks \(1 bow, 54 arrow, 1 white bed\), is lost at once in the void\. With no pickaxe and nothing to eat here, health 1\.3 at hunger 11 does not come back/);
   assert.match(s, /the dragon keeps its health \(200 of 200\)\. On the full runs the time from a death to the kit worn and held again was about 73 minutes/);
 });

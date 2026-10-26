@@ -11,5 +11,5 @@ test('the run line: waiting as hours and a share of play, mining and sleep besid
   assert.equal(runNightsSays({}), '');
   const bot = { inventory: { items: () => [] }, entity: { position: { x: 0, y: 64, z: 0 } }, spawnPoint: { x: 100, y: 64, z: 0 } };
   const tree = bedAfterSleepTree(bot, { deaths: [] }, Date.now(), { goal });
-  for (const k of ['leave_as_respawn', 'take_bed_along']) assert.match(tree[k].description, /This run so far: 21\.8 hours sealed in waiting/);
+  for (const k of ['leave_as_respawn']) assert.match(tree[k].description, /This run so far: 21\.8 hours sealed in waiting/);
 });

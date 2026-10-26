@@ -263,7 +263,7 @@ async function stashRods(bot, task, goal, save, actions, offer, { step = 'stash_
     if (eye.distanceTo(cell.offset(0.5, 0.5, 0.5)) > REACH && actions?.navigate) await actions.navigate(bot, task, new goals.GoalNear(cell.x, cell.y, cell.z, 2), { timeoutMs: 15000, stallMs: 4000 });
     const stored = await withStash(bot, task, entry, save, async window => {
       const done = [];
-      for (const name of KEPT) {
+      for (const name of (offer.names || KEPT)) {
         // What stays in the pack by the choice made (eye-bank.js: the search's spare Eye).
         const n = countOf(bot, name) - (keepBack?.[name] || 0);
         if (n <= 0) continue;
@@ -501,7 +501,8 @@ async function collect(bot, task, goal, save, actions = {}) {
     } catch (err) { task?.check?.(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; }
     const taken = await withStash(bot, task, entry, save, async window => {
       const done = [];
-      for (const i of window.containerItems().filter(i => KEPT.includes(i.name))) {
+      // A chest left before a chosen death holds the whole kit (note 2251): all of it comes back out.
+      for (const i of window.containerItems().filter(i => entry.all || KEPT.includes(i.name))) {
         task?.check?.();
         try { await window.withdraw(i.type, null, i.count); done.push({ item: i.name, count: i.count }); }
         catch (err) {

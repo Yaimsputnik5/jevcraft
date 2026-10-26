@@ -295,7 +295,7 @@ Questions that ride in one call together (the intake batch is one call per chat 
 
 ### `bed_after_sleep`
 
-**The night passed in the carried bed: leave it standing here as the respawn point, or take it up and carry it for the next night?**
+**The night passed in the carried bed: it stays standing here as the respawn point. Make a second bed to carry now, or leave it at that, or put spares in a chest beside it?**
 
 - When: On waking from a night slept in a carried bed put down (not the base's), the bed standing (note 2063).
 - Decision tree, choice; stakes medium; ledger kind `survival`
@@ -311,7 +311,6 @@ Questions that ride in one call together (the intake batch is one call per chat 
 | `stock_bed_kit` | root | put spares in the chest beside this bed | on waking with the chest standing and spares carried (note 2186) |
 | `spare_armour_by_bed` | root | make a spare armour piece and leave it in the chest beside this bed | on waking with the chest standing and the iron for a piece carried (note 2186) |
 | `leave_as_respawn` | root | leave the bed standing as the respawn point | always |
-| `take_bed_along` | root | take the bed up and carry it for the next night | always |
 | `second_bed` | root | leave this bed as the respawn and make another from what is carried to carry | a bed can be made from what is carried with crafts alone (three wool of one colour, or wool dyed white, and planks) |
 
 ### `body_way`
