@@ -10890,6 +10890,8 @@ class Survival {
 
   async stepOnce(task, goal, save, onStep) {
     const bot = this.bot;
+    // A death Jev chose to start over (respawn-fresh.js, note 2173): the survival layer stands down for it.
+    if (require('./respawn-fresh').standing(goal)) return false;
     // The survival layer has the turn: what the watchdogs held for it is met.
     takeTurn(bot, 'survival', 'step');
     bot._airAbort = false; bot._threatAbort = false;

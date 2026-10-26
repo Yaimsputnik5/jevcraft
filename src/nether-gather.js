@@ -727,6 +727,14 @@ async function netherGather(bot, task, goal, save, resource, { navigate, returnO
   const without = withoutOption(bot, goal, save, { forItem, resource });
   if (without?.none) facts.without = without.none;
   else if (without) options.without = without;
+  // A fresh start by a death chosen (respawn-fresh.js, note 2173; the user, 2026-10-26): with no pickaxe and no block
+  // the ways here can only walk the ground; dying here comes back to life at the bed with the record's re-kit time said.
+  try {
+    const RF = require('./respawn-fresh');
+    let lava = null; try { lava = require('./work').nearestLava(bot, goal); } catch (_) { lava = null; }
+    const rf = RF.offered(bot, goal, { lava });
+    if (rf) options.respawn_fresh = { description: RF.says(bot, goal, rf), run: async () => { await RF.run(bot, task, goal, save, { lava: rf.lava, navigate, move: require('./motion').move }); throw new Error('A death chosen to start over, as Jev chose'); } };
+  } catch (_) { /* the way is not the search */ }
   if (!Object.keys(options).length) throw new Error(`No way to ${words(resource)} from here: ${[...(Array.isArray(facts.knownPlaces) ? facts.knownPlaces : [facts.knownPlaces]), ...notOffered, facts.portal, ...legsClosed, facts.without].filter(Boolean).join('; ')}`.slice(0, 600));
 
   facts.blocksCarried = blocksCarried(bot);
