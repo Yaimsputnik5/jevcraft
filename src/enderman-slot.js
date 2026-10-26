@@ -271,7 +271,18 @@ async function fight(bot, task, site, { navigate, seconds = 60, want = 1, item =
     // A built slot's blocks laid from the mouth (note 2259), the walls first and the roof on them; one not laid is said and the fight goes on from what stands.
     if (site.builds?.length) {
       const W = require('./work'), t0 = Date.now(); let laid = 0;
-      for (const c of site.builds) { task.check(); try { await W.place(bot, task, c, site.material); if (bot.blockAt(c)?.boundingBox === 'block') laid++; } catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; } }
+      // A plant in the cell first (note 2262): a warped forest's roots, sprouts and vines stand in cells the site read as open, and a
+      // block is not laid into a cell a plant holds; forest-5 (2026-10-26 22:2xZ) laid 9 of 13 with nothing said of the four. Each
+      // cell not laid is said with why.
+      const failed = [];
+      for (const c of site.builds) {
+        task.check();
+        const was = bot.blockAt(c);
+        if (was && was.boundingBox !== 'block' && !/^(air|cave_air|void_air)$/.test(was.name) && !/lava|water|fire/.test(was.name)) { try { await bot.dig(was, true); } catch (_) { /* placed over, or said below */ } }
+        try { await W.place(bot, task, c, site.material); } catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; failed.push(`(${c.x}, ${c.y}, ${c.z}) ${bot.blockAt(c)?.name || '?'}: ${String(err.message || err).slice(0, 60)}`); continue; }
+        if (bot.blockAt(c)?.boundingBox === 'block') laid++; else failed.push(`(${c.x}, ${c.y}, ${c.z}) ${bot.blockAt(c)?.name || '?'}: not there after`);
+      }
+      if (failed.length) console.log(`[slot] not laid: ${failed.slice(0, 4).join('; ')}`);
       console.log(`[slot] built at the mouth (${site.mouth.x}, ${site.mouth.y}, ${site.mouth.z}): ${laid} of ${site.builds.length} ${site.material.replaceAll('_', ' ')} laid in ${Math.round((Date.now() - t0) / 100) / 10} s`);
       // No fight under an open roof (note 2261): an enderman walks into a slot with no roof over its cells and strikes the bot at its
       // back (the arena, 2026-10-26 21:41Z: the roof not laid, 7 hurt in each of four runs). The roof's cells over a and b are read.
