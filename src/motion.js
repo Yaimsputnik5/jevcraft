@@ -235,7 +235,7 @@ async function move(bot, task, { label, keys = ['forward'], sneak = true, why, l
   const controller = bot._controller && bot._controller.starting ? bot._controller : { name: label, keys: [...keys], sneak, why, since: Date.now() };
   delete controller.starting;
   bot._controller = controller;
-  const escaping = !!bodyBurning(bot);
+  const burningIn = bodyBurning(bot), escaping = !!burningIn;
   // A run out of fire walks the route its own search chose with the flames
   // in view (vitals.js fireRoute: round them where it can, through one where
   // they ring the body); the flames on it are not refused here, lava and a
@@ -245,8 +245,14 @@ async function move(bot, task, { label, keys = ['forward'], sneak = true, why, l
   // 397 steps of runs out of fire were refused so, and 48 of the 70 runs of
   // a second or more never moved half a block (note 792).
   const flames = !throughFlames;
+  // A body alight is refused lava and a fall that kills ahead as any other is, the flames alone left to it (note 2198):
+  // `escaping` set every check aside, and full-5 (25595, 2026-10-26 11:02:05Z) alight at 16.7 health ran out of a blaze's
+  // fire at a sprint, up three steps and on off the ledge at (-163, 71, 140), 35 blocks into the lava sea; the run's own
+  // guard stopped it a cell late, in the air. The fall seen ahead every tick (dropCell deep) would have stopped it on the rim.
+  // A body in lava is left its way out as before: the cells of its swim and its block out are lava (lava-escape.js).
+  const inLava = burningIn?.name === 'lava';
   const refused = () => {
-    const hit = !escaping && burningAhead(bot, keys, { deep: !sneak, flames });
+    const hit = !inLava && burningAhead(bot, keys, { deep: !sneak, flames: flames && !escaping });
     if (!hit || (intoFall && hit.name === 'deadly_fall')) return false;
     if (acrossGap && (hit.name === 'deadly_fall' || (Number.isFinite(hit.y) && hit.y < Math.floor(bot.entity.position.y)))) return false;
     // A move that ends in the cell ahead (stopAt: the portal's, note 1953) is not refused for what lies past that cell: the step into a portal with lava on its far face was 'lava ahead; not walked into' though the body stops in the sheet. A hazard in the stop cell itself still refuses it.
