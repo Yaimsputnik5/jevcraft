@@ -33,3 +33,18 @@ test('go_back under 100 blocks says the walk\'s seconds against the seconds left
   await corpseRunStep(bot, Object.assign(new Task('run'), { opportunityClient: { systemOne: async ({ questions }) => { text = JSON.stringify(Object.values(questions)[0]); return { answers: Object.fromEntries(Object.keys(questions).map(k => [k, { choice: 'leave_them', confidence: 0.9 }])) }; } } }), goal, () => {}, { move: async () => {}, collect: async () => false });
   assert.match(text, /52 blocks off, at y 37\. About 2[78]\d seconds before they vanish\. The way there is about \d+ seconds of them, at the pace the bot's walks and climbs have made, stalls counted\./);
 });
+
+test('with the drops not yet loaded, go_back says the blocks they wait within, not a template (note 2136)', async () => {
+  const { Vec3 } = require('vec3');
+  const { Task } = require('../src/skills');
+  const { corpseRun, corpseRunStep } = require('../src/corpse-run');
+  const deathAt = new Date(Date.now() - 20000).toISOString();
+  const bot = { game: { dimension: 'overworld' }, entity: { position: new Vec3(0, 64, 0) }, chat: () => {}, registry: require('minecraft-data')('26.1'), time: { timeOfDay: 2000 }, inventory: { items: () => [], slots: {} }, entities: {} };
+  const goal = { survival: { deaths: [{ at: deathAt, position: { x: 1400, y: -5, z: 0 }, dimension: 'overworld', cause: 'was blown up by Creeper', worn: ['iron_helmet'] }],
+    recovery: { at: deathAt, status: 'finished', recovered: {}, inventoryBeforeDeath: { diamond_pickaxe: 1, iron_helmet: 1 }, dropsSeen: [] } } };
+  assert.ok(corpseRun(bot, goal));
+  let text = '';
+  await corpseRunStep(bot, Object.assign(new Task('run'), { opportunityClient: { systemOne: async ({ questions }) => { text = JSON.stringify(Object.values(questions)[0]); return { answers: Object.fromEntries(Object.keys(questions).map(k => [k, { choice: 'leave_them', confidence: 0.9 }])) }; } } }), goal, () => {}, { move: async () => {}, collect: async () => false });
+  assert.match(text, /They last until the bot comes within 176 blocks, then five minutes\./);
+  assert.doesNotMatch(text, /\$\{TICKING\}/);
+});
