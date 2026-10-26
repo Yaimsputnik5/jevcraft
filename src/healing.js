@@ -270,8 +270,14 @@ function hitsLeftSays(bot, health) {
     .map(x => ({ ...x, through: ce.MOBS[x.name]?.ignoresArmour ? x.hit : ce.afterArmour(x.hit, worn) }));
   if (!priced.length) return null;
   const worst = priced.reduce((a, b) => b.through > a.through ? b : a);
-  const more = Math.max(0, Math.ceil(health / worst.through) - 1);
-  return `the hardest hit about, the ${worst.name.replace(/_/g, ' ')}'s, is about ${round(worst.through)} through what is worn${worn.points ? '' : ' (nothing worn)'}: at ${health} health the body takes ${more} more such hit${more === 1 ? '' : 's'}, and the ${more ? 'one after' : 'next one'} ends it${worst.name === 'blaze' ? '; a fireball that lands sets the body alight too, about a health a second for five seconds' : ''}`;
+  const left = x => { const more = Math.max(0, Math.ceil(health / x.through) - 1); return `at ${health} health the body takes ${more} more such hit${more === 1 ? '' : 's'}, and the ${more ? 'one after' : 'next one'} ends it`; };
+  // The one landing hits named beside the hardest (note 2211): with a creeper anywhere within sixteen the hardest hit is its
+  // 24, and full-7 (25597, 2026-10-26 12:52 to 12:57Z) read 'the next one ends it' on eight questions while a skeleton's
+  // arrows, about 3 through nothing worn, took it from 20 to 8 to none; the kind that hit the bot within twenty seconds
+  // (bot._hurtBy) is said with its own count where it is not the hardest.
+  const hurtBy = bot._hurtBy || {}, now = Date.now();
+  const hitting = priced.filter(x => x.name !== worst.name && hurtBy[x.name] > now - 20000).reduce((a, b) => !a || b.through > a.through ? b : a, null);
+  return `the hardest hit about, the ${worst.name.replace(/_/g, ' ')}'s, is about ${round(worst.through)} through what is worn${worn.points ? '' : ' (nothing worn)'}: ${left(worst)}${worst.name === 'blaze' ? '; a fireball that lands sets the body alight too, about a health a second for five seconds' : ''}${hitting ? `. The one hitting the bot now, the ${hitting.name.replace(/_/g, ' ')} (its last hit ${Math.max(1, Math.round((now - hurtBy[hitting.name]) / 1000))} s ago), lands about ${round(hitting.through)}: ${left(hitting)}` : ''}`;
 }
 // The standing fact: health and hunger, whether health comes back, the food
 // carried and the nearest known, the time to daylight, and what standing

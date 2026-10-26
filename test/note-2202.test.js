@@ -36,3 +36,10 @@ test('nothing hostile about: nothing said', () => {
   assert.equal(hitsLeftSays(bot({ health: 5 }), 5), null);
   assert.equal(healingSays(bot({ health: 5 }), {}).hitsLeft, undefined);
 });
+
+test('a creeper 15 off and the skeleton that hit the bot 4 s ago: the hardest hit is the creeper\'s, and the skeleton\'s own count is said beside it (note 2211)', () => {
+  const b = bot({ health: 8, entities: { 2: { id: 2, name: 'creeper', type: 'hostile', position: new Vec3(15.5, 64, 0.5), isValid: true, height: 1.7 }, 3: { id: 3, name: 'skeleton', type: 'hostile', position: new Vec3(6.5, 64, 0.5), isValid: true, height: 1.99 } } });
+  b._hurtBy = { skeleton: Date.now() - 4000 };
+  const says = hitsLeftSays(b, 8);
+  assert.match(says, /^the hardest hit about, the creeper's, is about 24 through what is worn \(nothing worn\): at 8 health the body takes 0 more such hits, and the next one ends it\. The one hitting the bot now, the skeleton \(its last hit 4 s ago\), lands about 3: at 8 health the body takes 2 more such hits, and the one after ends it$/);
+});
