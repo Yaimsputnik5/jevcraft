@@ -2603,8 +2603,17 @@ const siteByLava = (siteDig, lava) => !lava || !siteDig?.origin || Math.hypot(si
 // game's own record 4,727 to 6,462 blocks of rock dug and 7 to 11 iron
 // pickaxes made in eight hours, each climb said only with its own cost.
 const CLIMB_LOG_MS = 60 * 60000;
+// One note a climb (note 2125): the trip's question comes round at every
+// stair while a climb is under way, and each round noted the same climb
+// again. full-4 (2026-10-26 00:26 to 02:20Z) had 57 notes for 23 climbs,
+// eight of them in one second, and was told '57 climbs to open sky were
+// chosen ... about 188 minutes of climbing'. A note for the same need within
+// ten minutes of the last is the same climb.
+const CLIMB_NOTE_SAME_MS = 10 * 60000;
 function noteClimb(goal, need, cost, now = Date.now()) {
   const log = (goal.climbLog || []).filter(c => now - c.at < 2 * CLIMB_LOG_MS);
+  const last = log.at(-1);
+  if (last && last.need === need && now - last.at < CLIMB_NOTE_SAME_MS) { goal.climbLog = log; return; }
   log.push({ at: now, need, ...(cost ? { up: cost.up, seconds: Math.round(cost.seconds) } : {}) });
   goal.climbLog = log;
 }

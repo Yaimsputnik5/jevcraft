@@ -51,3 +51,15 @@ test('the crossing says the deaths where it comes out in the Nether (note 2112)'
   assert.equal(portalDeathsSays({ ...bot, _survivalState: { deaths: [] } }, goal, now), '');
   assert.equal(portalDeathsSays({ ...bot, game: { dimension: 'the_nether' } }, goal, now), '', 'said only on the Overworld side');
 });
+
+test('a climb is noted once: the same need again within ten minutes is the same climb (note 2125)', () => {
+  const { noteClimb, climbsLatelySays } = require('../src/work');
+  const now = Date.now(), goal = {};
+  noteClimb(goal, 'wood (any log)', { up: 40, seconds: 120 }, now - 9 * 60000);
+  for (let i = 0; i < 8; i++) noteClimb(goal, 'wood (any log)', { up: 40, seconds: 120 }, now - 9 * 60000 + i);   // eight in a second
+  noteClimb(goal, 'wood (any log)', { up: 40, seconds: 120 }, now - 6 * 60000);                                    // the same climb, three minutes on
+  noteClimb(goal, 'sheep', { up: 40, seconds: 120 }, now - 5 * 60000);                                             // another need: another climb
+  noteClimb(goal, 'wood (any log)', { up: 40, seconds: 120 }, now);                                                // wood again, 9 minutes after the first note but a sheep climb between: a new one
+  assert.equal(goal.climbLog.length, 3);
+  assert.match(climbsLatelySays(goal, now), /^In the last hour 3 climbs to open sky were chosen \(2 for wood \(any log\), 1 for sheep\)/);
+});
