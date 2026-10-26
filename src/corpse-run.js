@@ -17,7 +17,11 @@ const { collectNearbyDrops } = require('./drop-collection');
 
 const WORTH = /^(diamond|emerald|iron_ingot|gold_ingot|raw_iron|raw_gold|blaze_rod|blaze_powder|ender_pearl|ender_eye|obsidian|shield|bow|crossbow|arrow|bucket|water_bucket|lava_bucket|flint_and_steel|golden_apple|enchanted_golden_apple|trial_key|ominous_trial_key|ancient_debris|netherite_ingot|netherite_scrap|diamond_block|iron_block|gold_block|golden_carrot|cooked_beef|cooked_porkchop|cooked_mutton|bread)$|_(helmet|chestplate|leggings|boots|sword|pickaxe|axe)$/;
 const CHEAP = /^(wooden|stone)_(sword|pickaxe|axe)$/;
-const TICKING = 128, DESPAWN_MS = 5 * 60000, MARGIN_MS = 20000, KEEP_MS = 12 * 3600000 /* drops the bot is not near do not age: this bounds the list, not the drops */, LEG_MS = 120000, ARRIVE = 6, FAR = 96, LEG = 64, TURNS = [0, 50, -50, 90, -90];
+// Drops age while their chunk ticks: within the server's simulation distance
+// of a player, 10 chunks on the trial servers (server.properties), so up to
+// 176 blocks by chunk edges (note 2115; it was 128, and drops 128 to 176
+// blocks from the respawn were counted as not ageing while they were).
+const TICKING = 176, DESPAWN_MS = 5 * 60000, MARGIN_MS = 20000, KEEP_MS = 12 * 3600000 /* drops the bot is not near do not age: this bounds the list, not the drops */, LEG_MS = 120000, ARRIVE = 6, FAR = 96, LEG = 64, TURNS = [0, 50, -50, 90, -90];
 const ARMOUR = { helmet: 'head', chestplate: 'torso', leggings: 'legs', boots: 'feet' };
 const dim = name => String(name || 'overworld').replace(/^minecraft:/, '').replace(/^the_/, '');
 // Three dimensions: a death in a mine under the bed is not beside the bed.
@@ -103,6 +107,7 @@ function corpseRun(bot, goal, now = Date.now()) {
   if ((goal.corpseRunFor || goal.corpseRun?.deathAt) !== death.at) {
     if (recovery?.at !== death.at || recovery.status === 'pending') return null;
     const old = goal.corpseRun;
+    if (old?.status === 'open' && old.choice === 'go_back') note(goal, 'diedOnWay');
     if (old && ['open', 'left', 'unreachable'].includes(old.status) && !old.loadedAt && Object.keys(old.items || {}).length && !goal.corpseRunsEarlier.some(r => r.deathAt === old.deathAt)) goal.corpseRunsEarlier = [...goal.corpseRunsEarlier, old].slice(-3);
     goal.corpseRunFor = death.at;
     // A trip chosen for the death before is not this death's (note 1255):
@@ -180,7 +185,7 @@ function corpseRun(bot, goal, now = Date.now()) {
   // clock runs whether or not the bot is fit to go: it is the game's.
   if (!run.loadedAt && run.respawn && flat(run.respawn, run.position) <= TICKING) run.loadedAt = run.deathAt;
   if (!run.loadedAt && flat(bot.entity.position, run.position) <= TICKING) run.loadedAt = new Date(now).toISOString();
-  if (run.loadedAt && now - Date.parse(run.loadedAt) > DESPAWN_MS - MARGIN_MS) { run.status = 'despawned'; return null; }
+  if (run.loadedAt && now - Date.parse(run.loadedAt) > DESPAWN_MS - MARGIN_MS) { run.status = 'despawned'; note(goal, 'despawned'); return null; }
   // Whether it is fit to go is Jev's to weigh (corpse_run, told what was
   // about at the death, what it wore then and wears now). As a gate here it
   // kept the kit's own way back shut until the kit was made again:
@@ -208,7 +213,7 @@ const rank = name => { const i = FIRST.findIndex(r => r.test(name)); return i < 
 const lying = (bot, spot, name = null) => Object.values(bot.entities || {}).filter(e => { const it = e?.position && e.isValid !== false ? e.getDroppedItem?.() : null; return it && (!name || it.name === name) && e.position.distanceTo(spot) <= 12; });
 
 // A death in the Nether, the bot back to life in the Overworld: the kit lies
-// where it fell, not a second older (nobody is within 128 blocks of it), and
+// where it fell, not a second older (nobody is within the ticking 176 blocks of it), and
 // the way to it is the portal. The rule was the kit made again first, then
 // the next Nether trip: 25592 (2026-10-04 15:31Z) died in its warped forest
 // in iron armour with a diamond sword and an iron pickaxe, 5 pearls in a
@@ -299,7 +304,7 @@ async function kitTrip(bot, task, goal, save, now = Date.now()) {
   run.trip = { pick, at: now, ...(pick === 'go_at_dawn' ? { until: now + toDawn * 60000 } : {}) };
   if (pick !== 'go_now') { save(); return false; }
   // Chosen here, it is not asked again on the far side.
-  run.choice = 'go_back'; run.told = TOLD;
+  run.choice = 'go_back'; run.told = TOLD; note(goal, 'begun');
   goal.errand = { dimension: 'nether', items: [], for: KIT_ERRAND, at: now };
   bot.chat?.(`Straight back through the portal for what I dropped: ${listed(run.items)}.`);
   save();
@@ -310,6 +315,28 @@ async function kitTrip(bot, task, goal, save, now = Date.now()) {
 // bot set out at once and died again within ten minutes. full-2 (2026-10-22
 // 15:47:27 and 15:49:57Z) came back to life at its bed and was blown up 60
 // blocks from it two and a half minutes later, nothing worn either time.
+// This run's own record of its walks back, kept as it goes (note 2115), and
+// the fleet's: the seven full runs of 2026-10-19 to 25 (full-1 to full-7),
+// from their server logs, 288 deaths and 74 walks back set out, and the kit
+// came back whole or in part 0 times: 18 walks found nothing where it died
+// (7 of them within three minutes of the death), 14 ended in a death on the
+// way (a median 7 minutes out, about 350 blocks off), the rest were given up
+// or re-asked. Every kit lost was made again: full-5 smelted 377 ingots and
+// made 12 chestplates in 23 hours. The game's part, from the 26.1.2 server:
+// an item lying in a ticking chunk (within 176 blocks of a player) is gone
+// 5 minutes after it fell there; a zombie or skeleton spawns able to pick
+// up armour and weapons it walks over with chance 0.55 times the local
+// difficulty's multiplier (0 where the ground is new, toward 1 after many
+// hours played in it, DifficultyInstance), and the one that killed the bot
+// stands where it died.
+const FLEET_RECORD = Object.freeze({ runs: 7, from: '2026-10-19', to: '2026-10-25', deaths: 288, setOut: 74, back: 0, some: 0, nothing: 18, nothingQuick: 7, diedOnWay: 14, diedMinutes: 7, diedBlocks: 350 });
+function note(goal, key) { if (!goal) return; const r = goal.corpseRecord ||= {}; r[key] = (r[key] || 0) + 1; }
+function recordSays(bot, goal, now = Date.now()) {
+  const r = goal?.corpseRecord || {}, deaths = (bot?._survivalState?.deaths || []).length;
+  const F = FLEET_RECORD;
+  const own = r.begun ? ` On this run: ${deaths} death${deaths === 1 ? '' : 's'}, ${r.begun} walk${r.begun === 1 ? '' : 's'} back set out, ${r.done || 0} got everything back, ${r.partial || 0} some of it, ${r.gone || 0} found nothing where it died, ${r.diedOnWay || 0} ended in a death on the way, ${r.left || 0} left the drops${r.despawned ? `, ${r.despawned} gone before the bot came` : ''}.` : deaths ? ` On this run: ${deaths} death${deaths === 1 ? '' : 's'} and no walk back set out yet.` : '';
+  return `${own} On the ${F.runs} full runs of ${F.from} to ${F.to}: ${F.deaths} deaths, ${F.setOut} walks back set out, the kit back whole ${F.back} times and in part ${F.some}; ${F.nothing} found nothing where the bot died (${F.nothingQuick} of them within three minutes of the death), ${F.diedOnWay} ended in a death on the way (about ${F.diedMinutes} minutes out, about ${F.diedBlocks} blocks off). The game: an item lying within ${TICKING} blocks of a player is gone five minutes after it fell there (farther off it waits); zombies and skeletons may pick up armour and weapons they walk over (about 55 in 100 of them where the ground has been played in for many hours, none where it is new), and the one that killed the bot stands where it died.`;
+}
 // The walks back for these same drops that ended in a death (note 2113):
 // where, to what, with what about and what worn, said on every way. full-6
 // (2026-10-25 23:26 to 23:50Z), its iron armour 221 blocks off where a
@@ -351,7 +378,7 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
   // near the place.
   if (run.choice === 'through_nether') {
     if (goal.netherShortcut?.for === 'corpse_run') return false;
-    run.choice = 'go_back'; save();
+    run.choice = 'go_back'; note(goal, 'begun'); save();
   }
   if (!run.choice) {
     const death = (goal.survival?.deaths || []).find(d => d.at === run.deathAt) || (goal.survival?.deaths || []).at(-1) || {};
@@ -370,7 +397,7 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
     // What a chest in the Nether keeps did not drop (rod-stash.js, note 704).
     let kept = ''; try { kept = require('./rod-stash').stashSays(goal); } catch (_) { kept = ''; }
     const keptSays = kept ? ` Not dropped: ${kept}, kept there and counted as held.` : '';
-    const earlier = run.more ? ' This is a death before the last: what else it carried then is not on this list (what lies there is taken with the rest), and its drops last only if the bot has not been within 128 blocks of them since.' : '';
+    const earlier = run.more ? ' This is a death before the last: what else it carried then is not on this list (what lies there is taken with the rest), and its drops last only if the bot has not been within ${TICKING} blocks of them since.' : '';
     const others = (goal.corpseRunsEarlier || []).filter(r => r.dimension === run.dimension).map(r => `${listed(r.items)}${r.more ? ' and what else it carried then' : ''}, ${Math.round(flat(bot.entity.position, r.position))} blocks from here and ${Math.round(flat(spot, r.position))} from these`);
     const alsoLying = others.length ? ` From a death before this one there also lie: ${others.join('; ')}; that is asked of after this.` : '';
     const stalled = run.stalled ? ` ${run.stalled.walks} walks toward them${run.stalled.at ? ` from about (${run.stalled.at.x}, ${run.stalled.at.z})` : ''} got no nearer, straight and to each side${run.stalled.error ? ` (the last: ${run.stalled.error})` : ''}.` : '';
@@ -424,14 +451,14 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
     // The kit in the chest beside the bed first (bed-kit.js, note 2032).
     let bedKit = null; try { bedKit = kitActions ? require('./bed-kit').bedKitChores(bot, goal).take_bed_kit : null; } catch (_) { bedKit = null; }
     const tree = {
-      go_back: { description: `Go back for ${listed(run.items)}: ${far} blocks off${far >= 100 ? `, about ${minutes} minute${minutes > 1 ? 's' : ''}' ${climbSeconds ? 'walk and climb' : 'walk'}${rec?.walkBlocksAMinute ? ` at the ${rec.walkBlocksAMinute} blocks a minute the bot's walks have made, stalls and detours counted` : ''}` : ''}${Math.abs(spot.y - bot.entity.position.y) > 4 ? `, at y ${Math.round(spot.y)}` : ''}. ${left === null ? 'They last until the bot comes within 128 blocks, then five minutes.' : `About ${left} seconds before they vanish.`} ${death.cause ? `The bot ${death.cause} there; when it died, ` : 'When the bot died there, '}${about ? `about it were ${about}` : 'nothing hostile was in view'}; it wore ${death.worn?.length ? death.worn.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} then and wears ${wornNow.length ? wornNow.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} now. ${hour}${underSays}${stalled}${earlier}${eyesSay}${ringSays}${walkFoodSays}${alsoLying}` },
+      go_back: { description: `Go back for ${listed(run.items)}: ${far} blocks off${far >= 100 ? `, about ${minutes} minute${minutes > 1 ? 's' : ''}' ${climbSeconds ? 'walk and climb' : 'walk'}${rec?.walkBlocksAMinute ? ` at the ${rec.walkBlocksAMinute} blocks a minute the bot's walks have made, stalls and detours counted` : ''}` : ''}${Math.abs(spot.y - bot.entity.position.y) > 4 ? `, at y ${Math.round(spot.y)}` : ''}. ${left === null ? 'They last until the bot comes within ${TICKING} blocks, then five minutes.' : `About ${left} seconds before they vanish.`} ${death.cause ? `The bot ${death.cause} there; when it died, ` : 'When the bot died there, '}${about ? `about it were ${about}` : 'nothing hostile was in view'}; it wore ${death.worn?.length ? death.worn.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} then and wears ${wornNow.length ? wornNow.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} now. ${hour}${underSays}${stalled}${earlier}${eyesSay}${ringSays}${walkFoodSays}${alsoLying}` },
       leave_them: { description: `Leave them and go on with what is carried: ${listed(worth(Object.fromEntries(bot.inventory.items().map(i => [i.name, i.count])))) || 'nothing worth listing'}. What was dropped is made again, or found, later${again ? `: ${again}` : ''}.${ironRemakeSays(run.items)}${took}${keptSays}` },
     };
     if (quick) for (const k of Object.keys(tree)) tree[k].description += quick;
     const tried = triedDeathsSays(bot, run);
     if (tried) for (const k of Object.keys(tree)) tree[k].description += tried;
     if (bedKit) tree.kit_first = { description: `${bedKit.description} Then back for them as go back says.${quick}` };
-    // By night, and the drops not ageing (the bot not within 128 blocks of
+    // By night, and the drops not ageing (the bot not within the ticking 176 blocks of
     // them): going when it is day is a choice of its own, not leaving them.
     // By day too, when the walk is longer than the day that is left.
     const toDawn = Number.isFinite(t) ? Math.max(1, Math.round(((DAY.DAWN - t + 24000) % 24000) / 1200)) : null;
@@ -440,7 +467,7 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
     // eat, the walk there costing about 47 hunger sprinted, left them.
     const foodWant = Math.min(30, Math.round(far / 40));
     if (gatherFood && far >= 300 && foodCarried < foodWant) tree.food_first = { description: `Get food for the walk first, here: hunted, cooked or taken from a chest, toward ${foodWant} food points carried (${foodCarried} now), then set out for them; the drops do not age meanwhile. Twenty minutes at most on the food; then the walk with what there is.` };
-    if (toDawn !== null && (night || minutes > until) && !run.loadedAt && /overworld/.test(run.dimension)) tree.wait_for_day = { description: `Set out for them at ${night ? 'dawn' : 'the next dawn'}, about ${toDawn} real minute${toDawn === 1 ? '' : 's'} off, with the day ahead for the walk${night ? '' : ` (the day left now, about ${until}, is shorter than the walk, about ${minutes})`}, and go on with other things until then: the drops do not age while the bot is not within 128 blocks of them.${night ? ' From dawn the zombies and skeletons on open ground burn in the sun (not under a roof or in water, not husks or a zombie with a helmet, and never spiders or creepers), and no more spawn there in the light.' : ''} Asked again at dawn.${triedDeathsSays(bot, run)}` };
+    if (toDawn !== null && (night || minutes > until) && !run.loadedAt && /overworld/.test(run.dimension)) tree.wait_for_day = { description: `Set out for them at ${night ? 'dawn' : 'the next dawn'}, about ${toDawn} real minute${toDawn === 1 ? '' : 's'} off, with the day ahead for the walk${night ? '' : ` (the day left now, about ${until}, is shorter than the walk, about ${minutes})`}, and go on with other things until then: the drops do not age while the bot is not within ${TICKING} blocks of them.${night ? ' From dawn the zombies and skeletons on open ground burn in the sun (not under a roof or in water, not husks or a zombie with a helmet, and never spiders or creepers), and no more spawn there in the light.' : ''} Asked again at dawn.${triedDeathsSays(bot, run)}` };
     // Through the Nether, where the drop lies far off in the Overworld and a
     // portal the bot knows stands within 600 blocks of it and another within
     // 600 of the bot (note 1393): the nether shortcut's own way (out to the
@@ -458,6 +485,7 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
         tree.through_nether = { description: `Go back for them through the Nether: ${mine.d} blocks to the portal at (${mine.q.x}, ${mine.q.y}, ${mine.q.z}), about ${inNether} blocks across the Nether, and out by the portal at (${theirs.q.x}, ${theirs.q.y}, ${theirs.q.z}), ${theirs.d} blocks from them, in place of ${far} blocks over the ground. They last until the bot comes within 128 blocks, then five minutes; the Nether's mobs and lava are on the way.` };
       }
     }
+    { const rec = recordSays(bot, goal); for (const k of Object.keys(tree)) tree[k].description += rec; }
     const decision = await require('./decisions').decide('corpse_run', { client, bot, task, goal, save, tree,
       state: { distance: far, secondsLeft: left, aboutAtDeath: death.about || [], wornAtDeath: death.worn || [], wornNow, night, ...(until !== null ? { [night ? 'minutesToDawn' : 'minutesToNight']: until } : {}), ...(run.stalled ? { walksThatGotNoNearer: run.stalled } : {}), ...(kept ? { inAChest: kept } : {}) } });
     if (decision.stale) return false;
@@ -466,7 +494,7 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
       catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; console.log(`[corpse run] the kit by the bed was not taken: ${String(err.message || err).slice(0, 160)}`); }
       run.choice = 'go_back'; save(); return false;
     }
-    if (decision.path.at(-1) === 'food_first') { run.choice = 'go_back'; run.foodFirst = { at: Date.now(), want: foodWant }; save(); }
+    if (decision.path.at(-1) === 'food_first') { run.choice = 'go_back'; note(goal, 'begun'); run.foodFirst = { at: Date.now(), want: foodWant }; save(); }
     else if (decision.path.at(-1) === 'wait_for_day') { run.waitUntil = Date.now() + toDawn * 60000; save(); return false; }
     if (decision.path.at(-1) === 'through_nether') {
       const ns = require('./nether-shortcut');
@@ -477,7 +505,8 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
       return false;
     }
     if (decision.path.at(-1) !== 'food_first') run.choice = decision.path.at(-1); save();
-    if (run.choice === 'leave_them') { run.status = 'left'; run.leftWith = { ...run.items }; tripCameToNothing(bot, goal, run, save); save(); return false; }
+    if (decision.path.at(-1) === 'go_back') note(goal, 'begun');
+    if (run.choice === 'leave_them') { run.status = 'left'; note(goal, 'left'); run.leftWith = { ...run.items }; tripCameToNothing(bot, goal, run, save); save(); return false; }
   }
   // The food for the walk, where that was chosen: a pass of the gathering
   // at a time, until it is carried or twenty minutes are spent on it.
@@ -609,14 +638,14 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
   }
   run.passes++;
   if (got) await wearRecovered(bot);
-  if (!Object.keys(run.items).length) { run.status = 'done'; bot.chat?.('Got my things back.'); }
+  if (!Object.keys(run.items).length) { run.status = 'done'; note(goal, 'done'); bot.chat?.('Got my things back.'); }
   // Not closed while something on the list is still seen lying there and
   // the game's five minutes are not out: the next pass is for it.
   else if (Object.keys(run.items).some(name => lying(bot, spot, name).length) && run.passes < 8) {
     if (full) bot.chat?.('My pockets are full and my things are still lying here. Making room.');
   }
   else if (!got || run.passes >= 2) {
-    run.status = got ? 'partial' : 'gone';
+    run.status = got ? 'partial' : 'gone'; note(goal, run.status);
     bot.chat?.(got ? `Got some of it back. The rest is gone: ${listed(run.items)}.` : `Nothing left where I died. Lava or time took it.`);
     tripCameToNothing(bot, goal, run, save);
   }
@@ -650,4 +679,4 @@ function dropsWaitSays(bot, goal, now = Date.now()) {
   if (off > TICKING) return ` Given the turn, the work asks first about going back for what the last death dropped, ${off} blocks off: ${what}. Drops age only while their ground is loaded, so they keep until the bot comes near.`;
   return '';
 }
-module.exports = { triedDeathsSays, dropsWaitSays, quickDeathsSays, TOLD, tripCameToNothing, KIT_ERRAND, kitTrip, corpseRun, corpseRunStep, worth, madeAgain, ironRemakeSays, IRON_MINUTES, underWay };
+module.exports = { recordSays, FLEET_RECORD, TICKING, triedDeathsSays, dropsWaitSays, quickDeathsSays, TOLD, tripCameToNothing, KIT_ERRAND, kitTrip, corpseRun, corpseRunStep, worth, madeAgain, ironRemakeSays, IRON_MINUTES, underWay };
