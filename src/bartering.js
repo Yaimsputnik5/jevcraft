@@ -96,10 +96,15 @@ async function barterStep(bot, task, goal, save, actions = {}) {
   }
   // The Nether's gold ore mined for the barter (note 2185): with no gold to throw, ore within 32 and a pickaxe, up to
   // nine ingots' worth of ore is mined (acquireStep plans the ore, the nuggets and the ingot), two minutes at most.
-  if (!ingots(bot) && nuggets(bot) < 9 && actions.acquireStep && bot.inventory.items().some(i => /_pickaxe$/.test(i.name))) {
+  // Short of the gold the barter wants in hand (note 2193): a throw once a gold piece is worn, or the boots' four and a
+  // throw with none worn. mid-231-dk-nether-1 (25600, 2026-10-26 10:40Z) dug 29 nuggets, three ingots' worth, and the
+  // step then failed 'No gold to wear' on every pass: the mining ran only with no gold at all.
+  const inHand = () => ingots(bot) + Math.floor(nuggets(bot) / 9);
+  const shortOf = dressed(bot) ? 1 : BOOTS_INGOTS + 1;
+  if (inHand() < shortOf && actions.acquireStep && bot.inventory.items().some(i => /_pickaxe$/.test(i.name))) {
     let near = 0; try { const id = bot.registry?.blocksByName?.nether_gold_ore?.id; near = id !== undefined && typeof bot.findBlocks === 'function' ? bot.findBlocks({ matching: id, maxDistance: 32, count: 64 }).length : 0; } catch (_) { near = 0; }
     if (near) {
-      const want = Math.min(9, Math.max(1, Math.floor(near * 4 / 9)));
+      const want = Math.max(shortOf, Math.min(9, Math.floor(near * 4 / 9)));
       goal.step = { action: 'barter_mine_gold', ores: near, ingotsWanted: want }; save();
       bot.chat?.(`Gold ore in sight: mining it to barter with the piglins.`);
       // The nether gold ore itself, dug block by block (note 2187): asked for gold ingots, the planner's way was the
