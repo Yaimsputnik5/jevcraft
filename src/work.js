@@ -5252,6 +5252,9 @@ function rememberPortal(goal, save, portal, where) {
 }
 // Seconds a block of the tunnel home, as measured live (note 936).
 const TUNNEL_SECONDS = { pickaxe: 1.5, hand: 5 };
+// Stone, the Overworld's rock (note 2163): about 1.15 seconds a block with a stone pickaxe and 0.75 with iron by the game,
+// two blocks a step and the walk between; by hand stone takes 7.5 seconds a block and drops nothing.
+const STONE_TUNNEL_SECONDS = { pickaxe: 3, hand: 16 };
 // The tunnel home's rest, lifted where it rested for want of blocks and
 // blocks are carried now (note 980): what it stopped for is no longer so.
 // 25597 (mid-242-pf-nether-1, 2026-10-03 04:35:55Z), four rods, 25
@@ -5613,7 +5616,13 @@ async function portalWay(bot, task, goal, save, p, where, { walk, pickaxeWanted 
   // across, a cavern under it; the walk found only a drop, the staircase
   // rested, and portal_way offered going round or waiting. In the arena
   // the tunnel came 26 down through a cavern to its portal in 47 seconds.
-  if (where === 'nether' && (Math.hypot(target.x - here.x, target.z - here.z) > 6 || target.y - here.y <= -8) && !tunnelHomeResting(bot, goal)) {
+  // In the Overworld too where the portal is well below (note 2163): full-1 (2026-10-26 04:45Z) stood 10 blocks
+  // across and 100 above its lit portal at (27, -51, 60), the staircase resting for lava or water underfoot, and was
+  // offered legs round to the left and right, the boat again, a portal here and the wait; it answered none good
+  // (0.28). Of 60 such asks in 24 hours (the Overworld portal 8 or more below) none offered a tunnel, 9 were none
+  // good, and the legs round 'made no ground'. Stone digs slower than netherrack: the pace is said by the rock.
+  const overworldBelow = where === 'overworld' && target.y - here.y <= -8;
+  if (((where === 'nether' && (Math.hypot(target.x - here.x, target.z - here.z) > 6 || target.y - here.y <= -8)) || overworldBelow) && !tunnelHomeResting(bot, goal)) {
     const across = Math.round(Math.hypot(target.x - here.x, target.z - here.z)), dy = Math.round(target.y - here.y);
     // The pace as measured live (note 936): the tunnels home of 2026-10-02
     // made about 40 blocks a minute with a pickaxe (174 minutes of them) and
@@ -5622,7 +5631,7 @@ async function portalWay(bot, task, goal, save, p, where, { walk, pickaxeWanted 
     // time: 25595 (mid-242-rb-fortress-5, 20:35 to 20:37Z), three rods, no
     // pickaxe, was told about 240 seconds for 96 blocks, made a block about
     // every 14 seconds in a blaze's fire, and burned with the rods.
-    const pick = pickaxeTier(bot) >= 1, per = pick ? TUNNEL_SECONDS.pickaxe : TUNNEL_SECONDS.hand, stretch = Math.min(96, across);
+    const pick = pickaxeTier(bot) >= 1, per = overworldBelow ? (pick ? STONE_TUNNEL_SECONDS.pickaxe : STONE_TUNNEL_SECONDS.hand) : (pick ? TUNNEL_SECONDS.pickaxe : TUNNEL_SECONDS.hand), stretch = Math.min(96, across);
     // Where it begins, before any rock: the shooters with a line to the bot now.
     let inLine = '';
     try {
@@ -5655,7 +5664,7 @@ async function portalWay(bot, task, goal, save, p, where, { walk, pickaxeWanted 
       const want = stretch * 2 + Math.abs(dy);
       if (picks.length) usesSays = ` This go digs about ${want} blocks, a pickaxe use each while one lasts; the pickaxes carried have ${left} uses left (${picks.map(q => `${q.name.replaceAll('_', ' ')} ${q.usesLeft}`).join(', ')})${want >= left ? `: the last of them wears out on the way, the rest of the tunnel is dug by hand, and after it nothing in the Nether is mined until another pickaxe is made, from wood its forests have and nowhere else` : ''}.`;
     } catch (_) { usesSays = ''; }
-    tree.tunnel_home = { description: `Dig a tunnel straight at the portal through the rock, two high and one wide: ${dy ? `a step ${dy < 0 ? 'down' : 'up'} with each block until level with it (${Math.abs(dy)} ${dy < 0 ? 'below' : 'above'}), then level; ` : ''}a block laid where the floor is missing (${blocksLaid} carried), and over, under or round any lava met (no block is dug with lava or water behind it). Up to 96 blocks a go, about ${per} seconds a block ${pick ? 'with the pickaxe carried' : 'by hand (no pickaxe carried)'}: about ${Math.round(Math.max(stretch, Math.abs(dy)) * per)} seconds for ${stretch} blocks of the ${across} to the portal${Math.abs(dy) > stretch ? ` and the ${Math.abs(dy)} ${dy < 0 ? 'down' : 'up'}` : ''}, then asked again from where it ends (the pace is the live tunnels' of 2026-10-02: about ${Math.round(60 / TUNNEL_SECONDS.pickaxe)} blocks a minute with a pickaxe, ${Math.round(60 / TUNNEL_SECONDS.hand)} by hand).${usesSays}${gapSays}${inLine} Inside the rock no ghast or blaze has a line to the bot and there is no drop beside it; where it comes out into open air it lays its floor crouched, and stops there if something that pushes is in sight. It stops at lava it cannot pass. Measured in the arena: 41 blocks of netherrack, ten down, past a lava pocket and four blocks of open air, in 26 seconds with an iron pickaxe, no damage, 2 runs of 2.${rodsHere(bot)}` };
+    tree.tunnel_home = { description: `Dig a tunnel straight at the portal through the rock, two high and one wide: ${dy ? `a step ${dy < 0 ? 'down' : 'up'} with each block until level with it (${Math.abs(dy)} ${dy < 0 ? 'below' : 'above'}), then level; ` : ''}a block laid where the floor is missing (${blocksLaid} carried), and over, under or round any lava met (no block is dug with lava or water behind it). Up to 96 blocks a go, about ${per} seconds a block ${pick ? 'with the pickaxe carried' : 'by hand (no pickaxe carried)'}: about ${Math.round(Math.max(stretch, Math.abs(dy)) * per)} seconds for ${stretch} blocks of the ${across} to the portal${Math.abs(dy) > stretch ? ` and the ${Math.abs(dy)} ${dy < 0 ? 'down' : 'up'}` : ''}, then asked again from where it ends (${overworldBelow ? `through the Overworld's stone, about ${Math.round(60 / STONE_TUNNEL_SECONDS.pickaxe)} blocks a minute with a pickaxe by the game's dig times and the steps between, ${Math.round(60 / STONE_TUNNEL_SECONDS.hand)} by hand, which drops no stone` : `the pace is the live tunnels' of 2026-10-02: about ${Math.round(60 / TUNNEL_SECONDS.pickaxe)} blocks a minute with a pickaxe, ${Math.round(60 / TUNNEL_SECONDS.hand)} by hand`}).${usesSays}${gapSays}${inLine} Inside the rock no ${overworldBelow ? 'skeleton' : 'ghast or blaze'} has a line to the bot and there is no drop beside it; where it comes out into open air it lays its floor crouched, and stops there if something that pushes is in sight. It stops at lava it cannot pass.${overworldBelow ? '' : ' Measured in the arena: 41 blocks of netherrack, ten down, past a lava pocket and four blocks of open air, in 26 seconds with an iron pickaxe, no damage, 2 runs of 2.'}${rodsHere(bot)}` };
   }
   // Not on the trip home chosen for wood (upkeep's return_for_wood, note
   // 1113): the pickaxe first is a gathering for the wood the trip is for,
