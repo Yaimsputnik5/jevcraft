@@ -8355,6 +8355,23 @@ async function breakStillness(bot, task, goal, save, { client, survival, onStep 
         run: async () => { require('./game-progress').takeBackRung(goal, back.phase); save(); } };
     }
   }
+  // The wait itself, while a rest is held (note 2130): until_rest_ends was
+  // Jev's "other work until the rest ends", and inside the hold each detour
+  // over at once brought this question round again with only walks away on
+  // it. Five fresh runs (2026-10-26 01:00 to 03:15Z) were asked it 103
+  // times while a batch smelted, a median 9 seconds apart, and answered
+  // none good 51 times; full-6's 11 mutton (110 seconds) drew three asks in
+  // 39 seconds. Chosen, the hold waits quietly to the rest's end.
+  let waitedOut = false;
+  // Not where Jev chose other work over the wait (until_rest_ends as work, idle false): there the work
+  // running out ends the hold and asks the question above again (note 675).
+  if (holding && holding.idle !== false && until > now) {
+    const what = reason.replace(/^\w+:/, '').replace(/^rung:/, '').replaceAll('_', ' ');
+    const secs = Math.max(1, Math.round((until - now) / 1000));
+    const job = (() => { try { return require('./job-in-hand').jobInHand({ step: goal.step, here: bot.entity?.position, batch: goal.smelting || null }).short; } catch (_) { return null; } })();
+    tree.wait_it_out = { description: `Wait here for the ${what}'s rest to end, about ${secs} second${secs === 1 ? '' : 's'} (at ${new Date(until).toISOString().slice(11, 19)}Z)${holding.why ? `, set for: ${String(holding.why).slice(0, 160)}` : ''}${job ? `; ${job}` : ''}. Standing still spends no hunger; nothing is asked meanwhile but a threat that shows, and the work is taken up when the rest ends. ${WAIT_IT_OUT_RECORD.says}`,
+      waits: require('./waits').timer(`the ${what}'s rest to end`, until - now), run: async () => { waitedOut = true; } };
+  }
   const options = Object.keys(tree);
   const stats = survival?.state || goal.survival || goal;
   // Work while a rest runs out is not the work standing still.
@@ -8435,8 +8452,10 @@ async function breakStillness(bot, task, goal, save, { client, survival, onStep 
     // one way included.
     await decideAction(bot, task, goal, save, client, onStep, tree, context, id, { above });
   } finally { goal.step = step; save(); }
-  return true;
+  // The wait chosen is no work done: the hold (holdForRest) waits to the end.
+  return !waitedOut;
 }
+const WAIT_IT_OUT_RECORD = Object.freeze({ says: 'On 5 fresh runs (2026-10-26 01:00 to 03:15Z) this question came round 103 times while a batch smelted, a median 9 seconds apart, each detour over at once, and was answered none good 51 times.' });
 
 // The chance a block dug gives a drop other than itself, where the game fixes
 // it (gravel: flint one time in ten, and the gravel otherwise).
@@ -8522,7 +8541,7 @@ async function holdForRest(bot, task, goal, save, { client, survival, onStep = (
       const started = Date.now(), minutes = Math.max(1, Math.ceil((until - started) / 60000));
       // `none`: nothing was on offer (a detour tried and failed is not that).
       let worked = false, none = false;
-      try { worked = await breakStillness(bot, task, goal, save, { client, survival, onStep, reason, now: started, until, holding: { minutes, why }, above }); none = !worked; }
+      try { worked = await breakStillness(bot, task, goal, save, { client, survival, onStep, reason, now: started, until, holding: { minutes, why, idle }, above }); none = !worked; }
       catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled', 'Stalled'].includes(err.name)) throw err; }
       if (none && !idle) {
         console.log(`[wait] the work on offer while ${String(reason).replace(/^\w+:/, '').replaceAll('_', ' ')} rests has run out; the question above is asked again`);
