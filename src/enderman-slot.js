@@ -75,6 +75,39 @@ function slotFrom(bot, f) {
   return null;
 }
 
+// A slot built where no rock gives one (note 2259): on flat ground (a warped forest's nylium), the two cells past the
+// mouth with a floor, open two high, and the blocks the bot lays itself: the walls each side and behind, two high, and the
+// roof over both cells; cells already solid count as laid. The forest trial of 2026-10-26 (25600, forest-2, 21:17Z) died to
+// an enderman on flat nylium with no rock slot in reach, the open fight its one way; the arena (scripts/built-slot-drill.js,
+// 21:37Z) put the slot's own fight in a slot built so, three endermen about, four runs: 12 killed of 12, 7 pearls, no
+// health lost, 31 to 34 seconds a run. -> { mouth, a, b, d, digs: [], builds, material } or null
+const BUILD_MAX = 13;
+function builtSlotFrom(bot, f) {
+  const at = c => bot.blockAt(c), solid = b => !!b && b.boundingBox === 'block', open = b => !!b && b.boundingBox === 'empty' && !/lava|water|fire/.test(b.name);
+  if (!open(at(f)) || !open(at(f.offset(0, 1, 0))) || !solid(at(f.offset(0, -1, 0)))) return null;
+  let SCAFFOLD = []; try { SCAFFOLD = require('./pillar-recovery').SCAFFOLD || []; } catch (_) { SCAFFOLD = []; }
+  const carried = (bot.inventory?.items?.() || []).filter(i => SCAFFOLD.includes(i.name)).sort((x, y) => y.count - x.count)[0];
+  if (!carried) return null;
+  for (const [dx, dz] of DIRS) {
+    const a = f.offset(dx, 0, dz), b = f.offset(2 * dx, 0, 2 * dz), back = f.offset(3 * dx, 0, 3 * dz), side = new Vec3(dz, 0, dx);
+    if (![a, b].every(c => open(at(c)) && open(at(c.offset(0, 1, 0))) && solid(at(c.offset(0, -1, 0))))) continue;
+    const walls = [a, b].flatMap(c => [0, 1].flatMap(dy => [c.plus(side).offset(0, dy, 0), c.minus(side).offset(0, dy, 0)])).concat([0, 1].map(dy => back.offset(0, dy, 0)));
+    // The roof has nothing beside it to be laid against but what is laid for it: the back wall raised a block (its top at
+    // the roof's height), then the roof over b against it, then over a against that (the arena, 21:41Z: with the roof laid
+    // first, 10 of 12 went down, the two roof cells not, an enderman walked into the open-topped slot and hit for 7).
+    const roof = [back.offset(0, 2, 0), b.offset(0, 2, 0), a.offset(0, 2, 0)];
+    const need = [...walls, ...roof].filter(c => !solid(at(c)));
+    if (need.some(c => !open(at(c)) && !/air/.test(at(c)?.name || '') && at(c)?.boundingBox !== 'empty')) continue;
+    if (need.length > Math.min(BUILD_MAX, carried.count)) continue;
+    const near = c => [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, -1, 0]].some(([x, y, z]) => /lava/.test(at(c.offset(x, y, z))?.name || ''));
+    if ([f, a, b].some(near)) continue;
+    // Laid low first, then the roof that rests on the walls' tops.
+    const builds = [...need.filter(c => !roof.some(r => r.equals(c))).sort((x, y) => x.y - y.y), ...roof.filter(r => need.some(c => c.equals(r)))];
+    return { mouth: f, a, b, d: new Vec3(dx, 0, dz), digs: [], builds, material: carried.name };
+  }
+  return null;
+}
+
 // The nearest slot within `reach` of the bot: where it stands, or a cell at
 // its height (a block up or down) walked to. With `toward` (an enderman),
 // a slot whose mouth has a line to its eyes comes first, marked `line`
@@ -144,7 +177,12 @@ function slotSite(bot, { reach = 6, toward = null } = {}) {
     const s = slotFrom(bot, f);
     if (s) out.push({ ...s, off: Math.abs(dx) + Math.abs(dz) + Math.abs(dy) });
   }
-  out.sort((x, y) => x.off - y.off || x.digs.length - y.digs.length);
+  // No rock slot within reach: one built from the blocks carried (note 2259).
+  if (!out.length) for (let dx = -reach; dx <= reach; dx++) for (let dz = -reach; dz <= reach; dz++) for (const dy of [0, 1, -1]) {
+    const f = here.offset(dx, dy, dz), s = builtSlotFrom(bot, f);
+    if (s) out.push({ ...s, off: Math.abs(dx) + Math.abs(dz) + Math.abs(dy) });
+  }
+  out.sort((x, y) => x.off - y.off || x.digs.length - y.digs.length || (x.builds?.length || 0) - (y.builds?.length || 0));
   // The slot the bot stands at the back of comes before any other (note
   // 1057), and with an enderman turned on the bot about it is the only one:
   // 25593 (2026-10-03 13:31:56 to 13:32:42Z) waited twenty seconds at its
@@ -205,6 +243,7 @@ function slotSite(bot, { reach = 6, toward = null } = {}) {
 }
 
 function says(site, n) {
+  if (site.builds?.length) return `Fight it from a slot built here on the open ground: lay ${site.builds.length} ${String(site.material || 'block').replaceAll('_', ' ')} (walls each side and behind, two high, and a roof over two cells) ${site.off ? `${site.off} blocks off at (${site.mouth.x}, ${site.mouth.y}, ${site.mouth.z})` : 'beside where the bot stands'}, about ${Math.max(4, Math.round(site.builds.length * 0.6))} seconds; an enderman is 2.9 tall and does not come into a space two high, and from the slot's back the sword reaches one at the mouth while its blow does not reach the bot. In the arena (2026-10-26) the slot's fight from a slot built so killed 12 endermen of 12 with no health lost.${n > 1 ? ` ${n} endermen about.` : ''}`;
   return `Fight it from a slot: dig a tunnel one wide and two high two cells into the rock ${site.off ? `${site.off} blocks off at (${site.mouth.x}, ${site.mouth.y}, ${site.mouth.z})` : 'beside where the bot stands'} (${site.digs.length} blocks to dig), stand at its back and look the enderman in the eyes from its mouth to bring it${site.turned ? ` (the bot stands at the back of this slot now, and ${site.turned.n === 1 ? 'one enderman is' : `${site.turned.n} endermen are`} turned on it, the nearest ${site.turned.off} blocks off: taking this is waiting for ${site.turned.n === 1 ? 'it' : 'them'} here, where ${site.turned.n === 1 ? 'it does' : 'they do'} not come in, the sword on ${site.turned.n === 1 ? 'it' : 'each'} at the mouth; every other way of the hunt walks out of the slot to ${site.turned.n === 1 ? 'it' : 'them'} in the open)` : site.held && site.line ? ' (the bot stands at the back of this slot now, and the mouth has a line to its eyes)' : site.line ? ' (the mouth has a line to its eyes now)' : site.out ? ` (the mouth has no line to one now: the bot goes ${site.out.steps} cell${site.out.steps === 1 ? '' : 's'} out of it to where one ${site.out.off} blocks off is in sight, looks, and is back at the slot's end before it comes; in the arena, a wall between the mouth and an enderman 21 blocks off, 10 runs of 10, the look turning it in 9 of 10 goings out, no health lost; the first going out live, to a cell a step down beside a ledge with another enderman near, ended in a blow and a fall, and it now goes only to cells on the mouth's level with floor all round and none within twelve blocks)` : ''}. An enderman is 2.9 blocks tall and does not come into a space two high; from the mouth its blow falls about 0.4 blocks short of the bot, and the sword reaches it there. Each is struck until it dies and its drop taken from the mouth${n > 1 ? `; ${n} are about, and those that come are taken one after another` : ''}.`;
 }
 
@@ -229,6 +268,12 @@ async function fight(bot, task, site, { navigate, seconds = 60, want = 1, item =
   if (!bot.entity.position.floored().equals(site.b)) {
     if (!bot.entity.position.floored().equals(site.mouth)) await navigate(bot, task, new goals.GoalBlock(site.mouth.x, site.mouth.y, site.mouth.z), { timeoutMs: 8000, stallMs: 2500 });
     for (const c of site.digs) { task.check(); await bridging.clearCell(bot, task, c, { wall: true }); }
+    // A built slot's blocks laid from the mouth (note 2259), the walls first and the roof on them; one not laid is said and the fight goes on from what stands.
+    if (site.builds?.length) {
+      const W = require('./work'), t0 = Date.now(); let laid = 0;
+      for (const c of site.builds) { task.check(); try { await W.place(bot, task, c, site.material); if (bot.blockAt(c)?.boundingBox === 'block') laid++; } catch (err) { task.check(); if (['NeedsAir', 'NeedsSafety', 'Cancelled'].includes(err.name)) throw err; } }
+      console.log(`[slot] built at the mouth (${site.mouth.x}, ${site.mouth.y}, ${site.mouth.z}): ${laid} of ${site.builds.length} ${site.material.replaceAll('_', ' ')} laid in ${Math.round((Date.now() - t0) / 100) / 10} s`);
+    }
     await navigate(bot, task, new goals.GoalBlock(site.b.x, site.b.y, site.b.z), { timeoutMs: 5000, stallMs: 2000 });
   }
   if (!bot.entity.position.floored().equals(site.b)) { out.ended = 'the back of the slot was not reached'; return out; }
@@ -483,4 +528,4 @@ function standing(bot) {
   return `The bot stands at the back of the slot it dug at (${s.b.x}, ${s.b.y}, ${s.b.z}): one wide and two high, rock on every side but the mouth, two blocks to the ${compass(s.d)}. An enderman is ${TALL.enderman} blocks tall and does not come in under a roof two high (the game's rule): it stands at the mouth, where the sword reaches it and its blow does not reach the bot; ${who}. Nothing that shoots has a line in but along the slot from the mouth. Any way that walks out of it leaves that: in the open an enderman that has turned is at the bot at once, wherever it walks, about 7 a blow before armour.`;
 }
 
-module.exports = { outSpot, OUT_STEPS, standing, lineFrom, enter, stand, TALL, slotSite, slotFrom, says, fight, recordSays, RECORD };
+module.exports = { builtSlotFrom, outSpot, OUT_STEPS, standing, lineFrom, enter, stand, TALL, slotSite, slotFrom, says, fight, recordSays, RECORD };
