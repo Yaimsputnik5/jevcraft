@@ -3669,8 +3669,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             const facing = [Math.round(-Math.sin(yaw)) || 0, Math.round(-Math.cos(yaw)) || 0];
             const sides = [facing, [1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => dx || dz);
             const open = c => { const b = bot.blockAt(c); return !!b && b.boundingBox !== 'block' && !/water|lava/.test(b.name || ''); };
-            const cell = sides.map(([dx, dz]) => f.offset(dx, 0, dz)).find(c => bot.blockAt(c.offset(0, -1, 0))?.boundingBox === 'block' && open(c) && open(c.offset(0, 1, 0)));
-            if (!cell) throw new Error('No cell beside the feet with a floor for the boat');
+            // Two cells out, not one (note 2218; the arena's seat drill, 2026-10-26 14:08Z, scripts/seat-drill.js): the server refuses
+            // a boat whose box holds any entity, the player included, and a boat on the next cell overlaps the body; one cell away
+            // was refused 4 of 4 (dragon-317's four 'not set down'), two and three cells away placed and boarded 8 of 8.
+            const cell = sides.map(([dx, dz]) => ({ near: f.offset(dx, 0, dz), far: f.offset(dx * 2, 0, dz * 2) })).find(({ near, far }) => open(near) && open(near.offset(0, 1, 0)) && bot.blockAt(far.offset(0, -1, 0))?.boundingBox === 'block' && open(far) && open(far.offset(0, 1, 0)))?.far;
+            if (!cell) throw new Error('No cell two from the feet with a floor for the boat');
             await bot.lookAt(cell.offset(.5, -0.05, .5), true); await sleep(120); check();
             bot.activateItem();
             let boat = null;
