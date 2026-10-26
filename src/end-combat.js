@@ -2496,7 +2496,11 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     const waterStands = lastWater && bot.blockAt(lastWater)?.name === 'water' && lastWater.distanceTo(bot.entity.position) <= 6;
     // The last full bucket kept here too (note 1827, as note 1819 for the pool): 25588's dragon-192 (2026-10-18 05:25Z, three crystals, 372 blocks, full health) poured its second bucket against an enderman three blocks off, was flung off its column top at 86 by the dragon's body, 'falling ... with no water bucket to clutch with', and went into the void. The last bucket goes against an enderman only at 8 health or under.
     // Not kept from an enderman at arm's length (note 1851): 25588's dragon-210 (2026-10-18 12:46Z, one crystal) fought one with the sword at 1.4 to 1.8 blocks, 'the one full bucket carried is kept for the landing (health 13.5)', and went 13.5 to 2 to none under its blows; the water ends that fight at once, and a knock off a column is a lesser risk than a blow a second now.
-    const lastBucketKept = countOf(bot, 'water_bucket') < 2 && bot.health > 8 && !(turned && turned.position.distanceTo(bot.entity.position) <= 4);
+    // With a boat carried the landing is the boat's (fall-recovery.js boatClutch, note 2178), and the last bucket is not kept
+    // from an enderman (note 2194): dragon-312 (25592, 2026-10-26 10:33Z) kept its one bucket from an enderman at 5 blocks
+    // at 14 health, poured it at 1 block, and died on its climb.
+    const boatCarried = bot.inventory.items().some(i => require('./boats').boatItem(i.name));
+    const lastBucketKept = countOf(bot, 'water_bucket') < 2 && !boatCarried && bot.health > 8 && !(turned && turned.position.distanceTo(bot.entity.position) <= 4);
     if (turned && !waterStands && lastBucketKept && !(state.lastBucketEndermanSaid > Date.now() - 20000)) { state.lastBucketEndermanSaid = Date.now(); console.log(`[end combat] no water against the enderman ${Math.round(turned.position.distanceTo(bot.entity.position))} blocks off: the one full bucket carried is kept for the landing after a knock off a column (health ${bot.health.toFixed(1)})`); }
     // No reflex pour where the water would run off (note 1843, as the option's own check): the flow carries the body with it, and 25588's dragon-204 (2026-10-18 10:50Z) poured against an enderman on the island's lower shelf at (45, 29, -19) and went off its edge into the void at 11 health.
     const pourRunsOff = runOffSides(bot, bot.entity.position.floored()).length >= 1;
