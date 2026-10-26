@@ -843,6 +843,15 @@ async function searchForSheep(bot, task, goal, save, actions) {
   if (goal.woolSearch && Date.now() - (goal.woolSearch.lastAt || goal.woolSearch.since) > 30 * 60000) delete goal.woolSearch;
   const search = goal.woolSearch ||= { since: Date.now(), from: plain(bot.entity.position.floored()) };
   search.lastAt = Date.now();
+  // The climb to the surface chosen holds until the bot is up (note 2149):
+  // the question came back each pass of the climb, and Jev answered
+  // climb_first again 46 of 55 times within a minute tonight (2026-10-26
+  // 01:00 to 04:45Z); the sheep question was asked 93 times in all.
+  if (search.climbing) {
+    let under = false; try { under = bot.game?.dimension === 'overworld' && !require('./surface').surfaceObserver(bot)(bot.entity.position); } catch (_) { under = false; }
+    if (under && Date.now() - search.climbing.at < 10 * 60000) { await actions.explore(bot, task, goal, save, 'sheep', { surfaceOnly: true }); return; }
+    delete search.climbing; save();
+  }
   const held = search.toward;
   // A flock is walked to where it was, height and all: seen from a mine
   // below, "back to the sheep" by x and z alone ended under them sixty
@@ -1063,7 +1072,7 @@ async function searchForSheep(bot, task, goal, save, actions) {
   const chosen = way.biome;
   // explore_here, or the climb (explore's own surface trip comes first when
   // the bot is below the surface, work.js explore).
-  if (!chosen) { if (pick === 'climb_first') bot.chat?.('No sheep down here. Climbing to the surface to look.'); await actions.explore(bot, task, goal, save, 'sheep', { surfaceOnly: true }); return; }
+  if (!chosen) { if (pick === 'climb_first') { bot.chat?.('No sheep down here. Climbing to the surface to look.'); search.climbing = { at: Date.now() }; save(); } await actions.explore(bot, task, goal, save, 'sheep', { surfaceOnly: true }); return; }
   search.toward = { x: chosen.x, z: chosen.z, biome: chosen.biome }; save();
   bot.chat?.(`No sheep here. Trying the ${chosen.biome.replaceAll('_', ' ')} to the ${chosen.direction}.`);
 }

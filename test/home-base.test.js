@@ -704,3 +704,22 @@ test('wool of mixed colours with a bone to hand makes a white bed by dyeing, and
   assert(!plan.some(s => ['mine', 'hunt_mob', 'gather_wool'].includes(s.action)), `nothing fetched: ${steps.join(' ')}`);
   assert.equal(plan.filter(s => s.item === 'white_wool').reduce((n, s) => n + s.count, 0), 3, 'three white wool from the wool carried');
 });
+
+test('the climb chosen for sheep holds while the bot is under the rock, and is let go on the surface (note 2149)', async () => {
+  const w = await establishedHome(), { bot, goal, task, save } = w;
+  let explored = 0;
+  const actions = { navigate: async () => {}, explore: async () => { explored++; } };
+  // Under the rock (the observer finds no open sky): the climb goes on unasked.
+  const surface = require('../src/surface'); const real = surface.surfaceObserver;
+  surface.surfaceObserver = () => () => false;
+  try {
+    goal.woolSearch = { since: Date.now(), from: { x: 0, y: 65, z: 0 }, climbing: { at: Date.now() } };
+    await home.searchForSheep(bot, task, goal, save, actions);
+    assert.equal(explored, 1, 'the climb goes on');
+    assert.ok(goal.woolSearch.climbing, 'held');
+    goal.woolSearch.climbing.at = Date.now() - 11 * 60000;
+  } finally { surface.surfaceObserver = real; }
+  // Ten minutes on, or on the surface: the climb is let go and the search goes on as before.
+  await home.searchForSheep(bot, task, goal, save, { navigate: async () => {}, explore: async () => {} }).catch(() => {});
+  assert.equal(goal.woolSearch?.climbing, undefined, 'let go');
+});
