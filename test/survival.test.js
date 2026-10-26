@@ -2798,13 +2798,17 @@ test('back to life with nothing, on dirt, the shaft down is still offered: the d
   const bare = ground => {
     const bot = crowdBot({ health: 3.7 });
     bot.inventory = { items: () => [], slots: {} };
-    bot.blockAt = p => ({ position: p.floored(), name: p.y < 64 ? ground : 'air', boundingBox: p.y < 64 ? 'block' : 'empty', diggable: true, digTime: () => (ground === 'dirt' ? 750 : 7500) });
+    bot.blockAt = p => ({ position: p.floored(), name: p.y < 64 ? ground : 'air', boundingBox: p.y < 64 ? 'block' : 'empty', diggable: true, digTime: () => (['dirt', 'sand', 'gravel', 'clay'].includes(ground) ? 750 : 7500) });
     const survival = new Survival(bot, { place: async () => {}, dig: async () => {}, navigate: async () => {} }, { state: { shelters: [] } });
     return survival.stanceOptions(new Task('night'), {}, () => {}, [crowdMob(4, 'skeleton', 9), crowdMob(2, 'zombie', 0, 15)], false);
   };
   const dirt = bare('dirt');
   assert.match(dirt.dig_down.description, /Dig straight down \d blocks where the bot stands.*No block is carried: the dirt dug is the lid\./);
   assert.equal(bare('stone').dig_down, undefined);
+  // Clay too (note 2122): any ground dug by hand in a second that drops itself and stays put as a lid; sand and
+  // gravel fall, so a lid of them would come down on the head, and they are not.
+  assert.ok(bare('clay').dig_down, 'clay: the shaft down is offered bare');
+  for (const g of ['sand', 'gravel']) assert.equal(bare(g).dig_down, undefined, `${g}: no lid that stays up`);
 });
 
 test('a skeleton at the sword\'s reach is said in what is built, and one that walks is said of cover (note 1190)', () => {
