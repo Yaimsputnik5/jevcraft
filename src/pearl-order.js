@@ -184,8 +184,8 @@ function fightSays(bot, n) {
 function tree(bot, goal, r, now = Date.now()) {
   const o = overlap(bot, goal, r), out = {};
   out.rods_first = { ladderNext: true, description: inNether(bot)
-    ? `Go on with the rods, the ladder's order: ${o.fortress}; rods ${o.rods}. The pearls come after the rods (or while they rest): a warped forest's endermen, a barter, or the Overworld's night hunt. ${record.routeSays('rods_first', goal)}`
-    : `Go on to the Nether for the rods, the ladder's order: rods ${o.rods}. The pearls come after the rods (or while they rest): a warped forest's endermen, a barter, or the Overworld's night hunt. ${record.routeSays('rods_first', goal)}` };
+    ? `Go on with the rods now: ${o.fortress}; rods ${o.rods}. The pearls then, or while the rods rest: a warped forest's endermen, a barter, or the Overworld's night hunt. ${record.routeSays('rods_first', goal)}`
+    : `Go on to the Nether for the rods now: rods ${o.rods}. The pearls then, or while the rods rest: a warped forest's endermen, a barter, or the Overworld's night hunt. ${record.routeSays('rods_first', goal)}` };
   if (r.enderman) {
     const e = r.enderman.nearest.e, p = e.position;
     out.hunt_enderman = { target: { x: Math.round(p.x), y: Math.round(p.y), z: Math.round(p.z) },
@@ -251,7 +251,7 @@ function rodsAgain(bot, goal, now = Date.now()) {
   try { blazes = require('./danger').threats(bot, 48).filter(t => t.entity?.name === 'blaze'); } catch (_) { blazes = []; }
   const got = Math.max(0, count(bot, 'ender_pearl') - (h.pearlsAt ?? count(bot, 'ender_pearl')));
   const about = blazes.length ? ` ${plural(blazes.length, 'blaze')} within forty-eight blocks now, ${blazes.filter(t => t.visible).length} in sight, the nearest ${Math.round(blazes[0].distance)} blocks off.` : '';
-  return { description: `Go back to the rods, the ladder's order, and drop the pearl way chosen ${plural(Math.max(1, Math.round((now - h.at) / 60000)), 'minute')} ago (${h.pick.replaceAll('_', ' ')}; ${plural(got, 'pearl')} from it so far): ${o.fortress}; rods ${o.rods}.${about} The pearls come after the rods, or while they rest; the question of the order is asked again when a way to them not on offer then turns up, or its half hour is out.`,
+  return { description: `Go back to the rods and drop the pearl way chosen ${plural(Math.max(1, Math.round((now - h.at) / 60000)), 'minute')} ago (${h.pick.replaceAll('_', ' ')}; ${plural(got, 'pearl')} from it so far): ${o.fortress}; rods ${o.rods}.${about} The pearls come after the rods, or while they rest; the question of the order is asked again when a way to them not on offer then turns up, or its half hour is out.`,
     run: () => endHeld(goal, 'left at a stall for the rods', now) };
 }
 

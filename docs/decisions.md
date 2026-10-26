@@ -912,7 +912,7 @@ Questions that ride in one call together (the intake batch is one call per chat 
 
 ### `pearl_order`
 
-**In the Nether, or in the Overworld on the way to it, short of both the blaze rods and the ender pearls, with a way to the pearls real from here: go on with the rods (the ladder's order), or take that way to the pearls now and the rods after?**
+**In the Nether, or in the Overworld on the way to it, short of both the blaze rods and the ender pearls, with a way to the pearls real from here: go on with the rods now, or take that way to the pearls now and the rods after?**
 
 - When: On the game ladder, short of the rods and the pearls, with a way to the pearls real from here. In the Nether, the rods the step in hand (not resting): an enderman within 24 blocks, a warped forest known within 512 blocks whose walk and hunt are not resting, or gold to throw with a piglin within 32 (barterReady). In the Overworld, the ladder's step the way to the Nether for the rods (reach_nether): an enderman within 24 blocks, the one way there (note 790). Asked when no answer is held, and again only when a named fact changes, said in askedBecause: a kind of way real now that was not on offer at the answer, a death since, or the half hour the answer holds run out (five minutes for an answer taken as none good). A pearl way held is the step while it stays real (an enderman within 48, the forest open, the barter ready), the rods again after; the answer then stands as the order until a named fact changes.
 - Decision tree, choice; stakes medium; ledger kind `strategy`
