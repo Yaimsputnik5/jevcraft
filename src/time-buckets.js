@@ -25,7 +25,9 @@ function bucketOf(doing, stuck = false) {
   // stuck of which 17 were the night mine it chose.
   const detour = /^detour:(.+)$/.exec(d);
   if (detour) {
-    if (detour[1] === 'until_rest_ends') return 'waiting';
+    // The wait Jev chose inside a held rest (wait_it_out, note 2130) is waiting too (note 2156): time-lost
+    // read full-1's seven minutes of it (2026-10-26 05:10-05:45Z) as 'stuck 26%'.
+    if (detour[1] === 'until_rest_ends' || detour[1] === 'wait_it_out') return 'waiting';
     const b = bucketOf(detour[1], stuck);
     return b === 'other' ? 'stuck' : b;
   }
