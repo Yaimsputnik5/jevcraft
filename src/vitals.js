@@ -1608,7 +1608,7 @@ function airWays(bot, task, onAction = () => {}) {
       const land = require('./shore').shoreLand(bot, p => dryStanding(bot, p)).sort((a, b) => a.distanceTo(here) - b.distanceTo(here))[0];
       if (land && land.distanceTo(here) <= 48) {
         const d = round(Math.hypot(land.x + 0.5 - here.x, land.z + 0.5 - here.z));
-        ways.swim_to_land = { description: `Swim to the nearest land, ${d} blocks off at (${land.x}, ${land.y}, ${land.z}): about ${round(d / 2.2)} seconds at a swimmer's pace, the head kept up on the way.`,
+        ways.swim_to_land = { land: { x: land.x, y: land.y, z: land.z }, description: `Swim to the nearest land, ${d} blocks off at (${land.x}, ${land.y}, ${land.z}): about ${round(d / 2.2)} seconds at a swimmer's pace, the head kept up on the way.`,
           run: async () => {
             onAction({ action: 'surface', oxygen: bot.oxygenLevel, way: 'swim_to_land', to: { x: land.x, y: land.y, z: land.z } });
             const { goals } = require('mineflayer-pathfinder');
@@ -1752,7 +1752,30 @@ async function maintainVitals(bot, task, onAction = () => {}, { client = null, g
     // The way up is Jev's (body_way); with none found, the old swim, which
     // throws that no way up was found.
     const ways = airWays(bot, own, onAction);
-    const surface = () => Object.keys(ways).length ? body.answer(bot, own, 'air', ways, { ...asked, facts: { air: bot.oxygenLevel } }) : surfaceForAir(bot, own, onAction);
+    // Water the walk keeps putting the body back into (water-trap.js, note 2177): counted at every asking, and
+    // past once the ways that change the walk are offered beside the swims, with the count said.
+    let trapFacts = {};
+    try {
+      const WT = require('./water-trap'), feet = bot.entity.position.floored();
+      WT.note(goal, feet);
+      const trap = WT.here(goal, feet);
+      if (trap) {
+        trapFacts = { waterTrap: WT.says(trap, goal) };
+        const land = ways.swim_to_land?.land || null;
+        let boat = null;
+        try {
+          const boats = require('./boats');
+          if ((bot.inventory?.items?.() || []).some(i => boats.boatItem(i.name)) && !String(bot.game?.dimension || '').includes('nether')) {
+            let waterY = feet.y; while (waterY < feet.y + 16 && /water/.test(bot.blockAt(new Vec3(feet.x, waterY + 1, feet.z))?.name || '')) waterY++;
+            const { dryStanding } = require('./mining-access');
+            boat = { description: `Place the carried boat on the water's top ${waterY - feet.y} block${waterY - feet.y === 1 ? '' : 's'} up and board it from the water, then paddle it to the nearest landing a boat can reach and step off there: the head is out of the water as soon as the bot sits in it, and the walk goes on from the landing, not from this bank. About ten seconds; the boat is broken and picked up at the landing. Fails where no landing joins this water (the swim is then asked again).`,
+              run: async () => (await boats.boatFromWater(bot, own, goal, save, { waterY, client, ask: false, accept: p => dryStanding(bot, p) })) === 'landed' };
+          }
+        } catch (_) { boat = null; }
+        Object.assign(ways, WT.ways(bot, own, goal, save, trap, { land, boat }));
+      }
+    } catch (_) { trapFacts = {}; }
+    const surface = () => Object.keys(ways).length ? body.answer(bot, own, 'air', ways, { ...asked, facts: { air: bot.oxygenLevel, ...trapFacts } }) : surfaceForAir(bot, own, onAction);
     try { await surface(); delete bot._surfaceFailedAt; }
     catch (err) { if (err.name !== 'Cancelled' && /breathable air/.test(err.message)) bot._surfaceFailedAt = Date.now(); throw err; }
   }

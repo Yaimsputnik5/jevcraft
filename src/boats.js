@@ -303,7 +303,7 @@ async function recoverBoat(bot, task, boat, itemName, waterY) {
 // about a boat 0 times: the survey wanted a dock within nine blocks of dry
 // feet, and the swim for shore (shore.js) never looked for one.
 // -> 'landed' | 'declined' | 'none' (no boat carried, no route) | 'failed'.
-async function boatFromWater(bot, task, goal, save, { waterY, accept, client = task.opportunityClient, nearestSwim = null }) {
+async function boatFromWater(bot, task, goal, save, { waterY, accept, client = task.opportunityClient, nearestSwim = null, ask = true }) {
   if (!client || bot.vehicle || bot.game?.dimension?.includes('nether') || !bot.inventory?.items) return 'none';
   const itemName = bot.inventory.items().find(i => boatItem(i.name))?.name;
   if (!itemName) return 'none';
@@ -320,11 +320,14 @@ async function boatFromWater(bot, task, goal, save, { waterY, accept, client = t
   if (!route) return 'none';
   const trip = { entry: null, landing: route.landing, waterY, path: route.path, length: route.length, progress: null };
   const state = goal.boatTravel ||= { attempts: 0 };
-  const response = await chooseBoat(client, { ...tripFacts(bot, goal, trip, { fromWater: true }), swimSecondsWithoutBoat: Math.round((nearestSwim ?? route.swimBlocks) / 2), nearestShoreBlocks: nearestSwim ?? route.swimBlocks }, { bot, goal, task });
-  task.check();
-  if (response.stale) return 'declined';
-  state.fromWater = { at: new Date().toISOString(), ...response.answers.travel, swim: nearestSwim ?? route.swimBlocks, boatBlocks: route.length }; save();
-  if (response.answers.travel.choice !== 'boat') { setAside(goal, 'boat', 'from_water', 'Jev chose to swim', 60000); return 'declined'; }
+  // `ask: false`: chosen already on another question (the body's air question, water-trap.js); not asked again here.
+  if (ask) {
+    const response = await chooseBoat(client, { ...tripFacts(bot, goal, trip, { fromWater: true }), swimSecondsWithoutBoat: Math.round((nearestSwim ?? route.swimBlocks) / 2), nearestShoreBlocks: nearestSwim ?? route.swimBlocks }, { bot, goal, task });
+    task.check();
+    if (response.stale) return 'declined';
+    state.fromWater = { at: new Date().toISOString(), ...response.answers.travel, swim: nearestSwim ?? route.swimBlocks, boatBlocks: route.length }; save();
+    if (response.answers.travel.choice !== 'boat') { setAside(goal, 'boat', 'from_water', 'Jev chose to swim', 60000); return 'declined'; }
+  } else { state.fromWater = { at: new Date().toISOString(), choice: 'boat', by: 'body_way', swim: nearestSwim ?? route.swimBlocks, boatBlocks: route.length }; save(); }
   let boat;
   try {
     const item = bot.inventory.items().find(i => i.name === itemName);
