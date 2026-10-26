@@ -335,7 +335,7 @@ async function prepareEndSupplies(bot, task, goal, save, actions, client = task.
     // The old order, for the tests' stand-in only (note 707).
     const oldOrder = `top_up_${(short.find(i => !['food', 'health'].includes(i.key)) || short[0]).key}`;
     const decision = await decide('end_kit', { client, bot, task, goal, save, tree, context: { oldOrder },
-      state: { kit: Object.fromEntries(items.filter(i => i.key !== 'enchant').map(i => [i.key, `${i.carried} carried, the code would take ${i.wants}`])), health: bot.health, hunger: bot.food, ...(bot.entity?.position ? { riskNow: require('./risk').riskNow(bot) } : {}) } });
+      state: { kit: Object.fromEntries(items.filter(i => i.key !== 'enchant').map(i => [i.key, `${i.carried} carried, the code would take ${i.wants}`])), health: bot.health, hunger: bot.food, whatTheKillsUsed: killsUsedSays(bot), ...(bot.entity?.position ? { riskNow: require('./risk').riskNow(bot) } : {}) } });
     if (decision.stale) return false;
     pick = decision.path.at(-1);
     const item = short.find(i => `top_up_${i.key}` === pick);
@@ -396,4 +396,17 @@ async function prepareEndSupplies(bot, task, goal, save, actions, client = task.
   finally { sp.ms += Date.now() - began; save(); }
   return false;
 }
+// What the End's kills used, beside the sword's uses left (note 2246): the three End-stage kills of 2026-10-26 (323, 333
+// and 336, 21 to 31 minutes from the entry platform or the island) were each the sword at the perched head from open
+// ground, 34 to 55 blows, the crystals by climbs of 18 to 20 blocks quarried from the island with a pickaxe, food eaten
+// through the fight; arrows took 8 to 17 of the dragon's 200 and the bed bombs and the boat gave nothing (Fable 17:30Z).
+// stronghold-1-dragon-328 fought 55 minutes with no pickaxe and nothing to eat and was slain at 1.3 health.
+function killsUsedSays(bot) {
+  const items = bot?.inventory?.items?.() || [];
+  const swords = items.filter(i => /_sword$/.test(i.name)).map(i => ({ name: i.name, left: Math.max(0, (bot.registry?.itemsByName?.[i.name]?.maxDurability || 0) - (i.durabilityUsed || 0)) })).sort((a, b) => b.left - a.left);
+  const sword = swords[0] ? `the ${swords[0].name.replace(/_/g, ' ')} carried has ${swords[0].left} uses left` : 'no sword carried';
+  const pick = items.some(i => /_pickaxe$/.test(i.name)) ? 'a pickaxe carried' : 'no pickaxe carried';
+  return `The three End kills of 2026-10-26 (21 to 31 minutes) were each the sword at the perched dragon's head from open ground, 34 to 55 blows, about 60 sword uses with the crystals; the crystals' climbs were 18 to 20 blocks quarried from the island with a pickaxe, and food was eaten through the fight. Arrows took 8 to 17 of the dragon's 200; the bed bombs and the boat gave nothing. A fight with no pickaxe and nothing to eat (stronghold-1-dragon-328) lasted 55 minutes and was lost. Now: ${sword}, ${pick}.`;
+}
+
 module.exports = { bedsWorthSays, prepareEndSupplies, kitItems, homeByPortal, HOME_FAR, rehearsedSays, END_BEDS, REHEARSED };
