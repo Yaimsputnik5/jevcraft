@@ -419,6 +419,10 @@ async function evadeDragonInner(bot, task, goal, save, { allowed, timeoutMs = 16
     // 2026-10-13 06:17Z, full iron, two water buckets) went 20 to none in
     // three seconds there, as dragon-6, -7 and -9 had before it.
     // One block up out of a cloud at the feet, before any run (note 1893): the cloud's box is half a block high (note 1889's drill), so a block placed under the feet takes the body clear of it in a jump, about four tenths of a second; the runs from it on rough ground stalled. 25588's dragon-253 (2026-10-19 03:2xZ, two crystals) at (-2, 57, 30) with the cloud 0.7 off at its feet's level ran 0.9 and 0.5 blocks, 19.6 to 13.6 to 7.6, dead; dragon-252, 251 and 247 the same. Not with a fireball in flight within fourteen (it would burst on the new block's top), nor with a block over the head.
+    // Every cloud on the body said before the gate (note 2230): the first test (the cloud within half a block of the feet,
+    // the body on the ground) was silent, and dragon-325 (25592, 2026-10-26 15:52Z) took a fireball's cloud on the body,
+    // 20 to 14 to 9 to none, with the one-up never reached and no line of why.
+    if (dragon.name === 'area_effect_cloud' && !(bot._cloudSeenSaid > Date.now() - 1500)) { bot._cloudSeenSaid = Date.now(); const p = bot.entity.position; console.log(`[end safety] the cloud at ${dragon.position.floored()}: ${Math.round((dragon.position.y - p.y) * 10) / 10} from the feet, on ground ${bot.entity.onGround}, velocity ${bot.entity.velocity ? Math.round(bot.entity.velocity.y * 100) / 100 : '?'}, ${bot.health.toFixed(1)} health${Math.abs(dragon.position.y - p.y) <= 0.5 && bot.entity.onGround ? '' : ': not the one block up\'s case (it wants the cloud within half a block of the feet and the body on the ground)'}`); }
     if (dragon.name === 'area_effect_cloud' && Math.abs(dragon.position.y - bot.entity.position.y) <= 0.5 && bot.entity.onGround) {
       const f = bot.entity.position.floored(), pr = require('./pillar-recovery');
       const items = bot.inventory?.items?.() || [], carried = pr.SCAFFOLD.reduce((n, k) => n + items.filter(i => i.name === k).reduce((m, i) => m + i.count, 0), 0);
