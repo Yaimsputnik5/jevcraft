@@ -162,7 +162,9 @@ test('pocket_next says leave and night_mine undo the seal chosen seconds ago wit
   survival.wait = async () => {};
   await survival.step(new Task('wait'), goal, () => {}).catch(() => {});
   assert(tree, 'pocket_next was asked');
-  for (const k of ['leave', 'night_mine'].filter(k => tree[k])) assert.match(tree[k].description, /^Undoes the seal chosen \d+ seconds ago \(with no reason named for it\): the pocket is opened again/, k);
+  assert.match(tree.leave.description, /^Undoes the seal chosen \d+ seconds ago \(with no reason named for it\): the pocket is opened again/);
+  // The night mine keeps the seal (note 2157): said so, not as undoing it.
+  if (tree.night_mine) { assert.match(tree.night_mine.description, /^Keeps the seal chosen \d+ seconds ago \(with no reason named for it\): the mine goes down from inside the pocket/); assert.doesNotMatch(tree.night_mine.description, /staying up at the work was followed/); }
   assert(tree.leave, 'leave was offered');
   if (tree.stay) assert.doesNotMatch(tree.stay.description, /^Undoes/);
   assert.equal(survival.state.sealLog?.at(-1)?.next, 'night_mine');

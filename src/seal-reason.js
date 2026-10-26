@@ -133,4 +133,17 @@ function reversalSays(state, now = Date.now()) {
   return `Undoes the seal chosen ${ago} seconds ago (${s.none ? 'with no reason named for it' : s.short}): the pocket is opened again and its building spent for nothing. `;
 }
 
-module.exports = { sealReason, sealCostSays, recordSays, noteSeal, noteAfter, reversalSays, HEARD_NEAR, REVERSAL_MS, LAST_OF_NIGHT_S };
+// The night mine from a pocket keeps the seal: it sinks the pocket and
+// tunnels on through rock, shelter as the pocket is. Said in the same
+// minute the reversal is said on the ways that open the pocket (note 2157):
+// with 'Undoes the seal' on the mine, Jev chose the stay 50 times to the
+// mine's 7 (2026-10-25/26, 145-hour runs); without it, the mine 126 to 23,
+// and a stay chosen is held through the night.
+function keepsSealSays(state, now = Date.now()) {
+  const s = state?.lastSeal;
+  if (!s || s.next || now - s.at > REVERSAL_MS) return '';
+  const ago = Math.max(1, Math.round((now - s.at) / 1000));
+  return `Keeps the seal chosen ${ago} seconds ago (${s.none ? 'with no reason named for it' : s.short}): the mine goes down from inside the pocket and on through rock, shelter as the pocket is; nothing is opened and nothing built is spent. `;
+}
+
+module.exports = { sealReason, sealCostSays, recordSays, noteSeal, noteAfter, reversalSays, keepsSealSays, HEARD_NEAR, REVERSAL_MS, LAST_OF_NIGHT_S };

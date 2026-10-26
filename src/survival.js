@@ -11537,7 +11537,10 @@ class Survival {
         // (2026-10-05 22:05Z), back to life bare at night and sealed in,
         // left at 0.51 for logs and was dead in three minutes.
         if (options.leave) options.leave.description += nr.bareNightSays(bot, 'continue_request');
-        if (options.night_mine) options.night_mine.description += nr.bareNightSays(bot, 'continue_request');
+        // The night mine's own record, not 'staying up at the work' (note
+        // 2157): the mine is sealed under rock as it goes, and its record is
+        // no deaths in 7.3 bot-hours.
+        if (options.night_mine) options.night_mine.description += nr.nightMineSays(nr.placeOf({ y: bot.entity?.position?.y, underground: underRock(bot, refuge) }));
       }
       // A food errand Jev chose before the pocket was sealed (survival
       // priority's obtain_food, held as the food plan, note 784): said on
@@ -11589,8 +11592,15 @@ class Survival {
       // first on each way that opens the pocket (seal-reason.js, note 755):
       // 25594 sealed at 12:18:55Z with no reason named and chose night_mine
       // from the pocket eight seconds later.
+      // Not on the night mine, which keeps the seal (note 2157): said as
+      // undoing it, the mine was chosen 7 times to the stay's 50 in the
+      // minute after a seal, and 126 to 23 outside it; the stay chosen is
+      // held to dawn (wait_in_shelter 999 to 1279 minutes a run against
+      // 151 to 172 night-mining, 2026-10-26).
       const reversal = require('./seal-reason').reversalSays(this.state);
-      if (reversal) for (const k of Object.keys(options)) if (/^(leave|night_mine|tunnel_out|stash_valuables|cache_valuables|go_for_food|hunt_\w+)$/.test(k)) options[k].description = reversal + options[k].description;
+      if (reversal) for (const k of Object.keys(options)) if (/^(leave|tunnel_out|stash_valuables|cache_valuables|go_for_food|hunt_\w+)$/.test(k)) options[k].description = reversal + options[k].description;
+      const keeps = options.night_mine ? require('./seal-reason').keepsSealSays(this.state) : '';
+      if (keeps) options.night_mine.description = keeps + options.night_mine.description;
       // A choice that did nothing when it ran is not on offer again for a
       // minute, and why is said: the stay it fell back to was asked about
       // again five seconds later, the same choice came back, and did nothing
