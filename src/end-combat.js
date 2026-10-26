@@ -2217,7 +2217,8 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
         // Down under a cloud lying over the feet (note 2233): a body in a hole one deep is 1.8 tall, and a fireball's cloud on the ground beside the hole lies on the body's upper half; the stub would rise into it (note 1867), the run from the hole goes nowhere, and the two down of note 1692 is for a body with no blocks. 25592's stronghold-1-dragon-333 (2026-10-26 16:32Z) dug a hole one deep at (35, 60, 4) against the dragon's charge, took the fireball's cloud 0.8 over its feet, 5.3 wide ('no stub ... the stub would rise into it'), ran 0.7 blocks in 1.1 s, 20 to 14 to 9 to none. Dug down until the body's top is under the cloud's base, two at most, on ground four thick off the void.
         if (inBreath() && cloudOver && actions.dig && pickCarried() && !inWater()) {
           const f1 = bot.entity.position.floored();
-          const thick1 = [1, 2, 3, 4].every(dy => bot.blockAt(f1.offset(0, -dy, 0))?.boundingBox === 'block');
+          // Two thick is enough (note 2237): each block is dug only with a solid one under it, and the void within four is refused apart. 25592's stronghold-1-dragon-335 (2026-10-26 16:56Z) stood at (30, 61, -22) by its column's foot with one cloud at the feet and another a block over them, 'no dig under the cloud ... the ground under the feet is not four thick', and the one block up went into the upper cloud, 14 to 9 to none.
+          const thick1 = [1, 2].every(dy => bot.blockAt(f1.offset(0, -dy, 0))?.boundingBox === 'block');
           const need = Math.min(2, Math.max(1, Math.ceil(bot.entity.position.y + 1.9 - cloudOver.position.y)));
           if (thick1 && voidEdge(bot, bot.entity.position, 4) === null) {
             goal.step = { action: 'down_under_the_cloud', health: bot.health, need }; save();
@@ -2227,7 +2228,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             for (let k = 0; k < need; k++) { const under = bot.entity.position.floored().offset(0, -1, 0); if (bot.blockAt(under)?.boundingBox !== 'block' || bot.blockAt(under.offset(0, -1, 0))?.boundingBox !== 'block') break; try { await actions.dig(bot, task, under, { dropInto: true, openPit: true, requireDrops: false }); dug++; } catch (e3) { if (['Cancelled', 'Blocked', 'EndEmergency', 'NeedsAir'].includes(e3.name)) throw e3; break; } for (let i = 0; i < 20 && !bot.entity.onGround; i++) await sleep(50); }
             console.log(`[end combat] under the cloud: ${dug} of ${need} dug down in ${Date.now() - t0} ms, now at ${bot.entity.position.floored()}, ${h0.toFixed(1)} to ${bot.health.toFixed(1)} health${inBreath() ? ', still in it' : ''}`);
             if (dug && !inBreath()) return;
-          } else if (!(state.underCloudSaid > Date.now() - 5000)) { state.underCloudSaid = Date.now(); console.log(`[end combat] no dig under the cloud over the feet at ${f1}: ${thick1 ? 'the void within four' : 'the ground under the feet is not four thick'}`); }
+          } else if (!(state.underCloudSaid > Date.now() - 5000)) { state.underCloudSaid = Date.now(); console.log(`[end combat] no dig under the cloud over the feet at ${f1}: ${thick1 ? 'the void within four' : 'the ground under the feet is not two thick'}`); }
         }
         if (inBreath() && actions.navigate && pitWalls < 2) {
           const h0 = bot.health, p0 = bot.entity.position.floored();
