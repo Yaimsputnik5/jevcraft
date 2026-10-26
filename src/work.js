@@ -8365,7 +8365,10 @@ async function breakStillness(bot, task, goal, save, { client, survival, onStep 
   let waitedOut = false;
   // Not where Jev chose other work over the wait (until_rest_ends as work, idle false): there the work
   // running out ends the hold and asks the question above again (note 675).
-  if (holding && holding.idle !== false && until > now) {
+  // And on a smelt's hold (note 2140): leave_cooking was Jev's 'work while
+  // it cooks', its hold idle false, and the small work over in seconds
+  // brought this round again every nine; the wait belongs beside it there.
+  if (holding && (holding.idle !== false || /^smelt:/.test(String(reason))) && until > now) {
     const what = reason.replace(/^\w+:/, '').replace(/^rung:/, '').replaceAll('_', ' ');
     const secs = Math.max(1, Math.round((until - now) / 1000));
     const job = (() => { try { return require('./job-in-hand').jobInHand({ step: goal.step, here: bot.entity?.position, batch: goal.smelting || null }).short; } catch (_) { return null; } })();

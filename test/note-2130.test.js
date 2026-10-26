@@ -47,3 +47,18 @@ test('with no rest held the wait is not offered', async () => {
   catch (_) { /* a mock world: the way taken may fail */ } finally { console.log = log; }
   assert.ok(!asked || !asked.criteria.wait_it_out, 'no wait without a rest held');
 });
+
+test('on a smelt\'s hold the wait is offered though the hold is not idle (note 2140)', async () => {
+  const { breakStillness } = require('../src/work');
+  const { bot, goal } = world();
+  let asked = null;
+  const client = { model: 'jev', systemOne: async ({ questions }) => { asked = Object.values(questions)[0]; return { answers: Object.fromEntries(Object.keys(questions).map(k => [k, { choice: 'wait_it_out', confidence: 0.8 }])) }; } };
+  const log = console.log; console.log = () => {};
+  let worked;
+  try {
+    worked = await breakStillness(bot, new Task('still'), goal, () => {}, { client, reason: 'smelt:cooked_mutton', until: Date.now() + 80000, holding: { minutes: 2, why: '11 mutton cooking', idle: false },
+      answers: { wood_reserve: { description: 'Gather wood for sticks and a table.', run: async () => {} } } });
+  } finally { console.log = log; }
+  assert.equal(worked, false);
+  assert.ok(asked?.criteria?.wait_it_out, 'the wait is on the smelt\'s hold');
+});
