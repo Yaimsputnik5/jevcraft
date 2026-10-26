@@ -21,7 +21,8 @@ function note(goal, feet, now = Date.now()) {
   for (const [k, t] of Object.entries(traps)) if (now - t.last > WINDOW_MS) delete traps[k];
   // Within a block across and two up or down is the same water.
   const same = Object.values(traps).find(t => Math.abs(t.x - c.x) <= 1 && Math.abs(t.z - c.z) <= 1 && Math.abs(t.y - c.y) <= 2);
-  if (same) { same.count++; same.last = now; same.y = Math.min(same.y, c.y); return same; }
+  // One count a rescue, not one an asking (note 2189): the askings came fifteen to two seconds and the count ran to 15.
+  if (same) { if (now - same.last >= 15000) same.count++; same.last = now; same.y = Math.min(same.y, c.y); return same; }
   const t = { ...c, count: 1, first: now, last: now };
   traps[key(c)] = t;
   return t;
@@ -73,8 +74,12 @@ function fillBlock(bot) {
 function ways(bot, task, goal, save, t, { land = null, boat = null } = {}) {
   const out = {};
   const now = Date.now();
+  // A way chosen in the last minute is not offered again (note 2189): fill_it_from_the_bank was chosen four times in
+  // a second on 25595, none of them with time to fill anything.
+  const picked = key => t.lastPick?.key === key && now - t.lastPick.at < 60000;
+  const mark = (key, run) => async () => { t.lastPick = { key, at: Date.now() }; save?.(); return run(); };
   if (!(t.keptOut > now - KEEP_OUT_MS)) {
-    out.keep_out_of_walk = { description: `Swim to the bank as swim to land does, and keep this water and the cells round it (a block each way, two down and three up) out of every walk for ten minutes: the pathfinder goes round it or finds no route, and the step under way asks again where it does. Costs the swim's half second and whatever the way round adds.`,
+    if (!picked('keep_out_of_walk')) out.keep_out_of_walk = { description: `Swim to the bank as swim to land does, and keep this water and the cells round it (a block each way, two down and three up) out of every walk for ten minutes: the pathfinder goes round it or finds no route, and the step under way asks again where it does. Costs the swim's half second and whatever the way round adds.`,
       run: async () => {
         keepOut(bot, goal, t); save?.();
         bot.chat?.('That water keeps taking me. Going round it from now on.');
@@ -83,7 +88,7 @@ function ways(bot, task, goal, save, t, { land = null, boat = null } = {}) {
       } };
   }
   const block = fillBlock(bot);
-  if (block && land) {
+  if (block && land && !picked('fill_it_from_the_bank')) {
     out.fill_it_from_the_bank = { description: `Swim to the bank, then fill this water's cell at (${t.x}, ${t.y}, ${t.z}) with a ${block.name.replaceAll('_', ' ')} (${block.count} carried), placed on the block under it from the bank: the hole is gone for good and the walk goes over it. About three seconds; fails where the bank does not reach the cell (the block is then kept).`,
       run: async () => {
         const { goals } = require('mineflayer-pathfinder'), { Vec3 } = require('vec3');
@@ -106,7 +111,8 @@ function ways(bot, task, goal, save, t, { land = null, boat = null } = {}) {
         return true;
       } };
   }
-  if (boat) out.boat_out = { description: boat.description, run: boat.run };
+  if (boat && !picked('boat_out')) out.boat_out = { description: boat.description, run: boat.run };
+  for (const k of Object.keys(out)) out[k].run = mark(k, out[k].run);
   return out;
 }
 

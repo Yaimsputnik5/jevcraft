@@ -1775,7 +1775,13 @@ async function maintainVitals(bot, task, onAction = () => {}, { client = null, g
         Object.assign(ways, WT.ways(bot, own, goal, save, trap, { land, boat }));
       }
     } catch (_) { trapFacts = {}; }
-    const surface = () => Object.keys(ways).length ? body.answer(bot, own, 'air', ways, { ...asked, facts: { air: bot.oxygenLevel, ...trapFacts } }) : surfaceForAir(bot, own, onAction);
+    // Not asked again within two and a half seconds of the last asking while the breath holds (note 2189): a way that
+    // ends in a tenth of a second (the swim to a bank with no standing cell) had the question asked 15 times in two
+    // seconds (25595, 2026-10-26 10:19:01 to 10:19:02Z), each answer a Jev call and none of them a swim; the plain
+    // swim for air runs instead, and the question is asked again when the time is up or the breath is short.
+    const stormy = bot._airAskedAt > Date.now() - 2500 && (bot.oxygenLevel ?? 20) > 6;
+    if (!stormy) bot._airAskedAt = Date.now();
+    const surface = () => !stormy && Object.keys(ways).length ? body.answer(bot, own, 'air', ways, { ...asked, facts: { air: bot.oxygenLevel, ...trapFacts } }) : surfaceForAir(bot, own, onAction);
     try { await surface(); delete bot._surfaceFailedAt; }
     catch (err) { if (err.name !== 'Cancelled' && /breathable air/.test(err.message)) bot._surfaceFailedAt = Date.now(); throw err; }
   }
