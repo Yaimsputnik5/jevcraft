@@ -6280,7 +6280,12 @@ class Survival {
       const ordered = Object.fromEntries([...quick, ...Object.entries(options).filter(([, o]) => !o.quick)]);
       for (const k of Object.keys(options)) delete options[k];
       Object.assign(options, ordered);
-      for (const o of Object.values(options)) o.description = `${said.trim()} ${o.description}`;
+      // Said once, on the quickest way, not before every way (note 2266): prefixed to each option, the shared 600 characters of
+      // health, hits and pace were the first 600 of every option alike, the way itself after them; forest-8 (25600, 2026-10-27
+      // 01:19:23Z) at 10.3 health under an enderman read cap_fight, seal, pillar and fight_from_footing as one text to their
+      // 600th character, took cap_fight (a lid an enderman strikes past from the cell beside) and was dead four seconds later.
+      const first = Object.values(options)[0];
+      if (first) first.description = `${said.trim()} ${first.description}`;
     }
     // A fight with a creeper about says what its blast costs at the fight's
     // range, killed inside its fuse or not (combat-estimate creeperFought):

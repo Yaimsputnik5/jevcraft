@@ -69,7 +69,9 @@ test('at 4 health under a skeleton\'s hits, every stance leads with the skeleton
   }
   assert(options.eat, 'the beef is offered');
   assert.equal(keys[0], Object.entries(options).filter(([, o]) => o.quick).sort((a, b) => a[1].quick.seconds - b[1].quick.seconds)[0][0], 'the quickest way out of the hits listed first');
-  assert.match(options.eat.description, /^At 4 health and being hit, the ways out of the hits here, quickest first: .*eat the cooked beef, 1\.6 seconds standing still/);
+  // Said once, on the first (quickest) way (note 2266), not before every way.
+  assert.match(Object.values(options)[0].description, /^At 4 health and being hit, the ways out of the hits here, quickest first: .*eat the cooked beef, 1\.6 seconds standing still/);
+  assert.equal(Object.values(options).filter(o => /the ways out of the hits here/.test(o.description || '')).length, 1, 'said on one way only');
 });
 
 test('a stance held on a pillar is not asked again for its own way down coming on offer, a shot at another mob, or one of several mobs gone that was not the nearest (25583, note 752b)', () => {
