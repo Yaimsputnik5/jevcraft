@@ -40,7 +40,9 @@ test('fifteen minutes in the forest, looked at pass after pass, with no pearl: t
   const goal = { kind: 'win' };
   for (let at = t0; at <= t0 + 15 * 60000; at += 30000) assert.equal(await s.run(goal, at), true);
   assert.equal(await s.run(goal, t0 + 15 * 60000 + 30000), false);
-  assert.match(s.said.join(' '), /No pearls from the warped forest for a while/);
+  assert.match(s.said.join(' '), /No pearls here for a while\. Trying another part of the forest\./);
+  // Note 2265: this part rests, not the forests: the rung stays open and the ground about here is marked dry.
+  assert.ok(goal.warpedDry && goal.warpedDry.until > t0, 'the dry ground is marked');
 });
 
 test('standing in the forest, the walk to its landmark\'s own point is not made, and the hunt begins (note 1072)', async t => {

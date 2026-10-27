@@ -100,7 +100,10 @@ async function warpedPearls(bot, task, goal, save, actions, stage, { now = Date.
   // Standing in a forest counts as one known, its walk resting or not, and
   // whether or not it was ever noted (note 1072).
   const feet = bot.entity.position.floored();
-  const known = toWalk() || (inForest(bot) ? { landmark: { kind: 'warped_forest', x: feet.x, y: feet.y, z: feet.z }, distance: 0 } : null);
+  // A forest part rested for a dry spell (note 2265) is not counted as one stood in: the next forest known, or the sweep for one.
+  const dry = goal.warpedDry && goal.warpedDry.until > now() ? goal.warpedDry : null;
+  const inDry = dry && Math.hypot(feet.x - dry.x, feet.z - dry.z) <= 48;
+  const known = toWalk() || (inForest(bot) && !inDry ? { landmark: { kind: 'warped_forest', x: feet.x, y: feet.y, z: feet.z }, distance: 0 } : null);
   if (known) {
     // In the forest already (its biome underfoot, or its nylium within six
     // blocks): arrived, wherever in it the landmark's own point lies (note
@@ -182,8 +185,15 @@ async function warpedPearls(bot, task, goal, save, actions, stage, { now = Date.
     watch.lastAt = now();
     if (count(bot, 'ender_pearl') > watch.best) { watch.best = count(bot, 'ender_pearl'); watch.since = now(); }
     if (now() - watch.since > STALL_MS) {
-      setAside(goal, 'rung', 'warped_pearls', 'fifteen minutes in the warped forest without a pearl', REST_MS); delete goal.warpedHunt; save();
-      bot.chat?.('No pearls from the warped forest for a while. Trying another way.');
+      // This part of the forest rests, not the forests (note 2265): the step's whole rest sent the ladder on to carrying the rods
+      // home, and the forest trial forest-6 (2026-10-26 23:14 to 00:14Z, 6 pearls in its first 16 minutes, then the endermen about
+      // its slots killed) walked home with the rods for its last 44 minutes, 6 pearls short. Its walk rests, and so does the
+      // ground within 48 of here; the next pass walks to another forest known or sweeps for one.
+      const l = known.landmark;
+      setAside(goal, 'landmark_trip', tripKey(l), 'fifteen minutes in this part of the warped forest without a pearl', REST_MS);
+      goal.warpedDry = { x: feet.x, z: feet.z, until: now() + REST_MS }; delete goal.warpedHunt; save();
+      console.log(`[warped] fifteen minutes without a pearl at (${feet.x}, ${feet.z}): this part of the forest rests; another forest known, or the sweep for one, next`);
+      bot.chat?.('No pearls here for a while. Trying another part of the forest.');
       return false;
     }
     goal.step = { action: 'warped_pearls', at: { x: known.landmark.x, y: known.landmark.y, z: known.landmark.z }, pearls: count(bot, 'ender_pearl') }; save();
