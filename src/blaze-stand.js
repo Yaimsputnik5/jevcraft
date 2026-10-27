@@ -1703,9 +1703,15 @@ function blazeStands(bot, danger, { dig = true, hunted = false, pocket = false, 
         description: `Rise to the blaze ${round(first.distance)} blocks off, which no walk on the ground reaches within the sword's reach: ${rise.steps ? `walk ${rise.steps} block${rise.steps === 1 ? '' : 's'} to (${rise.base.x}, ${rise.base.y}, ${rise.base.z}) and ` : ''}pillar ${rise.up} block${rise.up === 1 ? '' : 's'} up (about ${secs} seconds in their fire${shield ? ', the shield up for each volley between blocks' : ''}) to (${rise.top.x}, ${rise.top.y}, ${rise.top.z}), within the sword's reach of where it hovers now, and strike it until it dies; a blaze moves, and one that drifts off leaves the bot on the pillar, asked again then.${fall}${sum ? closeInSays(sum, hp) : ''}` };
     }
     if (first && shield) {
+      // Its price said as every other way's is (note 2280): only `expects` carried it, and the text said none. full-8
+      // (25588, 2026-10-27 10:31:55Z, full iron and a shield, five blazes 2 to 6 blocks off and a wither skeleton at a
+      // spawner) read retreat's '1.9 damage over 3.7 seconds' beside a wait with no figure, took await_in_reach at 0.47
+      // over retreat's 0.09, went 20 to 7.6 in 24 seconds, and died at the charge after.
+      const awaitCost = standCost(bot, danger, {});
+      let awaitSays = ''; try { awaitSays = require('./survival').costSays(awaitCost, bot.health, awaitCost.mobs, { over: 'over the wait' }); } catch (_) { awaitSays = ''; }
       options.await_in_reach = { kind: 'await', site: { target: first.entity.id },
-        expects: { damage: round(standCost(bot, danger, {}).damage || 0), seconds: 15 },
-        description: `Hold here behind the shield facing the blaze ${round(first.distance)} blocks off, which no walk reaches within the sword's reach, and strike it if it comes within reach (a blaze within two blocks of its target swings instead of shooting, and closes): up to fifteen seconds, the shield up for each volley. It comes only as it chooses: nothing here brings it in.` };
+        expects: { damage: round(awaitCost.damage || 0), seconds: 15 },
+        description: `Hold here behind the shield facing the blaze ${round(first.distance)} blocks off, which no walk reaches within the sword's reach, and strike it if it comes within reach (a blaze within two blocks of its target swings instead of shooting, and closes): up to fifteen seconds, the shield up for each volley. It comes only as it chooses: nothing here brings it in.${awaitSays}` };
     }
   }
   let planned = false;
