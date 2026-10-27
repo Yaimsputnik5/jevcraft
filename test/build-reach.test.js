@@ -20,6 +20,10 @@ const { Task } = require('../src/skills');
 const { Survival, pocketPlan, pocketBiters, piglinGoldSays } = require('../src/survival');
 
 const registry = require('minecraft-data')('26.1');
+
+// The stance's shared facts are its state now (note 2267): the text a test was written against, rebuilt as it was said.
+const saidAs = (sv, d) => [sv?._stanceShared?.lowAndHit, sv?._stanceShared?.hitting, typeof d === 'string' ? d : d?.description, sv?._stanceShared?.mobNotes].filter(Boolean).join(' ');
+
 // Every line blocked: nothing is in sight (lineClear).
 const blind = { raycast: (from, dir) => ({ position: from.plus(dir).floored(), intersect: from.plus(dir) }) };
 const mob = (id, name, x, y, z, held) => ({ id, name, type: 'hostile', position: new Vec3(x, y, z), height: 1.95, isValid: true, ...(held ? { heldItem: { name: held } } : {}) });
@@ -50,7 +54,7 @@ test('a pocket is priced with the sword piglin out of sight 15.6 blocks off, at 
   assert.match(seal.description, /The piglin can be there before they are shut: one there first stands in a gap or drops in over the head, and the pocket does not close on it\./);
   assert.match(seal.description, /Counted though out of sight, at the bot before the building is done at its own speed: the piglin 16 blocks off, in about 2\.7 seconds\./);
   // Its blow leads, through this armour: 8 bare, 6.7 through the iron.
-  assert.match(seal.description, /^The piglin 16 blocks off, out of sight, hits for about 6\.7 a blow through the armour worn \(8 before it\)/);
+  assert.match(saidAs(survival, seal), /^The piglin 16 blocks off, out of sight, hits for about 6\.7 a blow through the armour worn \(8 before it\)/);
   // A stance with a second of setting up does not count it: it is not there.
   assert.equal(options.fight.expects.damage, 0);
 });

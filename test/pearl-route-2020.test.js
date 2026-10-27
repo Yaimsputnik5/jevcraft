@@ -16,7 +16,9 @@ test('the Overworld asks which way to the pearls once the sweep has had its time
   assert.equal(routes.routeAsked(g), true);
   const tree = routes.routeTree(b, g);
   assert.deepEqual(Object.keys(tree), ['warped_forest', 'overworld_hunt']);
-  assert.match(tree.warped_forest.description, /about 131 minutes of play, 73 of them on sweeps for a warped forest and 0 on the Overworld's endermen/);
+  // This run's pearl record is the question's state (note 2267), said once, not on each route.
+  assert.match(routes.routeTree.lastRecord, /about 131 minutes of play, 73 of them on sweeps for a warped forest and 0 on the Overworld's endermen/);
+  assert.doesNotMatch(tree.warped_forest.description, /minutes of play/);
   assert.match(tree.overworld_hunt.description, /It is day in the Overworld now/);
   assert.match(tree.overworld_hunt.description, /The patrol takes on any enderman in view.*the Overworld hunt gave about 0\.4 to 0\.5 pearls an hour/);
   assert.match(tree.warped_forest.description, /endermen fought from a slot in a warped forest gave 16 to 21 pearls an hour of slot time.*Twelve pearls are about an hour of forest slot time\./);

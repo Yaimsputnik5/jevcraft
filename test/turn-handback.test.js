@@ -148,6 +148,10 @@ test('the turn given to the work records what it was given against, and a ruling
 const { Survival } = require('../src/survival');
 const { Task } = require('../src/skills');
 const { EventEmitter } = require('node:events');
+
+// The stance's shared facts are its state now (note 2267): the text a test was written against, rebuilt as it was said.
+const saidAs = (sv, d) => [sv?._stanceShared?.lowAndHit, sv?._stanceShared?.hitting, typeof d === 'string' ? d : d?.description, sv?._stanceShared?.mobNotes].filter(Boolean).join(' ');
+
 const edgeBot = ({ piglinAt = new Vec3(3.1, 64, 0.5), shield = true } = {}) => {
   const piglin = { id: 1, name: 'piglin', type: 'hostile', position: piglinAt, height: 1.95, width: 0.6, isValid: true, heldItem: { name: 'golden_spear' } };
   const block = p => p.x === -1 ? (p.y <= 60 ? { name: 'lava', boundingBox: 'empty' } : { name: 'air', boundingBox: 'empty' }) : p.y < 64 ? { name: 'netherrack', boundingBox: 'block' } : { name: 'air', boundingBox: 'empty' };
@@ -170,7 +174,7 @@ test('mid-242-af-nether-1: a spear piglin by a drop into lava is met as a player
   assert.match(guard.description, /runs in with the spear raised from as far as ten blocks .* backs off six or seven blocks and comes again; a shield raised facing it a quarter second before takes the hit/);
   assert.match(guard.description, /A spear hit the shield takes knocks the bot nowhere/);
   // Seen, not reckoned at thirteen: 6.7 through the armour worn, the piglin's own blow.
-  assert.match(options.fight.description, /^The piglin 3 blocks off hits for about 6\.7 a blow through the armour worn/);
+  assert.match(saidAs(survival, options.fight), /^The piglin 3 blocks off hits for about 6\.7 a blow through the armour worn/);
   // The knock over the drop said on every stance that leaves the bot open, the fight saying its own jabs to it.
   for (const [k, o] of Object.entries(options)) {
     if (['fight', 'seal', 'bunker', 'rail_and_fight', 'fight_from_footing'].includes(k)) continue;

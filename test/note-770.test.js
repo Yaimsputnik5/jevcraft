@@ -12,6 +12,10 @@ const assert = require('node:assert/strict');
 const { Vec3 } = require('vec3');
 const { EventEmitter } = require('node:events');
 
+// The stance's shared facts are its state now (note 2267): the text a test was written against, rebuilt as it was said.
+const saidAs = (sv, d) => [sv?._stanceShared?.lowAndHit, sv?._stanceShared?.hitting, typeof d === 'string' ? d : d?.description, sv?._stanceShared?.mobNotes].filter(Boolean).join(' ');
+
+
 function scene(mobs, { health = 20, items = [{ name: 'iron_sword', count: 1 }, { name: 'cobblestone', count: 64 }], shield = true } = {}) {
   const entities = Object.fromEntries(mobs.map(m => [m.id, { type: 'hostile', height: m.name === 'creeper' ? 1.7 : 1.95, width: 0.6, isValid: true, metadata: [], ...m }]));
   const bot = Object.assign(new EventEmitter(), { game: { dimension: 'overworld', gameMode: 'survival', difficulty: 'normal' }, health, food: 19, oxygenLevel: 20,
@@ -29,7 +33,9 @@ const optionsOf = (bot, danger) => {
   const { Survival } = require('../src/survival');
   const { Task } = require('../src/skills');
   const survival = new Survival(bot, { navigate: async () => {} }, { state: { shelters: [] } });
-  return survival.stanceOptions(new Task('x'), {}, () => {}, danger, false);
+  const out = survival.stanceOptions(new Task('x'), {}, () => {}, danger, false);
+  Object.defineProperty(out, '_survival', { value: survival, enumerable: false });
+  return out;
 };
 
 test('a creeper past its follow range is left out of every stance\'s figures and said so; the fight is priced for the skeleton at arm\'s length (25585 23:39:22Z)', () => {
@@ -75,7 +81,7 @@ test('behind a skeleton shooting now, a mob by its blow seconds off is said as f
     { id: 2, name: 'zombie', position: new Vec3(0.5, 64, 14.5) },
   ]);
   const options = optionsOf(bot, danger);
-  const first = Object.values(options)[0].description;
+  const first = saidAs(options._survival, Object.values(options)[0]);
   assert.match(first, /^Shooting at the bot from here: the skeleton 6 blocks off, in sight .* Farther off, its first blow about [\d.]+ seconds away at its own speed: the zombie 14 blocks off/);
 });
 

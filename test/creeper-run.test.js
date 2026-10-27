@@ -210,6 +210,10 @@ test('the route search and the run are steered off the cells round a creeper, an
 // tried"; the run stood searching while it walked in, 12:06:55.3 to 57.9.
 // No armour was worn.
 const CAVE = require('./fixtures/creeper-cave-25583.json');
+
+// The stance's shared facts are its state now (note 2267): the text a test was written against, rebuilt as it was said.
+const saidAs = (sv, d) => [sv?._stanceShared?.lowAndHit, sv?._stanceShared?.hitting, typeof d === 'string' ? d : d?.description, sv?._stanceShared?.mobNotes].filter(Boolean).join(' ');
+
 function caveBot() {
   return groundBot(CAVE, { at: new Vec3(-199.06, 37, 64.48), health: 6.5, food: 17, held: 'iron_sword', worn: [],
     items: [['iron_sword', 1], ['cobblestone', 64], ['rotten_flesh', 3]], mobs: [{ id: 4286, name: 'creeper', at: new Vec3(-203.8, 36, 69.7) }] });
@@ -294,7 +298,7 @@ test('on the bridge over the creeper, out of its sight, staying behind the bridg
   const survival = new Survival(bot, { navigate: async () => {}, place: async () => {} }, { state: { shelters: [] } });
   const stay = survival.stanceOptions(new Task('x'), {}, () => {}, threats(bot, 24), false).block_creeper;
   assert.ok(stay, 'offered');
-  assert.match(stay.description, /^The creeper [^]*?\. Stay behind the netherrack at \(-40, 13, -5\), in the line from the eyes of the creeper \(3\.1 blocks off\) to the bot's\./);
+  assert.match(saidAs(survival, stay), /^The creeper [^]*?\. Stay behind the netherrack at \(-40, 13, -5\), in the line from the eyes of the creeper \(3\.1 blocks off\) to the bot's\./);
   assert.match(stay.description, /within 3 blocks of the bot the creeper stands where it is, lit or not, and out of its sight it does not light/);
   assert.equal(stay.expects.damage, 0.5, "out of sight, the record's 4 blasts in 160 (note 2016)");
 });
@@ -303,7 +307,7 @@ test('a creeper 7.1 blocks off walking in: the block in its line is offered, and
   const bot = caveBot();
   const survival = new Survival(bot, { navigate: async () => {}, place: async () => {} }, { state: { shelters: [] } });
   const options = survival.stanceOptions(new Task('x'), {}, () => {}, threats(bot, 24), false);
-  assert.match(options.block_creeper?.description || '', /^The creeper [^]*?\. Put \d blocks?(, two high,)? in the line from the eyes of the creeper \(7\.1 blocks off\) to the bot's/);
+  assert.match(saidAs(survival, options.block_creeper), /^The creeper [^]*?\. Put \d blocks?(, two high,)? in the line from the eyes of the creeper \(7\.1 blocks off\) to the bot's/);
   assert.match(options.block_creeper.description, /The line is cut about [\d.]+ seconds before it would go off\./);
   assert.match(options.eat.description, /While it eats, the creeper 7 blocks off, coming on at about 2\.7 blocks a second, is within three about 1\.\d seconds in and lights there: done eating, about 1\.\d seconds of its fuse are left, and with the bot still there it goes off [\d.]+ blocks from it, about \d+ after the armour worn, more than the bot has, unless the bot is more than 7 blocks from it or out of its sight by then\./);
 });

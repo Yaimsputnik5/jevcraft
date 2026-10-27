@@ -7,6 +7,10 @@ const { Task } = require('../src/skills');
 const { Survival, claim } = require('../src/survival');
 const { claimSays } = require('../src/arbiter');
 
+// The stance's shared facts are its state now (note 2267): the text a test was written against, rebuilt as it was said.
+const saidAs = (sv, d) => [sv?._stanceShared?.lowAndHit, sv?._stanceShared?.hitting, typeof d === 'string' ? d : d?.description, sv?._stanceShared?.mobNotes].filter(Boolean).join(' ');
+
+
 // mid-208-k-nether-4-fortress-1 (25589, note 590): up on its own two-block
 // pillar at 7.9 health, hunger 17 and nothing to eat, a hoglin four blocks
 // off that neither came nor went for eleven minutes and more; encounter_stance
@@ -56,7 +60,7 @@ test('up on its pillar over a hoglin that neither comes nor goes, the pillar say
     const r = await stanceAt(survival, t0 + s * 1000, [threat()], t => (++n === 2 && t.fight ? 'fight' : 'pillar'));
     if (!r.tree) continue;
     last = r; askedAt.push(s);
-    if (last.tree?.fight) fightLast = last.tree.fight.description;
+    if (last.tree?.fight) fightLast = [last.state?.lowAndHit, last.state?.hittingNow, last.tree.fight.description].filter(Boolean).join(' ');
   }
   assert.deepEqual(askedAt, [15, 315, 330, 630], 'asked at the recorded stance\'s end, at each hold\'s five-minute cap and after the fight, not forty-five times');
   assert.match(last.state.previousStance.askedAgainFor, /^held 5 minutes and nothing it was chosen on changed$/);

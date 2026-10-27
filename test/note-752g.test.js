@@ -12,6 +12,10 @@ const { Vec3 } = require('vec3');
 const { EventEmitter } = require('node:events');
 const danger = require('../src/danger');
 
+// The stance's shared facts are its state now (note 2267): the text a test was written against, rebuilt as it was said.
+const saidAs = (sv, d) => [sv?._stanceShared?.lowAndHit, sv?._stanceShared?.hitting, typeof d === 'string' ? d : d?.description, sv?._stanceShared?.mobNotes].filter(Boolean).join(' ');
+
+
 const T0 = Date.parse('2026-09-30T18:19:37Z');
 
 test('a ghast kept past forty blocks in sight a minute, no hit from its kind, stands off, said with the record; one within forty does not (25584, note 752g)', t => {
@@ -65,7 +69,7 @@ test('a shooter seen a moment ago stays in the stance\'s danger when it steps ou
   const kept = d.find(x => x.entity === skeleton);
   assert(kept, 'out of sight 0.6 s later: still in the danger');
   const options = survival.stanceOptions(new Task('x'), {}, () => {}, d, false);
-  assert.match(Object.values(options)[0].description, /Shooting at the bot from here: the skeleton 9 blocks off, seen a moment ago \(it fires from as far as \d+\)\./);
+  assert.match(saidAs(survival, Object.values(options)[0]), /Shooting at the bot from here: the skeleton 9 blocks off, seen a moment ago \(it fires from as far as \d+\)\./);
   t.mock.timers.setTime(T0 + 11000);
   assert(!survival.encounterDanger().some(x => x.entity === skeleton), 'out of sight ten seconds on: gone from it');
 });

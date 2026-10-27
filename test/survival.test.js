@@ -11,6 +11,10 @@ const { Survival } = require('../src/survival');
 const { EventEmitter } = require('node:events');
 const { houseBlueprint, verifyHouse } = require('../src/objectives');
 
+// The stance's shared facts are its state now (note 2267): the text a test was written against, rebuilt as it was said.
+const saidAs = (sv, d) => [sv?._stanceShared?.lowAndHit, sv?._stanceShared?.hitting, typeof d === 'string' ? d : d?.description, sv?._stanceShared?.mobNotes].filter(Boolean).join(' ');
+
+
 test('threat visibility uses the entire ray and respects solid cover', () => {
   const bot = { entity: { position: new Vec3(0, 64, 0) }, time: { timeOfDay: 13000 },
     entities: { 1: { name: 'skeleton', position: new Vec3(12, 64, 0), height: 1.8 } },
@@ -4069,10 +4073,10 @@ test('a crowd of endermen is told the fact a lone one is only ever fought or sea
   const crowd = [crowdMob(1, 'enderman', 4), crowdMob(2, 'enderman', -5), crowdMob(3, 'enderman', 0, 6)];
   const options = survival.stanceOptions(new Task('t'), {}, () => {}, crowd, false);
   const fact = /it is 2\.9 tall and cannot come into a space under three blocks high, so a two-high pocket or hole keeps it out/;
-  assert.match(options.seal.description, fact, 'seal: ' + options.seal.description);
-  assert.match(options.fight.description, fact, 'fight: ' + options.fight.description);
+  assert.match(saidAs(survival, options.seal), fact, 'seal: ' + options.seal.description);
+  assert.match(saidAs(survival, options.fight), fact, 'fight: ' + options.fight.description);
   // Said once, not three times over, for the three endermen of one name.
-  assert.equal(options.seal.description.match(/2\.9 tall/g)?.length, 1);
+  assert.equal(saidAs(survival, options.seal).match(/2\.9 tall/g)?.length, 1);
 });
 
 test('held on a span with a shot on its way and no walls or ground to be had, the shield comes up', async () => {
@@ -4313,7 +4317,7 @@ test('a wither skeleton reaches a pillar\'s top from the bot\'s own floor, and t
   const skeleton = { entity: { id: 1, name: 'wither_skeleton', position: new Vec3(7.5, 64, 3.5), height: 2.4 }, distance: Math.hypot(7, 3), visible: true };
   const options = survival.stanceOptions(new Task('x'), {}, () => {}, [skeleton], false);
   // After the hardest blow, said first on every stance (note 576).
-  assert.match(options.pillar.description, /^The wither skeleton 8 blocks off hits for about 8 a blow[^]*?seconds\. This way: about [\d.]+ damage over about 15 seconds, from 20 health \(more than the bot has\)\. Go two blocks straight up on placed blocks and fight from there\. Here two up is no cover from any of the mobs that bite: the wither skeleton reaches its top, and the fight up there is the fight here, begun once the blocks are down, on a top one block wide; shooters still can hit\./);
+  assert.match(saidAs(survival, options.pillar), /^The wither skeleton 8 blocks off hits for about 8 a blow[^]*?seconds\. This way: about [\d.]+ damage over about 15 seconds, from 20 health \(more than the bot has\)\. Go two blocks straight up on placed blocks and fight from there\. Here two up is no cover from any of the mobs that bite: the wither skeleton reaches its top, and the fight up there is the fight here, begun once the blocks are down, on a top one block wide; shooters still can hit\./);
   assert.match(options.pillar.description, /Two up does not stop a wither skeleton/);
   assert.match(options.pillar.description, /A blow that lands knocks the bot back/);
   // Fought from the top with no approach, it read 16.3 where the fight here read 23.8.
@@ -4960,7 +4964,7 @@ test('the bunker says the wall it leaves for the lava behind it, and once dug is
   survival.state.bunkerDug = { cells: [{ x: 0, y: 64, z: 0 }, { x: 0, y: 64, z: 1 }], inside: { x: 0, y: 64, z: 1 }, mouth: { x: 0, y: 64, z: 1 }, watch: { x: 0, y: 64, z: 0 }, at: Date.now(), dimension: 'overworld' };
   const held = survival.stanceOptions(new Task('x'), {}, () => {}, [threat(bot, zombie)], false);
   // After the hardest blow, said first on every stance (note 576).
-  assert.match(held.bunker.description, /^The zombie \d+ blocks off hits for about 3 a blow[^]*?\. Stay in the bunker already dug here/);
+  assert.match(saidAs(survival, held.bunker), /^The zombie \d+ blocks off hits for about 3 a blow[^]*?\. Stay in the bunker already dug here/);
   // Priced as its words say (note 2093).
   assert.ok(Number.isFinite(held.bunker.expects?.damage), 'the bunker is priced');
 });
@@ -5652,7 +5656,7 @@ test('a block in a creeper\'s line is offered, priced by the seconds until the l
   const options = survival.stanceOptions(new Task('x'), {}, () => {}, [creeper], false);
   const o = options.block_creeper;
   assert(o, Object.keys(options).join(','));
-  assert.match(o.description, /^The creeper 4\.5 blocks off goes off 1\.5 seconds after it lights, within 3 blocks in sight of the bot: about [\d.]+ through the armour worn two blocks off, as much as the [\d.]+ health the bot has, [^]*?\. Put 2 blocks, two high, in the line from the eyes of the creeper \(4\.5 blocks off\) to the bot's, beside the bot at head height: about 1\.2 seconds until the line is cut \(the second block\), 1\.2 for both, and stay behind it\./);
+  assert.match(saidAs(survival, o), /^The creeper 4\.5 blocks off goes off 1\.5 seconds after it lights, within 3 blocks in sight of the bot: about [\d.]+ through the armour worn two blocks off, as much as the [\d.]+ health the bot has, [^]*?\. Put 2 blocks, two high, in the line from the eyes of the creeper \(4\.5 blocks off\) to the bot's, beside the bot at head height: about 1\.2 seconds until the line is cut \(the second block\), 1\.2 for both, and stay behind it\./);
   assert.match(o.description, /its sight is one line from its eyes to the bot's, which any block stops; out of its sight the fuse burns back down a tick at a time/);
   assert.match(o.description, /It is not lit: at 3 blocks in about 0\.5 seconds at its walk, and it goes off 1\.5 seconds after that if it sees the bot\. The line is cut about 0\.8 seconds before it would go off\./);
   assert.match(o.description, /within 3 blocks of the bot the creeper stands where it is, lit or not, and out of its sight it does not light\. It is more than 3 off, so it walks on toward the bot round the block/);
@@ -5668,7 +5672,8 @@ test('a block in a creeper\'s line is offered, priced by the seconds until the l
   // Held, the line stopped: staying behind the block, nothing placed.
   survival.state.stance = { choice: 'block_creeper', at: Date.now() };
   const held = survival.stanceOptions(new Task('x'), {}, () => {}, [creeper], false);
-  assert.match(held.block_creeper?.description || '', /^The creeper [^]*?\. Stay behind the cobblestone at \(1, 65, 0\), in the line from the eyes of the creeper/);
+  // The creeper's own blow is the question's state now (note 2267); the way's own words are checked.
+  assert.match(held.block_creeper?.description || '', /Stay behind the cobblestone at \(1, 65, 0\), in the line from the eyes of the creeper/);
   assert.equal(await held.block_creeper.run(), true);
   assert.equal(placed.length, 2);
   // Not held, a line already stopped is the same stance, staying behind that
@@ -5676,7 +5681,7 @@ test('a block in a creeper\'s line is offered, priced by the seconds until the l
   // creeper's sight, was offered no way to stay there, and ran down into it
   // (note 604).
   delete survival.state.stance;
-  assert.match(survival.stanceOptions(new Task('x'), {}, () => {}, [creeper], false).block_creeper?.description || '', /^The creeper [^]*?\. Stay behind the cobblestone at \(1, 65, 0\), in the line from the eyes of the creeper/);
+  assert.match(survival.stanceOptions(new Task('x'), {}, () => {}, [creeper], false).block_creeper?.description || '', /Stay behind the cobblestone at \(1, 65, 0\), in the line from the eyes of the creeper/);
 });
 
 test('a creeper lit with too little fuse left for the block is said as too late, with its blast; one on a ledge above is cut over the head', () => {
@@ -5700,7 +5705,7 @@ test('a creeper lit with too little fuse left for the block is said as too late,
   shaft.blockAt = p => { const f = p.floored(); const solid = f.y < 64 || f.z < 0 || (f.y >= 64 && f.y < 68 && f.z >= 2); return { position: f, name: solid ? 'deepslate' : 'air', boundingBox: solid ? 'block' : 'empty' }; };
   const overhead = new Survival(shaft, { place: async () => {}, dig: async () => {}, navigate: async () => {} }, { state: { shelters: [] } })
     .stanceOptions(new Task('x'), {}, () => {}, [{ entity: above, distance: 4.4, visible: true }], false).block_creeper;
-  assert.match(overhead?.description || '', /^The creeper [^]*?\. Put a block in the line from the eyes of the creeper \(4\.4 blocks off\) to the bot's, over the bot's head: about 0\.6 seconds until the line is cut/);
+  assert.match(saidAs(survival, overhead), /^The creeper [^]*?\. Put a block in the line from the eyes of the creeper \(4\.4 blocks off\) to the bot's, over the bot's head: about 0\.6 seconds until the line is cut/);
 });
 
 test('no block is offered for a creeper with no cell between it and the bot, or none carried', () => {

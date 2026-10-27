@@ -62,16 +62,14 @@ test('at 4 health under a skeleton\'s hits, every stance leads with the skeleton
   const survival = new Survival(bot, { navigate: async () => {} }, { state: { shelters: [] } });
   const options = survival.stanceOptions(new Task('x'), {}, () => {}, danger(), false);
   const keys = Object.keys(options);
-  for (const [k, o] of Object.entries(options)) {
-    if (k === 'none_good') continue;
-    assert.match(o.description, /Hitting the bot now: the skeleton 6 blocks off \(1 hit in the last 20 seconds/, k);
-    assert.doesNotMatch(o.description, /^The spider/, k);
-  }
+  // Said once in the question's state (note 2267), not before each way.
+  assert.match(survival._stanceShared.hitting, /Hitting the bot now: the skeleton 6 blocks off \(1 hit in the last 20 seconds/);
+  for (const [k, o] of Object.entries(options)) { if (k !== 'none_good') assert.doesNotMatch(o.description, /^The spider|Hitting the bot now/, k); }
   assert(options.eat, 'the beef is offered');
   assert.equal(keys[0], Object.entries(options).filter(([, o]) => o.quick).sort((a, b) => a[1].quick.seconds - b[1].quick.seconds)[0][0], 'the quickest way out of the hits listed first');
-  // Said once, on the first (quickest) way (note 2266), not before every way.
-  assert.match(Object.values(options)[0].description, /^At 4 health and being hit, the ways out of the hits here, quickest first: .*eat the cooked beef, 1\.6 seconds standing still/);
-  assert.equal(Object.values(options).filter(o => /the ways out of the hits here/.test(o.description || '')).length, 1, 'said on one way only');
+  // The low-and-hit summary is the question's state (note 2267), on no way.
+  assert.match(survival._stanceShared.lowAndHit, /^At 4 health and being hit, the ways out of the hits here, quickest first: .*eat the cooked beef, 1\.6 seconds standing still/);
+  assert.equal(Object.values(options).filter(o => /the ways out of the hits here/.test(o.description || '')).length, 0, 'on no way');
 });
 
 test('a stance held on a pillar is not asked again for its own way down coming on offer, a shot at another mob, or one of several mobs gone that was not the nearest (25583, note 752b)', () => {

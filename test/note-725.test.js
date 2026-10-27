@@ -23,6 +23,10 @@ const { EventEmitter } = require('node:events');
 const { Task } = require('../src/skills');
 const registry = require('minecraft-data')('26.1');
 
+// The stance's shared facts are its state now (note 2267): the text a test was written against, rebuilt as it was said.
+const saidAs = (sv, d) => [sv?._stanceShared?.lowAndHit, sv?._stanceShared?.hitting, typeof d === 'string' ? d : d?.description, sv?._stanceShared?.mobNotes].filter(Boolean).join(' ');
+
+
 // --- (a) blowsSay: the double-comma join, fixed without narrowing which
 // mob leads (a distance/sight cutoff was tried and reverted: see the
 // comment above blowsSay in src/survival.js and this note's trial-notes
@@ -50,7 +54,7 @@ test('the stance\'s "hardest hitter" lead-in joins "out of sight" and "the harde
   const survival = new Survival(bot, { place: async () => {}, dig: async () => {}, navigate: async () => {} }, { state: { shelters: [] } });
   const danger = [threat(bot, cube, false), threat(bot, zombie, false)];
   const options = survival.stanceOptions(new Task('x'), {}, () => {}, danger, false);
-  const lead = options.fight?.description || options.charge_nearest?.description;
+  const lead = saidAs(survival, options.fight || options.charge_nearest);
   assert.ok(lead, Object.keys(options).join(','));
   // The zombie's first blow comes more than a second before the cube's,
   // so it leads as the first (note 770); the clauses join the same way.
@@ -64,7 +68,7 @@ test('with only one biter out of sight, "out of sight" is said alone, still with
   const survival = new Survival(bot, { place: async () => {}, dig: async () => {}, navigate: async () => {} }, { state: { shelters: [] } });
   const danger = [threat(bot, cube, false)];
   const options = survival.stanceOptions(new Task('x'), {}, () => {}, danger, false);
-  const lead = options.fight?.description || options.charge_nearest?.description;
+  const lead = saidAs(survival, options.fight || options.charge_nearest);
   assert.ok(lead, Object.keys(options).join(','));
   assert.match(lead, /^The magma cube \d+(\.\d+)? blocks off, out of sight, hits for/);
   assert.doesNotMatch(lead, /,,/);

@@ -186,15 +186,17 @@ function routeTree(bot, goal) {
   const record = ` On the pearls in this run so far: about ${Math.round(all / 60000)} minutes of play, ${sweep} of them on sweeps for a warped forest and ${patrol} on the Overworld's endermen; ${held} pearl${held === 1 ? '' : 's'} or eye${held === 1 ? '' : 's'} held now.`;
   const { portalTrip } = require('./game-progress');
   let trip = ''; try { trip = ` ${portalTrip(bot, goal)}`; } catch (_) { trip = ''; }
+  routeTree.lastRecord = record.trim();
   return {
-    warped_forest: { description: `Cross into the Nether and sweep for a warped forest, where endermen spawn by day and night alike, eight legs of 64 blocks; a sweep that finds none rests half an hour.${trip}${record}${ROUTE_RECORD}` },
-    overworld_hunt: { description: `Hunt the Overworld's endermen: they spawn in the dark on the surface, in ones and twos, each dropping a pearl about half the time, tall and slow to turn on a player who does not look at them. The patrol takes on any enderman in view, struck from under a roof two high or with the back to a wall so it cannot reach over, and with none in view does the work at hand on the surface (wood, food, ore, a shelter) and takes any that comes; the night is its time, not spent sealed in.${OVERWORLD_HUNT_RECORD}${shelterSays(goal)}${overworldHourSays(bot)}${endermenHereSays(bot)} The crossing is not made; held half an hour.${record}${ROUTE_RECORD}` },
+    warped_forest: { description: `Cross into the Nether and sweep for a warped forest, where endermen spawn by day and night alike, eight legs of 64 blocks; a sweep that finds none rests half an hour.${trip}${ROUTE_RECORD}` },
+    overworld_hunt: { description: `Hunt the Overworld's endermen: they spawn in the dark on the surface, in ones and twos, each dropping a pearl about half the time, tall and slow to turn on a player who does not look at them. The patrol takes on any enderman in view, struck from under a roof two high or with the back to a wall so it cannot reach over, and with none in view does the work at hand on the surface (wood, food, ore, a shelter) and takes any that comes; the night is its time, not spent sealed in.${OVERWORLD_HUNT_RECORD}${shelterSays(goal)}${overworldHourSays(bot)}${endermenHereSays(bot)} The crossing is not made; held half an hour.${ROUTE_RECORD}` },
   };
 }
 async function askRoute(bot, task, goal, save, actions = {}) {
   const now = Date.now(), { PEARL_ROUTE_MS } = require('./game-progress');
   const decision = await require('./decisions').decide('pearl_route', { client: actions.client || task.opportunityClient, bot, task, goal, save, tree: routeTree(bot, goal),
-    state: { pearlsHeld: pearlsHeld(bot, goal), dimension: 'overworld' } });
+    // This run's pearl record, said once in the state, not on each route (note 2267).
+    state: { pearlsHeld: pearlsHeld(bot, goal), dimension: 'overworld', ...(routeTree.lastRecord ? { pearlsThisRun: routeTree.lastRecord } : {}) } });
   if (decision.stale) return false;
   const pick = decision.path.at(-1);
   noteChange(bot, goal, pick === 'overworld_hunt' ? 'overworld' : 'nether', now);

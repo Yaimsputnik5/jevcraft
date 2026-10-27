@@ -11,6 +11,10 @@ const { Vec3 } = require('vec3');
 const { EventEmitter } = require('node:events');
 const hitLog = require('../src/hit-log');
 
+// The stance's shared facts are its state now (note 2267): the text a test was written against, rebuilt as it was said.
+const saidAs = (sv, d) => [sv?._stanceShared?.lowAndHit, sv?._stanceShared?.hitting, typeof d === 'string' ? d : d?.description, sv?._stanceShared?.mobNotes].filter(Boolean).join(' ');
+
+
 const T0 = Date.parse('2026-09-30T15:00:36Z');
 
 function twoZombies() {
@@ -48,7 +52,7 @@ test('shield_guard between two zombies says the one outside the shield\'s cover,
   const options = survival.stanceOptions(new Task('x'), {}, () => {}, danger, false);
   assert(options.shield_guard, Object.keys(options).join(','));
   assert.match(options.shield_guard.description, /Outside the shield's cover as it faces the zombie: the zombie 1\.8 blocks off, 180 degrees from the way the shield faces, which has landed 3 hits in the last 20 seconds; its blows land whole\./);
-  if (options.pillar?.quick) assert.match(Object.values(options)[0].description, /two blocks up on placed blocks, about 1\.5 seconds, out of the reach of what walks/);
+  if (options.pillar?.quick) assert.match(saidAs(survival, Object.values(options)[0]), /two blocks up on placed blocks, about 1\.5 seconds, out of the reach of what walks/);
 });
 
 test('with a creeper within its alert, a question about anything but the fight and the turn is not asked: it comes back stale, the creeper first (25598 15:21:22Z, note 752d)', async () => {

@@ -17,6 +17,10 @@ const { Task } = require('../src/skills');
 const { Survival } = require('../src/survival');
 const { fightEstimate, stanceCost, blocksPerSecond, GIVES_UP } = require('../src/combat-estimate');
 
+// The stance's shared facts are its state now (note 2267): the text a test was written against, rebuilt as it was said.
+const saidAs = (sv, d) => [sv?._stanceShared?.lowAndHit, sv?._stanceShared?.hitting, typeof d === 'string' ? d : d?.description, sv?._stanceShared?.mobNotes].filter(Boolean).join(' ');
+
+
 const WORN = ['iron_helmet', 'iron_chestplate'];
 const brute = (x, z = 0.5) => ({ id: 7, name: 'piglin_brute', type: 'hostile', position: new Vec3(x, 74, z), height: 1.95, isValid: true, heldItem: { name: 'golden_axe' } });
 // A ledge one wide along z 0 at y 73 over the lava sea (lava at y 30 and
@@ -50,7 +54,7 @@ test('the rail, the step to ground and the fight each price the brute\'s melee, 
   const options = survival.stanceOptions(new Task('t'), {}, () => {}, [threat(bot, entity)], false);
   assert.ok(options.rail_and_fight, Object.keys(options).join(','));
   const lead = /^The piglin brute 7 blocks off hits for about 12\.2 a blow through the armour worn \(13 before it\), a blow a second at arm's length: 2 blows end the bot from 20 health, and at its own speed \(about 5\.3 blocks a second\) it can be at arm's length in about 1 second\. /;
-  for (const [k, o] of Object.entries(options)) assert.match(o.description, lead, k);
+  for (const [k, o] of Object.entries(options)) assert.match(saidAs(survival, o), lead, k);
   // The rail was the one fighting stance with no figure: now its walling
   // and the fight after it, from 20 health, and expected of it when held.
   const rail = options.rail_and_fight;

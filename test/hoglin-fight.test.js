@@ -20,6 +20,10 @@ const { Task } = require('../src/skills');
 const { Survival } = require('../src/survival');
 const { fightEstimate, fightTimeline, stanceCost, MOBS } = require('../src/combat-estimate');
 
+// The stance's shared facts are its state now (note 2267): the text a test was written against, rebuilt as it was said.
+const saidAs = (sv, d) => [sv?._stanceShared?.lowAndHit, sv?._stanceShared?.hitting, typeof d === 'string' ? d : d?.description, sv?._stanceShared?.mobNotes].filter(Boolean).join(' ');
+
+
 // As worn in both: iron helmet, chestplate and leggings, golden boots (14 points).
 const WORN = ['iron_helmet', 'iron_chestplate', 'iron_leggings', 'golden_boots'];
 const slots = () => ({ 5: { name: 'iron_helmet' }, 6: { name: 'iron_chestplate' }, 7: { name: 'iron_leggings' }, 8: { name: 'golden_boots' }, 45: { name: 'shield' } });
@@ -62,7 +66,7 @@ test('every stance opens with the hoglin\'s blow from its least to its hardest, 
   const options = survival.stanceOptions(new Task('t'), {}, () => {}, [threat(bot, entity)], false);
   const lead = /^The hoglin 7 blocks off hits for 1\.5 to 4\.8 a blow through the armour worn, about 3 on the average \(3 to 8 before it\), a blow every 2 seconds at arm's length: 3 blows at their hardest end the bot from 13\.9 health \(5 on the average\), and at its own speed \(about 3\.9 blocks a second\) it can be at arm's length in about 1\.3 seconds\. /;
   assert.ok(options.fight);
-  for (const [k, o] of Object.entries(options)) if (k !== 'none_good') assert.match(o.description, lead, k);
+  for (const [k, o] of Object.entries(options)) if (k !== 'none_good') assert.match(saidAs(survival, o), lead, k);
   assert.match(options.fight.description, /from the hoglin \(about 3 each after armour, up to 4\.8: 3 at the hardest\) end it/);
 });
 

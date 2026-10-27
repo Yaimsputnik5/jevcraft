@@ -141,5 +141,5 @@ test('under a skeleton\'s fire, a stance that moves says the shield goes down wh
   for (const k of moving) assert.match(options[k].description, /The shield is lowered while it moves/, k);
   assert(options.eat, 'eating offered');
   assert.doesNotMatch(options.eat.description, /The shield is lowered while it moves/);
-  assert.match(Object.values(options)[0].description, /^At 12\.5 health, down from 20 in the last 10 seconds, and being hit, the ways out of the hits here, quickest first: /);
+  assert.match(survival._stanceShared.lowAndHit, /^At 12\.5 health, down from 20 in the last 10 seconds, and being hit, the ways out of the hits here, quickest first: /);
 });

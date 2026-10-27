@@ -29,7 +29,8 @@ test('one big magma cube is priced as one mob in the stance figures, its splits 
   assert.ok(fight, Object.keys(options).join(','));
   assert.ok(fight.expects.damage < 15, `the fight with one cube is priced ${fight.expects.damage}`);
   assert.doesNotMatch(fight.description, /kill the 1[0-9] in these figures/);
-  assert.match(fight.description, /splits into/);
+  // The mob notes are the question's state now (note 2267), said once, not on each way.
+  assert.match(survival._stanceShared?.mobNotes || '', /splits into/);
   // The seal's price stands on its own terms (the cube is inside the pocket before it shuts); the stances that meet it are one mob's worth.
   for (const k of ['shield_guard', 'pillar', 'run_from']) if (options[k]?.expects && Number.isFinite(options[k].expects.damage)) assert.ok(options[k].expects.damage < 30, `${k} priced ${options[k].expects.damage} against one cube`);
   for (const [k, o] of Object.entries(options)) assert.doesNotMatch(o.description || '', /the 1[0-9] in these figures|13 magma cubes/, k);

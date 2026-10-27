@@ -3920,6 +3920,8 @@ class Survival {
     }
   }
   stanceOptionsBuilt(task, goal, save, danger, swung) {
+    // The facts that hold for every way, said once in the question's state (note 2267): set as the options are built.
+    this._stanceShared = {};
     const bot = this.bot, options = {};
     // The fight stance itself, kept where the stances that end in it can
     // reach it after `options.fight` is left out (a stance that ended here
@@ -6141,7 +6143,7 @@ class Survival {
     const priceOf = o => Number.isFinite(o.expects?.damage)
       ? `This way: about ${Math.round(o.expects.damage * 10) / 10} damage${Number.isFinite(o.expects.seconds) ? ` over about ${Math.round(o.expects.seconds)} seconds` : ''}, from ${hpNow} health${o.expects.damage >= hpNow ? ' (more than the bot has)' : ''}. `
       : '';
-    if (lead) for (const o of Object.values(options)) o.description = `${lead} ${o.description}`;
+    if (lead) this._stanceShared.hitting = lead;
     // The shield held at a drop that kills (note 1030): a blow the shield
     // takes still knocks the bot half a block with a hop, and a block from
     // the edge the second is over it. The guard said the knock, and the drop
@@ -6261,7 +6263,9 @@ class Survival {
     const bearing = m => m.visible || (Number.isFinite(m.distance) && m.distance <= 8);
     const mobNotes = [...new Map(mobs.filter(m => m.note && bearing(m)).map(m => [m.name, m.note])).values()];
     const notesSay = mobNotes.length ? ` ${mobNotes.map(n => `${n[0].toUpperCase()}${n.slice(1)}.`).join(' ')}` : '';
-    if (notesSay) for (const o of Object.values(options)) o.description += notesSay;
+    // What applies to every way is the question's own fact, in its state (note 2267; the user, 2026-10-27 01:5xZ: 'should it just
+    // be in the state always?'): the mob notes and the low-and-hit summary were appended to or put before every option alike.
+    if (notesSay) this._stanceShared.mobNotes = notesSay.trim();
     // Low and being hit: the ways out of the hits (eating, breaking the
     // line) are named first, quickest first, with their times, and listed
     // first (note 752b: 25594 at 4 health with a beef carried and out of
@@ -6284,8 +6288,7 @@ class Survival {
       // health, hits and pace were the first 600 of every option alike, the way itself after them; forest-8 (25600, 2026-10-27
       // 01:19:23Z) at 10.3 health under an enderman read cap_fight, seal, pillar and fight_from_footing as one text to their
       // 600th character, took cap_fight (a lid an enderman strikes past from the cell beside) and was dead four seconds later.
-      const first = Object.values(options)[0];
-      if (first) first.description = `${said.trim()} ${first.description}`;
+      this._stanceShared.lowAndHit = said.trim();
     }
     // A fight with a creeper about says what its blast costs at the fight's
     // range, killed inside its fuse or not (combat-estimate creeperFought):
@@ -6930,7 +6933,8 @@ class Survival {
       // behind rock that blew it up six seconds later.
       const outOfSight = (() => { try { return require('./danger').threats(bot, 24).filter(t => !t.visible && !danger.some(d => d.entity.id === t.entity.id)).slice(0, 5); } catch (_) { return []; } })();
       const outOfSightSays = outOfSight.length ? `Within 24 blocks but out of sight, not gone: ${outOfSight.map(t => `a ${String(t.entity.name).replaceAll('_', ' ')} ${Math.round(t.distance * 10) / 10} blocks off`).join(', ')}.${outOfSight.some(t => t.entity.name === 'creeper') ? ' A creeper lights within 7 blocks once it has the bot in sight, about 1.5 seconds to the blast.' : ''}` : null;
-      const state = { ...(kept ? { noWayToTheBot: kept } : {}), ...(outOfSightSays ? { outOfSight: outOfSightSays } : {}), ...((d => d ? { dropBeside: d.trim() } : {})(dropBesideSays(bot))), health: bot.health, food: bot.food, dimension: String(bot.game?.dimension || ''), armour, weapon: defenseWeapon(bot)?.name || 'bare hands',
+      const shared = this._stanceShared || {};
+      const state = { ...(shared.lowAndHit ? { lowAndHit: shared.lowAndHit } : {}), ...(shared.hitting ? { hittingNow: shared.hitting } : {}), ...(shared.mobNotes ? { mobsHere: shared.mobNotes } : {}), ...(kept ? { noWayToTheBot: kept } : {}), ...(outOfSightSays ? { outOfSight: outOfSightSays } : {}), ...((d => d ? { dropBeside: d.trim() } : {})(dropBesideSays(bot))), health: bot.health, food: bot.food, dimension: String(bot.game?.dimension || ''), armour, weapon: defenseWeapon(bot)?.name || 'bare hands',
         shield: bot.inventory.slots?.[45]?.name === 'shield', arrows: countOf(bot, 'arrow'), buildingBlocks: shelter.materialStock(bot),
         dropWithinThreeBlocks: require('./terrain').dropFacts(bot, feetCell(bot), 3) || false,
         darkHere: darkHere(bot),

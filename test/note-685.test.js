@@ -12,6 +12,10 @@ const { Task } = require('../src/skills');
 const { setAside } = require('../src/progress');
 
 const SPAN = require('./fixtures/span-end-mid-243-cd.json');
+
+// The stance's shared facts are its state now (note 2267): the text a test was written against, rebuilt as it was said.
+const saidAs = (sv, d) => [sv?._stanceShared?.lowAndHit, sv?._stanceShared?.hitting, typeof d === 'string' ? d : d?.description, sv?._stanceShared?.mobNotes].filter(Boolean).join(' ');
+
 const SPAN_KIT = [['iron_pickaxe', 1], ['stone_pickaxe', 1], ['iron_sword', 1], ['stone_sword', 1], ['stone_axe', 1], ['raw_iron', 2], ['iron_nugget', 7], ['stick', 2]];
 function jevStub(picks) {
   const asked = [];
@@ -102,7 +106,7 @@ test('every stance leads with the creeper it was asked about, not a zombie sixte
   const options = survival.stanceOptions(new Task('x'), {}, () => {}, danger, false);
   for (const [k, o] of Object.entries(options)) {
     if (k === 'none_good') continue;
-    assert.match(o.description, /^The creeper 6 blocks off goes off 1\.5 seconds after it lights, within 3 blocks in sight of the bot: about [\d.]+ through the armour worn two blocks off/, k);
+    assert.match(saidAs(survival, o), /^The creeper 6 blocks off goes off 1\.5 seconds after it lights, within 3 blocks in sight of the bot: about [\d.]+ through the armour worn two blocks off/, k);
     assert.doesNotMatch(o.description, /^The zombie/, k);
   }
 });
