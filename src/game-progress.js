@@ -27,6 +27,13 @@ function observeProgress(bot, goal, now = Date.now()) {
   // When the bot came into the dimension it is in, for a choice made in
   // one stay there to end with that stay (netherLeaveHeld).
   if (where && progress.here?.dimension !== where) progress.here = { dimension: where, at: now };
+  // The kit lost at a death back on the body (note 2273): as many iron pieces worn as when it was lost.
+  const sv = goal.survival;
+  if (sv?.kitLost) {
+    const worn = [5, 6, 7, 8].map(i => bot.inventory?.slots?.[i]?.name).filter(n => /^(iron|diamond|netherite)_/.test(n || '')).length;
+    const at = Date.parse(sv.kitLost.at);
+    if (worn >= sv.kitLost.pieces && Number.isFinite(at)) { sv.kitBack = [...(sv.kitBack || []), { lostAt: sv.kitLost.at, minutes: Math.round((now - at) / 60000) }].slice(-12); delete sv.kitLost; }
+  }
   return progress;
 }
 

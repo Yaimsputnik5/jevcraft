@@ -68,6 +68,8 @@ function recordDeath(bot, state, now = Date.now()) {
   // The base's bed carried along drops with everything else: the base
   // asks for a bed again.
   if (state.home?.bed?.carriedAt) { delete state.home.bed.carriedAt; delete state.home.bed.claimedAt; }
+  // A kit lost (note 2273): the iron worn at the death, kept until as much is worn again, for the measured time back.
+  { const iron = (worn || []).filter(n => /^(iron|diamond|netherite)_(helmet|chestplate|leggings|boots)$/.test(n)).length; if (iron >= 2 && !state.kitLost) state.kitLost = { at: new Date(now).toISOString(), pieces: iron }; }
   state.deaths = [...(state.deaths || []), { at: new Date(now).toISOString(), position: { ...bot.entity.position }, dimension: bot.game.dimension, about, worn,
     food: bot.food, ...(cause ? { cause } : {}), ...(lastChoice ? { lastChoice } : {}), ...(lava ? { lava } : {}) }].slice(-10);
   // No stance or answer outlives the body it was chosen for (note 778b):

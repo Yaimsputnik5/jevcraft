@@ -59,9 +59,16 @@ function ironOf(items = {}) {
   const n = name => items[name] || 0;
   return n('iron_helmet') * 5 + n('iron_chestplate') * 8 + n('iron_leggings') * 7 + n('iron_boots') * 4 + n('iron_sword') * 2 + n('iron_pickaxe') * 3 + n('shield') + n('bucket') * 3 + n('water_bucket') * 3 + n('iron_ingot') + n('raw_iron');
 }
-function ironRemakeSays(items = {}) {
+function ironRemakeSays(items = {}, goal = null) {
   const iron = ironOf(items);
   if (iron < 5) return '';
+  // This run's own record first (note 2273): the pace of the iron work alone said 14 to 26 minutes, where full-5, 6
+  // and 7's kits lost at deaths came back on the body after a mean 1.4 hours (Fable's check-in, 2026-10-27 02:40Z).
+  const back = goal?.survival?.kitBack || [];
+  if (back.length) {
+    const m = back.map(b => b.minutes).sort((x, y) => x - y), median = m[Math.floor(m.length / 2)];
+    return ` On this run, ${back.length === 1 ? 'the one kit lost at a death was' : `the ${back.length} kits lost at deaths were`} back on the body after ${back.length === 1 ? `${m[0]} minutes` : `a median ${median} minutes (${m.join(', ')})`}, the walks, the mining, the smelting and the deaths on the way counted; the ${iron} iron alone is about ${Math.round(iron * IRON_MINUTES.low)} to ${Math.round(iron * IRON_MINUTES.high)} minutes of iron work.`;
+  }
   return ` The ${iron} iron is about ${Math.round(iron * IRON_MINUTES.low)} to ${Math.round(iron * IRON_MINUTES.high)} minutes of play to mine and smelt again, at the pace of the fresh runs' iron work (about 37 and 40 iron in 47 and 27 minutes, 2026-10-24).`;
 }
 
@@ -489,7 +496,7 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
     let bedKit = null; try { bedKit = kitActions ? require('./bed-kit').bedKitChores(bot, goal).take_bed_kit : null; } catch (_) { bedKit = null; }
     const tree = {
       go_back: { description: `Go back for ${listed(run.items)}: ${far} blocks off${far >= 100 ? `, about ${minutes} minute${minutes > 1 ? 's' : ''}' ${climbSeconds ? 'walk and climb' : 'walk'}${rec?.walkBlocksAMinute ? ` at the ${rec.walkBlocksAMinute} blocks a minute the bot's walks have made, stalls and detours counted` : ''}` : ''}${Math.abs(spot.y - bot.entity.position.y) > 4 ? `, at y ${Math.round(spot.y)}` : ''}. ${left === null ? `They last until the bot comes within ${TICKING} blocks, then five minutes.` : `About ${left} seconds before they vanish.${walkLeft}`} ${death.cause ? `The bot ${death.cause} there; when it died, ` : 'When the bot died there, '}${about ? `about it were ${about}` : 'nothing hostile was in view'}; it wore ${death.worn?.length ? death.worn.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} then and wears ${wornNow.length ? wornNow.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} now. ${hour}${underSays}${stalled}${earlier}${eyesSay}${ringSays}${walkFoodSays}${alsoLying}` },
-      leave_them: { description: `Leave them and go on with what is carried: ${listed(worth(Object.fromEntries(bot.inventory.items().map(i => [i.name, i.count])))) || 'nothing worth listing'}. What was dropped is made again, or found, later${again ? `: ${again}` : ''}.${ironRemakeSays(run.items)}${took}${keptSays}` },
+      leave_them: { description: `Leave them and go on with what is carried: ${listed(worth(Object.fromEntries(bot.inventory.items().map(i => [i.name, i.count])))) || 'nothing worth listing'}. What was dropped is made again, or found, later${again ? `: ${again}` : ''}.${ironRemakeSays(run.items, goal)}${took}${keptSays}` },
     };
     // What holds for every way (the quick deaths, the walks back that ended in one, the drops seen, the record) is said once,
     // in the question's state, not on each way (note 2268's rule, the user 2026-10-27: 'should it just be in the state always?').
