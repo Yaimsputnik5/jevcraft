@@ -421,6 +421,19 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
   if (!run.choice) {
     const death = (goal.survival?.deaths || []).find(d => d.at === run.deathAt) || (goal.survival?.deaths || []).at(-1) || {};
     const about = (death.about || []).map(t => `a ${t.name.replaceAll('_', ' ')} ${t.distance} blocks off`).join(', ');
+    // What each kind about it then does to the body as it is worn now (note 2281): full-6 (25596, 2026-10-27 11:43Z),
+    // bare, was told 'impaled by Drowned there; about it were a drowned 14 blocks off', went back at 0.56 for raw iron
+    // 62 blocks off, and the drowned's tridents (8 a throw on no armour) ended it 39 seconds after it came back to life.
+    let aboutHits = '';
+    try {
+      const kinds = [...new Map((death.about || []).map(t => [t.name, t])).values()].slice(0, 4);
+      if (kinds.length) {
+        const holds = n => (run.mobsAtDeath || []).find(m => m.name === n && m.holds?.length)?.holds?.[0] || (n === 'drowned' && /impaled/.test(String(death.cause || '')) ? 'trident' : null);
+        const est = require('./combat-estimate').fightEstimate({ threats: kinds.map(t => ({ name: t.name, distance: t.distance, visible: true, ...(holds(t.name) ? { held: holds(t.name), ...(/trident|bow|crossbow/.test(holds(t.name)) ? { shoots: true } : {}) } : {}) })), armour: [5, 6, 7, 8].map(slot => bot.inventory?.slots?.[slot]?.name).filter(Boolean), health: 20 }).mobs;
+        const each = est.filter(m => m.hitsBot > 0).map(m => `a ${m.name.replaceAll('_', ' ')}'s about ${m.hitsBot} (${Math.ceil((bot.health ?? 20) / m.hitsBot)} end the bot from ${Math.round(bot.health ?? 20)} health)`);
+        if (each.length) aboutHits = ` As worn now, a hit from each kind that was about it: ${each.join('; ')}.`;
+      }
+    } catch (_) { aboutHits = ''; }
     const wornNow = [5, 6, 7, 8].map(slot => bot.inventory?.slots?.[slot]?.name).filter(Boolean);
     const far = Math.round(flat(bot.entity.position, spot));
     const left = run.loadedAt ? Math.max(0, Math.round((DESPAWN_MS - (Date.now() - Date.parse(run.loadedAt))) / 1000)) : null;
@@ -495,7 +508,7 @@ async function corpseRunStep(bot, task, goal, save, { move = navigate, collect =
     // The kit in the chest beside the bed first (bed-kit.js, note 2032).
     let bedKit = null; try { bedKit = kitActions ? require('./bed-kit').bedKitChores(bot, goal).take_bed_kit : null; } catch (_) { bedKit = null; }
     const tree = {
-      go_back: { description: `Go back for ${listed(run.items)}: ${far} blocks off${far >= 100 ? `, about ${minutes} minute${minutes > 1 ? 's' : ''}' ${climbSeconds ? 'walk and climb' : 'walk'}${rec?.walkBlocksAMinute ? ` at the ${rec.walkBlocksAMinute} blocks a minute the bot's walks have made, stalls and detours counted` : ''}` : ''}${Math.abs(spot.y - bot.entity.position.y) > 4 ? `, at y ${Math.round(spot.y)}` : ''}. ${left === null ? `They last until the bot comes within ${TICKING} blocks, then five minutes.` : `About ${left} seconds before they vanish.${walkLeft}`} ${death.cause ? `The bot ${death.cause} there; when it died, ` : 'When the bot died there, '}${about ? `about it were ${about}` : 'nothing hostile was in view'}; it wore ${death.worn?.length ? death.worn.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} then and wears ${wornNow.length ? wornNow.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} now. ${hour}${underSays}${stalled}${earlier}${eyesSay}${ringSays}${walkFoodSays}${alsoLying}` },
+      go_back: { description: `Go back for ${listed(run.items)}: ${far} blocks off${far >= 100 ? `, about ${minutes} minute${minutes > 1 ? 's' : ''}' ${climbSeconds ? 'walk and climb' : 'walk'}${rec?.walkBlocksAMinute ? ` at the ${rec.walkBlocksAMinute} blocks a minute the bot's walks have made, stalls and detours counted` : ''}` : ''}${Math.abs(spot.y - bot.entity.position.y) > 4 ? `, at y ${Math.round(spot.y)}` : ''}. ${left === null ? `They last until the bot comes within ${TICKING} blocks, then five minutes.` : `About ${left} seconds before they vanish.${walkLeft}`} ${death.cause ? `The bot ${death.cause} there; when it died, ` : 'When the bot died there, '}${about ? `about it were ${about}` : 'nothing hostile was in view'}; it wore ${death.worn?.length ? death.worn.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} then and wears ${wornNow.length ? wornNow.map(n => n.replaceAll('_', ' ')).join(', ') : 'no armour'} now.${aboutHits} ${hour}${underSays}${stalled}${earlier}${eyesSay}${ringSays}${walkFoodSays}${alsoLying}` },
       leave_them: { description: `Leave them and go on with what is carried: ${listed(worth(Object.fromEntries(bot.inventory.items().map(i => [i.name, i.count])))) || 'nothing worth listing'}. What was dropped is made again, or found, later${again ? `: ${again}` : ''}.${ironRemakeSays(run.items, goal)}${took}${keptSays}` },
     };
     // What holds for every way (the quick deaths, the walks back that ended in one, the drops seen, the record) is said once,
