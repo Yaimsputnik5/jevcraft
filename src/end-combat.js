@@ -1588,6 +1588,15 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
     // Uphill first where no rim stands beside (note 1607): flowing water runs downhill and the body with it, and the ground's rise within two cells says which way is up. 25588 (dragon-147, 2026-10-14 08:51Z) in water on the shelf's slope moved toward the middle, 'still in the water', and the flow took it over the rim.
     const groundAt = (dx, dz) => { for (let dy = 2; dy >= -3; dy--) if (bot.blockAt(feet.offset(dx, dy, dz))?.boundingBox === 'block') return feet.y + dy; return feet.y - 4; };
     const uphill = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dz]) => ({ dx, dz, rise: Math.max(groundAt(dx, dz), groundAt(dx * 2, dz * 2)) - (feet.y - 1) })).filter(o => o.rise >= 1).sort((a, b) => b.rise - a.rise)[0];
+    // A roof over the head dug first (note 2275): the jump out of the water needs the cell two over the feet open.
+    // dragon-370 (25589, 2026-10-27 03:4xZ) stood in its flooded tunnel at (-21, 58, 30), the rim a block east with room
+    // over it, end stone at (-21, 60, 30) over its head, said 'out of the trench: still in the water' 187 times and died in
+    // the breath there.
+    { const over = feet.offset(0, 2, 0), ob = bot.blockAt(over);
+      if (ob?.boundingBox === 'block' && !/bedrock|obsidian|end_portal|crying_obsidian/.test(ob.name) && actions.dig) {
+        try { await actions.dig(bot, task, over, { requireDrops: false }); } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+        console.log(`[end combat] out of the trench: the ${ob.name} over the head at ${over} ${bot.blockAt(over)?.boundingBox === 'block' ? 'not dug' : 'dug'} for the jump out`);
+      } }
     const toward = way ? feet.offset(way.dx * (way.d + 1) + .5, 1.5, way.dz * (way.d + 1) + .5) : uphill ? feet.offset(uphill.dx * 2 + .5, 1.5, uphill.dz * 2 + .5) : bot.entity.position.offset(toMiddle.x / len * 2, 1, toMiddle.z / len * 2);
     try {
       await require('./motion').move(bot, task, { label: 'out_of_the_trench', keys: ['forward', 'jump'], sneak: false, why: 'up out of the water onto the rim before anything else (notes 1559, 1570)', look: toward, maxMs: 2500, tick: 25, until: () => !inWater() && bot.entity.onGround });
