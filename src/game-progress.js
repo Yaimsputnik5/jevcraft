@@ -121,9 +121,20 @@ function preparationStage(bot, goal = {}) {
 // quarter of the midgame trials' time before it (the scoreboard,
 // 2026-09-26). What going without costs is said with the Nether-first
 // option, hit by hit, for the mobs there.
+// The spare armour owed (note 2272): an iron piece worn with none of its kind in the pockets or in the store by the
+// bed slept in (the bed kit's chest, or the home's stash where it covers that bed). -> item name or null
+const SPARE_ORDER = ['iron_chestplate', 'iron_leggings', 'iron_helmet', 'iron_boots'];
+const SPARE_SLOT = { iron_helmet: 5, iron_chestplate: 6, iron_leggings: 7, iron_boots: 8 };
+function spareArmourOwed(bot, goal) {
+  const bed = bot?._survivalState?.spawnBed?.foot;
+  if (!bed || !Number.isFinite(bed.x)) return null;
+  const store = { ...(goal?.survival?.home?.stash?.contents || {}), ...(goal?.bedKit?.contents || {}) };
+  const pockets = bot.inventory?.items?.() || [];
+  return SPARE_ORDER.find(name => bot.inventory?.slots?.[SPARE_SLOT[name]]?.name === name && !pockets.some(i => i.name === name) && !(store[name] > 0)) || null;
+}
 const ARMOUR_PIECES = ['iron_armour', 'iron_helmet', 'iron_chestplate', 'iron_leggings', 'iron_boots'];
 // The crossing's kit may wait too (crossing-kit.js kitRungs, note 673).
-const DEFERRABLE = new Set(['bed', 'home_site', 'home_level', 'home_stash', 'home_bed', 'home_water', 'home_plot', 'home_pen', 'shield', 'leather_armour', 'fishing_rod', 'iron_sword', 'bucket', 'water_bucket', 'golden_boots', 'bow', 'arrows', 'diamond_pickaxe', 'diamond_sword', ...ARMOUR_PIECES, 'nether_pickaxe', 'nether_blocks', 'nether_food', 'nether_chest']);
+const DEFERRABLE = new Set(['spare_armour', 'bed', 'home_site', 'home_level', 'home_stash', 'home_bed', 'home_water', 'home_plot', 'home_pen', 'shield', 'leather_armour', 'fishing_rod', 'iron_sword', 'bucket', 'water_bucket', 'golden_boots', 'bow', 'arrows', 'diamond_pickaxe', 'diamond_sword', ...ARMOUR_PIECES, 'nether_pickaxe', 'nether_blocks', 'nether_food', 'nether_chest']);
 const RUNG_BUDGET_MS = 20 * 60 * 1000, RUNG_WAIT_MS = 30 * 60 * 1000;
 function preparationRung(bot, goal = {}, now = Date.now()) {
   const resting = attemptsFor(goal).of('rung', now);
@@ -496,6 +507,13 @@ function ladderRung(bot, goal, waiting, { allOptional = false } = {}) {
   // The iron pickaxe that waited for the armour (note 1108).
   if (pickAfterArmour) return headed(another('iron_pickaxe'));
   if (!carried.includes('golden_boots') && ready({ phase: 'golden_boots' })) return { phase: 'golden_boots', action: 'acquire', item: 'golden_boots', count: 1 };
+  // A spare set for the chest by the bed slept in (note 2272): the chest beside the bed (bed-kit.js, note 2032) and the
+  // home's stash take spare armour, but nothing made any, and every kit lost at a death was mined and smelted again.
+  // Fable's check-in (2026-10-27 02:40Z, artifacts/fable/checkin-2026-10-27-0240Z-rekit.md): on full-5, 6 and 7 since
+  // 10-25 20:00Z, 22 kits lost, 21 of them back by the craft in the Overworld, a mean 1.4 hours a loss, 31 of about 75
+  // bot-hours; the bed kit chests held nothing. A piece worn and not yet spare, in the store or the pockets, is the
+  // rung, the most armour for its iron first; it may wait as the armour's pieces may.
+  { const spare = spareArmourOwed(bot, goal); if (spare && /overworld/.test(String(bot.game?.dimension || '')) && ready({ phase: 'spare_armour' })) return { phase: 'spare_armour', action: 'acquire', item: spare, count: 1 }; }
   // Most of the run's deaths were arrows: skeletons in the caves, crossbow
   // piglins in the Nether, and a bot that could only answer at arm's length.
   // A bow and a quiver before the portal, so a shooter at ten blocks is a
@@ -1532,4 +1550,4 @@ function rungsAhead(bot, goal = {}, planFor = null) {
   });
 }
 
-module.exports = { noteFoodTrip, settleOptIns, skipsOptional, optionalRung, optedIn, optIn, optionalRungs, levelOrder, OPT_IN_MS, rungAsideSays, portalDistance, NETHER_TRIPS, netherPaceSays, cameThrough, agoSays, asideStands, takeBackRungs, takeBackRung, pearlRouteHeld, PEARL_ROUTE_MS, portalTrip, arrivalSays, leaveNetherStep, readyForHomeStep, routeThreatsSays, netherLeaveHeld, foodTripDrives, errandStage, elsewhereStep, tallyClock, runClock, bedRung, carryBedRung, rungsAhead, timeRung, preparationRung, openRungs, rungsOpenAhead, DEFERRABLE, RUNG_BUDGET_MS, RUNG_WAIT_MS, dimension, observeProgress, watchGameProgress, verifyGameCompletion, nextGameStage, preparationStage, gameStep, asideRungs, GOING_WITHOUT };
+module.exports = { spareArmourOwed, noteFoodTrip, settleOptIns, skipsOptional, optionalRung, optedIn, optIn, optionalRungs, levelOrder, OPT_IN_MS, rungAsideSays, portalDistance, NETHER_TRIPS, netherPaceSays, cameThrough, agoSays, asideStands, takeBackRungs, takeBackRung, pearlRouteHeld, PEARL_ROUTE_MS, portalTrip, arrivalSays, leaveNetherStep, readyForHomeStep, routeThreatsSays, netherLeaveHeld, foodTripDrives, errandStage, elsewhereStep, tallyClock, runClock, bedRung, carryBedRung, rungsAhead, timeRung, preparationRung, openRungs, rungsOpenAhead, DEFERRABLE, RUNG_BUDGET_MS, RUNG_WAIT_MS, dimension, observeProgress, watchGameProgress, verifyGameCompletion, nextGameStage, preparationStage, gameStep, asideRungs, GOING_WITHOUT };

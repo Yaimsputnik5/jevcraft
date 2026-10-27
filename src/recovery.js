@@ -78,7 +78,9 @@ function recordDeath(bot, state, now = Date.now()) {
   if (bot) delete bot._stance;
   state.recovery = { status: 'pending', at: new Date(now).toISOString(), position: { ...bot.entity.position },
     dimension: bot.game.dimension, inventoryBeforeDeath: recent ? { ...observed.items } : stock(bot),
-    inventoryObservedAt: new Date(recent ? observed.at : now).toISOString(), recovered: {}, attempts: 0, dropsSeen, mobsHolding };
+    inventoryObservedAt: new Date(recent ? observed.at : now).toISOString(), recovered: {}, attempts: 0, dropsSeen, mobsHolding,
+    // What was worn too (note 2272): the inventory leaves out the armour slots, so a death in full iron read as bare.
+    worn };
 }
 
 // Restrict retrieval to observed routes: no digging, scaffolding, swimming or
