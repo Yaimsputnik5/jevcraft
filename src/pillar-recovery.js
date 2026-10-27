@@ -224,13 +224,24 @@ async function pillarUp(bot, task, targetY, { dig, maxBlocks = 40, threats = tru
       try {
         const { sourceWater, fillWaterBucket } = require('./water');
     // The source within the bucket's reach, not within two (note 2208): the pool poured three cells from the column's foot ran into it, and dragon-318 (25589, 2026-10-26 12:05 to 12:19Z) was refused the climb eight times, 'water at the feet', no source within two and no dry cell beside in the trench, stood at the foot fifteen minutes and died in the breath; dragon-301 nine refusals, 312 seven.
-        const src = bot.findBlocks({ matching: bot.registry.blocksByName.water.id, maxDistance: 5, count: 12, useExtraInfo: sourceWater }).map(p => p.floored()).filter(p => Math.abs(p.y - feet.y) <= 1 && Math.abs(p.x - feet.x) <= 3 && Math.abs(p.z - feet.z) <= 3 && feet.offset(.5, 1.62, .5).distanceTo(p.offset(.5, .5, .5)) <= 4.3).sort((a, b) => a.distanceTo(feet) - b.distanceTo(feet))[0];
-        if (src) {
-          const t0 = Date.now(); await fillWaterBucket(bot, task, src, { timeoutMs: 1500 });
-          for (let i = 0; i < 30 && /water/.test(bot.blockAt(feet)?.name || ''); i++) await new Promise(r => setTimeout(r, 50));
-          console.log(`[pillar up] water at the feet at ${feet}: the source at ${src} taken up into the bucket, the feet ${/water/.test(bot.blockAt(feet)?.name || '') ? 'still wet' : 'dry'} in ${Date.now() - t0} ms`);
+        const src = bot.findBlocks({ matching: bot.registry.blocksByName.water.id, maxDistance: 5, count: 12, useExtraInfo: sourceWater }).map(p => p.floored()).filter(p => Math.abs(p.y - feet.y) <= 1 && Math.abs(p.x - feet.x) <= 3 && Math.abs(p.z - feet.z) <= 3 && feet.offset(.5, 1.62, .5).distanceTo(p.offset(.5, .5, .5)) <= 4.3).sort((a, b) => a.distanceTo(feet) - b.distanceTo(feet));
+        // Each source in reach tried in turn, and why one was not taken said (note 2271): dragon-368 (25589, 2026-10-27
+        // 02:22Z) poured its bucket against an enderman a block over and two off its feet, the breath came, nothing was said
+        // of the scoop, the climb stopped before its first block, 'water at the feet', and it died in the cloud, 20 to none.
+        // The flow drains a level a quarter second once its source is gone: waited up to 2.5 s (dragon-367 was 'still
+        // wet in 1559 ms' and refused).
+        const tried = [];
+        for (const one of src.slice(0, 3)) {
+          try {
+            const t0 = Date.now(); await fillWaterBucket(bot, task, one, { timeoutMs: 1500 });
+            for (let i = 0; i < 50 && /water/.test(bot.blockAt(feet)?.name || ''); i++) await new Promise(r => setTimeout(r, 50));
+            console.log(`[pillar up] water at the feet at ${feet}: the source at ${one} taken up into the bucket, the feet ${/water/.test(bot.blockAt(feet)?.name || '') ? 'still wet' : 'dry'} in ${Date.now() - t0} ms`);
+            tried.length = 0; break;
+          } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; tried.push(`${one}: ${String(err.message || err).slice(0, 80)}`); }
         }
-      } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; }
+        if (tried.length) console.log(`[pillar up] water at the feet at ${feet}: no source taken up (${tried.join('; ')})`);
+        else if (!src.length) console.log(`[pillar up] water at the feet at ${feet}: no source within the bucket's reach`);
+      } catch (err) { if (['Cancelled', 'Blocked', 'NeedsAir'].includes(err.name)) throw err; console.log(`[pillar up] water at the feet: the scoop failed: ${String(err.message || err).slice(0, 120)}`); }
     }
     if (!rested && /water/.test(bot.blockAt(feet)?.name || '')) {
       const dry = directions.map(d => feet.plus(d)).find(c => { const b = bot.blockAt(c), u = bot.blockAt(c.offset(0, -1, 0)), o = bot.blockAt(c.offset(0, 1, 0)); return b && /^(air|cave_air)$/.test(b.name) && o && /^(air|cave_air)$/.test(o.name) && u?.boundingBox === 'block' && !/water|lava/.test(u.name); });
