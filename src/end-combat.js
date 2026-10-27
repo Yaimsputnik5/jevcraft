@@ -2839,6 +2839,10 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             safeFiringPosition: true, flightSeconds: trajectory.ticks / 20, dragonHealth: beforeDragon, observedHealingCrystals: crystals.length, arrowsLeft: countOf(bot, 'arrow'),
             // What the choice came to this fight (note 2200): dragon-313 (25592, 2026-10-26) chose it 90 times in 31 minutes, 19 picks ended before an arrow left the bow (the firing position unsafe, no clear trajectory, a fireball's cut), the dragon lost 10 health to the arrows in all, and the question said nothing of it each time.
             thisFight: dragonShotsSays(state, beforeDragon),
+            // The shot's reach in the record (note 2277): the dragon's health lost in the eight seconds after each pick, by the
+            // arrow's flight time, over every End trial's log kept on 2026-10-27. dragon-377 (25589, 47 minutes, no crystal left)
+            // shot from 50 to 74 blocks, 41 arrows for 16 health; stronghold-1-dragon-373 shot from 9 and 10 and took it to 18.
+            byFlight: shotFlightSays(trajectory.ticks / 20),
             // The arrows against the crystals (note 1172): one loosed at the dragon is one fewer for a crystal, and a crystal standing heals back what the arrow took.
             ...(crystals.length ? { crystalsHealIt: `${crystals.length} healing crystal${crystals.length === 1 ? '' : 's'} in view still stand${crystals.length === 1 ? 's' : ''}: each heals the dragon while it flies near, only an arrow reaches one on its pillar, and ${countOf(bot, 'arrow')} arrow${countOf(bot, 'arrow') === 1 ? ' is' : 's are'} left` } : {}), ...(wet ? { fromItsWater: wetSays() } : {}) }, run: async () => { const t = state.dragonShots ||= { chosen: 0, loosed: 0, ended: {} }; t.chosen++; const n = state.shots.length; try { await shoot(dragon); } finally { if (state.shots.length > n && state.shots.at(-1).target === 'ender_dragon') t.loosed++; else { const why = bot._shootEnded || 'ended before the shot'; t.ended[why] = (t.ended[why] || 0) + 1; } delete bot._shootEnded; save(); } },
         };
@@ -4718,6 +4722,12 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
 }
 
 // The shots at the dragon this fight, said on the option (note 2200): how often chosen, how many arrows left the bow, what the dragon lost to them, and how the other picks ended.
+const SHOT_FLIGHT_RECORD = Object.freeze([[1, 156, 120], [1.5, 70, 40], [2, 38, 18], [Infinity, 20, 0]]);
+function shotFlightSays(seconds) {
+  const band = SHOT_FLIGHT_RECORD.find(([upTo]) => seconds < upTo);
+  const [, picks, lost] = band;
+  return `This arrow flies about ${Math.round(seconds * 10) / 10} seconds to the dragon. In the record (every End trial's log on 2026-10-27, the dragon's health lost in the eight seconds after each pick): flights under a second, 156 picks for 120 health (0.8 a pick); 1 to 1.5 s, 70 for 40 (0.6); 1.5 to 2 s, 38 for 18 (0.5); 2 s or more, 20 for none. This one is in the ${seconds < 1 ? 'first' : seconds < 1.5 ? 'second' : seconds < 2 ? 'third' : 'last'} band, ${picks} picks for ${lost}.`;
+}
 function dragonShotsSays(state, dragonHealth) {
   const t = state.dragonShots || { chosen: 0, loosed: 0, ended: {} };
   const since = state.fightStartedAt || 0;
@@ -4727,4 +4737,4 @@ function dragonShotsSays(state, dragonHealth) {
   const ended = Object.entries(t.ended).sort((a, b) => b[1] - a[1]).map(([why, n]) => `${why} ${n}`).join(', ');
   return `chosen ${t.chosen} time${t.chosen === 1 ? '' : 's'} this fight: ${t.loosed} arrow${t.loosed === 1 ? '' : 's'} left the bow at the dragon and it lost ${Math.round(lost)} health in the seconds after them (its health ${dragonHealth ?? '?'} of 200 now)${t.chosen > t.loosed ? `; the other ${t.chosen - t.loosed} pick${t.chosen - t.loosed === 1 ? '' : 's'} ended before any arrow: ${ended || 'nothing recorded'}` : ''}`;
 }
-module.exports = { dragonShotsSays, cloudOverClimb, runOffSides, spanSteps, PUNCH_RECORD, punchRecordSays, dragonNearRoute, enclosed, dropOffs, leaveHighGround, voidEdge, endermenNearRoute, metadata, perched, perchedHead, repeatedCrystalMiss, observeArena, endHazards, safeEndPoint, arenaMovement, arenaRoutes, fightEndStep };
+module.exports = { shotFlightSays, dragonShotsSays, cloudOverClimb, runOffSides, spanSteps, PUNCH_RECORD, punchRecordSays, dragonNearRoute, enclosed, dropOffs, leaveHighGround, voidEdge, endermenNearRoute, metadata, perched, perchedHead, repeatedCrystalMiss, observeArena, endHazards, safeEndPoint, arenaMovement, arenaRoutes, fightEndStep };
