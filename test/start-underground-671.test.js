@@ -64,17 +64,16 @@ test('while the saved batch cooks, the walks are said in pickaxe uses against th
   assert.equal(pick, 'leave_cooking');
   assert(!offered.dig_stone, '216 cobblestone carried');
   for (const key of ['dig_in_reach', 'mine_nearby']) {
-    assert.match(offered[key], /Each block dug, ore or the rock on the way to it, wears the pickaxe a use\. Pickaxes carried: iron pickaxe \(171 uses left\)\./, key);
-    assert.match(offered[key], /72 blocks up to open sky/, key);
-    assert.match(offered[key], /No other pickaxe can be made from the pockets/, key);
+    // What the pickaxes have left is the state's, said once (note 2270).
+    assert.match(offered[key], /Each block dug, ore or the rock on the way to it, wears the pickaxe a use \(pickaxeBudget says what is left\)\./, key);
   }
   assert.match(offered.wait_here, /and wears no pickaxe\.$/);
   assert.match(offered.leave_cooking, /^Leave the 64 raw iron cooking and go on with the wood reserve \(oak log\) now: the furnace cooks on its own/);
   assert.match(offered.leave_cooking, /within 16 blocks of the furnace once it is done \(in about 11 minutes\), or after 20 minutes once the bot is within 16 blocks of it; farther off then, the walk back is offered at upkeep with its distance \(fetch_batch\), never taken unasked/);
-  assert.match(state.pickaxeBudget, /171 uses left/);
+  assert.match(state.pickaxeBudget, /Pickaxes carried: iron pickaxe \(171 uses left\)\..*72 blocks up to open sky.*No other pickaxe can be made from the pockets/);
   // Asked again after a walk, with what the walks wore.
   await whileCooking(bot, task, goal, () => {}, { cooking: 500000, oreInReach: () => null, walkTarget: () => far, what: 'raw iron', count: 50, leave, walks: 'The walks so far this batch: 3 out and back, 86 pickaxe uses worn.' });
-  assert.match(offered.mine_nearby, /The walks so far this batch: 3 out and back, 86 pickaxe uses worn\.$/);
+  assert.match(state.walksSoFar, /The walks so far this batch: 3 out and back, 86 pickaxe uses worn\.$/);
   // Not offered with no batch left over from before (leave null).
   await whileCooking(bot, task, goal, () => {}, { cooking: 640000, oreInReach: () => ore, walkTarget: () => far, what: 'raw iron', count: 64 });
   assert(!offered.leave_cooking);

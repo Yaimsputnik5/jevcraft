@@ -98,15 +98,15 @@ test('with no mob about the cook says nothing of them; at full hunger and health
 test('every option of the batch that cooks says who is coming while the bot is at the furnace', async () => {
   const { whileCooking } = require('../src/work');
   const bot = scene();
-  let offered;
-  const task = { check() {}, opportunityClient: { systemOne: async ({ questions }) => { offered = questions.branch_0.criteria; return { answers: { branch_0: { choice: 'wait_here', confidence: 0.5 } } }; } } };
+  let offered, state;
+  const task = { check() {}, opportunityClient: { systemOne: async ({ questions, state: st }) => { offered = questions.branch_0.criteria; state = st; return { answers: { branch_0: { choice: 'wait_here', confidence: 0.5 } } }; } } };
   const args = { cooking: 70000, oreInReach: () => null, walkTarget: () => new Vec3(4.5, 53, 0.5), what: 'mutton', count: 7 };
   bot.blockAt = p => ({ name: p.y < 53 ? 'stone' : 'coal_ore', position: p.floored(), boundingBox: 'block' });
   assert.equal(await whileCooking(bot, task, {}, () => {}, args), 'wait_here');
-  for (const key of ['mine_nearby', 'wait_here']) {
-    assert.match(offered[key], /Standing at or near the furnace for those 70 seconds with 2 hostile mobs/, key);
-    assert.match(offered[key], /The work is stopped when one of them comes within eight blocks in sight or lands a hit\.$/, key);
-  }
+  // Said once, in the state (note 2270), not on each way.
+  assert.match(state.standingAmong, /Standing at or near the furnace for those 70 seconds with 2 hostile mobs/);
+  assert.match(state.standingAmong, /the work is stopped when one of them comes within eight blocks in sight or lands a hit\.$/);
+  for (const key of ['mine_nearby', 'wait_here']) assert.doesNotMatch(offered[key], /Standing at or near the furnace/, key);
 });
 
 test('a price that leaves less health than one blow is said to be a coin toss', () => {

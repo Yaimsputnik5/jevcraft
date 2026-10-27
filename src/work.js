@@ -3453,7 +3453,8 @@ async function whileCooking(bot, task, goal, save, { cooking, oreInReach, walkTa
   if (goal?.kind === 'win' && bot.game?.gameMode !== 'creative' && bot.inventory.items().some(i => /_pickaxe$/.test(i.name))) {
     try { budget = require('./pickaxe-budget').pickaxeBudget(bot, goal); } catch (_) { budget = null; }
   }
-  const wear = budget ? ` Each block dug, ore or the rock on the way to it, wears the pickaxe a use. ${budget.says}${walks ? ` ${walks}` : ''}` : '';
+  // What the pickaxes have left is the state's (pickaxeBudget, walksSoFar), said once (note 2270): each way digging says only that it wears one.
+  const wear = budget ? ' Each block dug, ore or the rock on the way to it, wears the pickaxe a use (pickaxeBudget says what is left).' : '';
   const near = oreInReach();
   if (near) tree.dig_in_reach = { description: `Dig the ${String(bot.blockAt(near)?.name || 'ore').replaceAll('_', ' ')} within arm's reach of the furnace, and any more there.${wear}` };
   // A walk only where there and back fits in the cooking, at a walk.
@@ -3487,12 +3488,13 @@ async function whileCooking(bot, task, goal, save, { cooking, oreInReach, walkTa
   // Each of them keeps the bot at or near the furnace for the batch, among
   // the mobs about (note 628).
   const among = require('./risk').standingAmong(bot, seconds, { what: 'at or near the furnace' });
-  if (among) for (const node of Object.values(tree)) node.description += ` ${among.says} The work is stopped when one of them comes within eight blocks in sight or lands a hit.`;
+  // Said once, in the state (note 2270), not on each way alike.
+  const amongSays = among ? `${among.says} Whatever is chosen keeps the bot at or near the furnace; the work is stopped when one of them comes within eight blocks in sight or lands a hit.` : null;
   for (const key of spent) delete tree[key];
   if (Object.keys(tree).length < 2) return null;
   try {
     const decision = await decide('while_cooking', { client, bot, task, goal, save, tree, state: { cooking: `${count} ${what}`, seconds, inventoryFreeSlots: bot.inventory.emptySlotCount?.() ?? null, timeOfDay: bot.time?.timeOfDay,
-      ...(budget ? { pickaxeBudget: budget.says } : {}), ...(walks ? { walksSoFar: walks } : {}), ...(leave ? { workInHand: leave.work } : {}), ...(ownState ? { leaveCooking: ownState } : {}), ...(sides ? { sideFurnaces: `${sides.count} more in ${sides.furnaces} beside` } : {}),
+      ...(budget ? { pickaxeBudget: budget.says } : {}), ...(walks ? { walksSoFar: walks } : {}), ...(leave ? { workInHand: leave.work } : {}), ...(ownState ? { leaveCooking: ownState } : {}), ...(sides ? { sideFurnaces: `${sides.count} more in ${sides.furnaces} beside` } : {}), ...(amongSays ? { standingAmong: amongSays } : {}),
       threats: (() => { try { return require('./danger').threats(bot, 16).slice(0, 6).map(t => ({ name: t.entity.name, distance: Math.round(t.distance), visible: t.visible })); } catch (_) { return []; } })(), riskNow: (() => { try { return require('./risk').riskNow(bot); } catch (_) { return null; } })() } });
     if (decision.stale) return null;
     return decision.path.at(-1);
