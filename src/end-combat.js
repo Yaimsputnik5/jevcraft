@@ -2245,7 +2245,13 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
           // Two thick is enough (note 2237): each block is dug only with a solid one under it, and the void within four is refused apart. 25592's stronghold-1-dragon-335 (2026-10-26 16:56Z) stood at (30, 61, -22) by its column's foot with one cloud at the feet and another a block over them, 'no dig under the cloud ... the ground under the feet is not four thick', and the one block up went into the upper cloud, 14 to 9 to none.
           const thick1 = [1, 2].every(dy => bot.blockAt(f1.offset(0, -dy, 0))?.boundingBox === 'block');
           const need = Math.min(2, Math.max(1, Math.ceil(bot.entity.position.y + 1.9 - cloudOver.position.y)));
-          if (thick1 && voidEdge(bot, bot.entity.position, 4) === null) {
+          // Not down into another cloud (note 2276): the cell dug down to has to be clear of every cloud's box (half a block
+          // high, from its base). stronghold-1-dragon-372 (25589, 2026-10-27 04:18Z) had one cloud at its feet and another a
+          // block over them: up one out of the first, down one under the second into the first, four times, 14.1 to 2.3, dead.
+          const downTo = bot.entity.position.y - need;
+          const cloudBelow = Object.values(bot.entities).find(e => e.name === 'area_effect_cloud' && e.isValid !== false && e !== cloudOver && e.position.y >= downTo - 0.5 && e.position.y <= downTo + 1.8 && Math.hypot(bot.entity.position.x - e.position.x, bot.entity.position.z - e.position.z) <= cloudRadius(bot, e) + 0.5) || null;
+          if (cloudBelow && !(state.cloudBelowSaid > Date.now() - 5000)) { state.cloudBelowSaid = Date.now(); console.log(`[end combat] no dig under the cloud over the feet at ${f1}: another cloud lies at ${cloudBelow.position.floored()}, where the body would come down to`); }
+          if (thick1 && !cloudBelow && voidEdge(bot, bot.entity.position, 4) === null) {
             goal.step = { action: 'down_under_the_cloud', health: bot.health, need }; save();
             const h0 = bot.health, t0 = Date.now();
             console.log(`[end combat] under the cloud over the feet at ${f1}: the cloud's base ${Math.round((cloudOver.position.y - bot.entity.position.y) * 10) / 10} over the feet, ${need} dug down to put the body under it, ${bot.health.toFixed(1)} health`);
@@ -2254,7 +2260,7 @@ async function fightEndStep(bot, task, goal, save, actions, client, { shot = sho
             console.log(`[end combat] under the cloud: ${dug} of ${need} dug down in ${Date.now() - t0} ms, now at ${bot.entity.position.floored()}, ${h0.toFixed(1)} to ${bot.health.toFixed(1)} health${inBreath() ? ', still in it' : ''}`);
             // Back to the top after a block dug (note 2241): the branches below read the body's old cell. 25592's dragon-337 (2026-10-26 17:11Z) dug one under a cloud two over its feet, a fresh fireball's cloud landed at its new feet during the dig, and the run and stub branches that followed judged from the old cell ('no run out of the cloud from a pit', the stub refused), 15 to 9 to none; read fresh, the cloud a block over the feet is one more block dug.
             if (dug) return;
-          } else if (!(state.underCloudSaid > Date.now() - 5000)) { state.underCloudSaid = Date.now(); console.log(`[end combat] no dig under the cloud over the feet at ${f1}: ${thick1 ? 'the void within four' : 'the ground under the feet is not two thick'}`); }
+          } else if (!cloudBelow && !(state.underCloudSaid > Date.now() - 5000)) { state.underCloudSaid = Date.now(); console.log(`[end combat] no dig under the cloud over the feet at ${f1}: ${thick1 ? 'the void within four' : 'the ground under the feet is not two thick'}`); }
         }
         if (inBreath() && blocksCarried(bot) >= 1 && !onObsidianTop() && !stubEdge && !ballClose && !cloudOver) {
           goal.step = { action: 'up_out_of_breath_first', health: bot.health }; save();
