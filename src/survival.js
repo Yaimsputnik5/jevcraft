@@ -5039,10 +5039,19 @@ class Survival {
         // (It was priced with those at arm's length reaching on through the
         // fifteen seconds: 25597 at 10:37:16Z read the cap at 68.8 damage,
         // 'Capped, the enderman still reaches it', and took it at 0.08.)
-        const capCost = stanceCost({ mobs: mobs.filter(m => m.name === 'enderman'), setup: plan.seconds, reaches: () => false });
+        // The sides an enderman can stand at, beside the capped cell (note 2279): it cannot come under the lid, but one
+        // standing in a cell beside with room for its 2.9 height reaches the body from there. The price had none reach
+        // once capped, and the option said 'none still about can ever land a hit': full-6 (25596, 2026-10-27 07:47Z), out
+        // of its slot stalking with seven endermen within four, took cap_fight at 0.51, 'more damage than priced (6.6 of
+        // 12.6 gone in 7.1 s)', and was slain; forest-8 (note 2266) the same.
+        const capCell = plan.kind === 'gap' ? plan.cell.floored() : feet;
+        const passable = c => { const b = bot.blockAt(c); return !!b && b.boundingBox !== 'block' && !/lava|fire/.test(b.name); };
+        const standSides = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => { const c = capCell.offset(dx, 0, dz); return [0, 1, 2].every(dy => passable(c.offset(0, dy, 0))) && bot.blockAt(c.offset(0, -1, 0))?.boundingBox === 'block'; }).length;
+        const capCost = stanceCost({ mobs: mobs.filter(m => m.name === 'enderman'), setup: plan.seconds, ...(standSides ? {} : { reaches: () => false }) });
+        const sidesSays = standSides ? ` But ${standSides} of the four cells beside it ${standSides === 1 ? 'has' : 'have'} room for an enderman to stand (three high, a floor under it), and one standing there reaches the body: the lid keeps them from coming in, not from striking from beside.` : ' No cell beside it has room for an enderman to stand, so none reaches it there.';
         const stepWords = plan.kind === 'here' ? 'Already under a two-high ceiling here' : plan.kind === 'gap' ? `Step ${plan.blocks === 0 && plan.cell.distanceTo(feet) < 1.5 ? 'onto' : 'into'} a two-high gap already ${Math.round(plan.cell.distanceTo(feet))} block${Math.round(plan.cell.distanceTo(feet)) === 1 ? '' : 's'} off` : 'Place one block above the bot\'s own head, capping the space here at two blocks high';
-        options.cap_fight = { ...(plan.kind !== 'here' ? { expects: { damage: capCost.damage, seconds: capCost.seconds, oneHit } } : {}),
-          description: `${stepWords}: an enderman cannot path into a cell that low, so once the lid is up none still about can ever land a hit, and the sword goes on reaching its legs from here.` + (plan.kind === 'place' ? buildCost : '') + (plan.kind === 'here' ? '' : costSays(capCost, bot.health, mobs, { doing: plan.kind === 'place' ? 'placing the lid' : 'stepping in', done: 'Capped' })) + (danger.length > 1 ? ` ${danger.length} endermen about; capped, they are taken one at a time, whichever is struck.` : ''),
+        options.cap_fight = { ...(plan.kind !== 'here' || standSides ? { expects: { damage: capCost.damage, seconds: capCost.seconds, oneHit } } : {}),
+          description: `${stepWords}: an enderman cannot path into a cell that low, and the sword goes on reaching its legs from here.${sidesSays}` + (plan.kind === 'place' ? buildCost : '') + (plan.kind === 'here' ? '' : costSays(capCost, bot.health, mobs, { doing: plan.kind === 'place' ? 'placing the lid' : 'stepping in', done: 'Capped' })) + (danger.length > 1 ? ` ${danger.length} endermen about; capped, they are taken one at a time, whichever is struck.` : ''),
           run: async () => {
             this.report(goal, save, { action: 'cap_overhead', kind: plan.kind, blocks: plan.blocks, threats: danger.map(t => t.entity.name).slice(0, 4), health: bot.health, stance: true });
             if (!await roof.takeRoof(bot, task, this.actions, plan)) { this.state.failWhy = plan.why || 'the roof was not taken'; return false; }
