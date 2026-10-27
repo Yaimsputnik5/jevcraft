@@ -64,7 +64,8 @@ test('the errand set aside and every detour resting: the stall\'s question is as
     assert.equal(asked.length, 1, `round ${round}: asked, not escalated round again unasked`);
     assert.match(asked[0].state.nothingAbove || '', /^The errand is set aside, and a rung set aside is not brought to its own question while it waits: nothing above this question is asked/);
     assert(asked[0].options.until_rest_ends && asked[0].options.differently, 'every way stays on offer');
-    assert.match(JSON.stringify(asked[0].options.differently), /It rests .* more from here/, 'with its rest said');
+    // Said once in the state where every way rests alike (note 2268).
+    assert.match(JSON.stringify([asked[0].state.triedHere, asked[0].options.differently]), /It rests .* more from here/, 'with its rest said');
     assert.notEqual(bot._stalls?.stall?.escalated?.to, 'rung_progress', 'no escalation to a question that is not asked');
   }
   assert.equal((goal.tried.escalations || []).filter(e => e.to === 'rung_progress').length, 0);

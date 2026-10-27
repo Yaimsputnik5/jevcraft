@@ -192,7 +192,7 @@ const SHIELD_ASKS = new Set(['encounter_stance', 'shot_answer', 'hunt_target', '
 // ways health could come back, each with its cost (healing.js, note 607).
 const WITHOUT_FOOD = 'withoutFood: health does not come back here; tripBackForFood is the way back through the portal for food; hoglinHunt, the one food of the Nether.';
 const AGAIN = 'sameAnswerAgain, lastAnswersCameToNothing and answersThatCameToNothing are this question\'s recent answers that came to nothing; the same answer again seldom ends differently.';
-const LEDGER = 'An option tried from about here lately says how it ended; waysResting are options left out after coming to nothing here, and when they come back; whatFailedBelow is what the question below tried and why it ended.';
+const LEDGER = 'An option tried from about here lately says how it ended; triedHere, when present, is that said once for every option alike; waysResting are options left out after coming to nothing here, and when they come back; whatFailedBelow is what the question below tried and why it ended.';
 const LEAST_BAD = 'leastBadLast: at this question\'s last asking Jev said none of its options was good; it says what was taken as the least bad and what came of it.';
 const LAST_HIT = 'lastHit: one hit ends the bot and only food brings health back.';
 const AT_ONCE = 'failedAtOnce: answers chosen a moment ago whose action ended within two seconds, and why; each rests from where it was chosen.';
@@ -805,6 +805,8 @@ async function decide(id, { client, bot, task, goal, save = () => {}, tree, stat
     keptBesideLeave = read.keptBesideLeave || [];
     if (read.allResting && spec.parent !== undefined && spec.parent !== null) escalateFrom(bot, goal, spec, `every way it had from here rests: ${read.resting.join('; ')}`, { until: read.until });
     tree = read.tree;
+    // A note on the question's own place, said once (note 2268).
+    if (read.placeSays) state = { ...(state || {}), triedHere: read.placeSays };
     if (read.resting.length) resting = read.resting;
     // Kept on offer with nothing above to ask, each says its own rest.
     // Kept on offer with nothing above to ask, each says its own rest; one

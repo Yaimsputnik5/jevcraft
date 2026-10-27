@@ -434,7 +434,24 @@ function leafAt(tree, key) {
 // later the pocket's question offered leave and three hunts only. Jev
 // answered none good, leave was taken in stay's place (note 1205's calm
 // answer gone from the list), and the zombies had it 27 seconds later.
-function read(bot, goal, q, tree, { target = null, sayOnly = false, leave = null, kept = null, now = Date.now() } = {}) {
+// The past tries said where they bear (note 2268; the user, 2026-10-27: the facts that hold for every way belong in the question's
+// state): a note about the question's own target, which every option without a target of its own would carry alike ('Tried 2 times
+// toward the same place from about here ... came to nothing', 45% of empty_spawner's option text), is returned as `placeSays` for
+// the state, said once; options with a target of their own, or notes that differ, keep theirs.
+function read(bot, goal, q, tree, opts = {}) {
+  const pending = new Map();
+  const out = readEach(bot, goal, q, tree, { ...opts, pending });
+  if (!pending.size) return out;
+  // Said once only when every way still on offer without a target of its own says it, and alike: a way not tried has no note.
+  const ways = leavesOf(out.tree).filter(({ key, node }) => key !== 'none_good' && !P(node?.target)).map(({ key }) => key);
+  const notes = [...new Set(ways.map(k => pending.get(k)))];
+  if (ways.length >= 2 && notes.length === 1 && notes[0]) return { ...out, placeSays: notes[0] };
+  // Not one note for all: each goes back on its own option.
+  const put = (t, path = []) => { if (!t || typeof t !== 'object') return t; const o = {}; for (const [k, v] of Object.entries(t)) { const key = [...path, k].join('/'); const said = pending.get(key) || pending.get(k); o[k] = said && v && typeof v === 'object' && !v.children ? addSays(v, said) : (v?.children ? { ...v, children: put(v.children, [...path, k]) } : v); } return o; };
+  return { ...out, tree: put(out.tree) };
+}
+
+function readEach(bot, goal, q, tree, { target = null, sayOnly = false, leave = null, kept = null, now = Date.now(), pending = null } = {}) {
   const here = P(bot?.entity?.position);
   // The walks' stall memory bears too (failed-places.js, note 777).
   if (!goal || (!goal.tried?.entries?.length && !bot?._stallSpots?.length && !bot?._walks?.length) || !here) return { tree, resting: [], allResting: false };
@@ -467,16 +484,21 @@ function read(bot, goal, q, tree, { target = null, sayOnly = false, leave = null
     }
     if (place && place.until > now) {
       const both = [said, place.says].filter(Boolean).join(' ');
-      resting.push({ key, until: place.until, held: false, wait: false, place: place.kind, said: both, says: `${label(key)}: ${both} It rests ${ago(place.until - now)} more from here.` });
+      resting.push({ key, own: !!own, until: place.until, held: false, wait: false, place: place.kind, said: both, says: `${label(key)}: ${both} It rests ${ago(place.until - now)} more from here.` });
       nodes.set(key, node); continue;
     }
     // Held by the repeat rule (decisions/repeats.js), and still held.
     const held = blockedOf(list).some(e => e.held && e.until > now);
-    if (until) { resting.push({ key, until, held, wait: blockedOf(list).every(e => e.wait), said, says: `${label(key)}: ${said} It rests ${ago(until - now)} more from here.` }); nodes.set(key, node); continue; }
+    if (until) { resting.push({ key, own: !!own, until, held, wait: blockedOf(list).every(e => e.wait), said, says: `${label(key)}: ${said} It rests ${ago(until - now)} more from here.` }); nodes.set(key, node); continue; }
+    // A note about the question's own target, the option naming none of its own (note 2268): held back here, and said once in
+    // the question's state when every such option would say it alike.
+    if (said && pending && !own) { pending.set(key, said); nodes.set(key, node); continue; }
     nodes.set(key, said ? addSays(node, said) : node);
   }
   if (!resting.length) return { tree: listedLast(rebuilt(tree, nodes), lastListed), resting: [], allResting: false };
   const isResting = k => resting.some(r => r.key === k);
+  // A rest said on a way naming no target of its own goes the way of the note above (note 2268).
+  const sayRest = (r, text) => { if (pending && !r.own) pending.set(r.key, text); else nodes.set(r.key, addSays(nodes.get(r.key), text)); };
   const onOffer = () => [...nodes.keys()].filter(k => nodes.get(k) && k !== 'none_good');
   // Every way resting with nothing above to ask stays on offer, each with
   // its rest said (note 609), but not an answer the repeat rule holds while
@@ -488,7 +510,7 @@ function read(bot, goal, q, tree, { target = null, sayOnly = false, leave = null
   const allResting = ({ say }) => {
     const heldOut = resting.some(r => !r.held && nodes.get(r.key)) ? resting.filter(r => r.held && nodes.get(r.key)) : [];
     for (const r of heldOut) nodes.delete(r.key);
-    if (say) for (const r of resting) if (nodes.get(r.key)) nodes.set(r.key, addSays(nodes.get(r.key), `${r.said} It rests ${ago(r.until - now)} more from here.`));
+    if (say) for (const r of resting) if (nodes.get(r.key)) sayRest(r, `${r.said} It rests ${ago(r.until - now)} more from here.`);
     return { tree: rebuilt(tree, nodes), resting: resting.map(r => r.says), allResting: true, until: Math.min(...resting.map(r => r.until)), heldOut: heldOut.map(r => r.says) };
   };
   const ways = resting.filter(r => !r.wait), waits = resting.filter(r => r.wait);
@@ -508,9 +530,9 @@ function read(bot, goal, q, tree, { target = null, sayOnly = false, leave = null
   const others = () => onOffer().filter(k => !isResting(k)).length;
   for (const r of waits) {
     if (others() >= 2) { nodes.delete(r.key); left.push(r); continue; }
-    nodes.set(r.key, addSays(nodes.get(r.key), `${r.said} It rests ${ago(r.until - now)} more from here, kept on offer: fewer than two other ways are open.`));
+    sayRest(r, `${r.said} It rests ${ago(r.until - now)} more from here, kept on offer: fewer than two other ways are open.`);
   }
-  for (const r of resting) if (!left.includes(r) && !waits.includes(r) && nodes.get(r.key)) nodes.set(r.key, addSays(nodes.get(r.key), `${r.said} It rests ${ago(r.until - now)} more from here.`));
+  for (const r of resting) if (!left.includes(r) && !waits.includes(r) && nodes.get(r.key)) sayRest(r, `${r.said} It rests ${ago(r.until - now)} more from here.`);
   if (!sayOnly && !left.length && !onOffer().some(k => !isResting(k))) return allResting({ say: false });
   return { tree: listedLast(rebuilt(tree, nodes), lastListed), resting: left.map(r => r.says), allResting: false };
 }

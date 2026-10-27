@@ -71,7 +71,8 @@ test('mid-242-bb: at a question with nothing above and every way resting, the he
   const tree = { keep_at_it: { description: 'Keep at the obtain blaze rods as it is going.' }, work_free: { description: 'Work free of the terrain one move at a time.' }, until_rest_ends: { description: 'Other work for the 1 minute until the first of the fortress leg\'s ways comes off its rest here.' } };
   await decide('rung_progress', { client, bot, goal, tree, state: { stalled: { what: 'obtain blaze rods' } } });
   assert.deepEqual(said.keys.sort(), ['until_rest_ends', 'work_free'], 'keep at it is not offered again');
-  assert.match(JSON.stringify(said.questions), /Work free.*It rests \d+ minutes? more from here/, 'the ways kept say their rests');
+  // The rest the kept ways share is said once in the state (note 2268), or on each way where it differs.
+  assert.match(JSON.stringify([said.state.triedHere, said.questions]), /It rests \d+ minutes? more from here/, 'the ways kept say their rests');
   assert.match(said.state.waysResting.join(' '), /^keep at it: Tried once from here .*It rests 5 minutes more from here\.$/);
   // Every way held: all stay on offer, each with its rest said (note 609), nothing left to ask otherwise.
   const allHeld = { kind: 'win', step: { action: 'find_fortress' }, gameProgress: { phase: 'obtain_blaze_rods' } };
