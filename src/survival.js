@@ -5744,6 +5744,24 @@ class Survival {
         run: async () => { this.report(goal, save, { action: 'out_of_water', threats: danger.map(t => t.entity.name).slice(0, 4), health: bot.health, air: bot.oxygenLevel, hiddenBank: banks.hidden });
           return !!await reachShore(bot, task, goal, save, { move: this.actions.navigate, client: this.client, dig: this.actions.dig, fight: danger }); } };
     }
+    // The boat carried, from the water, in the fight too (note 2278): reachShore offers it only with no mob about (its
+    // `!fight`), so a swim under a drowned's tridents never had it. full-6 (25596) carried an oak boat at four drowned
+    // deaths in twelve hours, each in open water on the way to a shore, three in full iron; the last (2026-10-27 06:44Z)
+    // took retreat, get_out_of_water, pillar and shield_the_tridents in two minutes of swimming and died at 2 health.
+    if (options.get_out_of_water && !String(bot.game?.dimension || '').includes('nether')) {
+      try {
+        const boats = require('./boats');
+        if ((bot.inventory?.items?.() || []).some(i => boats.boatItem(i.name)) && !bot.vehicle) {
+          const feet = bot.entity.position.floored();
+          let waterY = feet.y; while (waterY < feet.y + 16 && /water/.test(bot.blockAt(new Vec3(feet.x, waterY + 1, feet.z))?.name || '')) waterY++;
+          const tridents = danger.filter(t => t.entity.name === 'drowned').length;
+          options.boat_away = { description: `Place the carried boat on the water's top beside the bot and board it, about a second, then paddle it to the nearest landing a boat can reach and step off there: a boat on open water goes about eight blocks a second against a swim's ${SWIM} blocks a second, the body sits out of the water, and the boat is picked up again at the landing.${tridents ? ` A drowned's trident still reaches a body in a boat; ${tridents === 1 ? 'the drowned here swims' : `the ${tridents} drowned here swim`} after it, slower than the boat.` : ''}`,
+            run: async () => { this.report(goal, save, { action: 'boat_away', threats: danger.map(t => t.entity.name).slice(0, 4), health: bot.health });
+              const { dryStanding } = require('./mining-access');
+              return (await boats.boatFromWater(bot, task, goal, save, { waterY, client: this.client, ask: false, accept: q => dryStanding(bot, q) })) === 'landed'; } };
+        }
+      } catch (_) {}
+    }
     // Priced as every other stance is: the seconds of drawing standing
     // still, everything about reaching the bot meanwhile, then only what
     // else still shoots. Without a number beside the others' numbers the
